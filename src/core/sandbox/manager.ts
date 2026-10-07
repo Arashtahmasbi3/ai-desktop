@@ -133,6 +133,7 @@ export class SandboxManagerImpl implements SandboxManager {
         networkEnabled,
         env
       })
+      handle.ownsWorkspace = ownsWorkspace
 
       const timestamp = this.now()
       const info: SandboxInfo = {

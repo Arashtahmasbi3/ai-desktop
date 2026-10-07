@@ -10,7 +10,7 @@ connect to DeepSeek API, VPS servers (SSH), GitHub (Git), and the local desktop 
 **Repository**: https://github.com/Arashtahmasbi3/ai-desktop (private, independent).
 Default branch `master`; remote `origin` tracks it. Push after every committed change.
 
-Current state: **Stage 5 — context & state management**. Stage 1 skeleton (Electron + React 18 +
+Current state: **Stage 9 — packaging & release (v0.1.0)**. Stage 1 skeleton (Electron + React 18 +
 TypeScript), Stage 2 LLM adapters (OpenAI/Anthropic/DeepSeek/Google), Stage 3 code-execution
 sandbox and Stage 4 `AgentOrchestrator` (Planning → Execution → Observation → Reflection loop,
 loop detection, failure recovery) are in place. Stage 5 adds context/state management:
@@ -18,6 +18,17 @@ token estimation with automatic history compaction at 80% of the budget, a conte
 that strips code comments/blank lines and dedupes blocks, an on-disk JSON `SessionStore` with
 schema migration, and a `Persistence` layer that encrypts API keys (Electron `safeStorage` in
 the app) and resolves the AppData path. The chat UI, SSH and Git come next.
+
+Since then the renderer UI landed (chat with Markdown + streaming, tasks/logs, workspace
+file explorer + code viewer with syntax highlighting/diff, settings, status bar), along with
+a background worker queue and a localhost remote-access server, all wired through
+`src/main/ipc.ts` + `src/main/app-services.ts`. Stage 8 adds `test/e2e/`: integration
+coverage that drives the real local sandbox with a scripted LLM boundary — create/run a
+project, file change + renderer diff, session save/resume, and the failure paths (API
+cut/fallback, unavailable sandbox, transient sandbox retry, path escape, context overflow)
+plus performance/leak guards. Stage 9 packages the app for Windows (NSIS installer + portable
+exe, icon and version metadata), optimizes the production build (minify/tree-shake, no shipped
+`node_modules`) and adds `CHANGELOG.md` / `CONTRIBUTING.md`; release is `v0.1.0`.
 
 ## Tech stack
 
@@ -36,7 +47,9 @@ the app) and resolves the AppData path. The chat UI, SSH and Git come next.
 | `npm run build` | Build main/preload/renderer into `out/` |
 | `npm run typecheck` | Type-check node + web projects |
 | `npm test` | Run Vitest once (`npm run test:watch` to watch) |
-| `npm run build:win` | Build + package a Windows NSIS installer into `release/` |
+| `npm run test:e2e` | Run only the end-to-end suite in `test/e2e/` |
+| `npm run pack` | Build an unpacked app with electron-builder into `release/` |
+| `npm run build:win` | Build + package a Windows NSIS installer + portable exe into `release/` |
 
 ## Structure
 
@@ -118,6 +131,14 @@ test/                    Vitest tests (adapters use a mocked fetch boundary)
 - Sandbox tests: command-execution and file round-trips run for real against the local
   driver; the Docker driver is tested deterministically with an injected `CommandRunner`
   (asserting exact CLI flags), and real Docker integration is gated on daemon availability.
+- Sandbox workspace ownership: `SandboxManagerImpl` records whether it created the workspace.
+  A caller-supplied `workspaceRoot` (e.g. the active project) must survive `destroySandbox`;
+  only auto-created workspaces are deleted. The flag is passed to drivers as
+  `SandboxHandle.ownsWorkspace` — honour it in any new driver so project files are never
+  removed on teardown.
+- End-to-end tests live in `test/e2e/` and drive the real local sandbox with a scripted
+  `BaseLLMAdapter` (only the LLM boundary is faked). Keep them deterministic — no network,
+  no Docker — so they run in CI everywhere.
 - Agent orchestration goes through `AgentOrchestrator` (`src/core/agent-orchestrator.ts`).
   It owns the Planning → Execution → Observation → Reflection loop and is the only place
   that drives an adapter and a sandbox together. Tool calls are turned into `AgentAction`s
@@ -146,6 +167,22 @@ test/                    Vitest tests (adapters use a mocked fetch boundary)
 - Keep the Content-Security-Policy in `src/renderer/index.html` in sync with any new
   external resource (fonts, network calls to the DeepSeek API, etc.).
 
+## Packaging
+
+- Config lives in `electron-builder.yml` (referenced by `npm run build:win` / `npm run pack`).
+  Windows x64, NSIS installer + portable exe, icon in `build/icon.ico` / `build/icon.png`.
+- `dependencies` is intentionally **empty**: the renderer is fully bundled by Vite and
+  main/preload only use Electron + Node built-ins. Keep new runtime deps bundled (add to
+  `devDependencies`) so `node_modules` never ships inside the app. `files` packages only
+  `out/` + `package.json`.
+- Production build is minified/tree-shaken via `optimizeBuild` in `electron.vite.config.ts`
+  (esbuild minify, no source maps, `debugger` dropped). Don't turn minify off for releases.
+- Code signing is automatic when `CSC_LINK`/`CSC_KEY_PASSWORD` (or an OS cert) are present;
+  absent that the build is unsigned and must not fail (`forceCodeSigning: false`).
+- Building the Windows targets on Linux/macOS requires **wine** (electron-builder uses it to
+  patch the exe/installer resources). Without wine the NSIS step fails with `spawn wine ENOENT`.
+  The `win-unpacked/` app is still produced, which is enough for a smoke test.
+
 ## Environment notes
 
 - Target runtime is Windows (NSIS). `electron-builder.yml` currently targets `win`/`nsis`.
@@ -160,3 +197,19 @@ test/                    Vitest tests (adapters use a mocked fetch boundary)
   Never ship that flag in production.
 - Some hardened npm setups skip dependency install scripts, leaving Electron without its
   binary. If `node_modules/electron/path.txt` is missing, run `node node_modules/electron/install.js`.
+
+### Verifying the running renderer
+
+- `npm run dev -- --noSandbox --remoteDebuggingPort 9223` exposes Chrome DevTools Protocol on
+  `http://127.0.0.1:9223/json`. Drive it with a CDP WebSocket client (Python `websockets` works)
+  to read `document.body.innerText` and click real buttons — this is the fastest way to confirm
+  what the Electron window actually renders without a human looking at it.
+- Screenshots: `DISPLAY=:99 XAUTHORITY=<xvfb-run auth file> import -window root artifacts/ui.png`
+  (the Xauthority path is in the `Xvfb` process line; `artifacts/` is git-ignored).
+- Gotcha: editing two nearby regions of one file in quick succession can leave Vite's transform
+  cache stale; the dev server then serves a module that references a symbol whose import was
+  only added in the second write, and React unmounts the tree with a `ReferenceError`, leaving a
+  blank window. `location.reload()` may not fix it — restart `electron-vite dev` (and delete
+  `node_modules/.vite` if needed) and re-check.
+- Render errors unmount the whole React tree, so panels are wrapped in `ErrorBoundary`
+  (`src/renderer/src/components/ErrorBoundary.tsx`); keep new panels inside one.

@@ -31,6 +31,7 @@ export interface ProviderSettings {
 export interface AppSettings {
   version: number
   activeProvider?: ProviderId
+  activeProjectId?: string
   providers: Partial<Record<ProviderId, ProviderSettings>>
   projects: ProjectRecord[]
   updatedAt: number
@@ -123,6 +124,7 @@ export async function migrateSettings(
 
   // v1 (current).
   if (typeof raw.activeProvider === 'string') next.activeProvider = raw.activeProvider as ProviderId
+  if (typeof raw.activeProjectId === 'string') next.activeProjectId = raw.activeProjectId
   if (isRecord(raw.providers)) {
     for (const [key, value] of Object.entries(raw.providers)) {
       if (!isRecord(value)) continue
@@ -155,6 +157,7 @@ export interface RedactedProviderSettings {
 export interface RedactedSettings {
   version: number
   activeProvider?: ProviderId
+  activeProjectId?: string
   providers: Partial<Record<ProviderId, RedactedProviderSettings>>
   projects: ProjectRecord[]
 }
@@ -230,6 +233,7 @@ export class Persistence {
     return {
       version: this.settings.version,
       ...(this.settings.activeProvider ? { activeProvider: this.settings.activeProvider } : {}),
+      ...(this.settings.activeProjectId ? { activeProjectId: this.settings.activeProjectId } : {}),
       providers,
       projects: this.settings.projects
     }
@@ -272,10 +276,26 @@ export class Persistence {
     await this.persist()
   }
 
+  async setActiveProject(id: string | undefined): Promise<void> {
+    await this.load()
+    if (id === undefined) {
+      delete this.settings.activeProjectId
+    } else {
+      this.settings.activeProjectId = id
+    }
+    await this.persist()
+  }
+
+  getActiveProject(): ProjectRecord | undefined {
+    const id = this.settings.activeProjectId
+    return id ? this.settings.projects.find((project) => project.id === id) : undefined
+  }
+
   async addProject(name: string, path: string): Promise<ProjectRecord> {
     await this.load()
     const project: ProjectRecord = { id: this.idFactory(), name, path, createdAt: this.now() }
     this.settings.projects.push(project)
+    this.settings.activeProjectId = project.id
     await this.persist()
     return project
   }
@@ -285,6 +305,9 @@ export class Persistence {
     const before = this.settings.projects.length
     this.settings.projects = this.settings.projects.filter((project) => project.id !== id)
     if (this.settings.projects.length === before) return false
+    if (this.settings.activeProjectId === id) {
+      this.settings.activeProjectId = this.settings.projects[0]?.id
+    }
     await this.persist()
     return true
   }

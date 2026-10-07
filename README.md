@@ -3,20 +3,31 @@
 An Electron desktop AI assistant — a local, Codex-like companion that connects to the
 DeepSeek API, VPS servers (SSH), GitHub (Git), and your local files.
 
-> Status: **Stage 5 — context & state management**. The app ships a provider-agnostic LLM
-> abstraction (OpenAI, Anthropic, DeepSeek, Google), a sandboxed code-execution layer
-> (`SandboxManager`: Docker-backed by default with local/Windows fallbacks), an
-> `AgentOrchestrator` that runs the Planning → Execution → Observation → Reflection loop
-> (with loop detection and failure recovery), and context/state management: token-budgeted
-> history with automatic 80% compaction via LLM summarization, a context compressor, on-disk
-> session persistence with resume, and encrypted (OS `safeStorage`) API-key storage. The chat
-> UI, SSH and Git come in later stages.
+> Status: **Stage 9 — packaging & release (v0.1.0)**. The app ships a Codex-like agent
+> workspace: provider-agnostic LLM adapters (OpenAI/Anthropic/DeepSeek/Google), the
+> `SandboxManager` code-execution layer, the `AgentOrchestrator` Planning → Execution →
+> Observation → Reflection loop, token-budgeted context/session state, and the full renderer
+> UI (chat, tasks/logs, workspace explorer + code viewer with diff, settings, status bar),
+> plus a background worker queue and a localhost remote-access server. Stage 8 added
+> end-to-end integration tests; Stage 9 adds Windows packaging, build optimization and
+> release documentation.
 
 ## Requirements
 
 - Node.js 20 LTS or newer (tested on Node 24)
 - npm 10+
 - Windows 10/11 for the NSIS installer target (dev works cross-platform)
+
+## Install (Windows)
+
+Download `AI Desktop Setup 0.1.0.exe` from the
+[Releases](https://github.com/Arashtahmasbi3/ai-desktop/releases) page and run it. The
+installer is per-user, lets you choose the install directory, and creates desktop and
+start-menu shortcuts. A standalone `AI Desktop 0.1.0 Portable.exe` is also published — no
+installation required.
+
+On first launch, open **Settings** and add a DeepSeek (or OpenAI/Anthropic/Google) API key;
+keys are encrypted with the OS keystore and stored locally.
 
 ## Getting started
 
@@ -33,7 +44,9 @@ npm run dev     # opens the Electron window
 | `npm run build` | Build main/preload/renderer to `out/` |
 | `npm run typecheck` | Type-check the Node and Web TypeScript projects |
 | `npm test` | Run the test suite (Vitest) |
-| `npm run build:win` | Package a Windows NSIS installer into `release/` |
+| `npm test:e2e` | Run only the end-to-end suite (`vitest run test/e2e`) |
+| `npm run pack` | Build an unpacked app with electron-builder (into `release/`) |
+| `npm run build:win` | Package the Windows NSIS installer + portable exe into `release/` |
 
 ## Project layout
 
@@ -142,6 +155,45 @@ await settings.setApiKey('deepseek', apiKey)
 ```
 
 See [`AGENTS.md`](./AGENTS.md) for architecture notes and conventions.
+
+## Packaging & release
+
+```bash
+npm run pack       # unpacked app in release/win-unpacked (quick smoke test)
+npm run build:win  # NSIS installer + portable exe in release/
+```
+
+`electron-builder` is configured in [`electron-builder.yml`](./electron-builder.yml): Windows
+x64, an NSIS installer (choose install directory, desktop + start-menu shortcuts) and a
+Portable executable. Only the compiled `out/` tree plus `package.json` are packaged — every
+renderer dependency is bundled by Vite and the main/preload processes use Electron + Node
+built-ins only, so **no `node_modules` ship inside the app**. The production build is
+minified and tree-shaken (main ~81 KB, preload ~1.4 KB, renderer JS ~321 KB, CSS ~25 KB).
+
+Code signing is applied automatically when a certificate is available and skipped otherwise:
+
+```bash
+CSC_LINK=/path/to/cert.pfx CSC_KEY_PASSWORD=secret npm run build:win
+```
+
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the full release checklist and
+[`CHANGELOG.md`](./CHANGELOG.md) for release notes.
+
+## Testing
+
+```bash
+npm test          # full Vitest suite (unit + integration)
+npx vitest run test/e2e   # end-to-end flows only
+```
+
+`test/e2e/` covers the app end to end with only the LLM boundary scripted
+(`ScriptedAdapter`), running against the real local sandbox:
+
+| File | Covers |
+| --- | --- |
+| `agent-flow.e2e.test.ts` | Create + run a project in the sandbox, file change → renderer diff, session save/resume |
+| `error-scenarios.e2e.test.ts` | API cut (bounded retries), provider fallback on auth error, unavailable sandbox, transient sandbox retry, path-escape rejection, context overflow with deterministic compaction fallback |
+| `performance.e2e.test.ts` | Renderer tokenize/diff budgets, no sandbox leaks across many runs, bounded heap growth and bounded persisted transcript under overflow |
 
 ## License
 

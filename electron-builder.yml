@@ -1,21 +1,56 @@
 appId: com.sepid.ai-desktop
 productName: AI Desktop
 copyright: Copyright © 2026 Sepid_Com
+
 directories:
   buildResources: build
   output: release
+
+# Only the compiled app is shipped. The renderer is fully bundled by Vite and
+# the main/preload processes depend on Electron + Node built-ins only, so no
+# node_modules need to be packaged at all.
 files:
   - out/**/*
   - package.json
+  - '!**/*.map'
+  - '!**/*.ts'
+  - '!**/node_modules/**'
+
+asar: true
+compression: maximum
+# Keeps the packaged package.json free of dev-time scripts and devDependencies.
+removePackageScripts: true
+removePackageKeywords: true
+# Never try to publish from a local build.
+publish: null
+
 win:
+  icon: build/icon.ico
+  # Signing is applied automatically when CSC_LINK / CSC_KEY_PASSWORD (or a
+  # certificate in the OS store) are provided; otherwise it is skipped safely.
+  forceCodeSigning: false
   target:
     - target: nsis
       arch:
         - x64
+    - target: portable
+      arch:
+        - x64
+
 nsis:
   oneClick: false
   perMachine: false
+  allowElevation: true
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: AI Desktop
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  installerHeaderIcon: build/icon.ico
+  deleteAppDataOnUninstall: false
+  runAfterFinish: true
+  artifactName: ${productName} Setup ${version}.${ext}
+
+portable:
+  artifactName: ${productName} ${version} Portable.${ext}

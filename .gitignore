@@ -4,6 +4,8 @@ dist
 release
 build/*
 !build/.gitkeep
+!build/icon.png
+!build/icon.ico
 coverage
 .vite
 *.log

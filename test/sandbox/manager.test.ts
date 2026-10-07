@@ -87,6 +87,19 @@ describe('SandboxManagerImpl — basic operations', () => {
     await manager.dispose()
   })
 
+  it('keeps a caller-supplied workspace on destroy', async () => {
+    const manager = createManager()
+    const external = join(base, 'external-project')
+    await fs.mkdir(external, { recursive: true })
+    await fs.writeFile(join(external, 'keep.txt'), 'survives', 'utf8')
+
+    const { id } = await manager.createSandbox({ provider: 'local', workspaceRoot: external })
+    await manager.destroySandbox(id)
+
+    await expect(fs.readFile(join(external, 'keep.txt'), 'utf8')).resolves.toBe('survives')
+    await manager.dispose()
+  })
+
   it('throws for unknown sandbox ids', async () => {
     const manager = createManager()
     await expect(manager.executeCommand('nope', 'echo')).rejects.toBeInstanceOf(

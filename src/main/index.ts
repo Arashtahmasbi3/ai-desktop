@@ -1,10 +1,15 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow } from 'electron'
 import { join } from 'node:path'
+import { AppServices } from './app-services'
+import { registerIpc } from './ipc'
 
 const isDev = !app.isPackaged
 
+let mainWindow: BrowserWindow | null = null
+let services: AppServices | null = null
+
 function createWindow(): void {
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     minWidth: 900,
@@ -26,31 +31,39 @@ function createWindow(): void {
     }
   })
 
-  mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
+  const window = mainWindow
+  window.on('ready-to-show', () => window.show())
+  window.on('closed', () => {
+    if (mainWindow === window) mainWindow = null
   })
 
-  mainWindow.webContents.setWindowOpenHandler((details) => {
+  window.webContents.setWindowOpenHandler((details) => {
     void shell.openExternal(details.url)
     return { action: 'deny' }
   })
 
   const rendererUrl = process.env['ELECTRON_RENDERER_URL']
   if (isDev && rendererUrl) {
-    void mainWindow.loadURL(rendererUrl)
+    void window.loadURL(rendererUrl)
   } else {
-    void mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+    void window.loadFile(join(__dirname, '../renderer/index.html'))
   }
 }
 
-app.whenReady().then(() => {
-  ipcMain.handle('app:ping', () => 'pong')
+app.whenReady().then(async () => {
+  services = new AppServices()
+  await services.init()
+  registerIpc(services, () => mainWindow)
 
   createWindow()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+})
+
+app.on('before-quit', () => {
+  void services?.dispose()
 })
 
 app.on('window-all-closed', () => {

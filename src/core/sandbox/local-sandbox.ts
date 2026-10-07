@@ -104,6 +104,8 @@ export class LocalSandboxDriver implements SandboxDriver {
   }
 
   async destroy(handle: SandboxHandle): Promise<void> {
+    // A caller-supplied workspace is not ours to delete.
+    if (handle.ownsWorkspace === false) return
     await fs.rm(handle.workspaceRoot, { recursive: true, force: true })
   }
 }

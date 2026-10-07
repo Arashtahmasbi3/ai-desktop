@@ -13,6 +13,11 @@ export interface SandboxHandle {
   image?: string
   /** Host directory mounted as the sandbox workspace. */
   workspaceRoot: string
+  /**
+   * Whether the sandbox owns `workspaceRoot`. When false the workspace was
+   * supplied by the caller and must survive teardown (defaults to true).
+   */
+  ownsWorkspace?: boolean
   /** Container name (Docker only). */
   containerName?: string
   limits: SandboxLimits
