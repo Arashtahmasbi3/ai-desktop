@@ -3,7 +3,7 @@
 An Electron desktop AI assistant — a local, Codex-like companion that connects to the
 DeepSeek API, VPS servers (SSH), GitHub (Git), and your local files.
 
-> Status: **Stage 9 — packaging & release (v0.1.0)**. The app ships a Codex-like agent
+> Status: **Stage 9 — packaging & release (v1.0.0)**. The app ships a Codex-like agent
 > workspace: provider-agnostic LLM adapters (OpenAI/Anthropic/DeepSeek/Google), the
 > `SandboxManager` code-execution layer, the `AgentOrchestrator` Planning → Execution →
 > Observation → Reflection loop, token-budgeted context/session state, and the full renderer
@@ -20,10 +20,10 @@ DeepSeek API, VPS servers (SSH), GitHub (Git), and your local files.
 
 ## Install (Windows)
 
-Download `AI Desktop Setup 0.1.0.exe` from the
+Download `AI Desktop Setup 1.0.0.exe` from the
 [Releases](https://github.com/Arashtahmasbi3/ai-desktop/releases) page and run it. The
 installer is per-user, lets you choose the install directory, and creates desktop and
-start-menu shortcuts. A standalone `AI Desktop 0.1.0 Portable.exe` is also published — no
+start-menu shortcuts. A standalone `AI Desktop 1.0.0 Portable.exe` is also published — no
 installation required.
 
 On first launch, open **Settings** and add a DeepSeek (or OpenAI/Anthropic/Google) API key;
@@ -176,8 +176,10 @@ Code signing is applied automatically when a certificate is available and skippe
 CSC_LINK=/path/to/cert.pfx CSC_KEY_PASSWORD=secret npm run build:win
 ```
 
-See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the full release checklist and
-[`CHANGELOG.md`](./CHANGELOG.md) for release notes.
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the full release checklist,
+[`CHANGELOG.md`](./CHANGELOG.md) for release notes, and
+[`FINAL_REPORT.md`](./FINAL_REPORT.md) for the project-level summary, verification results
+and the next-version roadmap.
 
 ## Testing
 

@@ -10,7 +10,7 @@ connect to DeepSeek API, VPS servers (SSH), GitHub (Git), and the local desktop 
 **Repository**: https://github.com/Arashtahmasbi3/ai-desktop (private, independent).
 Default branch `master`; remote `origin` tracks it. Push after every committed change.
 
-Current state: **Stage 9 — packaging & release (v0.1.0)**. Stage 1 skeleton (Electron + React 18 +
+Current state: **Stage 9 — packaging & release (v1.0.0)**. Stage 1 skeleton (Electron + React 18 +
 TypeScript), Stage 2 LLM adapters (OpenAI/Anthropic/DeepSeek/Google), Stage 3 code-execution
 sandbox and Stage 4 `AgentOrchestrator` (Planning → Execution → Observation → Reflection loop,
 loop detection, failure recovery) are in place. Stage 5 adds context/state management:
@@ -213,3 +213,56 @@ test/                    Vitest tests (adapters use a mocked fetch boundary)
   `node_modules/.vite` if needed) and re-check.
 - Render errors unmount the whole React tree, so panels are wrapped in `ErrorBoundary`
   (`src/renderer/src/components/ErrorBoundary.tsx`); keep new panels inside one.
+
+## Patterns
+
+Conventions that recur across the codebase — follow them when adding code.
+
+- **Adapter/registry pattern for providers.** New LLM providers implement `BaseLLMAdapter`
+  and are registered in `src/core/llm-adapters/registry.ts`; shared HTTP/SSE/retry/error
+  plumbing lives in `base.ts` / `http.ts` / `sse.ts` / `errors.ts`. Never special-case a
+  provider inside the orchestrator.
+- **Driver/manager pattern for execution.** `SandboxManager` is the only entry point; the
+  Docker and local behaviours are drivers behind it (`driver.ts`, `registry.ts`). Ownership of
+  a workspace is tracked on the handle so `destroy()` never deletes a caller-supplied path.
+- **Event-driven IPC, not request/response for long work.** Streaming LLM output and task
+  progress flow to the renderer as events (`window.api.on*`); one-shot operations use
+  `ipcMain.handle`/`invoke`. Every new channel needs three edits: main handler, preload
+  entry, and `src/preload/index.d.ts` type.
+- **Inject the boundary, don't mock internals.** Tests depend on injectable seams:
+  `config.fetchImpl` (LLM HTTP), `CommandRunner` (process exec), and a fake `Cipher`
+  (`test/helpers/`). E2E tests use a scripted `BaseLLMAdapter` and the **real** local sandbox.
+- **Layered state with migration.** `SessionStore` and the settings/persistence layers write
+  versioned payloads and migrate forward on read; keep that so old sessions/keys keep working.
+- **Time/limits are injected, not hard-coded.** TTL/idle sweeps, timeouts and token budgets
+  come from config so tests can drive them deterministically.
+
+## Lessons learned
+
+- **Verify the packaged artifact, not just the build.** `npm run build` passing says nothing
+  about what ships. Inspect `app.asar` (`@electron/asar`'s `listPackage`) and the installer
+  (`7zz l`). This is how we confirmed no `node_modules`/source maps leaked into the release.
+- **`dependencies: {}` is a feature.** Because Vite bundles the renderer and main/preload use
+  only Electron + Node built-ins, nothing needs to be installed at runtime — the app package
+  stays ~1 MB and the installer is just Electron + that. Keep new runtime libs bundled.
+- **Cross-building Windows NSIS on Linux needs 32-bit Wine.** electron-builder runs the
+  32-bit installer once (`WineVmManager`) to generate the uninstaller, so it fails with
+  `spawn wine ENOENT`, then `wine32 is missing`, then `failed to load .../ntdll.dll`. Installing
+  `wine32:i386` (and its i386 deps) and initializing the prefix (`wineboot -u`) fixes it.
+  electron-builder's bundled Wine (`toolsets.wine`) is 64-bit-only here and is *not* enough.
+  `release/win-unpacked/` is produced even when the NSIS step fails — useful for a smoke test.
+- **Namespace the packaged payload.** Restrict `files:` to `out/**` + `package.json` and
+  exclude `**/*.map`, `**/*.ts`, `**/node_modules/**`; set `removePackageScripts`,
+  `removePackageKeywords`, `compression: maximum`. Small, predictable artifacts.
+- **The sandbox ownership bug is easy to reintroduce.** A sandbox created around a user's
+  workspace must not delete that workspace on destroy. The handle carries `ownsWorkspace`,
+  and `test/sandbox/manager.test.ts` guards it.
+- **Context overflow needs a deterministic fallback.** Compaction can itself fail; the
+  orchestrator falls back to deterministic trimming rather than erroring (covered in
+  `test/e2e/error-scenarios.e2e.test.ts`).
+- **Headless UI verification is worth the setup.** The CDP probe (`/json`, websockets) reading
+  `document.body.innerText` catches blank-window/ReferenceError regressions that unit tests
+  cannot; it was reused across Stage 6–8.
+- **Keep docs in lockstep with the artifact.** Every packaging change moves three files:
+  `electron-builder.yml`, the npm scripts, and the version in `package.json`/`CHANGELOG.md`.
+  Dated changelog entries + a SemVer tag are cheap and make releases reproducible.

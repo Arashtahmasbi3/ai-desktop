@@ -7,9 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.0] — 2026-10-07
+## [1.0.0] — 2026-10-07
 
-First public build. Ships as a Windows x64 NSIS installer and a portable executable.
+First stable release. Ships as a Windows x64 NSIS installer and a portable executable.
 
 ### Added
 
@@ -58,5 +58,5 @@ First public build. Ships as a Windows x64 NSIS installer and a portable executa
   `node_modules` are shipped inside the app package.
 - Optional code signing via `CSC_LINK` / `CSC_KEY_PASSWORD` (skipped safely when absent).
 
-[Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/Arashtahmasbi3/ai-desktop/releases/tag/v0.1.0
+[Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/Arashtahmasbi3/ai-desktop/releases/tag/v1.0.0
