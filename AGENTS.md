@@ -7,7 +7,9 @@ Persistent memory / operating guide for AI agents working in this repository.
 **AI Desktop** — an Electron desktop AI assistant. Long-term goal: behave like Codex and
 connect to DeepSeek API, VPS servers (SSH), GitHub (Git), and the local desktop (file I/O).
 
-Current state: **Stage 1 — project skeleton** (Electron + React 18 + TypeScript, no features yet).
+Current state: **Stage 2 — LLM adapter layer**. Stage 1 skeleton (Electron + React 18 +
+TypeScript) is in place. Stage 2 adds a provider-agnostic LLM abstraction under
+`src/core/llm-adapters/` (OpenAI, Anthropic, DeepSeek, Google) plus `src/shared/` types.
 
 ## Tech stack
 
@@ -35,6 +37,19 @@ src/
   main/index.ts          Electron main process (window + IPC handlers)
   preload/index.ts       contextBridge API exposed as window.api
   preload/index.d.ts     window.api type declarations
+  shared/types.ts        provider-agnostic LLM types (ChatMessage, ToolCall, ...)
+  core/
+    llm-adapters/
+      base.ts            BaseLLMAdapter interface + BaseAdapter class + collectStream
+      openai.ts          OpenAI (also the OpenAI-compatible base)
+      deepseek.ts        DeepSeek (extends OpenAIAdapter, api.deepseek.com/v1)
+      anthropic.ts       Anthropic Messages API (event-based SSE)
+      google.ts          Google Gemini (contents/parts, alt=sse)
+      registry.ts        provider metadata + adapter selection
+      errors.ts          typed errors (Auth/RateLimit/Timeout/Network/API/...)
+      http.ts            fetch + timeout + retry/backoff
+      sse.ts             Server-Sent Events parser
+      util.ts            safe JSON walking helpers
   renderer/
     index.html
     src/
@@ -43,7 +58,7 @@ src/
       assets/main.css    Tailwind entry + Vazirmatn font
       components/        UI components (added in later stages)
       lib/               non-UI logic (llm, agent, ...)
-test/                    Vitest tests
+test/                    Vitest tests (adapters use a mocked fetch boundary)
 ```
 
 ## Conventions
@@ -53,6 +68,16 @@ test/                    Vitest tests
   `nodeIntegration`; keep `contextIsolation: true`.
 - New IPC channels: add `ipcMain.handle('<ns>:<action>')` in `src/main/index.ts`, expose it
   in `src/preload/index.ts`, and declare its type in `src/preload/index.d.ts`.
+- LLM providers: never call a provider SDK directly — go through `BaseLLMAdapter`
+  (`chat` / `streamChat` / `getCapabilities` / `validateConfig`). Pick the adapter with
+  `registry.ts` (`createAdapter`, `getAdapter`, `createAdapterForConfig`). Provider-specific
+  request/response translation lives in the adapter; shared plumbing (HTTP, retry, SSE,
+  errors) lives in `base.ts` / `http.ts` / `sse.ts` / `errors.ts`.
+- Import via path aliases: `@shared/*` → `src/shared/*`, `@core/*` → `src/core/*`,
+  `@main/*`, `@preload/*`, `@renderer/*`. Aliases are configured in `tsconfig.*.json`,
+  `electron.vite.config.ts` and `vitest.config.ts`.
+- Tests mock the HTTP boundary (a fake `fetch` injected via `config.fetchImpl` or
+  `test/helpers/mock-fetch.ts`) so adapters' own logic is still exercised end to end.
 - UI: dark theme only. Use the Tailwind theme tokens `bg-bg-primary` `#0a0a0a`,
   `bg-bg-secondary` `#141414`, `bg-bg-tertiary` `#1e1e1e`, `border-border`, `text-accent`.
 - Menus/labels in English; chat content is RTL (`dir="rtl"`), font Vazirmatn.
