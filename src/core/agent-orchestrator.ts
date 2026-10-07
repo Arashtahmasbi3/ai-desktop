@@ -4,6 +4,7 @@ import type {
   SandboxProvider
 } from '@shared/sandbox'
 import type {
+  ChatMessage,
   ChatResponse,
   ProviderId,
   ToolDefinition,
@@ -27,10 +28,16 @@ import type {
 } from '@shared/agent'
 export type { ProviderEntry }
 import { sleep } from '@core/llm-adapters'
-import { ContextManager } from './agent/context-manager'
+import {
+  ContextManager,
+  summarizeDeterministically,
+  type ContextSummarizer
+} from './agent/context-manager'
+import { compressMessage, type CompressOptions } from './agent/context-compressor'
 import { ErrorRecovery, guidanceForToolError } from './agent/error-recovery'
 import { LoopDetector } from './agent/loop-detector'
 import { silentLogger } from './agent/logger'
+import { SESSION_SCHEMA_VERSION, type AgentSession, type SessionStore } from './agent/session-store'
 import { SANDBOX_TOOLS, SandboxToolExecutor, actionFromToolCall } from './agent/tools'
 
 export interface AgentOrchestratorOptions {
@@ -49,6 +56,19 @@ export interface AgentOrchestratorOptions {
   recoveryPolicy?: Partial<AgentRecoveryPolicy>
   /** Extra options merged into `createSandbox`. */
   sandboxOptions?: CreateSandboxOptions
+  /** Token budget for the model context (defaults from provider capabilities). */
+  contextWindowTokens?: number
+  /** Fraction of the token budget that triggers compaction. Default 0.8 (80%). */
+  compactionThreshold?: number
+  /** Compress old context (strip code comments/blank lines, dedupe). Default true. */
+  compressContext?: boolean
+  compressOptions?: CompressOptions
+  /** Override the summarizer used when compacting history. */
+  summarizer?: ContextSummarizer
+  /** Persist each run's session to disk (see {@link SessionStore}). */
+  sessionStore?: SessionStore
+  /** Base session id, reused across runs so resumes update the same session. */
+  sessionId?: string
   now?: () => number
   runIdFactory?: () => string
 }
@@ -63,6 +83,60 @@ function addUsage(total: Usage | undefined, next: Usage | undefined): Usage | un
     promptTokens: total.promptTokens + next.promptTokens,
     completionTokens: total.completionTokens + next.completionTokens,
     totalTokens: total.totalTokens + next.totalTokens
+  }
+}
+
+function defaultContextTokens(entry: ProviderEntry): number {
+  const caps = entry.adapter.getCapabilities(entry.config.model)
+  const reserve = caps.maxOutputTokens ?? 4096
+  return Math.max(2048, (caps.contextWindow ?? 32_000) - reserve)
+}
+
+function formatTranscriptForSummary(messages: readonly ChatMessage[]): string {
+  return messages
+    .map((message) => {
+      const role = message.role.toUpperCase()
+      const body = message.content ?? ''
+      const calls = message.toolCalls?.map((call) => `${call.name}(${call.arguments})`).join(', ')
+      return calls ? `${role}: ${body}\n[tool_calls: ${calls}]` : `${role}: ${body}`
+    })
+    .join('\n\n')
+}
+
+/**
+ * Build a {@link ContextSummarizer} that asks the provider to compress dropped
+ * history, falling back to a deterministic summary if the call fails.
+ */
+export function createAdapterSummarizer(entry: ProviderEntry): ContextSummarizer {
+  const instruction =
+    'You compress an AI coding agent conversation. Summarize the transcript into ' +
+    'a compact brief (max ~200 words) that preserves: the user goal, files created ' +
+    'or changed, key commands and their outcomes, decisions made, and any open ' +
+    'blockers. Keep file paths and identifiers verbatim. Respond with the summary only.'
+
+  return async ({ previousSummary, messages }) => {
+    const transcript = formatTranscriptForSummary(messages)
+    try {
+      const response = await entry.adapter.chat(
+        {
+          model: entry.config.model,
+          temperature: 0,
+          messages: [
+            { role: 'system', content: instruction },
+            {
+              role: 'user',
+              content: `${previousSummary ? `Previous summary:\n${previousSummary}\n\n` : ''}Transcript:\n${transcript}`
+            }
+          ]
+        },
+        entry.config
+      )
+      const summary = response.content?.trim()
+      if (summary) return summary
+    } catch {
+      // Fall through to the deterministic summary.
+    }
+    return summarizeDeterministically(messages, previousSummary)
   }
 }
 
@@ -138,6 +212,13 @@ export class AgentOrchestrator {
   private readonly loopPolicy: Partial<LoopDetectionPolicy>
   private readonly recovery: ErrorRecovery
   private readonly sandboxOptions: CreateSandboxOptions
+  private readonly contextWindowTokens: number
+  private readonly compactionThreshold: number
+  private readonly compressContext: boolean
+  private readonly compressOptions: CompressOptions
+  private readonly summarizer?: ContextSummarizer
+  private readonly sessionStore?: SessionStore
+  private readonly sessionId?: string
   private readonly now: () => number
   private readonly runIdFactory: () => string
   private runCounter = 0
@@ -156,6 +237,14 @@ export class AgentOrchestrator {
     this.loopPolicy = options.loopPolicy ?? {}
     this.recovery = new ErrorRecovery(options.recoveryPolicy)
     this.sandboxOptions = options.sandboxOptions ?? {}
+    this.contextWindowTokens =
+      options.contextWindowTokens ?? defaultContextTokens(this.providers[0])
+    this.compactionThreshold = options.compactionThreshold ?? 0.8
+    this.compressContext = options.compressContext ?? true
+    this.compressOptions = options.compressOptions ?? {}
+    this.summarizer = options.summarizer
+    this.sessionStore = options.sessionStore
+    this.sessionId = options.sessionId
     this.now = options.now ?? (() => Date.now())
     this.runCounter = 0
     this.runIdFactory = options.runIdFactory ?? (() => `run-${++this.runCounter}`)
@@ -217,13 +306,45 @@ export class AgentOrchestrator {
     const observedSignatures = new Set<string>()
     const context = new ContextManager({
       systemPrompt: buildSystemPrompt(provider, this.tools),
-      ...(this.contextMaxChars !== undefined ? { maxChars: this.contextMaxChars } : {})
+      maxTokens: this.contextWindowTokens,
+      compactionThreshold: this.compactionThreshold,
+      ...(this.contextMaxChars !== undefined ? { maxChars: this.contextMaxChars } : {}),
+      ...(this.compressContext
+        ? { transformOldMessages: (message: ChatMessage) => compressMessage(message, this.compressOptions) }
+        : {})
     })
+
+    // Resume a stored session (e.g. after an app restart) before the new task.
+    const resumeId = options.resumeSessionId
+    if (resumeId && this.sessionStore) {
+      try {
+        const session = await this.sessionStore.load(resumeId)
+        if (session) {
+          context.restore({
+            messages: session.messages,
+            summary: session.summary ?? null,
+            droppedCount: 0
+          })
+          this.log('info', 'session.resumed', runId, {
+            sessionId: resumeId,
+            messages: session.messages.length
+          })
+        }
+      } catch (error) {
+        this.log('warn', 'session.resume_failed', runId, {
+          sessionId: resumeId,
+          message: error instanceof Error ? error.message : String(error)
+        })
+      }
+    }
+
     context.appendUser(task)
     this.log('debug', 'context.built', runId, {
       messages: context.length,
       estimatedTokens: context.estimateTokens()
     })
+
+    const summarizer = this.summarizer ?? createAdapterSummarizer(this.providers[0])
 
     let status: AgentStatus = 'max_steps'
     let finalAnswer: string | null = null
@@ -239,6 +360,9 @@ export class AgentOrchestrator {
 
         const startedStepAt = this.now()
         this.log('debug', 'step.start', runId, { step: index, phase: 'planning' })
+
+        // ---- Compaction: keep the prompt within budget before planning ----
+        await this.maybeCompact(context, summarizer, runId, index)
 
         // ---- Planning: ask the model (with provider fallback) ----
         const outcome = await this.callLlm(context, runId, index, options)
@@ -353,18 +477,8 @@ export class AgentOrchestrator {
       this.log('error', 'run.error', runId, { message: text })
       // A cancellation that lands mid-call should read as `aborted`, not `failed`.
       const aborted = options.signal?.aborted === true
-      return this.finish(
-        runId,
-        task,
-        aborted ? 'aborted' : 'failed',
-        steps,
-        finalAnswer,
-        aborted ? 'Run aborted by caller' : `LLM call failed: ${text}`,
-        { provider: providerUsed, sandboxId },
-        warnings,
-        usage,
-        startedAt
-      )
+      status = aborted ? 'aborted' : 'failed'
+      message = aborted ? 'Run aborted by caller' : `LLM call failed: ${text}`
     } finally {
       if (sandboxId) {
         try {
@@ -379,7 +493,7 @@ export class AgentOrchestrator {
       }
     }
 
-    return this.finish(
+    const result = this.finish(
       runId,
       task,
       status,
@@ -391,6 +505,67 @@ export class AgentOrchestrator {
       usage,
       startedAt
     )
+    await this.persistSession(context, task, result, options.resumeSessionId)
+    return result
+  }
+
+  /** Compact the context when it crosses the token threshold (best-effort). */
+  private async maybeCompact(
+    context: ContextManager,
+    summarizer: ContextSummarizer,
+    runId: string,
+    step: number
+  ): Promise<void> {
+    if (!context.needsCompaction()) return
+    const tokensBefore = context.estimateTokens()
+    try {
+      const result = await context.compact(summarizer)
+      if (!result) return
+      this.log('info', 'context.compacted', runId, {
+        step,
+        droppedMessages: result.droppedMessages,
+        tokensBefore: result.tokensBefore,
+        tokensAfter: result.tokensAfter
+      })
+    } catch (error) {
+      // Compaction is an optimization: never fail a run because it failed.
+      this.log('warn', 'context.compaction_failed', runId, {
+        step,
+        tokensBefore,
+        message: error instanceof Error ? error.message : String(error)
+      })
+    }
+  }
+
+  /** Persist the run's session (best-effort) when a store is configured. */
+  private async persistSession(
+    context: ContextManager,
+    task: string,
+    result: AgentRunResult,
+    resumeSessionId?: string
+  ): Promise<void> {
+    if (!this.sessionStore) return
+    const snapshot = context.snapshot()
+    const session: AgentSession = {
+      id: this.sessionId ?? resumeSessionId ?? result.runId,
+      version: SESSION_SCHEMA_VERSION,
+      task,
+      status: result.status,
+      createdAt: result.startedAt,
+      updatedAt: result.finishedAt,
+      messages: snapshot.messages,
+      summary: snapshot.summary,
+      result
+    }
+    try {
+      await this.sessionStore.save(session)
+      this.log('info', 'session.saved', result.runId, { sessionId: session.id })
+    } catch (error) {
+      this.log('warn', 'session.save_failed', result.runId, {
+        sessionId: session.id,
+        message: error instanceof Error ? error.message : String(error)
+      })
+    }
   }
 
   private finish(

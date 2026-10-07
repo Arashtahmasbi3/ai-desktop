@@ -3,12 +3,14 @@
 An Electron desktop AI assistant — a local, Codex-like companion that connects to the
 DeepSeek API, VPS servers (SSH), GitHub (Git), and your local files.
 
-> Status: **Stage 4 — agent orchestrator**. The app ships a provider-agnostic LLM
+> Status: **Stage 5 — context & state management**. The app ships a provider-agnostic LLM
 > abstraction (OpenAI, Anthropic, DeepSeek, Google), a sandboxed code-execution layer
-> (`SandboxManager`: Docker-backed by default with local/Windows fallbacks) and an
-> `AgentOrchestrator` that runs the Planning → Execution → Observation → Reflection loop,
-> executes tools in the sandbox, detects loops and recovers from failures. The chat UI,
-> SSH and Git come in later stages.
+> (`SandboxManager`: Docker-backed by default with local/Windows fallbacks), an
+> `AgentOrchestrator` that runs the Planning → Execution → Observation → Reflection loop
+> (with loop detection and failure recovery), and context/state management: token-budgeted
+> history with automatic 80% compaction via LLM summarization, a context compressor, on-disk
+> session persistence with resume, and encrypted (OS `safeStorage`) API-key storage. The chat
+> UI, SSH and Git come in later stages.
 
 ## Requirements
 
@@ -37,10 +39,10 @@ npm run dev     # opens the Electron window
 
 ```
 src/
-  main/       Electron main process (window, IPC)
+  main/       Electron main process (window, IPC, safeStorage cipher)
   preload/    contextBridge bridge (window.api)
-  shared/     provider-agnostic LLM + sandbox types
-  core/       LLM adapters (OpenAI, Anthropic, DeepSeek, Google) + sandbox module
+  shared/     provider-agnostic LLM + sandbox + agent types
+  core/       LLM adapters + sandbox module + agent orchestrator & context/state
   renderer/   React UI (Vazirmatn, RTL, dark theme)
 test/         Vitest tests
 ```
@@ -99,6 +101,45 @@ calls. It warns after an action is repeated more than three times, pauses with
 `needs_input` after repeated no-progress steps, retries transient sandbox failures and
 falls back to the next provider on auth/config errors. Pass an `AbortSignal` via
 `agent.run(task, { signal })` to cancel.
+
+### Context, sessions and settings
+
+The orchestrator keeps the prompt inside a token budget and compacts history automatically:
+
+```ts
+import { AgentOrchestrator, createAdapterSummarizer } from '@core/agent-orchestrator'
+import { FileSessionStore, Persistence, resolveUserDataDir } from '@core/agent'
+
+const agent = new AgentOrchestrator({
+  sandbox: manager,
+  providers: [{ provider: 'deepseek', adapter, config }],
+  contextWindowTokens: 32_000,   // default: provider contextWindow − max output
+  compactionThreshold: 0.8,      // compact at 80% of the budget
+  summarizer: createAdapterSummarizer({ provider: 'deepseek', adapter, config }),
+  sessionStore: new FileSessionStore(`${resolveUserDataDir({ appName: 'AI Desktop' })}/sessions`),
+  sessionId: 'chat-1'
+})
+
+await agent.run('Refactor src/app.ts')
+
+// After an app restart, resume the stored conversation:
+await agent.run('Continue', { resumeSessionId: 'chat-1' })
+```
+
+Old messages may also be compressed (comments/blank lines stripped, duplicate code blocks
+dropped) before being sent; the stored history is untouched. API keys are encrypted with the
+OS keystore (`safeStorage`) via `Persistence` and never written in plaintext:
+
+```ts
+import { Persistence } from '@core/agent'
+import { createSafeStorageCipher } from '@main/secure-cipher'
+
+const settings = new Persistence({
+  file: `${resolveUserDataDir({ appName: 'AI Desktop' })}/settings.json`,
+  cipher: createSafeStorageCipher()
+})
+await settings.setApiKey('deepseek', apiKey)
+```
 
 See [`AGENTS.md`](./AGENTS.md) for architecture notes and conventions.
 

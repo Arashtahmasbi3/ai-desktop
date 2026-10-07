@@ -74,3 +74,124 @@ describe('ContextManager', () => {
     expect(context.buildMessages()).toEqual([{ role: 'system', content: 'SYS' }])
   })
 })
+
+describe('ContextManager token budget and compaction', () => {
+  it('disables the character budget when a token budget is set', () => {
+    const context = new ContextManager({ systemPrompt: 'S', maxTokens: 100_000, minMessages: 1 })
+    context.appendUser('a'.repeat(50_000))
+    expect(context.buildMessages()).toHaveLength(2)
+  })
+
+  it('reports usage and needsCompaction at the 80% threshold', () => {
+    const context = new ContextManager({ systemPrompt: 'S', maxTokens: 100, minMessages: 1 })
+    context.appendUser('a'.repeat(200)) // 50 tokens -> 50%
+    expect(context.needsCompaction()).toBe(false)
+    expect(context.usage().ratio).toBeCloseTo(0.5, 1)
+
+    context.appendUser('b'.repeat(200)) // 100 tokens -> 100%
+    expect(context.needsCompaction()).toBe(true)
+  })
+
+  it('compacts the oldest turns into a summary message', async () => {
+    const context = new ContextManager({ systemPrompt: 'S', maxTokens: 100, minMessages: 2 })
+    context.appendUser('a'.repeat(400))
+    context.appendUser('b'.repeat(40))
+    context.appendUser('c'.repeat(40))
+    context.appendUser('d'.repeat(40))
+
+    expect(context.needsCompaction()).toBe(true)
+    const tokensBefore = context.estimateTokens()
+    const result = await context.compact(async () => 'SUMMARY-BRIEF')
+
+    expect(result).not.toBeNull()
+    expect(result?.summary).toBe('SUMMARY-BRIEF')
+    expect(result?.tokensAfter).toBeLessThan(tokensBefore)
+    expect(context.summaryText).toBe('SUMMARY-BRIEF')
+    expect(context.dropped).toBeGreaterThan(0)
+
+    const messages = context.buildMessages()
+    expect(messages.some((m) => m.content?.includes('[compacted-history-summary]'))).toBe(true)
+    // The most recent messages are always kept.
+    expect(messages[messages.length - 1].content).toBe('d'.repeat(40))
+  })
+
+  it('returns null from compact() when nothing can be dropped', async () => {
+    const context = new ContextManager({ systemPrompt: 'S', maxTokens: 10, minMessages: 6 })
+    context.appendUser('tiny')
+    expect(await context.compact(async () => 'x')).toBeNull()
+  })
+
+  it('does not compact without a token budget', async () => {
+    const context = new ContextManager({ systemPrompt: 'S' })
+    context.appendUser('a'.repeat(100_000))
+    expect(context.needsCompaction()).toBe(false)
+    expect(await context.compact()).toBeNull()
+  })
+
+  it('passes the previous summary back to the summarizer', async () => {
+    const context = new ContextManager({ systemPrompt: 'S', maxTokens: 100, minMessages: 2 })
+    const seen: (string | null)[] = []
+    const summarizer = async ({ previousSummary }: { previousSummary: string | null }) => {
+      seen.push(previousSummary)
+      return `BRIEF-${seen.length}`
+    }
+    const fill = (): void => {
+      context.appendUser('a'.repeat(400))
+      context.appendUser('b'.repeat(40))
+      context.appendUser('c'.repeat(40))
+      context.appendUser('d'.repeat(40))
+    }
+
+    fill()
+    await context.compact(summarizer)
+    fill()
+    await context.compact(summarizer)
+
+    expect(seen).toEqual([null, 'BRIEF-1'])
+  })
+
+  it('falls back to a deterministic summary when the summarizer throws', async () => {
+    const context = new ContextManager({ systemPrompt: 'S', maxTokens: 100, minMessages: 2 })
+    context.appendUser('a'.repeat(400))
+    context.appendUser('b'.repeat(40))
+    context.appendUser('c'.repeat(40))
+    context.appendUser('d'.repeat(40))
+
+    const result = await context.compact(async () => {
+      throw new Error('summarizer exploded')
+    })
+    expect(result?.summary).toContain('compacted')
+  })
+
+  it('round-trips state through snapshot()/restore()', async () => {
+    const source = new ContextManager({ systemPrompt: 'S', maxTokens: 100, minMessages: 2 })
+    source.appendUser('a'.repeat(400))
+    source.appendUser('b'.repeat(40))
+    source.appendUser('c'.repeat(40))
+    source.appendUser('d'.repeat(40))
+    await source.compact(async () => 'BRIEF')
+    const snapshot = source.snapshot()
+
+    const restored = new ContextManager({ systemPrompt: 'S', maxTokens: 100, minMessages: 2 })
+    restored.restore(snapshot)
+
+    expect(restored.length).toBe(source.length)
+    expect(restored.summaryText).toBe('BRIEF')
+    expect(restored.buildMessages()).toEqual(source.buildMessages())
+  })
+
+  it('applies transformOldMessages only to messages older than keepRecent', () => {
+    const context = new ContextManager({
+      systemPrompt: 'S',
+      minMessages: 1,
+      keepRecent: 1,
+      transformOldMessages: (message) => ({ ...message, content: `${message.content}!` })
+    })
+    context.appendUser('a')
+    context.appendUser('b')
+    context.appendUser('c')
+
+    const contents = context.buildMessages().map((m) => m.content)
+    expect(contents).toEqual(['S', 'a!', 'b!', 'c'])
+  })
+})

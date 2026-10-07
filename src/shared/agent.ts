@@ -97,6 +97,8 @@ export interface AgentRunResult {
 
 export interface AgentRunOptions {
   signal?: AbortSignal
+  /** Load a stored session's history into the context before running. */
+  resumeSessionId?: string
 }
 
 /** One provider the orchestrator may call; the first entry is the primary. */

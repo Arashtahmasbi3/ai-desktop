@@ -10,13 +10,14 @@ connect to DeepSeek API, VPS servers (SSH), GitHub (Git), and the local desktop 
 **Repository**: https://github.com/Arashtahmasbi3/ai-desktop (private, independent).
 Default branch `master`; remote `origin` tracks it. Push after every committed change.
 
-Current state: **Stage 4 — agent orchestrator**. Stage 1 skeleton (Electron + React 18 +
-TypeScript), Stage 2 LLM adapters (OpenAI/Anthropic/DeepSeek/Google) and Stage 3
-code-execution sandbox are in place. Stage 4 adds `AgentOrchestrator`
-(`src/core/agent-orchestrator.ts`): it runs the Planning → Execution → Observation →
-Reflection loop against a provider-agnostic adapter, executes tools inside a
-`SandboxManager`, detects loops (repeated actions / no progress) and recovers from tool
-and LLM failures with provider fallback. The chat UI, SSH and Git come next.
+Current state: **Stage 5 — context & state management**. Stage 1 skeleton (Electron + React 18 +
+TypeScript), Stage 2 LLM adapters (OpenAI/Anthropic/DeepSeek/Google), Stage 3 code-execution
+sandbox and Stage 4 `AgentOrchestrator` (Planning → Execution → Observation → Reflection loop,
+loop detection, failure recovery) are in place. Stage 5 adds context/state management:
+token estimation with automatic history compaction at 80% of the budget, a context compressor
+that strips code comments/blank lines and dedupes blocks, an on-disk JSON `SessionStore` with
+schema migration, and a `Persistence` layer that encrypts API keys (Electron `safeStorage` in
+the app) and resolves the AppData path. The chat UI, SSH and Git come next.
 
 ## Tech stack
 
@@ -42,6 +43,7 @@ and LLM failures with provider fallback. The chat UI, SSH and Git come next.
 ```
 src/
   main/index.ts          Electron main process (window + IPC handlers)
+  main/secure-cipher.ts  safeStorage-backed SecretCipher for API keys
   preload/index.ts       contextBridge API exposed as window.api
   preload/index.d.ts     window.api type declarations
   shared/types.ts        provider-agnostic LLM types (ChatMessage, ToolCall, ...)
@@ -50,7 +52,10 @@ src/
   core/
     agent-orchestrator.ts  AgentOrchestrator — plan/execute/observe/reflect loop
     agent/
-      context-manager.ts   conversation history + character budget
+      context-manager.ts   history + token budget + 80% auto-compaction + summary
+      context-compressor.ts comment/blank stripping + code-block dedupe
+      session-store.ts     on-disk JSON sessions + schema migration
+      persistence.ts       encrypted API keys, AppData path, settings migration
       loop-detector.ts     repeated-action / no-progress detection
       error-recovery.ts    tool + LLM retry/fallback policies
       tools.ts             SANDBOX_TOOLS + SandboxToolExecutor + action parsing
@@ -125,6 +130,16 @@ test/                    Vitest tests (adapters use a mocked fetch boundary)
 - Agent tests inject a scripted `BaseLLMAdapter` (`test/helpers/fake-adapter.ts`) at the
   LLM boundary and use a real local `SandboxManager` (`test/helpers/local-sandbox-manager.ts`),
   so tool execution, context handling and loop detection run for real.
+- Context/state: `AgentOrchestrator` builds its `ContextManager` with a token budget
+  (`contextWindowTokens`, defaulted from the provider's `getCapabilities`) and compacts history
+  with an LLM summary once usage crosses `compactionThreshold` (default 80%). `compressContext`
+  (default on) runs old messages through `context-compressor.ts` before they are sent — it only
+  affects the prompt, never the stored history/session. Sessions are saved via `SessionStore`
+  (one JSON file per session, atomic writes) and can be resumed with `run(task, { resumeSessionId })`.
+  API keys are never stored in plaintext: they go through a `SecretCipher`
+  (`SafeStorageCipher` = Electron `safeStorage` in the app) inside `persistence.ts`, which also
+  owns the AppData path (`resolveUserDataDir`) and settings migration. Both stores migrate old
+  payloads forward and re-save so legacy plaintext is scrubbed.
 - UI: dark theme only. Use the Tailwind theme tokens `bg-bg-primary` `#0a0a0a`,
   `bg-bg-secondary` `#141414`, `bg-bg-tertiary` `#1e1e1e`, `border-border`, `text-accent`.
 - Menus/labels in English; chat content is RTL (`dir="rtl"`), font Vazirmatn.

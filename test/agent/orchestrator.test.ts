@@ -2,10 +2,11 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { AgentOrchestrator, buildSystemPrompt } from '@core/agent-orchestrator'
+import { AgentOrchestrator, buildSystemPrompt, createAdapterSummarizer } from '@core/agent-orchestrator'
 import type { ProviderEntry } from '@core/agent-orchestrator'
 import { APIError, AuthError } from '@core/llm-adapters'
 import { MemoryLogger } from '@core/agent/logger'
+import { FileSessionStore } from '@core/agent/session-store'
 import { SANDBOX_TOOLS } from '@core/agent/tools'
 import { ScriptedAdapter, toolCall } from '../helpers/fake-adapter'
 import { createLocalManager, createUnavailableManager } from '../helpers/local-sandbox-manager'
@@ -322,5 +323,130 @@ describe('AgentOrchestrator', () => {
     expect(result.status).toBe('aborted')
     expect(result.message).toContain('aborted')
     await manager.dispose()
+  })
+})
+
+describe('AgentOrchestrator context and sessions (Stage 5)', () => {
+  it('compacts the context when it exceeds the token threshold', async () => {
+    const manager = createLocalManager(base)
+    const big = 'x'.repeat(5_000)
+    const adapter = new ScriptedAdapter('deepseek', [
+      { content: 'writing', toolCalls: [toolCall('write_file', { path: 'big.txt', content: big })] },
+      { content: 'reading', toolCalls: [toolCall('read_file', { path: 'big.txt' })] },
+      { content: 'reading again', toolCalls: [toolCall('read_file', { path: 'big.txt' })] },
+      { content: 'All done.' }
+    ])
+    const logger = new MemoryLogger()
+    const orchestrator = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(adapter)],
+      logger,
+      contextWindowTokens: 400,
+      compactionThreshold: 0.5,
+      compressContext: false,
+      summarizer: async () => 'BRIEF'
+    })
+
+    const result = await orchestrator.run('create and read a large file')
+
+    expect(result.status).toBe('completed')
+    expect(result.finalAnswer).toBe('All done.')
+    expect(logger.count('context.compacted')).toBeGreaterThan(0)
+    await manager.dispose()
+  })
+
+  it('persists the run to a session store and resumes it on the next run', async () => {
+    const manager = createLocalManager(base)
+    const store = new FileSessionStore(join(base, 'sessions'))
+    const firstAdapter = new ScriptedAdapter('deepseek', [{ content: 'first done' }])
+    const first = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(firstAdapter)],
+      sessionStore: store,
+      sessionId: 'shared'
+    })
+
+    const run1 = await first.run('remember the number 7')
+    expect(run1.status).toBe('completed')
+
+    const saved = await store.load('shared')
+    expect(saved?.task).toBe('remember the number 7')
+    expect(saved?.status).toBe('completed')
+    expect(saved?.messages).toEqual([
+      { role: 'user', content: 'remember the number 7' },
+      { role: 'assistant', content: 'first done' }
+    ])
+
+    const secondAdapter = new ScriptedAdapter('deepseek', [{ content: 'second done' }])
+    const second = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(secondAdapter)],
+      sessionStore: store,
+      sessionId: 'shared'
+    })
+
+    const run2 = await second.run('what number?', { resumeSessionId: 'shared' })
+    expect(run2.status).toBe('completed')
+    // The resumed history was sent to the model before the new task.
+    const sent = secondAdapter.calls[0].messages.map((message) => message.content)
+    expect(sent).toContain('remember the number 7')
+    expect(sent).toContain('first done')
+    expect(sent[sent.length - 1]).toBe('what number?')
+
+    await manager.dispose()
+  })
+
+  it('does not fail the run when the session store rejects', async () => {
+    const manager = createLocalManager(base)
+    const failingStore = {
+      save: async (): Promise<void> => {
+        throw new Error('disk full')
+      },
+      load: async (): Promise<null> => null,
+      list: async (): Promise<never[]> => [],
+      delete: async (): Promise<void> => undefined
+    }
+    const logger = new MemoryLogger()
+    const adapter = new ScriptedAdapter('deepseek', [{ content: 'done' }])
+    const orchestrator = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(adapter)],
+      logger,
+      sessionStore: failingStore
+    })
+
+    const result = await orchestrator.run('do a thing')
+
+    expect(result.status).toBe('completed')
+    expect(logger.count('session.save_failed')).toBe(1)
+    await manager.dispose()
+  })
+})
+
+describe('createAdapterSummarizer', () => {
+  it('returns the model summary and sends the transcript', async () => {
+    const adapter = new ScriptedAdapter('deepseek', [{ content: 'COMPACT BRIEF' }])
+    const summarizer = createAdapterSummarizer(entry(adapter))
+
+    const summary = await summarizer({
+      previousSummary: 'earlier',
+      messages: [{ role: 'user', content: 'hello world' }]
+    })
+
+    expect(summary).toBe('COMPACT BRIEF')
+    const request = adapter.calls[0]
+    expect(request.messages[0].role).toBe('system')
+    expect(request.messages[1].content).toContain('hello world')
+    expect(request.messages[1].content).toContain('Previous summary:')
+    expect(request.messages[1].content).toContain('earlier')
+  })
+
+  it('falls back to a deterministic summary when the call fails', async () => {
+    const adapter = new ScriptedAdapter('deepseek', [{ error: new Error('boom') }])
+    const summarizer = createAdapterSummarizer(entry(adapter))
+
+    const summary = await summarizer({ previousSummary: null, messages: [{ role: 'user', content: 'hi' }] })
+
+    expect(summary).toContain('compacted')
   })
 })
