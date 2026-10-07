@@ -206,6 +206,29 @@ describe('AgentOrchestrator', () => {
     await manager.dispose()
   })
 
+  it('resets loop state between sequential runs on the same instance', async () => {
+    const manager = createLocalManager(base)
+    const action = (): ReturnType<typeof toolCall> =>
+      toolCall('write_file', { path: 'same.txt', content: 'x' })
+    const adapter = new ScriptedAdapter('deepseek', [
+      { toolCalls: [action()] },
+      { content: 'first done' },
+      { toolCalls: [action()] },
+      { content: 'second done' }
+    ])
+    const orchestrator = new AgentOrchestrator({ sandbox: manager, providers: [entry(adapter)] })
+
+    const first = await orchestrator.run('first task')
+    const second = await orchestrator.run('second task')
+
+    expect(first.runId).not.toBe(second.runId)
+    // The same action is "new" again in the second run: no stale loop state leaks over.
+    expect(first.steps[0].productive).toBe(true)
+    expect(second.steps[0].productive).toBe(true)
+    expect(second.warnings).toHaveLength(0)
+    await manager.dispose()
+  })
+
   it('falls back to the next provider on an auth error', async () => {
     const manager = createLocalManager(base)
     const primary = new ScriptedAdapter('openai', [
@@ -283,6 +306,21 @@ describe('AgentOrchestrator', () => {
     expect(result.status).toBe('aborted')
     expect(result.message).toContain('aborted')
     expect(manager.listSandboxes()).toHaveLength(0)
+    await manager.dispose()
+  })
+
+  it('reports an abort that lands mid-call as aborted (not failed)', async () => {
+    const manager = createLocalManager(base)
+    const controller = new AbortController()
+    const adapter = new ScriptedAdapter('deepseek', [
+      { onChat: () => controller.abort(), error: new Error('aborted mid-flight') }
+    ])
+    const orchestrator = new AgentOrchestrator({ sandbox: manager, providers: [entry(adapter)] })
+
+    const result = await orchestrator.run('cancel mid-call', { signal: controller.signal })
+
+    expect(result.status).toBe('aborted')
+    expect(result.message).toContain('aborted')
     await manager.dispose()
   })
 })

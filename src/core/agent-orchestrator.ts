@@ -135,12 +135,11 @@ export class AgentOrchestrator {
   private readonly maxSteps: number
   private readonly contextMaxChars?: number
   private readonly commandTimeoutMs: number
-  private readonly loopDetector: LoopDetector
+  private readonly loopPolicy: Partial<LoopDetectionPolicy>
   private readonly recovery: ErrorRecovery
   private readonly sandboxOptions: CreateSandboxOptions
   private readonly now: () => number
   private readonly runIdFactory: () => string
-  private readonly observedSignatures = new Set<string>()
   private runCounter = 0
 
   constructor(options: AgentOrchestratorOptions) {
@@ -154,7 +153,7 @@ export class AgentOrchestrator {
     this.maxSteps = options.maxSteps ?? DEFAULT_MAX_STEPS
     this.contextMaxChars = options.contextMaxChars
     this.commandTimeoutMs = options.commandTimeoutMs ?? DEFAULT_COMMAND_TIMEOUT_MS
-    this.loopDetector = new LoopDetector(options.loopPolicy)
+    this.loopPolicy = options.loopPolicy ?? {}
     this.recovery = new ErrorRecovery(options.recoveryPolicy)
     this.sandboxOptions = options.sandboxOptions ?? {}
     this.now = options.now ?? (() => Date.now())
@@ -213,6 +212,9 @@ export class AgentOrchestrator {
     }
 
     const executor = new SandboxToolExecutor(this.sandbox, sandboxId, this.commandTimeoutMs)
+    // Per-run state so sequential or concurrent `run()` calls never share loop state.
+    const loopDetector = new LoopDetector(this.loopPolicy)
+    const observedSignatures = new Set<string>()
     const context = new ContextManager({
       systemPrompt: buildSystemPrompt(provider, this.tools),
       ...(this.contextMaxChars !== undefined ? { maxChars: this.contextMaxChars } : {})
@@ -290,7 +292,7 @@ export class AgentOrchestrator {
         }
 
         // ---- Observation + Reflection ----
-        const productive = this.isProductive(actions, observations)
+        const productive = this.isProductive(actions, observations, observedSignatures)
         const reflection = this.reflect(actions, observations, productive)
         this.log('debug', 'step.reflection', runId, {
           step: index,
@@ -311,7 +313,7 @@ export class AgentOrchestrator {
         })
 
         // ---- Loop detection ----
-        const loop = this.loopDetector.observe({
+        const loop = loopDetector.observe({
           signatures: actions.map((action) => action.signature),
           productive
         })
@@ -330,11 +332,11 @@ export class AgentOrchestrator {
         if (loop.shouldAskUser) {
           this.log('warn', 'loop.needs_input', runId, {
             step: index,
-            noProgressSteps: this.loopDetector.noProgressSteps
+            noProgressSteps: loopDetector.noProgressSteps
           })
           status = 'needs_input'
           message =
-            `Stopped after ${this.loopDetector.noProgressSteps} steps without progress. ` +
+            `Stopped after ${loopDetector.noProgressSteps} steps without progress. ` +
             'Provide guidance to continue.'
           finalAnswer = null
           break
@@ -349,13 +351,15 @@ export class AgentOrchestrator {
     } catch (error) {
       const text = error instanceof Error ? error.message : String(error)
       this.log('error', 'run.error', runId, { message: text })
+      // A cancellation that lands mid-call should read as `aborted`, not `failed`.
+      const aborted = options.signal?.aborted === true
       return this.finish(
         runId,
         task,
-        'failed',
+        aborted ? 'aborted' : 'failed',
         steps,
         finalAnswer,
-        `LLM call failed: ${text}`,
+        aborted ? 'Run aborted by caller' : `LLM call failed: ${text}`,
         { provider: providerUsed, sandboxId },
         warnings,
         usage,
@@ -537,10 +541,11 @@ export class AgentOrchestrator {
   /** A step is productive when a newly-attempted action succeeds. */
   private isProductive(
     actions: AgentAction[],
-    observations: AgentToolResult[]
+    observations: AgentToolResult[],
+    observedSignatures: Set<string>
   ): boolean {
-    const attemptedBefore = new Set(this.observedSignatures)
-    for (const action of actions) this.observedSignatures.add(action.signature)
+    const attemptedBefore = new Set(observedSignatures)
+    for (const action of actions) observedSignatures.add(action.signature)
     return observations.some(
       (result, index) => result.ok && !attemptedBefore.has(actions[index]?.signature ?? '')
     )

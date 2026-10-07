@@ -17,6 +17,8 @@ export interface ScriptedTurn {
   usage?: ChatResponse['usage']
   /** When set, the adapter throws this instead of returning a response. */
   error?: unknown
+  /** Side effect run just before the turn is returned/throws (e.g. abort a signal). */
+  onChat?: () => void
 }
 
 let callCounter = 0
@@ -55,6 +57,7 @@ export class ScriptedAdapter implements BaseLLMAdapter {
     this.calls.push(request)
     const turn = this.queue.shift()
     if (!turn) throw new Error(`ScriptedAdapter(${this.provider}): no scripted turn left`)
+    turn.onChat?.()
     if (turn.error) throw turn.error
     const toolCalls = turn.toolCalls ?? []
     return {
