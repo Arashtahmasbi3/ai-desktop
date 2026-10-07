@@ -7,9 +7,11 @@ Persistent memory / operating guide for AI agents working in this repository.
 **AI Desktop** — an Electron desktop AI assistant. Long-term goal: behave like Codex and
 connect to DeepSeek API, VPS servers (SSH), GitHub (Git), and the local desktop (file I/O).
 
-Current state: **Stage 2 — LLM adapter layer**. Stage 1 skeleton (Electron + React 18 +
-TypeScript) is in place. Stage 2 adds a provider-agnostic LLM abstraction under
-`src/core/llm-adapters/` (OpenAI, Anthropic, DeepSeek, Google) plus `src/shared/` types.
+Current state: **Stage 3 — code-execution sandbox**. Stage 1 skeleton (Electron + React 18 +
+TypeScript) and Stage 2 LLM adapters (OpenAI/Anthropic/DeepSeek/Google) are in place.
+Stage 3 adds `src/core/sandbox/`: a `SandboxManager` with a Docker-backed provider
+(resource limits, no network by default) and local/Windows fallbacks, plus lifecycle
+management (concurrency cap, TTL/idle auto-destroy).
 
 ## Tech stack
 
@@ -38,6 +40,7 @@ src/
   preload/index.ts       contextBridge API exposed as window.api
   preload/index.d.ts     window.api type declarations
   shared/types.ts        provider-agnostic LLM types (ChatMessage, ToolCall, ...)
+  shared/sandbox.ts      sandbox types (SandboxManager, limits, ExecResult, ...)
   core/
     llm-adapters/
       base.ts            BaseLLMAdapter interface + BaseAdapter class + collectStream
@@ -50,6 +53,16 @@ src/
       http.ts            fetch + timeout + retry/backoff
       sse.ts             Server-Sent Events parser
       util.ts            safe JSON walking helpers
+    sandbox/
+      manager.ts         SandboxManagerImpl — lifecycle, concurrency, TTL/idle sweep
+      docker-sandbox.ts  DockerSandboxDriver (limits, --network none, read-only rootfs)
+      local-sandbox.ts   LocalSandboxDriver + WindowsSandboxDriver (no-Docker fallback)
+      driver.ts          SandboxDriver/SandboxHandle interfaces
+      command-runner.ts  ChildProcessRunner (spawn + timeout + capped output)
+      concurrency.ts     Semaphore for max concurrent sandboxes
+      registry.ts        provider registry + availability-based selection
+      paths.ts           workspace path containment (rejects escapes)
+      errors.ts          typed sandbox errors
   renderer/
     index.html
     src/
@@ -78,6 +91,14 @@ test/                    Vitest tests (adapters use a mocked fetch boundary)
   `electron.vite.config.ts` and `vitest.config.ts`.
 - Tests mock the HTTP boundary (a fake `fetch` injected via `config.fetchImpl` or
   `test/helpers/mock-fetch.ts`) so adapters' own logic is still exercised end to end.
+- Sandbox code execution goes through `SandboxManager` (`createSandbox`, `executeCommand`,
+  `writeFile`, `readFile`, `destroySandbox`) — never spawn processes for rendered code
+  directly. Providers: `docker` (primary; hardened flags, `--network none` default) then
+  `windows`/`local` fallbacks. The local fallback is **not** a security boundary; state
+  that explicitly whenever it is used. Every path is validated by `paths.ts`.
+- Sandbox tests: command-execution and file round-trips run for real against the local
+  driver; the Docker driver is tested deterministically with an injected `CommandRunner`
+  (asserting exact CLI flags), and real Docker integration is gated on daemon availability.
 - UI: dark theme only. Use the Tailwind theme tokens `bg-bg-primary` `#0a0a0a`,
   `bg-bg-secondary` `#141414`, `bg-bg-tertiary` `#1e1e1e`, `border-border`, `text-accent`.
 - Menus/labels in English; chat content is RTL (`dir="rtl"`), font Vazirmatn.
