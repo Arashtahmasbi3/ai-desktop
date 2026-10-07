@@ -3,10 +3,11 @@
 An Electron desktop AI assistant — a local, Codex-like companion that connects to the
 DeepSeek API, VPS servers (SSH), GitHub (Git), and your local files.
 
-> Status: **Stage 3 — code-execution sandbox**. The app ships a provider-agnostic LLM
-> abstraction (OpenAI, Anthropic, DeepSeek, Google) and a sandboxed code-execution layer
-> (`SandboxManager`): Docker-backed by default (resource limits, no network), with local/
-> Windows fallbacks, concurrency limits and TTL/idle auto-destroy. Chat UI, the agent loop,
+> Status: **Stage 4 — agent orchestrator**. The app ships a provider-agnostic LLM
+> abstraction (OpenAI, Anthropic, DeepSeek, Google), a sandboxed code-execution layer
+> (`SandboxManager`: Docker-backed by default with local/Windows fallbacks) and an
+> `AgentOrchestrator` that runs the Planning → Execution → Observation → Reflection loop,
+> executes tools in the sandbox, detects loops and recovers from failures. The chat UI,
 > SSH and Git come in later stages.
 
 ## Requirements
@@ -76,6 +77,28 @@ Docker sandboxes run with `--network none` (default), a read-only root filesyste
 memory/PID limits, and only a dedicated workspace bind-mount is writable. Without Docker,
 `WindowsSandboxDriver` (Windows) or `LocalSandboxDriver` is used — that path is a
 convenience fallback and **not** a security boundary.
+
+### Agent orchestrator
+
+```ts
+import { AgentOrchestrator } from '@core/agent-orchestrator'
+
+const agent = new AgentOrchestrator({
+  sandbox: manager,
+  providers: [{ provider: 'deepseek', adapter, config: { apiKey, model: 'deepseek-chat' } }]
+})
+
+const result = await agent.run('Create a Node script that prints the first 10 primes and run it.')
+console.log(result.status, result.finalAnswer, result.steps.length, result.warnings)
+```
+
+The orchestrator loops Planning → Execution → Observation → Reflection: it asks the model
+for the next tool call, runs it in the sandbox (`write_file`, `read_file`, `list_dir`,
+`run_command`), feeds the observation back and stops when the model answers without tool
+calls. It warns after an action is repeated more than three times, pauses with
+`needs_input` after repeated no-progress steps, retries transient sandbox failures and
+falls back to the next provider on auth/config errors. Pass an `AbortSignal` via
+`agent.run(task, { signal })` to cancel.
 
 See [`AGENTS.md`](./AGENTS.md) for architecture notes and conventions.
 

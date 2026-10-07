@@ -10,11 +10,13 @@ connect to DeepSeek API, VPS servers (SSH), GitHub (Git), and the local desktop 
 **Repository**: https://github.com/Arashtahmasbi3/ai-desktop (private, independent).
 Default branch `master`; remote `origin` tracks it. Push after every committed change.
 
-Current state: **Stage 3 — code-execution sandbox**. Stage 1 skeleton (Electron + React 18 +
-TypeScript) and Stage 2 LLM adapters (OpenAI/Anthropic/DeepSeek/Google) are in place.
-Stage 3 adds `src/core/sandbox/`: a `SandboxManager` with a Docker-backed provider
-(resource limits, no network by default) and local/Windows fallbacks, plus lifecycle
-management (concurrency cap, TTL/idle auto-destroy).
+Current state: **Stage 4 — agent orchestrator**. Stage 1 skeleton (Electron + React 18 +
+TypeScript), Stage 2 LLM adapters (OpenAI/Anthropic/DeepSeek/Google) and Stage 3
+code-execution sandbox are in place. Stage 4 adds `AgentOrchestrator`
+(`src/core/agent-orchestrator.ts`): it runs the Planning → Execution → Observation →
+Reflection loop against a provider-agnostic adapter, executes tools inside a
+`SandboxManager`, detects loops (repeated actions / no progress) and recovers from tool
+and LLM failures with provider fallback. The chat UI, SSH and Git come next.
 
 ## Tech stack
 
@@ -44,7 +46,16 @@ src/
   preload/index.d.ts     window.api type declarations
   shared/types.ts        provider-agnostic LLM types (ChatMessage, ToolCall, ...)
   shared/sandbox.ts      sandbox types (SandboxManager, limits, ExecResult, ...)
+  shared/agent.ts        agent types (AgentStep, AgentRunResult, LoopWarning, policies)
   core/
+    agent-orchestrator.ts  AgentOrchestrator — plan/execute/observe/reflect loop
+    agent/
+      context-manager.ts   conversation history + character budget
+      loop-detector.ts     repeated-action / no-progress detection
+      error-recovery.ts    tool + LLM retry/fallback policies
+      tools.ts             SANDBOX_TOOLS + SandboxToolExecutor + action parsing
+      logger.ts            JSON-Lines / in-memory loggers
+      index.ts             barrel export
     llm-adapters/
       base.ts            BaseLLMAdapter interface + BaseAdapter class + collectStream
       openai.ts          OpenAI (also the OpenAI-compatible base)
@@ -102,6 +113,18 @@ test/                    Vitest tests (adapters use a mocked fetch boundary)
 - Sandbox tests: command-execution and file round-trips run for real against the local
   driver; the Docker driver is tested deterministically with an injected `CommandRunner`
   (asserting exact CLI flags), and real Docker integration is gated on daemon availability.
+- Agent orchestration goes through `AgentOrchestrator` (`src/core/agent-orchestrator.ts`).
+  It owns the Planning → Execution → Observation → Reflection loop and is the only place
+  that drives an adapter and a sandbox together. Tool calls are turned into `AgentAction`s
+  by `tools.ts`, executed via `SandboxToolExecutor` (never host APIs directly), and the
+  result is fed back as a `tool` message. Loop detection lives in `loop-detector.ts`
+  (warn on >3 repeats of the same action signature; ask the user after repeated
+  no-progress steps), recovery policies in `error-recovery.ts` (bounded retries for
+  transient sandbox errors; provider fallback on auth/config errors). Streaming is not
+  used by the orchestrator — it calls `adapter.chat`.
+- Agent tests inject a scripted `BaseLLMAdapter` (`test/helpers/fake-adapter.ts`) at the
+  LLM boundary and use a real local `SandboxManager` (`test/helpers/local-sandbox-manager.ts`),
+  so tool execution, context handling and loop detection run for real.
 - UI: dark theme only. Use the Tailwind theme tokens `bg-bg-primary` `#0a0a0a`,
   `bg-bg-secondary` `#141414`, `bg-bg-tertiary` `#1e1e1e`, `border-border`, `text-accent`.
 - Menus/labels in English; chat content is RTL (`dir="rtl"`), font Vazirmatn.

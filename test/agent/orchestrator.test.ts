@@ -1,0 +1,288 @@
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { promises as fs } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
+import { AgentOrchestrator, buildSystemPrompt } from '@core/agent-orchestrator'
+import type { ProviderEntry } from '@core/agent-orchestrator'
+import { APIError, AuthError } from '@core/llm-adapters'
+import { MemoryLogger } from '@core/agent/logger'
+import { SANDBOX_TOOLS } from '@core/agent/tools'
+import { ScriptedAdapter, toolCall } from '../helpers/fake-adapter'
+import { createLocalManager, createUnavailableManager } from '../helpers/local-sandbox-manager'
+
+let base: string
+
+beforeEach(async () => {
+  base = await fs.mkdtemp(join(tmpdir(), 'agent-orch-'))
+})
+
+afterEach(async () => {
+  await fs.rm(base, { recursive: true, force: true })
+})
+
+function entry(adapter: ScriptedAdapter): ProviderEntry {
+  return { provider: adapter.provider, adapter, config: { apiKey: 'test-key', model: 'test-model' } }
+}
+
+describe('buildSystemPrompt', () => {
+  it('describes the sandbox provider and the available tools', () => {
+    const prompt = buildSystemPrompt('docker', SANDBOX_TOOLS)
+    expect(prompt).toContain('docker')
+    expect(prompt).toContain('write_file')
+    expect(prompt).toContain('run_command')
+    expect(prompt).toContain('Planning')
+  })
+})
+
+describe('AgentOrchestrator', () => {
+  it('requires at least one provider', () => {
+    const manager = createLocalManager(base)
+    expect(() => new AgentOrchestrator({ sandbox: manager, providers: [] })).toThrow()
+  })
+
+  it('exposes the phase order', () => {
+    expect(AgentOrchestrator.phaseOrder()).toEqual([
+      'planning',
+      'execution',
+      'observation',
+      'reflection'
+    ])
+  })
+
+  it('completes when the model answers without tool calls', async () => {
+    const manager = createLocalManager(base)
+    const adapter = new ScriptedAdapter('deepseek', [{ content: 'All done.' }])
+    const logger = new MemoryLogger()
+    const orchestrator = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(adapter)],
+      logger
+    })
+
+    const result = await orchestrator.run('say hi')
+
+    expect(result.status).toBe('completed')
+    expect(result.finalAnswer).toBe('All done.')
+    expect(result.message).toBeNull()
+    expect(result.steps).toHaveLength(1)
+    expect(result.steps[0].actions).toHaveLength(0)
+    expect(result.sandboxId).not.toBeNull()
+    expect(manager.listSandboxes()).toHaveLength(0)
+    expect(logger.first('run.end')).toBeDefined()
+    await manager.dispose()
+  })
+
+  it('executes tool calls and feeds real observations back to the model', async () => {
+    const manager = createLocalManager(base)
+    const adapter = new ScriptedAdapter('deepseek', [
+      { toolCalls: [toolCall('write_file', { path: 'hello.txt', content: 'hi world' })] },
+      { toolCalls: [toolCall('read_file', { path: 'hello.txt' })] },
+      { content: 'The file contains: hi world' }
+    ])
+    const orchestrator = new AgentOrchestrator({ sandbox: manager, providers: [entry(adapter)] })
+
+    const result = await orchestrator.run('create and read a file')
+
+    expect(result.status).toBe('completed')
+    expect(result.finalAnswer).toBe('The file contains: hi world')
+    expect(result.steps).toHaveLength(3)
+    expect(result.steps[0]).toMatchObject({ productive: true })
+    expect(result.steps[0].actions[0].name).toBe('write_file')
+    expect(result.steps[0].observations[0].ok).toBe(true)
+
+    const secondCall = adapter.calls[1].messages
+    expect(secondCall.some((m) => m.role === 'tool' && m.content?.includes('hello.txt'))).toBe(true)
+
+    const thirdCall = adapter.calls[2].messages
+    expect(thirdCall.some((m) => m.role === 'tool' && m.content?.includes('hi world'))).toBe(true)
+
+    await manager.dispose()
+  })
+
+  it('reports tool failures as observations and keeps going', async () => {
+    const manager = createLocalManager(base)
+    const adapter = new ScriptedAdapter('deepseek', [
+      { toolCalls: [toolCall('delete_everything', {})] },
+      { content: 'I cannot do that.' }
+    ])
+    const orchestrator = new AgentOrchestrator({ sandbox: manager, providers: [entry(adapter)] })
+
+    const result = await orchestrator.run('destroy the world')
+
+    expect(result.status).toBe('completed')
+    expect(result.steps[0].observations[0]).toMatchObject({ ok: false, code: 'unknown_tool' })
+    const observation = adapter.calls[1].messages.find((m) => m.role === 'tool')
+    expect(observation?.content).toContain('unknown_tool')
+    await manager.dispose()
+  })
+
+  it('accumulates token usage across steps', async () => {
+    const manager = createLocalManager(base)
+    const adapter = new ScriptedAdapter('deepseek', [
+      {
+        toolCalls: [toolCall('write_file', { path: 'u.txt', content: 'x' })],
+        usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 }
+      },
+      { content: 'done', usage: { promptTokens: 3, completionTokens: 2, totalTokens: 5 } }
+    ])
+    const orchestrator = new AgentOrchestrator({ sandbox: manager, providers: [entry(adapter)] })
+
+    const result = await orchestrator.run('count tokens')
+
+    expect(result.usage).toEqual({ promptTokens: 13, completionTokens: 7, totalTokens: 20 })
+    await manager.dispose()
+  })
+
+  it('detects a repeated action after more than three identical calls', async () => {
+    const manager = createLocalManager(base)
+    const same = (): ReturnType<typeof toolCall> =>
+      toolCall('write_file', { path: 'same.txt', content: 'x' })
+    const adapter = new ScriptedAdapter('deepseek', [
+      { toolCalls: [same()] },
+      { toolCalls: [same()] },
+      { toolCalls: [same()] },
+      { toolCalls: [same()] },
+      { content: 'Stopping, I was looping.' }
+    ])
+    const logger = new MemoryLogger()
+    const orchestrator = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(adapter)],
+      logger
+    })
+
+    const result = await orchestrator.run('write the same file')
+
+    expect(result.status).toBe('completed')
+    expect(result.warnings.find((w) => w.kind === 'repeated_action')).toMatchObject({ count: 4 })
+    expect(logger.find('loop.warning').length).toBeGreaterThan(0)
+    await manager.dispose()
+  })
+
+  it('stops and asks the user after repeated unproductive steps', async () => {
+    const manager = createLocalManager(base)
+    const same = (): ReturnType<typeof toolCall> =>
+      toolCall('write_file', { path: 'loop.txt', content: 'x' })
+    const adapter = new ScriptedAdapter('deepseek', [
+      { toolCalls: [same()] },
+      { toolCalls: [same()] },
+      { toolCalls: [same()] },
+      { toolCalls: [same()] },
+      { toolCalls: [same()] }
+    ])
+    const orchestrator = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(adapter)],
+      loopPolicy: { noProgressThreshold: 2, repeatedActionThreshold: 100 }
+    })
+
+    const result = await orchestrator.run('loop forever')
+
+    expect(result.status).toBe('needs_input')
+    expect(result.finalAnswer).toBeNull()
+    expect(result.message).toContain('without progress')
+    expect(result.warnings.some((w) => w.kind === 'no_progress')).toBe(true)
+    await manager.dispose()
+  })
+
+  it('stops at maxSteps when the model keeps calling tools', async () => {
+    const manager = createLocalManager(base)
+    const adapter = new ScriptedAdapter('deepseek', [
+      { toolCalls: [toolCall('write_file', { path: 'a.txt', content: '1' })] },
+      { toolCalls: [toolCall('write_file', { path: 'b.txt', content: '2' })] },
+      { content: 'never reached' }
+    ])
+    const orchestrator = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(adapter)],
+      maxSteps: 2,
+      loopPolicy: { noProgressThreshold: 100, repeatedActionThreshold: 100 }
+    })
+
+    const result = await orchestrator.run('do two things')
+
+    expect(result.status).toBe('max_steps')
+    expect(result.steps).toHaveLength(2)
+    await manager.dispose()
+  })
+
+  it('falls back to the next provider on an auth error', async () => {
+    const manager = createLocalManager(base)
+    const primary = new ScriptedAdapter('openai', [
+      { error: new AuthError('bad key', { provider: 'openai' }) }
+    ])
+    const fallback = new ScriptedAdapter('deepseek', [{ content: 'Fallback answer.' }])
+    const logger = new MemoryLogger()
+    const orchestrator = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(primary), entry(fallback)],
+      logger
+    })
+
+    const result = await orchestrator.run('hello')
+
+    expect(result.status).toBe('completed')
+    expect(result.finalAnswer).toBe('Fallback answer.')
+    expect(logger.first('recovery.provider_switch')).toMatchObject({
+      from: 'openai',
+      to: 'deepseek'
+    })
+    await manager.dispose()
+  })
+
+  it('fails the run when every provider call fails', async () => {
+    const manager = createLocalManager(base)
+    const adapter = new ScriptedAdapter('deepseek', [
+      { error: new APIError('server exploded', { retryable: true }) }
+    ])
+    const orchestrator = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(adapter)],
+      recoveryPolicy: { maxLlmAttempts: 1, maxAttempts: 1 }
+    })
+
+    const result = await orchestrator.run('will fail')
+
+    expect(result.status).toBe('failed')
+    expect(result.message).toContain('LLM call failed')
+    expect(adapter.calls).toHaveLength(1)
+    expect(manager.listSandboxes()).toHaveLength(0)
+    await manager.dispose()
+  })
+
+  it('fails fast when no sandbox can be created', async () => {
+    const manager = createUnavailableManager(base)
+    const adapter = new ScriptedAdapter('deepseek', [{ content: 'unused' }])
+    const logger = new MemoryLogger()
+    const orchestrator = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(adapter)],
+      logger
+    })
+
+    const result = await orchestrator.run('anything')
+
+    expect(result.status).toBe('failed')
+    expect(result.sandboxId).toBeNull()
+    expect(result.steps).toHaveLength(0)
+    expect(result.message).toContain('unavailable')
+    expect(adapter.calls).toHaveLength(0)
+    expect(logger.first('sandbox.create_failed')).toBeDefined()
+    await manager.dispose()
+  })
+
+  it('reports an aborted run', async () => {
+    const manager = createLocalManager(base)
+    const adapter = new ScriptedAdapter('deepseek', [])
+    const controller = new AbortController()
+    controller.abort()
+    const orchestrator = new AgentOrchestrator({ sandbox: manager, providers: [entry(adapter)] })
+
+    const result = await orchestrator.run('stop now', { signal: controller.signal })
+
+    expect(result.status).toBe('aborted')
+    expect(result.message).toContain('aborted')
+    expect(manager.listSandboxes()).toHaveLength(0)
+    await manager.dispose()
+  })
+})
