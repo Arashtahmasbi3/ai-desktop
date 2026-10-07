@@ -167,6 +167,55 @@ test/                    Vitest tests (adapters use a mocked fetch boundary)
 - Keep the Content-Security-Policy in `src/renderer/index.html` in sync with any new
   external resource (fonts, network calls to the DeepSeek API, etc.).
 
+## Release process
+
+The project uses SemVer + annotated git tags, with GitHub Releases as the distribution channel.
+Tags are `v<version>` and match `version` in `package.json`.
+
+1. **Bump the version** in `package.json`, then sync the lockfile:
+   `npm install --package-lock-only --ignore-scripts`.
+2. **Update `CHANGELOG.md`** — move the `[Unreleased]` bullets under a new
+   `## [<version>] — <date>` heading and update the compare-link footnotes.
+3. **Re-verify** before tagging: `npm run typecheck && npm test` (must be green) and
+   `npm run build:win` (produce the artifacts). Cross-building on Linux needs 32-bit Wine —
+   see *Lessons learned*.
+4. **Checksum the artifacts** (in `release/`):
+   `sha256sum "AI Desktop Setup <v>.exe" "AI Desktop <v> Portable.exe" > SHA256SUMS.txt`.
+   GitHub's limit is 2 GB per asset; both artifacts are ~110 MB so no Git LFS is needed.
+5. **Commit and push** the version/changelog/docs changes to `master`.
+6. **Tag and push:**
+   ```bash
+   git tag -a v<version> -m "AI Desktop v<version>"
+   git push origin master && git push origin v<version>
+   ```
+7. **Create the GitHub Release** for the tag. Start as a **pre-release** to collect feedback,
+   then promote to a full release once install/run is confirmed on a clean Windows machine.
+   Upload `AI Desktop Setup <v>.exe`, `AI Desktop <v> Portable.exe` and `SHA256SUMS.txt`, and
+   put the checksums in the release body. Example (uses `$GITHUB_PERSONAL_ACCESS_TOKEN`):
+   ```bash
+   REL=$(curl -s -X POST \
+     -H "Authorization: Bearer $GITHUB_PERSONAL_ACCESS_TOKEN" \
+     -H "Accept: application/vnd.github+json" \
+     https://api.github.com/repos/Arashtahmasbi3/ai-desktop/releases \
+     -d '{"tag_name":"v<version>","target_commitish":"master",
+          "name":"v<version> — Initial Release (Pre-release)","prerelease":true,
+          "body":"..."}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])')
+
+   for f in "AI Desktop Setup <v>.exe" "AI Desktop <v> Portable.exe" SHA256SUMS.txt; do
+     curl -s -X POST \
+       -H "Authorization: Bearer $GITHUB_PERSONAL_ACCESS_TOKEN" \
+       -H "Content-Type: application/octet-stream" \
+       --data-binary @"release/$f" \
+       "https://uploads.github.com/repos/Arashtahmasbi3/ai-desktop/releases/$REL/assets?name=$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1]))" "$f")"
+   done
+   ```
+8. **Verify** the release via the API (`/releases/tags/v<version>`): `prerelease` flag, all
+   three assets present with the expected sizes.
+
+Notes: assets are uploaded via `uploads.github.com` (not the API host); the release body always
+carries the SmartScreen warning while the build is unsigned. Do **not** delete the tag when
+promoting — just flip the release's `prerelease` flag to `false`.
+
 ## Packaging
 
 - Config lives in `electron-builder.yml` (referenced by `npm run build:win` / `npm run pack`).
