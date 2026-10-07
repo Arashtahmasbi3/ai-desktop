@@ -7,6 +7,9 @@ Persistent memory / operating guide for AI agents working in this repository.
 **AI Desktop** — an Electron desktop AI assistant. Long-term goal: behave like Codex and
 connect to DeepSeek API, VPS servers (SSH), GitHub (Git), and the local desktop (file I/O).
 
+**Repository**: https://github.com/Arashtahmasbi3/ai-desktop (private, independent).
+Default branch `master`; remote `origin` tracks it. Push after every committed change.
+
 Current state: **Stage 3 — code-execution sandbox**. Stage 1 skeleton (Electron + React 18 +
 TypeScript) and Stage 2 LLM adapters (OpenAI/Anthropic/DeepSeek/Google) are in place.
 Stage 3 adds `src/core/sandbox/`: a `SandboxManager` with a Docker-backed provider
