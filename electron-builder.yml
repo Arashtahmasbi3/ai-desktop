@@ -1,0 +1,21 @@
+appId: com.sepid.ai-desktop
+productName: AI Desktop
+copyright: Copyright © 2026 Sepid_Com
+directories:
+  buildResources: build
+  output: release
+files:
+  - out/**/*
+  - package.json
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: AI Desktop
