@@ -6,9 +6,50 @@
 - تاریخ پایان: 2026-10-05
 - مجموع Sprintها: ۴ (v1.1, v1.2, v1.3, v2.0)
 - مجموع قابلیتها: ۱۵
-- مجموع کامیتهای Sprint 4: ۳ (به‌علاوه کامیتهای Sprint 1–3 روی برنچ‌های جدا)
+- مجموع کامیتهای Sprint 4: ۵ (۳ کامیت قابلیت/تست + یادداشت backlog + اصلاح build)
+- مجموع کامیتهای `master`: ۳۲
 - مجموع تستها: **384 پاس / 1 skip** (۵۳ فایل) — `typecheck` و `build` سبز
-- وضعیت نهایی: ✅ (به‌صورت محلی کامیت شد؛ push/merge به master انجام نشد — نیازمند تأیید کاربر)
+- حجم کد: **~14,256 خط** TypeScript/TSX در `src/` (۱۱۰ فایل) + **~5,578 خط** تست
+- وضعیت نهایی: ✅ (merge به master، tag، pre-release و installer منتشر شد)
+
+## لینک pre-releaseها
+
+| نسخه | لینک |
+| --- | --- |
+| v1.1.0 | https://github.com/Arashtahmasbi3/ai-desktop/releases/tag/v1.1.0 |
+| v1.2.0 | https://github.com/Arashtahmasbi3/ai-desktop/releases/tag/v1.2.0 |
+| v1.3.0 | https://github.com/Arashtahmasbi3/ai-desktop/releases/tag/v1.3.0 |
+| v2.0.0 | https://github.com/Arashtahmasbi3/ai-desktop/releases/tag/v2.0.0 |
+
+📦 دانلود v2.0.0 (assetها): https://github.com/Arashtahmasbi3/ai-desktop/releases/tag/v2.0.0
+
+- `AI Desktop Setup 2.0.0.exe` — ~107.2 MB (نصبکننده NSIS)
+- `AI Desktop 2.0.0 Portable.exe` — ~106.9 MB (نسخهٔ portable)
+- `SHA256SUMS.txt` — چکسام SHA-256
+
+## قابلیتهای هر Sprint
+
+### Sprint 1 — v1.1 (مدل و UX)
+- Model switcher در هدر چت (انتخاب مدل/پرووایدر برای هر پیام)
+- کاتالوگ مرکزی مدلها (`src/shared/models.ts`)
+- Custom providers سازگار با OpenAI + تست اتصال زنده
+- ویزارد onboarding در اجرای اول
+
+### Sprint 2 — v1.2 (پیشنمایش و مرور)
+- Diff دوبهدو (split view)
+- Markdown preview درونبرنامهای
+- مرورگر داخلی sandboxed (Ctrl+4) محدود به `http(s)`
+
+### Sprint 3 — v1.3 (GitHub)
+- احراز هویت OAuth Device Flow (توکن رمزنگاریشده)
+- عملیات مخزن: commit / pull / push / clone (view Ctrl+5)
+- لیست Pull Requestها و Issueها
+
+### Sprint 4 — v2.0 (VPS / Remote)
+- اتصال SSH (رمز/کلید) با تأیید اجباری host key
+- ترمینال زنده (xterm) + File explorer از راه دور (SFTP)
+- ابزار guardشدهٔ `remote_shell` برای Agent
+- گاردهای امنیتی: deny list، rate limit 100/min، audit log JSON، قطع خودکار ۳۰ دقیقهای
 
 ## Sprint 1 — v1.1
 
@@ -42,7 +83,7 @@
   3. File explorer از راه دور (SFTP)
   4. یکپارچگی با Agent (`remote_shell` مورد اعتماد/guard شده)
   5. تست نفوذ
-- کامیتها: ۳
+- کامیتها: ۵
 - تستهای نفوذ: **پاس در همه سناریوها** — `rm -rf /`، `curl … | bash`، fork bomb،
   `dd of=/dev/sda`، عبور از ۱۰۰ دستور/دقیقه، و host key اشتباه همگی بلاک می‌شوند
   (`test/security/penetration.test.ts`).
@@ -55,10 +96,43 @@
 ## آمار کلی
 
 - نسخه نهایی: 2.0.0
-- تگها: پیشنهادی `v1.1.0, v1.2.0, v1.3.0, v2.0.0` (تگ‌زنی محلی انجام نشد)
-- پیش‌نیازهای کاربر: Windows 10+, Node.js 20+, Git (اختیاری), حساب GitHub (اختیاری), VPS با SSH (اختیاری)
+- تگها: `v1.1.0, v1.2.0, v1.3.0, v2.0.0` — همه ساخته و به origin push شدند
+- کامیتها روی `master`: ۳۲
+- تستها: ۵۳ فایل / 384 پاس / 1 skip
+- خطوط کد: ~14,256 خط TS/TSX در `src/` + ~5,578 خط تست
+- پیشنیازهای کاربر: Windows 10+, Node.js 20+, Git (اختیاری), حساب GitHub (اختیاری), VPS با SSH (اختیاری)
 - هزینه توکن تخمینی: —
 - زمان تخمینی اجرا: —
+
+## Smoke test (اجرای داخلی)
+
+روی همین محیط Linux با `xvfb-run` + Electron ساختهشده (`out/main/index.js`) و از طریق
+Chrome DevTools Protocol اجرا شد:
+
+- ✅ پنجره باز شد (عنوان `AI Desktop`، ریشهٔ React رندر شد).
+- ✅ `window.api` با همهٔ namespaceها موجود بود: `app, settings, dialog, projects,
+  customProviders, onboarding, github, vps, fs, agent, worker, remote, webUtils, events`.
+- ✅ IPC handlerها واقعاً پاسخ دادند:
+  - `app.ping` → `"pong"`
+  - `settings.get` → شیء settings
+  - `vps.list` / `vps.status` / `vps.audit` → مقادیر معتبر (disconnected / 0)
+  - `agent.sessions` → آرایه
+  - `worker.status` → `{state:"idle", online:true, ...}`
+  - `fs.list` → پاسخ معتبر
+- ✅ **صفر خطای console و صفر exception**.
+- (خطوط `dbus` در لاگ، خطای محیط بدون D-Bus هستند و بیربط به اپ.)
+
+اسکرینشات پنجرهٔ اجراشده: `.agent_tmp/smoke-v2.0.0.png`
+
+## Installer v2.0.0
+
+از `master` ساخته و به pre-release v2.0.0 آپلود شد:
+
+| فایل | حجم | SHA-256 |
+| --- | --- | --- |
+| `AI Desktop Setup 2.0.0.exe` | ~107.2 MB | `14f3135937e53f055b398d11fade2fe9ff4579e843fc32058033ef819a8602c9` |
+| `AI Desktop 2.0.0 Portable.exe` | ~106.9 MB | `2b5d95528dd080a6a3e4cecea7d89d8c87689c096a19620ec06aa6b3d7710edf` |
+| `SHA256SUMS.txt` | چکسام | — |
 
 ## دستاوردهای کلیدی
 
@@ -70,6 +144,10 @@
 
 ## محدودیت‌ها و کارهای آینده (v2.1+)
 
+- **TODO v2.1 (تصمیم کاربر):** گزینه «اعمال Deny-list روی ترمینال دستی» در Settings —
+  پیش‌فرض **خاموش**. امروز ترمینال دستی VPS آزاد است چون کاربر مالک سرور است؛ در v2.1 یک
+  تاگل اختیاری در Settings اضافه می‌شود تا deny list روی ورودی تایپ‌شده هم اعمال شود.
+  (ثبت‌شده در `AGENTS.md` بخش Backlog.)
 - Code Signing
 - Auto-update
 - Ollama/Local models
