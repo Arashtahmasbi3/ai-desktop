@@ -36,10 +36,22 @@ export interface FileEntry {
 export interface AgentRunRequest {
   task: string
   provider?: ProviderId
+  /** Model override for the primary provider (chosen in the chat header). */
+  model?: string
+  /** Id of a custom (OpenAI-compatible) provider to use instead of a built-in one. */
+  customProviderId?: string
   /** Base session id to save under (reused across runs). */
   sessionId?: string
   /** Load this stored session before running. */
   resumeSessionId?: string
+}
+
+/** The model the user has selected for the next/next messages. */
+export interface ModelSelection {
+  provider: ProviderId
+  model: string
+  /** Set when the selection points at a custom provider rather than a built-in one. */
+  customProviderId?: string
 }
 
 export interface SessionInfo {
@@ -68,6 +80,9 @@ export type AgentEvent =
       finalAnswer: string | null
       message: string | null
       warnings: LoopWarning[]
+      /** Provider/model that actually served the primary call (after fallback). */
+      provider?: ProviderId
+      model?: string
       at: number
     }
   | { type: 'log'; entry: AgentLogEntry }

@@ -1,60 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
-import ReactMarkdown from 'react-markdown'
-import { AlertTriangle, Bot, Loader2, Send, Square, Trash2, User } from 'lucide-react'
-import { useStore, type ChatMessage } from '../store'
+import { AlertTriangle, Bot, Loader2, Send, Square, Trash2 } from 'lucide-react'
+import { useStore } from '../store'
+import MessageBubble from './MessageBubble'
+import ModelSwitcher from './ModelSwitcher'
+import ProviderWarning from './ProviderWarning'
 
 const SUGGESTIONS = [
   'لیست فایل‌های پوشه پروژه را بخوان و ساختار آن را توضیح بده.',
   'یک تابع TypeScript برای اعتبارسنجی ایمیل بنویس و تستش کن.',
   'package.json را باز کن و وابستگی‌های قدیمی را گزارش کن.'
 ]
-
-function Avatar({ role }: { role: ChatMessage['role'] }): JSX.Element {
-  const map = {
-    user: { icon: User, className: 'bg-accent/20 text-accent' },
-    assistant: { icon: Bot, className: 'bg-bg-tertiary text-emerald-400' },
-    tool: { icon: Bot, className: 'bg-bg-tertiary text-sky-400' },
-    system: { icon: AlertTriangle, className: 'bg-amber-500/15 text-amber-400' }
-  }[role]
-  const Icon = map.icon
-  return (
-    <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${map.className}`}>
-      <Icon className="h-4 w-4" />
-    </span>
-  )
-}
-
-function Bubble({ message }: { message: ChatMessage }): JSX.Element {
-  const isUser = message.role === 'user'
-
-  if (message.role === 'tool') {
-    return (
-      <div className="flex justify-start px-4">
-        <span className="rounded-full border border-border bg-bg-secondary px-2.5 py-1 font-mono text-[11px] text-sky-300">
-          {message.content}
-        </span>
-      </div>
-    )
-  }
-
-  return (
-    <div className={`flex gap-2 px-4 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
-      <Avatar role={message.role} />
-      <div className={`flex min-w-0 max-w-[min(46rem,85%)] flex-col ${isUser ? 'items-end' : 'items-start'}`}>
-        <span className="mb-0.5 px-1 text-[10px] uppercase tracking-wide text-neutral-500">
-          {message.role}
-        </span>
-        <div
-          className={`chat-markdown w-full rounded-xl px-3 py-2 text-sm leading-relaxed ${
-            isUser ? 'bg-accent/20 text-neutral-100' : 'bg-bg-tertiary text-neutral-200'
-          } ${message.role === 'system' ? 'border border-amber-500/30' : ''}`}
-        >
-          <ReactMarkdown>{message.content}</ReactMarkdown>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 export default function ChatPanel(): JSX.Element {
   const messages = useStore((state) => state.messages)
@@ -89,8 +44,8 @@ export default function ChatPanel(): JSX.Element {
 
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-bg-primary">
-      <div className="flex h-8 shrink-0 items-center justify-between border-b border-border px-3 text-[11px] text-neutral-500">
-        <span>Conversation (RTL)</span>
+      <div className="flex h-8 shrink-0 items-center justify-between gap-2 border-b border-border px-3 text-[11px] text-neutral-500">
+        <ModelSwitcher />
         <button
           type="button"
           onClick={newSession}
@@ -127,7 +82,7 @@ export default function ChatPanel(): JSX.Element {
             </div>
           </div>
         ) : (
-          messages.map((message) => <Bubble key={message.id} message={message} />)
+          messages.map((message) => <MessageBubble key={message.id} message={message} />)
         )}
 
         {running ? (
@@ -137,6 +92,8 @@ export default function ChatPanel(): JSX.Element {
           </div>
         ) : null}
       </div>
+
+      <ProviderWarning />
 
       {warnings.length > 0 ? (
         <div className="mx-3 mb-2 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-300">

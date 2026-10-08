@@ -2,9 +2,11 @@ import { create } from 'zustand'
 import type { AgentLogEntry } from '@shared/agent'
 import type { LoopWarning } from '@shared/agent'
 import type { ProviderId } from '@shared/types'
+import { DEFAULT_SELECTION, resolveSelection } from '@shared/selection'
 import type {
   AgentEvent,
   FileEntry,
+  ModelSelection,
   RemoteStatus,
   SessionInfo,
   SettingsView,
@@ -19,6 +21,8 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'tool' | 'system'
   content: string
   at: number
+  /** Provider/model that produced an assistant message (display only). */
+  model?: string
 }
 
 const MAX_LOGS = 500
@@ -56,10 +60,14 @@ interface AppState {
   remote: RemoteStatus | null
   error: string | null
 
+  /** Model chosen in the chat header for the next message. */
+  selection: ModelSelection
+
   init: () => Promise<void>
   openSettings: () => void
   closeSettings: () => void
   setView: (view: ViewId) => void
+  setSelection: (patch: Partial<ModelSelection>) => void
   applyEvent: (event: AgentEvent) => void
   send: (text: string) => Promise<void>
   abort: () => void
@@ -113,6 +121,7 @@ export const useStore = create<AppState>((set, get) => ({
   worker: null,
   remote: null,
   error: null,
+  selection: DEFAULT_SELECTION,
 
   async init() {
     try {
@@ -121,7 +130,7 @@ export const useStore = create<AppState>((set, get) => ({
         window.api.worker.status(),
         window.api.remote.status()
       ])
-      set({ settings, worker, remote, ready: true })
+      set({ settings, worker, remote, ready: true, selection: resolveSelection(settings) })
       await get().refreshFiles()
       await get().refreshSessions()
     } catch (error) {
@@ -132,6 +141,7 @@ export const useStore = create<AppState>((set, get) => ({
   openSettings: () => set({ settingsOpen: true }),
   closeSettings: () => set({ settingsOpen: false }),
   setView: (view) => set({ view }),
+  setSelection: (patch) => set({ selection: { ...get().selection, ...patch } }),
 
   applyEvent(event) {
     switch (event.type) {
@@ -164,7 +174,13 @@ export const useStore = create<AppState>((set, get) => ({
         const text = event.finalAnswer ?? event.message ?? ''
         const messages = [...get().messages]
         if (text) {
-          messages.push({ id: newId(), role: 'assistant', content: text, at: event.at })
+          messages.push({
+            id: newId(),
+            role: 'assistant',
+            content: text,
+            at: event.at,
+            ...(event.model ? { model: event.model } : {})
+          })
         }
         set({
           running: false,
@@ -192,13 +208,20 @@ export const useStore = create<AppState>((set, get) => ({
   async send(text) {
     const trimmed = text.trim()
     if (!trimmed || get().running) return
+    const selection = get().selection
     set({
       messages: [...get().messages, { id: newId(), role: 'user', content: trimmed, at: Date.now() }],
       running: true,
       error: null
     })
     try {
-      await window.api.agent.run({ task: trimmed, sessionId: get().sessionId })
+      await window.api.agent.run({
+        task: trimmed,
+        sessionId: get().sessionId,
+        provider: selection.provider,
+        model: selection.model,
+        ...(selection.customProviderId ? { customProviderId: selection.customProviderId } : {})
+      })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       set({ running: false, error: message })

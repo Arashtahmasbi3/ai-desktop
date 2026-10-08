@@ -26,6 +26,13 @@ export interface AgentServiceOptions {
   now?: () => number
 }
 
+/** Which provider/model to put first for an agent run. */
+export interface ProviderSelection {
+  preferred?: ProviderId
+  model?: string
+  customProviderId?: string
+}
+
 export function providerOrder(
   ids: ProviderId[],
   preferred?: ProviderId,
@@ -64,35 +71,55 @@ export class AgentService {
   }
 
   /** Build provider entries (with keys) ordered by preference. */
-  async buildProviders(preferred?: ProviderId): Promise<ProviderEntry[]> {
+  async buildProviders(options: ProviderSelection = {}): Promise<ProviderEntry[]> {
     const settings = await this.persistence.load()
     const ids = Object.keys(PROVIDERS) as ProviderId[]
-    const order = providerOrder(ids, preferred, settings.activeProvider)
-    const entries: ProviderEntry[] = []
+    const order = providerOrder(ids, options.preferred, settings.activeProvider)
 
+    const candidates: Array<{
+      id: ProviderId
+      apiKey: string
+      model?: string
+      baseUrl?: string
+    }> = []
     for (const id of order) {
       const stored = settings.providers[id]
       if (!stored?.apiKeyEnc) continue
       const apiKey = await this.persistence.getApiKey(id)
       if (!apiKey) continue
-      const descriptor = PROVIDERS[id]
-      const config = {
-        provider: id,
+      candidates.push({
+        id,
         apiKey,
-        model: stored.model ?? descriptor.defaultModel,
-        baseUrl: stored.baseUrl ?? descriptor.defaultBaseUrl
-      }
-      entries.push({ provider: id, adapter: createAdapterForConfig(config), config })
+        ...(stored.model ? { model: stored.model } : {}),
+        ...(stored.baseUrl ? { baseUrl: stored.baseUrl } : {})
+      })
     }
 
-    if (entries.length === 0) {
+    if (candidates.length === 0) {
       throw new Error('No API key configured. Add one in Settings.')
     }
-    return entries
+
+    return candidates.map((candidate, index) => {
+      const descriptor = PROVIDERS[candidate.id]
+      // The model chosen in the chat header only overrides the primary entry;
+      // fallback providers keep their own configured model.
+      const model =
+        index === 0 && options.model ? options.model : (candidate.model ?? descriptor.defaultModel)
+      const config = {
+        provider: candidate.id,
+        apiKey: candidate.apiKey,
+        model,
+        baseUrl: candidate.baseUrl ?? descriptor.defaultBaseUrl
+      }
+      return { provider: candidate.id, adapter: createAdapterForConfig(config), config }
+    })
   }
 
   async run(request: AgentRunRequest, externalSignal?: AbortSignal): Promise<AgentRunResult> {
-    const providers = await this.buildProviders(request.provider)
+    const providers = await this.buildProviders({
+      ...(request.provider ? { preferred: request.provider } : {}),
+      ...(request.model ? { model: request.model } : {})
+    })
     const orchestrator = new AgentOrchestrator({
       sandbox: this.sandbox,
       providers,
@@ -121,6 +148,8 @@ export class AgentService {
         finalAnswer: result.finalAnswer,
         message: result.message,
         warnings: result.warnings,
+        provider: providers[0].provider,
+        model: providers[0].config.model,
         at: this.now()
       })
       return result
