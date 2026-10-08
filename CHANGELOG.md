@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-10-05
+
+UX and model improvements.
+
+### Added
+
+- **Model switcher in chat** — a grouped provider/model dropdown in the chat header lets you
+  choose the model for the next message (or a custom provider); the choice is sent with the
+  run and the effective model is reported back on completion.
+- **Central model catalog** (`src/shared/models.ts`) — every provider's models, tags
+  (`cheap`/`fast`/`powerful`) and defaults in one place; `PROVIDERS` is derived from it, and
+  both the chat dropdown and Settings selects read from it.
+- **Custom providers** — add any OpenAI-compatible endpoint (base URL + model + optional
+  headers). API keys are encrypted with Electron `safeStorage` and never written in plaintext
+  or exposed to the renderer. Includes a live “Test connection” and an “Other” group in the
+  model picker; built-in providers remain as fallback.
+- **First-run onboarding** — a four-step wizard (welcome + use-case model suggestion, connect a
+  provider, add a first project, summary) that suggests a model from the catalog and can be
+  skipped. Completion is persisted under the app data directory.
+
+### Changed
+
+- Settings' built-in provider select and the chat model picker now share the central catalog.
+- `AgentService.buildProviders()` accepts a per-run model override and a selected custom
+  provider (tried first, built-ins as fallback).
+
 ## [1.0.0] — 2026-10-07
 
 First stable release. Ships as a Windows x64 NSIS installer and a portable executable.

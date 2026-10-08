@@ -39,6 +39,17 @@ npm install
 npm run dev     # opens the Electron window
 ```
 
+On first run a short onboarding wizard suggests a model, then points you at Settings
+(`Ctrl+,`) to add a provider key and your first project folder.
+
+## What's new in v1.1
+
+- **Model switcher** in the chat header — pick the provider/model (or a custom provider) per message.
+- **Central model catalog** (`src/shared/models.ts`) shared by the chat picker and Settings.
+- **Custom providers** — any OpenAI-compatible endpoint, with an encrypted key and a live
+  “Test connection”.
+- **Onboarding wizard** for first-run setup.
+
 ## Scripts
 
 | Script | Description |

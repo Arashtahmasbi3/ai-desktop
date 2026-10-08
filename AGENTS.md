@@ -315,3 +315,30 @@ Conventions that recur across the codebase — follow them when adding code.
 - **Keep docs in lockstep with the artifact.** Every packaging change moves three files:
   `electron-builder.yml`, the npm scripts, and the version in `package.json`/`CHANGELOG.md`.
   Dated changelog entries + a SemVer tag are cheap and make releases reproducible.
+
+## Autonomous sprint log
+
+Running notes for the `MASTER_AUTONOMOUS.md` execution (v1.1 → v2.0). Decisions that deviate
+from the plan are tagged `[AUTO-DECISION]` or `[BETTER-ALTERNATIVE]`.
+
+### Sprint 1 — v1.1 (branch `feature/v1.1-ux-improvements`)
+
+- `[BETTER-ALTERNATIVE]` **Follow the real tree, not the plan's paths.** The plan names files
+  like `src/core/agent-service.ts`, `src/main/ipc/custom-providers.ts` and
+  `src/renderer/components/...`; the repository actually uses `src/main/agent-service.ts`,
+  `src/main/ipc.ts` (one handler table), and `src/renderer/src/components/...`. New code lives in
+  the real locations; the plan's intent (feature behaviour) is unchanged.
+- `[BETTER-ALTERNATIVE]` **Onboarding state in the main process, not `localStorage`.** The plan
+  chose renderer `localStorage`; we persist `onboarding.json` under the app data dir via
+  `OnboardingStore`. Reason: consistent with `settings.json`/`sessions/`, survives renderer
+  storage resets, and is testable under the node Vitest environment.
+- `[AUTO-DECISION]` **Onboarding is four steps** (`welcome` → `connect` → `project` → `done`),
+  not six slides, with a use-case → model recommendation instead of a static tour.
+- `[AUTO-DECISION]` **Custom providers are OpenAI-compatible only**, with an optional JSON
+  “extra headers” field; keys reuse the existing `SecretCipher`/`safeStorage` seam
+  (`createSafeStorageCipher`) rather than adding a new crypto dependency.
+- `[AUTO-DECISION]` **`CustomProviderStore.test()` is non-throwing** — it returns
+  `{ ok, latencyMs?, message? }` so a bad endpoint cannot crash the Settings panel.
+- `[AUTO-DECISION]` **Model catalog is the single source of truth**; `PROVIDERS` is derived, so a
+  missing recommended model falls back to the provider default (`recommendModel`).
+- Tests: 43 files / 304 passed, 1 skipped. `typecheck` and `build` green.
