@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-10-05
+
+Preview and browsing.
+
+### Added
+
+- **Split (side-by-side) diff** — the code viewer can compare the working draft with the file
+  on disk side by side, pairing each changed line with its replacement. Reuses the existing
+  LCS diff and tokenizer (no new highlighting dependency).
+- **In-app Markdown preview** — open `.md`/`.markdown`/`.mdx` files as a rendered document
+  next to their source.
+- **Internal browser** (Ctrl+4) — a sandboxed `<webview>` with a URL bar, history chips and
+  back/forward/reload. Navigation is restricted to `http(s)`; attached webviews never inherit a
+  preload or Node access, and non-web navigation/popups are denied (`src/main/webview-policy.ts`,
+  `src/shared/url.ts`).
+
 ## [1.1.0] — 2026-10-05
 
 UX and model improvements.

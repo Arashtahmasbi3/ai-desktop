@@ -342,3 +342,20 @@ from the plan are tagged `[AUTO-DECISION]` or `[BETTER-ALTERNATIVE]`.
 - `[AUTO-DECISION]` **Model catalog is the single source of truth**; `PROVIDERS` is derived, so a
   missing recommended model falls back to the provider default (`recommendModel`).
 - Tests: 43 files / 304 passed, 1 skipped. `typecheck` and `build` green.
+
+### Sprint 2 — v1.2 (branch `feature/v1.2-preview-browser`)
+
+- `[BETTER-ALTERNATIVE]` **Reuse the existing diff/highlighter, add no dependencies.** The plan
+  proposed shiki/`prism-react-renderer` + `diff`; the repo already ships a tokenizer
+  (`lib/highlight.ts`) and an LCS diff (`lib/diff.ts`). Split view is built on those
+  (`lib/split-diff.ts`), so `dependencies` stays empty (see “Lessons learned”).
+- `[AUTO-DECISION]` **Browser only allows `http(s)`.** `src/shared/url.ts` normalizes input
+  (bare host → `https://`) and rejects `file:`/`data:`/`javascript:`; `installWebviewPolicy`
+  denies popups and non-web navigation, and `will-attach-webview` strips preload + Node.
+- `[AUTO-DECISION]` **HTML/image preview deferred.** The file IPC is text-only, so previewing
+  images would need a new binary channel; rendering HTML in the privileged renderer risks script
+  execution, and the new Browser view is the sanctioned way to view a page. `PreviewPane`
+  renders Markdown only and says so for other types.
+- Branch based on `feature/v1.1-ux-improvements` (not `master`) so Sprint 1 code is present;
+  master has not been updated yet.
+- Tests: 45 files / 313 passed, 1 skipped. `typecheck` and `build` green.

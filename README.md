@@ -42,7 +42,13 @@ npm run dev     # opens the Electron window
 On first run a short onboarding wizard suggests a model, then points you at Settings
 (`Ctrl+,`) to add a provider key and your first project folder.
 
-## What's new in v1.1
+## What's new in v1.2
+
+- **Split diff** — compare the working draft against the file on disk side by side.
+- **Markdown preview** — render `.md` files next to their source.
+- **Internal browser** (Ctrl+4) — a sandboxed webview with URL bar and history, limited to `http(s)`.
+
+### v1.1
 
 - **Model switcher** in the chat header — pick the provider/model (or a custom provider) per message.
 - **Central model catalog** (`src/shared/models.ts`) shared by the chat picker and Settings.
