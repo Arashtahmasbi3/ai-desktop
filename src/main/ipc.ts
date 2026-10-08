@@ -29,6 +29,29 @@ export function registerIpc(services: AppServices, getWindow: () => BrowserWindo
   const handlers: Array<[string, (...args: never[]) => unknown]> = [
     ['app:ping', () => 'pong'],
 
+    ['chats:list', () => services.chats.list()],
+    ['chats:load', (id: string) => services.chats.load(id)],
+    [
+      'chats:save',
+      (input: Parameters<typeof services.chats.save>[0]) => services.chats.save(input)
+    ],
+    ['chats:rename', (id: string, title: string) => services.chats.rename(id, title)],
+    ['chats:remove', (id: string) => services.chats.remove(id)],
+
+    ['window:minimize', () => getWindow()?.minimize()],
+    [
+      'window:toggleMaximize',
+      () => {
+        const window = getWindow()
+        if (!window) return false
+        if (window.isMaximized()) window.unmaximize()
+        else window.maximize()
+        return window.isMaximized()
+      }
+    ],
+    ['window:close', () => getWindow()?.close()],
+    ['window:isMaximized', () => getWindow()?.isMaximized() ?? false],
+
     ['settings:get', () => services.settingsView()],
     [
       'settings:setApiKey',
@@ -74,6 +97,14 @@ export function registerIpc(services: AppServices, getWindow: () => BrowserWindo
         return changed()
       }
     ],
+    [
+      'settings:updateProjectPath',
+      async (id: string, path: string) => {
+        await services.persistence.updateProjectPath(id, path)
+        await services.openActiveProject()
+        return changed()
+      }
+    ],
 
     [
       'dialog:pickDirectory',
@@ -83,6 +114,18 @@ export function registerIpc(services: AppServices, getWindow: () => BrowserWindo
           ? dialog.showOpenDialog(window, { properties: ['openDirectory', 'createDirectory'] })
           : dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] }))
         return result.canceled ? null : (result.filePaths[0] ?? null)
+      }
+    ],
+    [
+      'dialog:pickFile',
+      async () => {
+        const window = getWindow()
+        const result = await (window
+          ? dialog.showOpenDialog(window, {
+              properties: ['openFile', 'multiSelections']
+            })
+          : dialog.showOpenDialog({ properties: ['openFile', 'multiSelections'] }))
+        return result.canceled ? [] : result.filePaths
       }
     ],
 

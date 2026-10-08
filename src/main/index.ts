@@ -16,14 +16,9 @@ function createWindow(): void {
     minWidth: 900,
     minHeight: 600,
     show: false,
+    frame: false,
     autoHideMenuBar: true,
-    backgroundColor: '#0a0a0a',
-    titleBarStyle: 'hidden',
-    titleBarOverlay: {
-      color: '#0a0a0a',
-      symbolColor: '#e5e5e5',
-      height: 36
-    },
+    backgroundColor: '#0d0d0d',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
@@ -35,6 +30,8 @@ function createWindow(): void {
 
   const window = mainWindow
   window.on('ready-to-show', () => window.show())
+  window.on('maximize', () => window.webContents.send('window:maximized', true))
+  window.on('unmaximize', () => window.webContents.send('window:maximized', false))
   window.on('closed', () => {
     if (mainWindow === window) mainWindow = null
   })

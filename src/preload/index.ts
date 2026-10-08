@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { CustomProviderInput, CustomProviderTestResult, CustomProviderView, ProviderId } from '@shared/types'
 import type { OnboardingStatus } from '@shared/onboarding'
+import type { ChatSaveInput, ChatSummary, StoredChat } from '@shared/chat'
 import type {
   AuditEntryView,
   RemoteFileEntry,
@@ -40,6 +41,13 @@ export const api = {
     ping: (): Promise<string> => invoke<string>('app:ping')
   },
 
+  window: {
+    minimize: (): Promise<void> => invoke('window:minimize'),
+    toggleMaximize: (): Promise<boolean> => invoke('window:toggleMaximize'),
+    close: (): Promise<void> => invoke('window:close'),
+    isMaximized: (): Promise<boolean> => invoke('window:isMaximized')
+  },
+
   settings: {
     get: (): Promise<SettingsView> => invoke('settings:get'),
     setApiKey: (provider: ProviderId, apiKey: string): Promise<SettingsView> =>
@@ -52,15 +60,27 @@ export const api = {
       invoke('settings:setActiveProvider', provider),
     addProject: (name: string, path: string): Promise<SettingsView> =>
       invoke('settings:addProject', name, path),
-    removeProject: (id: string): Promise<SettingsView> => invoke('settings:removeProject', id)
+    removeProject: (id: string): Promise<SettingsView> => invoke('settings:removeProject', id),
+    updateProjectPath: (id: string, path: string): Promise<SettingsView> =>
+      invoke('settings:updateProjectPath', id, path)
   },
 
   dialog: {
-    pickDirectory: (): Promise<string | null> => invoke('dialog:pickDirectory')
+    pickDirectory: (): Promise<string | null> => invoke('dialog:pickDirectory'),
+    pickFile: (): Promise<string[]> => invoke('dialog:pickFile')
   },
 
   projects: {
     open: (id: string): Promise<SettingsView> => invoke('projects:open', id)
+  },
+
+  chats: {
+    list: (): Promise<ChatSummary[]> => invoke('chats:list'),
+    load: (id: string): Promise<StoredChat | null> => invoke('chats:load', id),
+    save: (input: ChatSaveInput): Promise<StoredChat> => invoke('chats:save', input),
+    rename: (id: string, title: string): Promise<ChatSummary | null> =>
+      invoke('chats:rename', id, title),
+    remove: (id: string): Promise<boolean> => invoke('chats:remove', id)
   },
 
   customProviders: {

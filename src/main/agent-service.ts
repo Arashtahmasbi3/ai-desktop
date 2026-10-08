@@ -1,14 +1,84 @@
 import type { AgentLogEntry, AgentLogger } from '@shared/agent'
 import type { AgentRunResult } from '@shared/agent'
-import type { ProviderId } from '@shared/types'
+import type { ProviderId, ToolDefinition } from '@shared/types'
+import type { VpsExecResult } from '@shared/vps'
 import type { AgentEvent, AgentRunRequest, SessionInfo, SessionRecordView } from '@shared/ui'
 import { AgentOrchestrator } from '@core/agent-orchestrator'
 import type { ProviderEntry } from '@core/agent-orchestrator'
+import type { ToolExecutor } from '@core/agent/tools'
 import { PROVIDERS, createAdapterForConfig } from '@core/llm-adapters/registry'
+import { REMOTE_SHELL_TOOL } from '@core/tools/remote-shell-tool'
+import { RemoteShellToolExecutor } from '@core/tools/remote-shell-executor'
 import type { Persistence } from '@core/agent/persistence'
 import type { SessionStore } from '@core/agent/session-store'
 import type { SandboxManager } from '@shared/sandbox'
 import type { CustomProviderStore } from './custom-providers'
+
+/**
+ * The slice of the SSH manager the agent needs to run remote commands. Kept as
+ * an interface so tests can inject a fake without a real SSH backend.
+ */
+export interface RemoteShellHost {
+  connectedServers(): string[]
+  exec(serverId: string, command: string): Promise<VpsExecResult>
+}
+
+/** Keywords that make the agent reach for `remote_shell` on a default chat. */
+const VPS_KEYWORDS = /\b(vps|ssh|server|remote|سرور|ریموت)\b/i
+
+interface RemoteRuntime {
+  extraTools?: ToolDefinition[]
+  extraExecutor?: ToolExecutor
+  systemHint?: string
+}
+
+/**
+ * Pure decision function: does this task get the `remote_shell` tool, and if so
+ * which server is it pinned to? Exported so it can be unit-tested without a real
+ * SSH backend or LLM.
+ */
+export function planRemoteRuntime(
+  task: string,
+  vpsServerId: string | undefined,
+  vps: RemoteShellHost | undefined
+): RemoteRuntime {
+  if (!vps) return {}
+  const connected = vps.connectedServers()
+  const wants = VPS_KEYWORDS.test(task)
+
+  const pinned = vpsServerId && connected.includes(vpsServerId) ? vpsServerId : undefined
+  if (!pinned && !(wants && connected.length > 0)) {
+    if (wants && connected.length === 0) {
+      return {
+        systemHint:
+          'The user asked about a VPS / remote server, but none is connected. ' +
+          'Explain that they must add a VPS in Settings and connect it first, then retry.'
+      }
+    }
+    return {}
+  }
+
+  const target = pinned ?? connected[0]
+  const tool: ToolDefinition = {
+    ...REMOTE_SHELL_TOOL,
+    description: `${REMOTE_SHELL_TOOL.description} Use server_id="${target}".`
+  }
+  const executor = new RemoteShellToolExecutor(
+    {
+      exec: (serverId, command) => vps.exec(serverId, command),
+      connectedServers: () => vps.connectedServers()
+    },
+    target
+  )
+  return {
+    extraTools: [tool],
+    extraExecutor: executor,
+    systemHint:
+      `You have access to the "remote_shell" tool on the connected VPS "${target}". ` +
+      'Use it for tasks about that server; call it with server_id ' +
+      `"${target}" and the shell command to run.`
+  }
+}
 
 /** Forwards orchestrator log entries to a sink (the renderer, in the app). */
 class EmittingLogger implements AgentLogger {
@@ -27,6 +97,8 @@ export interface AgentServiceOptions {
   now?: () => number
   /** Optional: enables user-defined OpenAI-compatible providers. */
   customProviders?: CustomProviderStore
+  /** Optional: enables the `remote_shell` tool against connected VPS servers. */
+  vps?: RemoteShellHost
 }
 
 /** Which provider/model to put first for an agent run. */
@@ -59,6 +131,7 @@ export class AgentService {
   private readonly emit: (event: AgentEvent) => void
   private readonly now: () => number
   private readonly customProviders?: CustomProviderStore
+  private readonly vps?: RemoteShellHost
   private readonly controllers = new Set<AbortController>()
   private runCounter = 0
 
@@ -69,10 +142,19 @@ export class AgentService {
     this.emit = options.emit
     this.now = options.now ?? (() => Date.now())
     if (options.customProviders) this.customProviders = options.customProviders
+    if (options.vps) this.vps = options.vps
   }
 
   isRunning(): boolean {
     return this.controllers.size > 0
+  }
+
+  /**
+   * Decide whether this run gets the `remote_shell` tool and, if so, build the
+   * runtime that pins it to a server.
+   */
+  private buildRemoteRuntime(task: string, vpsServerId?: string): RemoteRuntime {
+    return planRemoteRuntime(task, vpsServerId, this.vps)
   }
 
   /** Build provider entries (with keys) ordered by preference. */
@@ -159,7 +241,8 @@ export class AgentService {
       providers,
       logger: new EmittingLogger(this.emit),
       sessionStore: this.sessionStore,
-      ...(request.sessionId ? { sessionId: request.sessionId } : {})
+      ...(request.sessionId ? { sessionId: request.sessionId } : {}),
+      ...this.buildRemoteRuntime(request.task, request.vpsServerId)
     })
 
     const controller = new AbortController()

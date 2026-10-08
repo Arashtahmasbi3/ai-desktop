@@ -1,6 +1,21 @@
-import { promises as fs } from 'node:fs'
+import { existsSync, promises as fs } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import type { FileEntry } from '@shared/ui'
+
+/** Error code returned when a requested folder no longer exists on this OS. */
+export const PATH_NOT_FOUND = 'PATH_NOT_FOUND'
+
+/** A missing-file/dir error the renderer can recognise by `code`. */
+export class PathNotFoundError extends Error {
+  readonly code = PATH_NOT_FOUND
+  readonly path: string
+
+  constructor(path: string) {
+    super(`Path not found: ${path}`)
+    this.name = 'PathNotFoundError'
+    this.path = path
+  }
+}
 
 /**
  * Reads/writes files inside the active project root. Every path is resolved and
@@ -12,6 +27,11 @@ export class FileService {
 
   getRoot(): string | null {
     return this.root
+  }
+
+  /** Whether the current root exists on disk (false also when no root is set). */
+  rootExists(): boolean {
+    return this.root !== null && existsSync(this.root)
   }
 
   setRoot(root: string | null | undefined): void {
@@ -41,6 +61,9 @@ export class FileService {
   /** List a directory (dirs first, then files, both alphabetical). */
   async list(relativePath = '.'): Promise<FileEntry[]> {
     const dir = this.resolveSafe(relativePath)
+    // A project path can point at a folder from another OS (e.g. a Linux path
+    // saved on Windows). Fail with a typed error instead of an opaque ENOENT.
+    if (!existsSync(dir)) throw new PathNotFoundError(dir)
     const entries = await fs.readdir(dir, { withFileTypes: true })
     const result: FileEntry[] = []
     for (const entry of entries) {

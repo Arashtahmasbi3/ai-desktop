@@ -1,4 +1,5 @@
-import { Cpu, HardDrive, Server, Wifi, WifiOff } from 'lucide-react'
+import { Cpu, Globe, HardDrive, Languages, Server, Wifi, WifiOff } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useStore } from '../store'
 
 function Dot({ ok }: { ok: boolean }): JSX.Element {
@@ -6,12 +7,16 @@ function Dot({ ok }: { ok: boolean }): JSX.Element {
 }
 
 export default function StatusBar(): JSX.Element {
+  const { t } = useTranslation()
   const ready = useStore((state) => state.ready)
   const worker = useStore((state) => state.worker)
   const remote = useStore((state) => state.remote)
   const setOnline = useStore((state) => state.setOnline)
   const toggleRemote = useStore((state) => state.toggleRemote)
   const sessionId = useStore((state) => state.sessionId)
+  const selection = useStore((state) => state.selection)
+  const locale = useStore((state) => state.locale)
+  const setLocale = useStore((state) => state.setLocale)
 
   const online = worker?.online ?? true
 
@@ -20,7 +25,7 @@ export default function StatusBar(): JSX.Element {
       <div className="flex items-center gap-3">
         <span className="flex items-center gap-1">
           <Dot ok={ready} />
-          {ready ? 'Ready' : 'Starting…'}
+          {ready ? 'Ready' : t('common.loading')}
         </span>
         <span className="flex items-center gap-1" title="Background worker">
           <Cpu className="h-3 w-3" />
@@ -35,10 +40,23 @@ export default function StatusBar(): JSX.Element {
             {worker.cpuCores}cpu / {worker.memoryMb}MB
           </span>
         ) : null}
+        <span className="flex items-center gap-1" title={selection.model}>
+          <Globe className="h-3 w-3" />
+          {selection.provider}/{selection.model}
+        </span>
         <span className="text-neutral-600">session {sessionId.slice(0, 8)}</span>
       </div>
 
       <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setLocale(locale === 'fa' ? 'en' : 'fa')}
+          title={t('common.language')}
+          className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-bg-tertiary hover:text-neutral-200"
+        >
+          <Languages className="h-3 w-3" />
+          {locale}
+        </button>
         <button
           type="button"
           onClick={() => void setOnline(!online)}

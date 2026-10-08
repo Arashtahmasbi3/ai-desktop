@@ -39,6 +39,7 @@ import { LoopDetector } from './agent/loop-detector'
 import { silentLogger } from './agent/logger'
 import { SESSION_SCHEMA_VERSION, type AgentSession, type SessionStore } from './agent/session-store'
 import { SANDBOX_TOOLS, SandboxToolExecutor, actionFromToolCall } from './agent/tools'
+import type { ToolExecutor, ToolExecOptions } from './agent/tools'
 
 export interface AgentOrchestratorOptions {
   sandbox: SandboxManager
@@ -46,6 +47,12 @@ export interface AgentOrchestratorOptions {
   logger?: AgentLogger
   /** Tools exposed to the model (defaults to {@link SANDBOX_TOOLS}). */
   tools?: ToolDefinition[]
+  /** Extra tools (e.g. `remote_shell`) exposed alongside the sandbox tools. */
+  extraTools?: ToolDefinition[]
+  /** Executor for {@link extraTools}; sandbox tools keep using the sandbox. */
+  extraExecutor?: ToolExecutor
+  /** Extra environment/instructions appended to the system prompt. */
+  systemHint?: string
   /** Maximum number of plan/execute cycles before stopping. Default 12. */
   maxSteps?: number
   /** Character budget for history sent to the model. */
@@ -155,14 +162,18 @@ function summarizeTools(tools: ToolDefinition[]): string {
     .join('\n')
 }
 
-export function buildSystemPrompt(provider: SandboxProvider, tools: ToolDefinition[]): string {
+export function buildSystemPrompt(
+  provider: SandboxProvider,
+  tools: ToolDefinition[],
+  systemHint?: string
+): string {
   return `You are AI Desktop, an autonomous coding agent working inside a sandbox.
 
 # Environment
 - You operate inside an isolated "${provider}" sandbox workspace. The host filesystem is NOT accessible.
 - Every path you use is relative to the workspace root (for example "hello.txt", "src/app.js").
 - Network access is disabled by default.
-
+${systemHint ? `\n# Remote access\n${systemHint}\n` : ''}
 # Available tools
 ${summarizeTools(tools)}
 
@@ -206,6 +217,9 @@ export class AgentOrchestrator {
   private readonly providers: ProviderEntry[]
   private readonly logger: AgentLogger
   private readonly tools: ToolDefinition[]
+  private readonly extraExecutor?: ToolExecutor
+  private readonly extraToolNames: Set<string>
+  private readonly systemHint?: string
   private readonly maxSteps: number
   private readonly contextMaxChars?: number
   private readonly commandTimeoutMs: number
@@ -230,7 +244,10 @@ export class AgentOrchestrator {
     this.sandbox = options.sandbox
     this.providers = [...options.providers]
     this.logger = options.logger ?? silentLogger
-    this.tools = options.tools ?? SANDBOX_TOOLS
+    this.tools = [...(options.tools ?? SANDBOX_TOOLS), ...(options.extraTools ?? [])]
+    this.extraExecutor = options.extraExecutor
+    this.extraToolNames = new Set((options.extraTools ?? []).map((tool) => tool.name))
+    this.systemHint = options.systemHint
     this.maxSteps = options.maxSteps ?? DEFAULT_MAX_STEPS
     this.contextMaxChars = options.contextMaxChars
     this.commandTimeoutMs = options.commandTimeoutMs ?? DEFAULT_COMMAND_TIMEOUT_MS
@@ -300,12 +317,12 @@ export class AgentOrchestrator {
       )
     }
 
-    const executor = new SandboxToolExecutor(this.sandbox, sandboxId, this.commandTimeoutMs)
+    const executor = this.buildExecutor(sandboxId)
     // Per-run state so sequential or concurrent `run()` calls never share loop state.
     const loopDetector = new LoopDetector(this.loopPolicy)
     const observedSignatures = new Set<string>()
     const context = new ContextManager({
-      systemPrompt: buildSystemPrompt(provider, this.tools),
+      systemPrompt: buildSystemPrompt(provider, this.tools, this.systemHint),
       maxTokens: this.contextWindowTokens,
       compactionThreshold: this.compactionThreshold,
       ...(this.contextMaxChars !== undefined ? { maxChars: this.contextMaxChars } : {}),
@@ -671,9 +688,27 @@ export class AgentOrchestrator {
     throw lastError
   }
 
+  /** Compose sandbox tools with any extra (e.g. remote) tool runtime. */
+  private buildExecutor(sandboxId: string): ToolExecutor {
+    const sandboxExecutor = new SandboxToolExecutor(
+      this.sandbox,
+      sandboxId,
+      this.commandTimeoutMs
+    )
+    const extra = this.extraExecutor
+    if (!extra) return sandboxExecutor
+    const extraNames = this.extraToolNames
+    return {
+      execute: (action: AgentAction, options?: ToolExecOptions) =>
+        extraNames.has(action.name)
+          ? extra.execute(action, options)
+          : sandboxExecutor.execute(action, options)
+    }
+  }
+
   /** Execute one action, retrying transient sandbox failures. */
   private async executeAction(
-    executor: SandboxToolExecutor,
+    executor: ToolExecutor,
     action: AgentAction,
     runId: string,
     step: number,

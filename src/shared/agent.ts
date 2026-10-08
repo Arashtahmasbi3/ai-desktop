@@ -43,6 +43,8 @@ export type ToolErrorCode =
   | 'sandbox_error'
   | 'not_found'
   | 'exit_nonzero'
+  | 'remote_error'
+  | 'blocked'
 
 export interface AgentStep {
   index: number

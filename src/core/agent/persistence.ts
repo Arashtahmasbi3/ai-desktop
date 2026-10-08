@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs'
 import { randomUUID } from 'node:crypto'
-import { dirname, join } from 'node:path'
+import { dirname, isAbsolute, join, normalize } from 'node:path'
 import { homedir } from 'node:os'
 import type { ProviderId } from '@shared/types'
 
@@ -59,6 +59,23 @@ export function resolveUserDataDir(options: UserDataDirOptions): string {
   }
   const xdg = env.XDG_CONFIG_HOME ?? join(home, '.config')
   return join(xdg, options.appName)
+}
+
+/**
+ * Normalize a user-supplied project path and reject anything that is not
+ * absolute — relative paths would resolve against the process CWD and silently
+ * point at the wrong folder. Throws a clear, user-facing error.
+ */
+export function normalizeProjectPath(path: string): string {
+  const trimmed = path.trim()
+  if (trimmed === '') throw new Error('Project path is required.')
+  // Accept Windows drive paths even when the check runs on POSIX (tests/CI),
+  // since the desktop app targets Windows.
+  const windowsAbsolute = /^[a-zA-Z]:[\\/]/.test(trimmed)
+  if (!windowsAbsolute && !isAbsolute(trimmed)) {
+    throw new Error(`Project path must be absolute: ${trimmed}`)
+  }
+  return normalize(trimmed)
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -293,9 +310,34 @@ export class Persistence {
 
   async addProject(name: string, path: string): Promise<ProjectRecord> {
     await this.load()
-    const project: ProjectRecord = { id: this.idFactory(), name, path, createdAt: this.now() }
+    const normalized = normalizeProjectPath(path)
+    const project: ProjectRecord = {
+      id: this.idFactory(),
+      name: name.trim() || normalized,
+      path: normalized,
+      createdAt: this.now()
+    }
+    // Avoid duplicate entries for the same folder.
+    const existing = this.settings.projects.find((entry) => entry.path === project.path)
+    if (existing) {
+      this.settings.activeProjectId = existing.id
+      await this.persist()
+      return existing
+    }
     this.settings.projects.push(project)
     this.settings.activeProjectId = project.id
+    await this.persist()
+    return project
+  }
+
+  /** Point an existing project at a new folder (used by the "Locate" action). */
+  async updateProjectPath(id: string, path: string): Promise<ProjectRecord | null> {
+    await this.load()
+    const normalized = normalizeProjectPath(path)
+    const project = this.settings.projects.find((entry) => entry.id === id)
+    if (!project) return null
+    project.path = normalized
+    if (!project.name.trim()) project.name = normalized
     await this.persist()
     return project
   }

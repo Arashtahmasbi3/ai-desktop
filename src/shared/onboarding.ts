@@ -1,10 +1,10 @@
 import { PROVIDERS } from './providers'
 import type { ProviderId } from './types'
 
-export type OnboardingStep = 'welcome' | 'connect' | 'project' | 'done'
+export type OnboardingStep = 'welcome' | 'connect' | 'project' | 'vps' | 'done'
 
 /** Ordered steps of the first-run wizard. */
-export const ONBOARDING_STEPS: OnboardingStep[] = ['welcome', 'connect', 'project', 'done']
+export const ONBOARDING_STEPS: OnboardingStep[] = ['welcome', 'connect', 'project', 'vps', 'done']
 
 export type UseCase = 'quick' | 'balanced' | 'powerful'
 
