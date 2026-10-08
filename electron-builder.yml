@@ -28,8 +28,13 @@ compression: maximum
 # Keeps the packaged package.json free of dev-time scripts and devDependencies.
 removePackageScripts: true
 removePackageKeywords: true
-# Never try to publish from a local build.
 publish: null
+
+# ssh2 ships a pure-JS fallback; its optional `cpu-features` native module is not
+# packaged and cannot be cross-compiled when building the Windows target from
+# Linux, so skip the native rebuild entirely.
+npmRebuild: false
+buildDependenciesFromSource: false
 
 win:
   icon: build/icon.ico
