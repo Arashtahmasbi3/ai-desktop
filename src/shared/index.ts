@@ -1,5 +1,7 @@
 export * from './types'
 export * from './sandbox'
 export * from './agent'
+export * from './models'
 export * from './providers'
+export * from './selection'
 export * from './ui'

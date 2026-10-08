@@ -42,7 +42,7 @@ export default function ModelSwitcher(): JSX.Element {
           <optgroup key={id} label={PROVIDERS[id].label}>
             {PROVIDERS[id].models.map((model) => (
               <option key={`${id}::${model.id}`} value={encodeSelection(id, model.id)}>
-                {model.label}
+                {model.tags.length ? `${model.label} · ${model.tags.join(', ')}` : model.label}
               </option>
             ))}
           </optgroup>
