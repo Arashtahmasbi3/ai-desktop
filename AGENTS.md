@@ -388,3 +388,9 @@ from the plan are tagged `[AUTO-DECISION]` or `[BETTER-ALTERNATIVE]`.
 - Testability: `SshBackend` is an interface, so `test/main/ssh-manager.test.ts` and
   `test/security/penetration.test.ts` run the real manager with a fake transport.
 - Tests: 53 files / 384 passed, 1 skipped. `typecheck` and `build` green.
+
+## Backlog
+
+- **TODO v2.1:** گزینه «اعمال Deny-list روی ترمینال دستی» در Settings (پیش‌فرض: خاموش).
+  (Manual VPS terminal input is intentionally unrestricted today because the user owns the
+  server; v2.1 will add an opt-in Settings toggle to apply the deny list to typed input too.)
