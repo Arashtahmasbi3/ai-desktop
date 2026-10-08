@@ -3,7 +3,9 @@ import {
   ChevronDown,
   ChevronUp,
   Code2,
+  Columns2,
   Eye,
+  FileText,
   FileWarning,
   Pencil,
   Save,
@@ -12,21 +14,11 @@ import {
   X
 } from 'lucide-react'
 import { diffLines, summarizeDiff } from '../lib/diff'
-import { languageOf, tokenClassName, tokenize } from '../lib/highlight'
+import { languageOf } from '../lib/highlight'
 import { useStore } from '../store'
-
-function HighlightedLine({ text, language }: { text: string; language: string }): JSX.Element {
-  const tokens = useMemo(() => tokenize(text, language), [text, language])
-  return (
-    <>
-      {tokens.map((token, index) => (
-        <span key={index} className={tokenClassName(token.type)}>
-          {token.text}
-        </span>
-      ))}
-    </>
-  )
-}
+import DiffViewer from './DiffViewer'
+import HighlightedLine from './Highlighted'
+import PreviewPane, { previewKind } from './PreviewPane'
 
 /** Case-insensitive match ranges within a line. */
 function matchRanges(line: string, query: string): Array<[number, number]> {
@@ -55,12 +47,15 @@ export default function CodeViewer(): JSX.Element {
   const [editing, setEditing] = useState(false)
   const [query, setQuery] = useState('')
   const [matchIndex, setMatchIndex] = useState(0)
+  const [splitDiff, setSplitDiff] = useState(false)
+  const [preview, setPreview] = useState(false)
   const bodyRef = useRef<HTMLDivElement>(null)
   const matchRefs = useRef<Array<HTMLDivElement | null>>([])
 
   const language = selectedFile ? languageOf(selectedFile) : 'plain'
   const lines = (draft ?? fileContent).split('\n')
   const changed = draft !== null && draft !== fileContent
+  const canPreview = previewKind(selectedFile) === 'markdown'
   const diff = useMemo(
     () => (changed ? diffLines(fileContent, draft) : []),
     [changed, fileContent, draft]
@@ -80,6 +75,11 @@ export default function CodeViewer(): JSX.Element {
     matchRefs.current = []
     setMatchIndex(0)
   }, [query, selectedFile])
+
+  useEffect(() => {
+    setPreview(false)
+    setSplitDiff(false)
+  }, [selectedFile])
 
   useEffect(() => {
     const lineIndex = matchLines[matchIndex]
@@ -221,9 +221,51 @@ export default function CodeViewer(): JSX.Element {
             <span className="text-red-400">-{summary.removed}</span>
           </span>
         ) : null}
+        {changed && !editing && !preview ? (
+          <button
+            type="button"
+            onClick={() => setSplitDiff((value) => !value)}
+            title={splitDiff ? 'Unified diff' : 'Side-by-side diff'}
+            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200"
+          >
+            <Columns2 className="h-3 w-3" />
+            {splitDiff ? 'Unified' : 'Split'}
+          </button>
+        ) : null}
+        {canPreview ? (
+          <button
+            type="button"
+            onClick={() => setPreview((value) => !value)}
+            title={preview ? 'Show source' : 'Preview markdown'}
+            className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] ${
+              preview ? 'bg-accent/20 text-accent' : 'text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200'
+            }`}
+          >
+            <FileText className="h-3 w-3" />
+            {preview ? 'Source' : 'Preview'}
+          </button>
+        ) : null}
       </div>
 
-      {editing ? (
+      {preview && canPreview && selectedFile ? (
+        <div className="flex min-h-0 flex-1" dir="ltr">
+          <div className="min-h-0 w-1/2 overflow-auto border-r border-border font-mono text-xs">
+            {lines.map((line, index) => (
+              <div key={index} className="flex px-2">
+                <span className="w-10 shrink-0 select-none pr-2 text-right text-neutral-600">
+                  {index + 1}
+                </span>
+                <span className="whitespace-pre text-neutral-200">
+                  <HighlightedLine text={line} language={language} />
+                </span>
+              </div>
+            ))}
+          </div>
+          <div className="flex min-h-0 w-1/2 flex-col">
+            <PreviewPane path={selectedFile} content={draft ?? fileContent} />
+          </div>
+        </div>
+      ) : editing ? (
         <textarea
           value={draft ?? fileContent}
           onChange={(event) => setDraft(event.target.value)}
@@ -232,6 +274,9 @@ export default function CodeViewer(): JSX.Element {
           className="min-h-0 flex-1 resize-none bg-bg-primary p-3 font-mono text-xs text-neutral-200 outline-none"
         />
       ) : changed ? (
+        splitDiff ? (
+          <DiffViewer before={fileContent} after={draft ?? ''} language={language} />
+        ) : (
         <div ref={bodyRef} className="min-h-0 flex-1 overflow-auto font-mono text-xs">
           {diff.map((line, index) => (
             <div
@@ -259,6 +304,7 @@ export default function CodeViewer(): JSX.Element {
             </div>
           ))}
         </div>
+        )
       ) : (
         <div ref={bodyRef} className="min-h-0 flex-1 overflow-auto font-mono text-xs">
           {lines.map((line, index) => {
