@@ -11,6 +11,7 @@ import { FileService } from './file-service'
 import {
   appDataDir,
   createCustomProviderStore,
+  createGitHubService,
   createOnboardingStore,
   createSessionStore,
   createSettingsStore,
@@ -18,6 +19,7 @@ import {
 } from './stores'
 import type { CustomProviderStore } from './custom-providers'
 import type { OnboardingStore } from './onboarding-store'
+import type { GitHubService } from './github/service'
 
 export type EventSender = (channel: string, payload: unknown) => void
 
@@ -31,6 +33,8 @@ export interface AppServicesOptions {
   customProviders?: CustomProviderStore
   /** Optional injected onboarding store (tests). */
   onboarding?: OnboardingStore
+  /** Optional injected GitHub service (tests). */
+  github?: GitHubService
 }
 
 /**
@@ -43,6 +47,7 @@ export class AppServices {
   readonly sessions: SessionStore
   readonly customProviders: CustomProviderStore
   readonly onboarding: OnboardingStore
+  readonly github: GitHubService
   readonly files = new FileService()
   readonly sandbox: SandboxManager
   readonly agent: AgentService
@@ -58,6 +63,7 @@ export class AppServices {
     this.sessions = createSessionStore(this.dir)
     this.customProviders = options.customProviders ?? createCustomProviderStore(this.dir)
     this.onboarding = options.onboarding ?? createOnboardingStore(this.dir)
+    this.github = options.github ?? createGitHubService(this.dir)
     this.sandbox =
       options.sandbox ??
       new SandboxManagerImpl({ baseDir: sandboxDir(this.dir) })
@@ -96,6 +102,7 @@ export class AppServices {
     await this.persistence.load()
     await this.customProviders.load()
     await this.onboarding.load()
+    await this.github.load()
     const project = this.persistence.getActiveProject()
     this.files.setRoot(project?.path)
     this.worker.start()

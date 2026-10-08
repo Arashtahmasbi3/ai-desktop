@@ -1,5 +1,6 @@
 import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import type { CustomProviderInput, ProviderId } from '@shared/types'
+import type { GitCommitInput } from '@shared/github'
 import type { AgentRunRequest, WorkerJobRequest } from '@shared/ui'
 import type { AppServices } from './app-services'
 
@@ -100,6 +101,33 @@ export function registerIpc(services: AppServices, getWindow: () => BrowserWindo
 
     ['onboarding:get', () => services.onboarding.load()],
     ['onboarding:complete', () => services.onboarding.complete()],
+
+    ['github:status', () => services.github.status()],
+    ['github:setClientId', (clientId: string) => services.github.setClientId(clientId)],
+    ['github:startAuth', () => services.github.startAuth()],
+    ['github:pollAuth', (deviceCode: string) => services.github.pollAuth(deviceCode)],
+    ['github:logout', () => services.github.logout()],
+    ['github:repos', () => services.github.listRepos()],
+    [
+      'github:pulls',
+      (owner: string, repo: string, state: string | undefined) =>
+        services.github.listPulls(owner, repo, state ?? 'open')
+    ],
+    [
+      'github:issues',
+      (owner: string, repo: string, state: string | undefined) =>
+        services.github.listIssues(owner, repo, state ?? 'open')
+    ],
+    ['github:gitStatus', (cwd: string) => services.github.gitStatus(cwd)],
+    ['github:gitClone', (url: string, target: string) => services.github.gitClone(url, target)],
+    ['github:gitPull', (cwd: string) => services.github.gitPull(cwd)],
+    ['github:gitPush', (cwd: string) => services.github.gitPush(cwd)],
+    ['github:gitCommit', (cwd: string, input: GitCommitInput) => services.github.gitCommit(cwd, input)],
+    [
+      'github:gitCheckout',
+      (cwd: string, branch: string, create: boolean | undefined) =>
+        services.github.gitCheckout(cwd, branch, create ?? false)
+    ],
 
     ['files:list', (path: string | undefined) => services.files.list(path ?? '.')],
     ['files:read', (path: string) => services.files.read(path)],

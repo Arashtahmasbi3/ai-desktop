@@ -2,6 +2,17 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { CustomProviderInput, CustomProviderTestResult, CustomProviderView, ProviderId } from '@shared/types'
 import type { OnboardingStatus } from '@shared/onboarding'
 import type {
+  GitCommitInput,
+  GitOpResult,
+  GitRepoStatus,
+  GitHubAuthPollResult,
+  GitHubAuthStatus,
+  GitHubDeviceCode,
+  GitHubIssue,
+  GitHubPull,
+  GitHubRepo
+} from '@shared/github'
+import type {
   AgentRunRequest,
   AppEventMap,
   RemoteStatus,
@@ -56,6 +67,30 @@ export const api = {
   onboarding: {
     get: (): Promise<OnboardingStatus> => invoke('onboarding:get'),
     complete: (): Promise<OnboardingStatus> => invoke('onboarding:complete')
+  },
+
+  github: {
+    status: (): Promise<GitHubAuthStatus> => invoke('github:status'),
+    setClientId: (clientId: string): Promise<GitHubAuthStatus> =>
+      invoke('github:setClientId', clientId),
+    startAuth: (): Promise<GitHubDeviceCode> => invoke('github:startAuth'),
+    pollAuth: (deviceCode: string): Promise<GitHubAuthPollResult> =>
+      invoke('github:pollAuth', deviceCode),
+    logout: (): Promise<GitHubAuthStatus> => invoke('github:logout'),
+    repos: (): Promise<GitHubRepo[]> => invoke('github:repos'),
+    pulls: (owner: string, repo: string, state?: string): Promise<GitHubPull[]> =>
+      invoke('github:pulls', owner, repo, state),
+    issues: (owner: string, repo: string, state?: string): Promise<GitHubIssue[]> =>
+      invoke('github:issues', owner, repo, state),
+    gitStatus: (cwd: string): Promise<GitRepoStatus> => invoke('github:gitStatus', cwd),
+    gitClone: (url: string, target: string): Promise<GitOpResult> =>
+      invoke('github:gitClone', url, target),
+    gitPull: (cwd: string): Promise<GitOpResult> => invoke('github:gitPull', cwd),
+    gitPush: (cwd: string): Promise<GitOpResult> => invoke('github:gitPush', cwd),
+    gitCommit: (cwd: string, input: GitCommitInput): Promise<GitOpResult> =>
+      invoke('github:gitCommit', cwd, input),
+    gitCheckout: (cwd: string, branch: string, create?: boolean): Promise<GitOpResult> =>
+      invoke('github:gitCheckout', cwd, branch, create)
   },
 
   fs: {

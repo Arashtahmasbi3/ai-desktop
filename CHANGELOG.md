@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-10-05
+
+GitHub integration.
+
+### Added
+
+- **GitHub authentication** — OAuth Device Flow (no backend or redirect URI needed): paste an
+  OAuth App client id, authorise in the browser, and the access token is stored encrypted with
+  `safeStorage`. The token never leaves the main process.
+- **Repository operations** — a GitHub view (Ctrl+5) shows the active project's git status
+  (branch, ahead/behind, changed files) and can commit (stage all), pull (fast-forward) and
+  push, plus clone. Built on the `git` CLI rather than a bundled library.
+- **Pull requests and issues** — list open PRs/issues from `api.github.com`, with links to
+  GitHub; pick a repository from your account or type `owner/repo`.
+
+### Notes
+
+- Client ID can also come from `AI_DESKTOP_GITHUB_CLIENT_ID`. Requires a `git` binary on PATH.
+- Implemented with `fetch` + the `git` CLI, so no runtime npm dependencies were added.
+
 ## [1.2.0] — 2026-10-05
 
 Preview and browsing.

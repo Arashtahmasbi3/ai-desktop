@@ -6,6 +6,17 @@ import type {
 } from '@shared/types'
 import type { OnboardingStatus } from '@shared/onboarding'
 import type {
+  GitCommitInput,
+  GitOpResult,
+  GitRepoStatus,
+  GitHubAuthPollResult,
+  GitHubAuthStatus,
+  GitHubDeviceCode,
+  GitHubIssue,
+  GitHubPull,
+  GitHubRepo
+} from '@shared/github'
+import type {
   AgentRunRequest,
   AppEventMap,
   FileEntry,
@@ -47,6 +58,22 @@ export interface Api {
   onboarding: {
     get(): Promise<OnboardingStatus>
     complete(): Promise<OnboardingStatus>
+  }
+  github: {
+    status(): Promise<GitHubAuthStatus>
+    setClientId(clientId: string): Promise<GitHubAuthStatus>
+    startAuth(): Promise<GitHubDeviceCode>
+    pollAuth(deviceCode: string): Promise<GitHubAuthPollResult>
+    logout(): Promise<GitHubAuthStatus>
+    repos(): Promise<GitHubRepo[]>
+    pulls(owner: string, repo: string, state?: string): Promise<GitHubPull[]>
+    issues(owner: string, repo: string, state?: string): Promise<GitHubIssue[]>
+    gitStatus(cwd: string): Promise<GitRepoStatus>
+    gitClone(url: string, target: string): Promise<GitOpResult>
+    gitPull(cwd: string): Promise<GitOpResult>
+    gitPush(cwd: string): Promise<GitOpResult>
+    gitCommit(cwd: string, input: GitCommitInput): Promise<GitOpResult>
+    gitCheckout(cwd: string, branch: string, create?: boolean): Promise<GitOpResult>
   }
   fs: {
     list(path?: string): Promise<FileEntry[]>

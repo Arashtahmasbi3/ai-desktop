@@ -359,3 +359,15 @@ from the plan are tagged `[AUTO-DECISION]` or `[BETTER-ALTERNATIVE]`.
 - Branch based on `feature/v1.1-ux-improvements` (not `master`) so Sprint 1 code is present;
   master has not been updated yet.
 - Tests: 45 files / 313 passed, 1 skipped. `typecheck` and `build` green.
+
+### Sprint 3 — v1.3 (branch `feature/v1.3-github`)
+
+- `[BETTER-ALTERNATIVE]` **No `octokit`/`simple-git`.** Both were trialled and reverted: the repo
+  packages with no `node_modules` (see “Lessons learned”), so a runtime dependency would ship a
+  broken app. GitHub is `fetch` (`src/main/github/client.ts`) + the `git` CLI
+  (`src/main/github/git.ts`). Requires `git` on PATH.
+- `[AUTO-DECISION]` **OAuth Device Flow** (not a redirect/broker): works without a backend or
+  registered callback. The client id is user-supplied or from `AI_DESKTOP_GITHUB_CLIENT_ID`.
+- Token stored with the same `safeStorage` cipher as provider keys and never sent to the renderer.
+- `parseGitStatus` and device-flow parsing are pure and unit-tested (`test/main/*`).
+- Tests: 47 files / 327 passed, 1 skipped. `typecheck` and `build` green.

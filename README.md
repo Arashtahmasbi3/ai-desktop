@@ -42,7 +42,12 @@ npm run dev     # opens the Electron window
 On first run a short onboarding wizard suggests a model, then points you at Settings
 (`Ctrl+,`) to add a provider key and your first project folder.
 
-## What's new in v1.2
+## What's new in v1.3
+
+- **GitHub** (Ctrl+5) — connect with an OAuth App client ID (device flow, token stored
+  encrypted), commit/pull/push the active project, and browse your pull requests and issues.
+
+### v1.2
 
 - **Split diff** — compare the working draft against the file on disk side by side.
 - **Markdown preview** — render `.md` files next to their source.

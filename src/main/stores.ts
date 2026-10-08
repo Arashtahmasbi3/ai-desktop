@@ -4,6 +4,8 @@ import { FileSessionStore } from '@core/agent/session-store'
 import { createSafeStorageCipher } from './secure-cipher'
 import { CustomProviderStore } from './custom-providers'
 import { OnboardingStore } from './onboarding-store'
+import { GitHubService } from './github/service'
+import { createNodeGitExec } from './github/git'
 
 /** App data directory (e.g. `%APPDATA%\AI Desktop` on Windows). */
 export function appDataDir(appName = 'AI Desktop'): string {
@@ -39,4 +41,13 @@ export function sandboxDir(dir = appDataDir()): string {
 /** First-run onboarding state (non-secret). */
 export function createOnboardingStore(dir = appDataDir()): OnboardingStore {
   return new OnboardingStore({ file: join(dir, 'onboarding.json') })
+}
+
+/** GitHub auth (encrypted token) + git CLI operations. */
+export function createGitHubService(dir = appDataDir()): GitHubService {
+  return new GitHubService({
+    file: join(dir, 'github.json'),
+    cipher: createSafeStorageCipher(),
+    exec: createNodeGitExec()
+  })
 }
