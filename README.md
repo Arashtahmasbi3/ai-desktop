@@ -18,13 +18,14 @@ DeepSeek API, VPS servers (SSH), GitHub (Git), and your local files.
 
 ## Install (Windows)
 
-> **v1.0.0 is a pre-release and the build is unsigned** — expect a SmartScreen warning; see
-> [`KNOWN_ISSUES.md`](./KNOWN_ISSUES.md) and [`TESTING_GUIDE.md`](./TESTING_GUIDE.md).
+> **v2.0.0 is a pre-release and the build is unsigned** — expect a SmartScreen warning; see
+> [`KNOWN_ISSUES_v2.0.0.md`](./KNOWN_ISSUES_v2.0.0.md) and
+> [`TESTING_GUIDE_v2.0.0.md`](./TESTING_GUIDE_v2.0.0.md).
 
-Download `AI Desktop Setup 1.0.0.exe` from the
+Download `AI Desktop Setup 2.0.0.exe` from the
 [Releases](https://github.com/Arashtahmasbi3/ai-desktop/releases) page and run it. The
 installer is per-user, lets you choose the install directory, and creates desktop and
-start-menu shortcuts. A standalone `AI Desktop 1.0.0 Portable.exe` is also published — no
+start-menu shortcuts. A standalone `AI Desktop 2.0.0 Portable.exe` is also published — no
 installation required.
 
 On first launch, open **Settings** and add a DeepSeek (or OpenAI/Anthropic/Google) API key;
@@ -212,9 +213,21 @@ See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the full release checklist,
 [`FINAL_REPORT.md`](./FINAL_REPORT.md) for the project-level summary, verification results
 and the next-version roadmap.
 
-Before installing, please read [`KNOWN_ISSUES.md`](./KNOWN_ISSUES.md) — most importantly the
-**SmartScreen warning** (the v1.0.0 pre-release is unsigned) and the **API key / Docker**
-requirements. To validate a build yourself, follow [`TESTING_GUIDE.md`](./TESTING_GUIDE.md).
+Before installing, please read [`KNOWN_ISSUES_v2.0.0.md`](./KNOWN_ISSUES_v2.0.0.md) — most
+importantly the **SmartScreen warning** (the v2.0.0 pre-release is unsigned) and the
+**API key / Docker** requirements. To validate a build yourself, follow
+[`TESTING_GUIDE_v2.0.0.md`](./TESTING_GUIDE_v2.0.0.md).
+
+## Documentation
+
+| Document | What it covers |
+| --- | --- |
+| [`TESTING_GUIDE_v2.0.0.md`](./TESTING_GUIDE_v2.0.0.md) | Full Windows test checklist for v1.1 → v2.0, SHA-256 verification, bug-report template and troubleshooting |
+| [`KNOWN_ISSUES_v2.0.0.md`](./KNOWN_ISSUES_v2.0.0.md) | Known limitations of the v2.0.0 pre-release (unsigned build, API key, Docker, `ssh2`, v2.1 TODO) |
+| [`FINAL_REPORT_v2.0.0.md`](./FINAL_REPORT_v2.0.0.md) | Per-sprint results, final stats, smoke test and installer details |
+| [`CHANGELOG.md`](./CHANGELOG.md) | Release notes per version |
+| [`AGENTS.md`](./AGENTS.md) | Architecture notes, conventions and the sprint log |
+| [`CONTRIBUTING.md`](./CONTRIBUTING.md) | Release checklist (maintainers) |
 
 ## Testing
 

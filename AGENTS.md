@@ -30,6 +30,19 @@ plus performance/leak guards. Stage 9 packages the app for Windows (NSIS install
 exe, icon and version metadata), optimizes the production build (minify/tree-shake, no shipped
 `node_modules`) and adds `CHANGELOG.md` / `CONTRIBUTING.md`; release is `v0.1.0`.
 
+## Status
+
+**Ready for manual Windows testing. Waiting for user feedback.** (2026-10-05)
+
+- Latest release: **v2.0.0 (pre-release)** — installer + portable exe published with
+  `SHA256SUMS.txt`; `master` at the v2.0.0 merge (all four sprint branches merged with `--no-ff`).
+- Test suite green: 53 files / 384 passed, 1 skipped; `typecheck` and `build` green.
+- Installers smoke-tested on Linux under `xvfb` (window loads, `window.api` complete, IPC
+  handlers respond, no console errors) — a **clean Windows machine** install is still pending.
+- Next action: the user tests on Windows using [`TESTING_GUIDE_v2.0.0.md`](./TESTING_GUIDE_v2.0.0.md)
+  and reports back (known limitations in [`KNOWN_ISSUES_v2.0.0.md`](./KNOWN_ISSUES_v2.0.0.md)).
+- Backlog entry for v2.1: opt-in deny list for the manual VPS terminal (see **Backlog** below).
+
 ## Tech stack
 
 - Electron 44 + electron-vite 5 + Vite 7
