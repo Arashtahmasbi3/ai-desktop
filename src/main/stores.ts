@@ -6,6 +6,8 @@ import { CustomProviderStore } from './custom-providers'
 import { OnboardingStore } from './onboarding-store'
 import { GitHubService } from './github/service'
 import { createNodeGitExec } from './github/git'
+import { VpsServerStore } from './ssh/server-store'
+import { AuditLog } from '@core/agent/audit-log'
 
 /** App data directory (e.g. `%APPDATA%\AI Desktop` on Windows). */
 export function appDataDir(appName = 'AI Desktop'): string {
@@ -50,4 +52,17 @@ export function createGitHubService(dir = appDataDir()): GitHubService {
     cipher: createSafeStorageCipher(),
     exec: createNodeGitExec()
   })
+}
+
+/** Persisted VPS servers (encrypted secrets, referenced private keys). */
+export function createVpsServerStore(dir = appDataDir()): VpsServerStore {
+  return new VpsServerStore({
+    file: join(dir, 'vps-servers.json'),
+    cipher: createSafeStorageCipher()
+  })
+}
+
+/** JSON trail of every SSH command (allowed, blocked or rate limited). */
+export function createAuditLog(dir = appDataDir()): AuditLog {
+  return new AuditLog({ file: join(dir, 'ssh-audit.json') })
 }

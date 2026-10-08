@@ -6,6 +6,7 @@ import CodeViewer from './components/CodeViewer'
 import ErrorBoundary from './components/ErrorBoundary'
 import FileExplorer from './components/FileExplorer'
 import GitHubPanel from './components/GitHubPanel'
+import VpsPanel from './components/Vps/VpsPanel'
 import Onboarding from './components/Onboarding'
 import SettingsPanel from './components/SettingsPanel'
 import Sidebar from './components/Sidebar'
@@ -45,11 +46,11 @@ export default function App(): JSX.Element {
       } else if (event.ctrlKey && event.key === ',') {
         event.preventDefault()
         state.openSettings()
-      } else if (event.ctrlKey && ['1', '2', '3', '4', '5'].includes(event.key)) {
+      } else if (event.ctrlKey && ['1', '2', '3', '4', '5', '6'].includes(event.key)) {
         event.preventDefault()
         state.setView(
-          ({ '1': 'chat', '2': 'tasks', '3': 'files', '4': 'browser', '5': 'github' } as const)[
-            event.key as '1' | '2' | '3' | '4' | '5'
+          ({ '1': 'chat', '2': 'tasks', '3': 'files', '4': 'browser', '5': 'github', '6': 'vps' } as const)[
+            event.key as '1' | '2' | '3' | '4' | '5' | '6'
           ]
         )
       } else if (event.key === 'Escape') {
@@ -99,6 +100,7 @@ export default function App(): JSX.Element {
               {view === 'files' ? <FileExplorer /> : null}
               {view === 'browser' ? <BrowserPanel /> : null}
               {view === 'github' ? <GitHubPanel /> : null}
+              {view === 'vps' ? <VpsPanel /> : null}
             </ErrorBoundary>
           )}
 

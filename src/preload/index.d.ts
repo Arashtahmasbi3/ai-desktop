@@ -6,6 +6,14 @@ import type {
 } from '@shared/types'
 import type { OnboardingStatus } from '@shared/onboarding'
 import type {
+  AuditEntryView,
+  RemoteFileEntry,
+  VpsConnectionState,
+  VpsExecResult,
+  VpsServerInput,
+  VpsServerView
+} from '@shared/vps'
+import type {
   GitCommitInput,
   GitOpResult,
   GitRepoStatus,
@@ -74,6 +82,25 @@ export interface Api {
     gitPush(cwd: string): Promise<GitOpResult>
     gitCommit(cwd: string, input: GitCommitInput): Promise<GitOpResult>
     gitCheckout(cwd: string, branch: string, create?: boolean): Promise<GitOpResult>
+  }
+  vps: {
+    list(): Promise<VpsServerView[]>
+    save(input: VpsServerInput): Promise<VpsServerView>
+    remove(id: string): Promise<boolean>
+    status(): Promise<VpsConnectionState>
+    connect(id: string): Promise<VpsConnectionState>
+    disconnect(id: string): Promise<VpsConnectionState>
+    approveFingerprint(id: string): Promise<VpsConnectionState>
+    exec(id: string, command: string): Promise<VpsExecResult>
+    audit(): Promise<AuditEntryView[]>
+    terminalOpen(id: string, cols?: number, rows?: number): Promise<string>
+    terminalWrite(id: string, data: string): Promise<void>
+    terminalResize(id: string, cols: number, rows: number): Promise<void>
+    files: {
+      list(id: string, path: string): Promise<RemoteFileEntry[]>
+      read(id: string, path: string): Promise<string>
+      write(id: string, path: string, content: string): Promise<void>
+    }
   }
   fs: {
     list(path?: string): Promise<FileEntry[]>

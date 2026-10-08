@@ -10,16 +10,21 @@ import { AgentService } from './agent-service'
 import { FileService } from './file-service'
 import {
   appDataDir,
+  createAuditLog,
   createCustomProviderStore,
   createGitHubService,
   createOnboardingStore,
   createSessionStore,
   createSettingsStore,
+  createVpsServerStore,
   sandboxDir
 } from './stores'
 import type { CustomProviderStore } from './custom-providers'
 import type { OnboardingStore } from './onboarding-store'
 import type { GitHubService } from './github/service'
+import { SshManager } from './ssh/ssh-manager'
+import { Ssh2Backend } from './ssh/ssh2-backend'
+import type { VpsServerStore } from './ssh/server-store'
 
 export type EventSender = (channel: string, payload: unknown) => void
 
@@ -35,6 +40,10 @@ export interface AppServicesOptions {
   onboarding?: OnboardingStore
   /** Optional injected GitHub service (tests). */
   github?: GitHubService
+  /** Optional injected SSH manager (tests). */
+  vps?: SshManager
+  /** Optional injected VPS store (tests). */
+  vpsServers?: VpsServerStore
 }
 
 /**
@@ -48,6 +57,8 @@ export class AppServices {
   readonly customProviders: CustomProviderStore
   readonly onboarding: OnboardingStore
   readonly github: GitHubService
+  readonly vpsServers: VpsServerStore
+  readonly vps: SshManager
   readonly files = new FileService()
   readonly sandbox: SandboxManager
   readonly agent: AgentService
@@ -64,6 +75,16 @@ export class AppServices {
     this.customProviders = options.customProviders ?? createCustomProviderStore(this.dir)
     this.onboarding = options.onboarding ?? createOnboardingStore(this.dir)
     this.github = options.github ?? createGitHubService(this.dir)
+    this.vpsServers = options.vpsServers ?? createVpsServerStore(this.dir)
+    this.vps =
+      options.vps ??
+      new SshManager({
+        store: this.vpsServers,
+        backend: new Ssh2Backend(),
+        audit: createAuditLog(this.dir),
+        onStatus: (state) => this.emit('vps:status', state),
+        onData: (sessionId, chunk) => this.emit('vps:data', { sessionId, chunk })
+      })
     this.sandbox =
       options.sandbox ??
       new SandboxManagerImpl({ baseDir: sandboxDir(this.dir) })
@@ -109,6 +130,7 @@ export class AppServices {
   }
 
   async dispose(): Promise<void> {
+    await this.vps.disconnectAll().catch(() => undefined)
     await this.remote.stop().catch(() => undefined)
     await this.worker.stop().catch(() => undefined)
     await this.sandbox.destroyAll().catch(() => undefined)

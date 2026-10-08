@@ -2,6 +2,14 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { CustomProviderInput, CustomProviderTestResult, CustomProviderView, ProviderId } from '@shared/types'
 import type { OnboardingStatus } from '@shared/onboarding'
 import type {
+  AuditEntryView,
+  RemoteFileEntry,
+  VpsConnectionState,
+  VpsExecResult,
+  VpsServerInput,
+  VpsServerView
+} from '@shared/vps'
+import type {
   GitCommitInput,
   GitOpResult,
   GitRepoStatus,
@@ -91,6 +99,31 @@ export const api = {
       invoke('github:gitCommit', cwd, input),
     gitCheckout: (cwd: string, branch: string, create?: boolean): Promise<GitOpResult> =>
       invoke('github:gitCheckout', cwd, branch, create)
+  },
+
+  vps: {
+    list: (): Promise<VpsServerView[]> => invoke('vps:list'),
+    save: (input: VpsServerInput): Promise<VpsServerView> => invoke('vps:save', input),
+    remove: (id: string): Promise<boolean> => invoke('vps:remove', id),
+    status: (): Promise<VpsConnectionState> => invoke('vps:status'),
+    connect: (id: string): Promise<VpsConnectionState> => invoke('vps:connect', id),
+    disconnect: (id: string): Promise<VpsConnectionState> => invoke('vps:disconnect', id),
+    approveFingerprint: (id: string): Promise<VpsConnectionState> =>
+      invoke('vps:approveFingerprint', id),
+    exec: (id: string, command: string): Promise<VpsExecResult> => invoke('vps:exec', id, command),
+    audit: (): Promise<AuditEntryView[]> => invoke('vps:audit'),
+    terminalOpen: (id: string, cols?: number, rows?: number): Promise<string> =>
+      invoke('vps:terminalOpen', id, cols, rows),
+    terminalWrite: (id: string, data: string): Promise<void> => invoke('vps:terminalWrite', id, data),
+    terminalResize: (id: string, cols: number, rows: number): Promise<void> =>
+      invoke('vps:terminalResize', id, cols, rows),
+    files: {
+      list: (id: string, path: string): Promise<RemoteFileEntry[]> =>
+        invoke('vps:files:list', id, path),
+      read: (id: string, path: string): Promise<string> => invoke('vps:files:read', id, path),
+      write: (id: string, path: string, content: string): Promise<void> =>
+        invoke('vps:files:write', id, path, content)
+    }
   },
 
   fs: {

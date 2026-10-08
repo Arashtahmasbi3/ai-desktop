@@ -1,5 +1,6 @@
 import type { AgentLogEntry, AgentStatus, LoopWarning } from './agent'
 import type { ChatMessage, ProviderId } from './types'
+import type { VpsConnectionState } from './vps'
 
 /** A project (folder) the user has added to the app. */
 export interface ProjectRecord {
@@ -143,4 +144,6 @@ export interface AppEventMap {
   'remote:status': RemoteStatus
   'settings:changed': SettingsView
   'files:changed': { root: string }
+  'vps:status': VpsConnectionState
+  'vps:data': { sessionId: string; chunk: string }
 }

@@ -20,7 +20,7 @@ import type {
   WorkerStatus
 } from '@shared/ui'
 
-export type ViewId = 'chat' | 'tasks' | 'files' | 'browser' | 'github'
+export type ViewId = 'chat' | 'tasks' | 'files' | 'browser' | 'github' | 'vps'
 
 export interface ChatMessage {
   id: string
