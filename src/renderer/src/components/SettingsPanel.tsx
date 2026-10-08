@@ -9,6 +9,7 @@ import {
 import { PROVIDERS, PROVIDER_IDS } from '@shared/providers'
 import type { ProviderId } from '@shared/types'
 import { useStore } from '../store'
+import CustomProvidersSection from './CustomProvidersSection'
 
 export default function SettingsPanel(): JSX.Element | null {
   const open = useStore((state) => state.settingsOpen)
@@ -161,6 +162,8 @@ export default function SettingsPanel(): JSX.Element | null {
               })}
             </div>
           </section>
+
+          <CustomProvidersSection />
 
           <section className="mt-6">
             <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">

@@ -1,7 +1,12 @@
 import { create } from 'zustand'
 import type { AgentLogEntry } from '@shared/agent'
 import type { LoopWarning } from '@shared/agent'
-import type { ProviderId } from '@shared/types'
+import type {
+  CustomProviderInput,
+  CustomProviderTestResult,
+  CustomProviderView,
+  ProviderId
+} from '@shared/types'
 import { DEFAULT_SELECTION, resolveSelection } from '@shared/selection'
 import type {
   AgentEvent,
@@ -62,12 +67,18 @@ interface AppState {
 
   /** Model chosen in the chat header for the next message. */
   selection: ModelSelection
+  /** User-defined OpenAI-compatible providers (secrets never reach the renderer). */
+  customProviders: CustomProviderView[]
 
   init: () => Promise<void>
   openSettings: () => void
   closeSettings: () => void
   setView: (view: ViewId) => void
   setSelection: (patch: Partial<ModelSelection>) => void
+  refreshCustomProviders: () => Promise<void>
+  saveCustomProvider: (input: CustomProviderInput) => Promise<CustomProviderView>
+  removeCustomProvider: (id: string) => Promise<void>
+  testCustomProvider: (input: CustomProviderInput) => Promise<CustomProviderTestResult>
   applyEvent: (event: AgentEvent) => void
   send: (text: string) => Promise<void>
   abort: () => void
@@ -122,15 +133,24 @@ export const useStore = create<AppState>((set, get) => ({
   remote: null,
   error: null,
   selection: DEFAULT_SELECTION,
+  customProviders: [],
 
   async init() {
     try {
-      const [settings, worker, remote] = await Promise.all([
+      const [settings, worker, remote, customProviders] = await Promise.all([
         window.api.settings.get(),
         window.api.worker.status(),
-        window.api.remote.status()
+        window.api.remote.status(),
+        window.api.customProviders.list()
       ])
-      set({ settings, worker, remote, ready: true, selection: resolveSelection(settings) })
+      set({
+        settings,
+        worker,
+        remote,
+        customProviders,
+        ready: true,
+        selection: resolveSelection(settings)
+      })
       await get().refreshFiles()
       await get().refreshSessions()
     } catch (error) {
@@ -142,6 +162,21 @@ export const useStore = create<AppState>((set, get) => ({
   closeSettings: () => set({ settingsOpen: false }),
   setView: (view) => set({ view }),
   setSelection: (patch) => set({ selection: { ...get().selection, ...patch } }),
+
+  async refreshCustomProviders() {
+    set({ customProviders: await window.api.customProviders.list() })
+  },
+  async saveCustomProvider(input) {
+    const view = await window.api.customProviders.save(input)
+    await get().refreshCustomProviders()
+    return view
+  },
+  async removeCustomProvider(id) {
+    await window.api.customProviders.remove(id)
+    await get().refreshCustomProviders()
+    if (get().selection.customProviderId === id) set({ selection: DEFAULT_SELECTION })
+  },
+  testCustomProvider: (input) => window.api.customProviders.test(input),
 
   applyEvent(event) {
     switch (event.type) {

@@ -1,5 +1,5 @@
 import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
-import type { ProviderId } from '@shared/types'
+import type { CustomProviderInput, ProviderId } from '@shared/types'
 import type { AgentRunRequest, WorkerJobRequest } from '@shared/ui'
 import type { AppServices } from './app-services'
 
@@ -92,6 +92,11 @@ export function registerIpc(services: AppServices, getWindow: () => BrowserWindo
         return changed()
       }
     ],
+
+    ['customProviders:list', () => services.customProviders.list()],
+    ['customProviders:save', (input: CustomProviderInput) => services.customProviders.save(input)],
+    ['customProviders:remove', (id: string) => services.customProviders.remove(id)],
+    ['customProviders:test', (input: CustomProviderInput) => services.customProviders.test(input)],
 
     ['files:list', (path: string | undefined) => services.files.list(path ?? '.')],
     ['files:read', (path: string) => services.files.read(path)],

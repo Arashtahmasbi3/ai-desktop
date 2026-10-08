@@ -3,6 +3,7 @@ import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { AgentService } from '../../src/main/agent-service'
+import { CustomProviderStore } from '../../src/main/custom-providers'
 import { Persistence } from '@core/agent/persistence'
 import type { SessionStore } from '@core/agent/session-store'
 import type { SandboxManager } from '@shared/sandbox'
@@ -11,12 +12,13 @@ import { XorCipher } from '../helpers/fake-cipher'
 let dir: string
 let persistence: Persistence
 
-function makeService(): AgentService {
+function makeService(customProviders?: CustomProviderStore): AgentService {
   return new AgentService({
     sandbox: {} as SandboxManager,
     persistence,
     sessionStore: {} as SessionStore,
-    emit: () => undefined
+    emit: () => undefined,
+    ...(customProviders ? { customProviders } : {})
   })
 }
 
@@ -70,5 +72,53 @@ describe('AgentService.buildProviders', () => {
     await persistence.setApiKey('openai', 'sk-oa')
     const entries = await makeService().buildProviders({ preferred: 'openai' })
     expect(entries[0].provider).toBe('openai')
+  })
+
+  it('uses a custom provider first and keeps built-ins as fallback', async () => {
+    await persistence.setApiKey('deepseek', 'sk-ds')
+    const customProviders = new CustomProviderStore({
+      file: join(dir, 'custom-providers.json'),
+      cipher: new XorCipher()
+    })
+    await customProviders.save({
+      label: 'Together',
+      baseUrl: 'https://api.together.xyz/v1',
+      model: 'llama-3.3',
+      apiKey: 'sk-custom'
+    })
+    const entries = await makeService(customProviders).buildProviders({
+      customProviderId: customProviders.list()[0].id
+    })
+    expect(entries[0].config.baseUrl).toBe('https://api.together.xyz/v1')
+    expect(entries[0].config.model).toBe('llama-3.3')
+    expect(entries.some((entry) => entry.provider === 'deepseek')).toBe(true)
+  })
+
+  it('applies the model override to the custom entry', async () => {
+    const customProviders = new CustomProviderStore({
+      file: join(dir, 'custom-providers.json'),
+      cipher: new XorCipher()
+    })
+    await customProviders.save({
+      label: 'Together',
+      baseUrl: 'https://api.together.xyz/v1',
+      model: 'llama-3.3',
+      apiKey: 'sk-custom'
+    })
+    const entries = await makeService(customProviders).buildProviders({
+      customProviderId: customProviders.list()[0].id,
+      model: 'llama-3.3-70b'
+    })
+    expect(entries[0].config.model).toBe('llama-3.3-70b')
+  })
+
+  it('throws when the selected custom provider is unknown', async () => {
+    const customProviders = new CustomProviderStore({
+      file: join(dir, 'custom-providers.json'),
+      cipher: new XorCipher()
+    })
+    await expect(
+      makeService(customProviders).buildProviders({ customProviderId: 'missing' })
+    ).rejects.toThrow(/custom provider was not found/)
   })
 })

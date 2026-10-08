@@ -8,6 +8,7 @@ import { PROVIDERS, createAdapterForConfig } from '@core/llm-adapters/registry'
 import type { Persistence } from '@core/agent/persistence'
 import type { SessionStore } from '@core/agent/session-store'
 import type { SandboxManager } from '@shared/sandbox'
+import type { CustomProviderStore } from './custom-providers'
 
 /** Forwards orchestrator log entries to a sink (the renderer, in the app). */
 class EmittingLogger implements AgentLogger {
@@ -24,6 +25,8 @@ export interface AgentServiceOptions {
   sessionStore: SessionStore
   emit: (event: AgentEvent) => void
   now?: () => number
+  /** Optional: enables user-defined OpenAI-compatible providers. */
+  customProviders?: CustomProviderStore
 }
 
 /** Which provider/model to put first for an agent run. */
@@ -55,6 +58,7 @@ export class AgentService {
   private readonly sessionStore: SessionStore
   private readonly emit: (event: AgentEvent) => void
   private readonly now: () => number
+  private readonly customProviders?: CustomProviderStore
   private readonly controllers = new Set<AbortController>()
   private runCounter = 0
 
@@ -64,6 +68,7 @@ export class AgentService {
     this.sessionStore = options.sessionStore
     this.emit = options.emit
     this.now = options.now ?? (() => Date.now())
+    if (options.customProviders) this.customProviders = options.customProviders
   }
 
   isRunning(): boolean {
@@ -75,6 +80,28 @@ export class AgentService {
     const settings = await this.persistence.load()
     const ids = Object.keys(PROVIDERS) as ProviderId[]
     const order = providerOrder(ids, options.preferred, settings.activeProvider)
+
+    const entries: ProviderEntry[] = []
+    let primaryIsCustom = false
+
+    if (options.customProviderId) {
+      const custom = this.customProviders
+        ? await this.customProviders.getDecrypted(options.customProviderId)
+        : null
+      if (!custom) {
+        throw new Error('Selected custom provider was not found. Re-add it in Settings.')
+      }
+      // Custom endpoints speak the OpenAI protocol, so they reuse that adapter.
+      const config = {
+        provider: 'openai' as ProviderId,
+        apiKey: custom.apiKey,
+        model: options.model ?? custom.model,
+        baseUrl: custom.baseUrl,
+        ...(custom.headers ? { headers: custom.headers } : {})
+      }
+      entries.push({ provider: 'openai', adapter: createAdapterForConfig(config), config })
+      primaryIsCustom = true
+    }
 
     const candidates: Array<{
       id: ProviderId
@@ -95,30 +122,37 @@ export class AgentService {
       })
     }
 
-    if (candidates.length === 0) {
+    entries.push(
+      ...candidates.map((candidate, index) => {
+        const descriptor = PROVIDERS[candidate.id]
+        // The model chosen in the chat header overrides only the primary entry;
+        // fallback providers keep their own configured model.
+        const model =
+          !primaryIsCustom && index === 0 && options.model
+            ? options.model
+            : (candidate.model ?? descriptor.defaultModel)
+        const config = {
+          provider: candidate.id,
+          apiKey: candidate.apiKey,
+          model,
+          baseUrl: candidate.baseUrl ?? descriptor.defaultBaseUrl
+        }
+        return { provider: candidate.id, adapter: createAdapterForConfig(config), config }
+      })
+    )
+
+    if (entries.length === 0) {
       throw new Error('No API key configured. Add one in Settings.')
     }
 
-    return candidates.map((candidate, index) => {
-      const descriptor = PROVIDERS[candidate.id]
-      // The model chosen in the chat header only overrides the primary entry;
-      // fallback providers keep their own configured model.
-      const model =
-        index === 0 && options.model ? options.model : (candidate.model ?? descriptor.defaultModel)
-      const config = {
-        provider: candidate.id,
-        apiKey: candidate.apiKey,
-        model,
-        baseUrl: candidate.baseUrl ?? descriptor.defaultBaseUrl
-      }
-      return { provider: candidate.id, adapter: createAdapterForConfig(config), config }
-    })
+    return entries
   }
 
   async run(request: AgentRunRequest, externalSignal?: AbortSignal): Promise<AgentRunResult> {
     const providers = await this.buildProviders({
       ...(request.provider ? { preferred: request.provider } : {}),
-      ...(request.model ? { model: request.model } : {})
+      ...(request.model ? { model: request.model } : {}),
+      ...(request.customProviderId ? { customProviderId: request.customProviderId } : {})
     })
     const orchestrator = new AgentOrchestrator({
       sandbox: this.sandbox,

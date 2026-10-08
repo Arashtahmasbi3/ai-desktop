@@ -2,6 +2,7 @@ import { join } from 'node:path'
 import { Persistence, resolveUserDataDir } from '@core/agent/persistence'
 import { FileSessionStore } from '@core/agent/session-store'
 import { createSafeStorageCipher } from './secure-cipher'
+import { CustomProviderStore } from './custom-providers'
 
 /** App data directory (e.g. `%APPDATA%\AI Desktop` on Windows). */
 export function appDataDir(appName = 'AI Desktop'): string {
@@ -19,6 +20,14 @@ export function createSettingsStore(dir = appDataDir()): Persistence {
 /** On-disk agent session store. */
 export function createSessionStore(dir = appDataDir()): FileSessionStore {
   return new FileSessionStore(join(dir, 'sessions'))
+}
+
+/** Store for user-defined OpenAI-compatible providers (encrypted keys). */
+export function createCustomProviderStore(dir = appDataDir()): CustomProviderStore {
+  return new CustomProviderStore({
+    file: join(dir, 'custom-providers.json'),
+    cipher: createSafeStorageCipher()
+  })
 }
 
 /** Directory for sandbox workspaces. */

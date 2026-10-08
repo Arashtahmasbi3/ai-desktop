@@ -1,5 +1,10 @@
 import type { ProviderId } from '@shared/types'
 import type {
+  CustomProviderInput,
+  CustomProviderTestResult,
+  CustomProviderView
+} from '@shared/types'
+import type {
   AgentRunRequest,
   AppEventMap,
   FileEntry,
@@ -31,6 +36,12 @@ export interface Api {
   }
   projects: {
     open(id: string): Promise<SettingsView>
+  }
+  customProviders: {
+    list(): Promise<CustomProviderView[]>
+    save(input: CustomProviderInput): Promise<CustomProviderView>
+    remove(id: string): Promise<boolean>
+    test(input: CustomProviderInput): Promise<CustomProviderTestResult>
   }
   fs: {
     list(path?: string): Promise<FileEntry[]>
