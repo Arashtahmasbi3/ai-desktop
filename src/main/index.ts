@@ -2,6 +2,7 @@ import { app, shell, BrowserWindow } from 'electron'
 import { join } from 'node:path'
 import { AppServices } from './app-services'
 import { registerIpc } from './ipc'
+import { installWebviewPolicy } from './webview-policy'
 
 const isDev = !app.isPackaged
 
@@ -27,7 +28,8 @@ function createWindow(): void {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      webviewTag: true
     }
   })
 
@@ -42,6 +44,13 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
+  // A <webview> must never inherit a preload or Node access from its host.
+  window.webContents.on('will-attach-webview', (_event, webPreferences) => {
+    delete webPreferences.preload
+    webPreferences.nodeIntegration = false
+    webPreferences.contextIsolation = true
+  })
+
   const rendererUrl = process.env['ELECTRON_RENDERER_URL']
   if (isDev && rendererUrl) {
     void window.loadURL(rendererUrl)
@@ -51,6 +60,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(async () => {
+  installWebviewPolicy(app)
   services = new AppServices()
   await services.init()
   registerIpc(services, () => mainWindow)
