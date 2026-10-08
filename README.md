@@ -20,6 +20,9 @@ DeepSeek API, VPS servers (SSH), GitHub (Git), and your local files.
 
 ## Install (Windows)
 
+> **v1.0.0 is a pre-release and the build is unsigned** — expect a SmartScreen warning; see
+> [`KNOWN_ISSUES.md`](./KNOWN_ISSUES.md) and [`TESTING_GUIDE.md`](./TESTING_GUIDE.md).
+
 Download `AI Desktop Setup 1.0.0.exe` from the
 [Releases](https://github.com/Arashtahmasbi3/ai-desktop/releases) page and run it. The
 installer is per-user, lets you choose the install directory, and creates desktop and
@@ -180,6 +183,10 @@ See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the full release checklist,
 [`CHANGELOG.md`](./CHANGELOG.md) for release notes, and
 [`FINAL_REPORT.md`](./FINAL_REPORT.md) for the project-level summary, verification results
 and the next-version roadmap.
+
+Before installing, please read [`KNOWN_ISSUES.md`](./KNOWN_ISSUES.md) — most importantly the
+**SmartScreen warning** (the v1.0.0 pre-release is unsigned) and the **API key / Docker**
+requirements. To validate a build yourself, follow [`TESTING_GUIDE.md`](./TESTING_GUIDE.md).
 
 ## Testing
 
