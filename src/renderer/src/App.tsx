@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Bot, AlertTriangle, UploadCloud, X } from 'lucide-react'
+import BrowserPanel from './components/BrowserPanel'
 import ChatPanel from './components/ChatPanel'
 import CodeViewer from './components/CodeViewer'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -43,9 +44,13 @@ export default function App(): JSX.Element {
       } else if (event.ctrlKey && event.key === ',') {
         event.preventDefault()
         state.openSettings()
-      } else if (event.ctrlKey && ['1', '2', '3'].includes(event.key)) {
+      } else if (event.ctrlKey && ['1', '2', '3', '4'].includes(event.key)) {
         event.preventDefault()
-        state.setView(({ '1': 'chat', '2': 'tasks', '3': 'files' } as const)[event.key as '1'])
+        state.setView(
+          ({ '1': 'chat', '2': 'tasks', '3': 'files', '4': 'browser' } as const)[
+            event.key as '1' | '2' | '3' | '4'
+          ]
+        )
       } else if (event.key === 'Escape') {
         if (state.settingsOpen) state.closeSettings()
         else clearError()
@@ -91,6 +96,7 @@ export default function App(): JSX.Element {
               {view === 'chat' ? <ChatPanel /> : null}
               {view === 'tasks' ? <TaskPanel /> : null}
               {view === 'files' ? <FileExplorer /> : null}
+              {view === 'browser' ? <BrowserPanel /> : null}
             </ErrorBoundary>
           )}
 

@@ -1,11 +1,12 @@
-import { ListChecks, MessageSquare, FolderTree, Settings2 } from 'lucide-react'
+import { ListChecks, MessageSquare, FolderTree, Globe, Settings2 } from 'lucide-react'
 import type { ViewId } from '../store'
 import { useStore } from '../store'
 
 const ITEMS: Array<{ id: ViewId; label: string; icon: typeof MessageSquare }> = [
   { id: 'chat', label: 'Chat (Ctrl+1)', icon: MessageSquare },
   { id: 'tasks', label: 'Tasks (Ctrl+2)', icon: ListChecks },
-  { id: 'files', label: 'Workspace (Ctrl+3)', icon: FolderTree }
+  { id: 'files', label: 'Workspace (Ctrl+3)', icon: FolderTree },
+  { id: 'browser', label: 'Browser (Ctrl+4)', icon: Globe }
 ]
 
 export default function Sidebar(): JSX.Element {
