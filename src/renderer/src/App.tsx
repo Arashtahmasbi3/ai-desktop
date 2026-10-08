@@ -5,6 +5,7 @@ import ChatPanel from './components/ChatPanel'
 import CodeViewer from './components/CodeViewer'
 import ErrorBoundary from './components/ErrorBoundary'
 import FileExplorer from './components/FileExplorer'
+import GitHubPanel from './components/GitHubPanel'
 import Onboarding from './components/Onboarding'
 import SettingsPanel from './components/SettingsPanel'
 import Sidebar from './components/Sidebar'
@@ -44,11 +45,11 @@ export default function App(): JSX.Element {
       } else if (event.ctrlKey && event.key === ',') {
         event.preventDefault()
         state.openSettings()
-      } else if (event.ctrlKey && ['1', '2', '3', '4'].includes(event.key)) {
+      } else if (event.ctrlKey && ['1', '2', '3', '4', '5'].includes(event.key)) {
         event.preventDefault()
         state.setView(
-          ({ '1': 'chat', '2': 'tasks', '3': 'files', '4': 'browser' } as const)[
-            event.key as '1' | '2' | '3' | '4'
+          ({ '1': 'chat', '2': 'tasks', '3': 'files', '4': 'browser', '5': 'github' } as const)[
+            event.key as '1' | '2' | '3' | '4' | '5'
           ]
         )
       } else if (event.key === 'Escape') {
@@ -97,6 +98,7 @@ export default function App(): JSX.Element {
               {view === 'tasks' ? <TaskPanel /> : null}
               {view === 'files' ? <FileExplorer /> : null}
               {view === 'browser' ? <BrowserPanel /> : null}
+              {view === 'github' ? <GitHubPanel /> : null}
             </ErrorBoundary>
           )}
 
