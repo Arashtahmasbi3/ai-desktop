@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] — 2026-10-05
+
+VPS / remote — SSH servers from the desktop app, with a hard security boundary.
+
+### Added
+
+- **SSH connections** — add VPS servers (key or password auth), connect/disconnect, and a
+  live status indicator. Servers are stored locally; passwords/passphrases are encrypted with
+  `safeStorage` and private keys are referenced by path (never copied).
+- **Mandatory host-key verification** — a first connection refuses to proceed until you confirm
+  the presented `SHA256:` fingerprint; a changed key is always rejected as a possible MITM.
+- **Live terminal** — an xterm.js shell (write, output, resize) per connected server.
+- **Remote file explorer** — browse, read and edit files over SFTP.
+- **Agent integration** — a guarded `remote_shell` tool so the agent can run commands on a
+  connected VPS.
+- **Security guards** (all enforced in the main process):
+  - command deny list (`rm -rf /`, `mkfs*`, `dd of=/dev/*`, fork bombs, `curl | bash`, …);
+  - 100 commands/minute rate limit;
+  - JSON audit log of every connect/exec/blocked/rate-limited action;
+  - 30-minute idle auto-disconnect;
+  - a missing private key blocks the connection instead of warning.
+- **VPS view** (Ctrl+6) with server list, tabs for Terminal / Files / Audit.
+
+### Notes
+
+- SSH is implemented with `ssh2` (added as a runtime dependency; it is the only one and is
+  loaded lazily, so it is listed explicitly in `electron-builder.yml`).
+- `keytar` was replaced with the existing `safeStorage` cipher to avoid a second native
+  keystore dependency.
+
 ## [1.3.0] — 2026-10-05
 
 GitHub integration.

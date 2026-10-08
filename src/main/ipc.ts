@@ -3,6 +3,7 @@ import type { CustomProviderInput, ProviderId } from '@shared/types'
 import type { GitCommitInput } from '@shared/github'
 import type { AgentRunRequest, WorkerJobRequest } from '@shared/ui'
 import type { AppServices } from './app-services'
+import { registerVpsIpc } from './vps-ipc'
 
 /**
  * Registers every IPC channel the renderer is allowed to call. Handlers only
@@ -181,7 +182,10 @@ export function registerIpc(services: AppServices, getWindow: () => BrowserWindo
     ipcMain.handle(channel, (_event, ...args) => handler(...(args as never[])))
   }
 
+  const disposeVps = registerVpsIpc(services)
+
   return () => {
+    disposeVps()
     for (const [channel] of handlers) ipcMain.removeHandler(channel)
   }
 }
