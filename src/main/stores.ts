@@ -3,6 +3,7 @@ import { Persistence, resolveUserDataDir } from '@core/agent/persistence'
 import { FileSessionStore } from '@core/agent/session-store'
 import { createSafeStorageCipher } from './secure-cipher'
 import { CustomProviderStore } from './custom-providers'
+import { OnboardingStore } from './onboarding-store'
 
 /** App data directory (e.g. `%APPDATA%\AI Desktop` on Windows). */
 export function appDataDir(appName = 'AI Desktop'): string {
@@ -33,4 +34,9 @@ export function createCustomProviderStore(dir = appDataDir()): CustomProviderSto
 /** Directory for sandbox workspaces. */
 export function sandboxDir(dir = appDataDir()): string {
   return join(dir, 'sandboxes')
+}
+
+/** First-run onboarding state (non-secret). */
+export function createOnboardingStore(dir = appDataDir()): OnboardingStore {
+  return new OnboardingStore({ file: join(dir, 'onboarding.json') })
 }

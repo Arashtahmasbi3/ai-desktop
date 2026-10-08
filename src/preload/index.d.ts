@@ -4,6 +4,7 @@ import type {
   CustomProviderTestResult,
   CustomProviderView
 } from '@shared/types'
+import type { OnboardingStatus } from '@shared/onboarding'
 import type {
   AgentRunRequest,
   AppEventMap,
@@ -42,6 +43,10 @@ export interface Api {
     save(input: CustomProviderInput): Promise<CustomProviderView>
     remove(id: string): Promise<boolean>
     test(input: CustomProviderInput): Promise<CustomProviderTestResult>
+  }
+  onboarding: {
+    get(): Promise<OnboardingStatus>
+    complete(): Promise<OnboardingStatus>
   }
   fs: {
     list(path?: string): Promise<FileEntry[]>

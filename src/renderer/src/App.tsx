@@ -4,6 +4,7 @@ import ChatPanel from './components/ChatPanel'
 import CodeViewer from './components/CodeViewer'
 import ErrorBoundary from './components/ErrorBoundary'
 import FileExplorer from './components/FileExplorer'
+import Onboarding from './components/Onboarding'
 import SettingsPanel from './components/SettingsPanel'
 import Sidebar from './components/Sidebar'
 import StatusBar from './components/StatusBar'
@@ -114,6 +115,8 @@ export default function App(): JSX.Element {
       ) : null}
 
       <StatusBar />
+
+      <Onboarding />
 
       <SettingsPanel />
 

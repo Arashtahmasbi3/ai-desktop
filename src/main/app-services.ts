@@ -11,11 +11,13 @@ import { FileService } from './file-service'
 import {
   appDataDir,
   createCustomProviderStore,
+  createOnboardingStore,
   createSessionStore,
   createSettingsStore,
   sandboxDir
 } from './stores'
 import type { CustomProviderStore } from './custom-providers'
+import type { OnboardingStore } from './onboarding-store'
 
 export type EventSender = (channel: string, payload: unknown) => void
 
@@ -27,6 +29,8 @@ export interface AppServicesOptions {
   remotePort?: number
   /** Optional injected custom-provider store (tests). */
   customProviders?: CustomProviderStore
+  /** Optional injected onboarding store (tests). */
+  onboarding?: OnboardingStore
 }
 
 /**
@@ -38,6 +42,7 @@ export class AppServices {
   readonly persistence: Persistence
   readonly sessions: SessionStore
   readonly customProviders: CustomProviderStore
+  readonly onboarding: OnboardingStore
   readonly files = new FileService()
   readonly sandbox: SandboxManager
   readonly agent: AgentService
@@ -52,6 +57,7 @@ export class AppServices {
     this.persistence = createSettingsStore(this.dir)
     this.sessions = createSessionStore(this.dir)
     this.customProviders = options.customProviders ?? createCustomProviderStore(this.dir)
+    this.onboarding = options.onboarding ?? createOnboardingStore(this.dir)
     this.sandbox =
       options.sandbox ??
       new SandboxManagerImpl({ baseDir: sandboxDir(this.dir) })
@@ -89,6 +95,7 @@ export class AppServices {
   async init(): Promise<void> {
     await this.persistence.load()
     await this.customProviders.load()
+    await this.onboarding.load()
     const project = this.persistence.getActiveProject()
     this.files.setRoot(project?.path)
     this.worker.start()

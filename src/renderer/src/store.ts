@@ -8,6 +8,7 @@ import type {
   ProviderId
 } from '@shared/types'
 import { DEFAULT_SELECTION, resolveSelection } from '@shared/selection'
+import type { OnboardingStatus } from '@shared/onboarding'
 import type {
   AgentEvent,
   FileEntry,
@@ -69,6 +70,8 @@ interface AppState {
   selection: ModelSelection
   /** User-defined OpenAI-compatible providers (secrets never reach the renderer). */
   customProviders: CustomProviderView[]
+  /** First-run wizard state; null until loaded. */
+  onboarding: OnboardingStatus | null
 
   init: () => Promise<void>
   openSettings: () => void
@@ -79,6 +82,7 @@ interface AppState {
   saveCustomProvider: (input: CustomProviderInput) => Promise<CustomProviderView>
   removeCustomProvider: (id: string) => Promise<void>
   testCustomProvider: (input: CustomProviderInput) => Promise<CustomProviderTestResult>
+  completeOnboarding: () => Promise<void>
   applyEvent: (event: AgentEvent) => void
   send: (text: string) => Promise<void>
   abort: () => void
@@ -134,20 +138,23 @@ export const useStore = create<AppState>((set, get) => ({
   error: null,
   selection: DEFAULT_SELECTION,
   customProviders: [],
+  onboarding: null,
 
   async init() {
     try {
-      const [settings, worker, remote, customProviders] = await Promise.all([
+      const [settings, worker, remote, customProviders, onboarding] = await Promise.all([
         window.api.settings.get(),
         window.api.worker.status(),
         window.api.remote.status(),
-        window.api.customProviders.list()
+        window.api.customProviders.list(),
+        window.api.onboarding.get()
       ])
       set({
         settings,
         worker,
         remote,
         customProviders,
+        onboarding,
         ready: true,
         selection: resolveSelection(settings)
       })
@@ -177,6 +184,9 @@ export const useStore = create<AppState>((set, get) => ({
     if (get().selection.customProviderId === id) set({ selection: DEFAULT_SELECTION })
   },
   testCustomProvider: (input) => window.api.customProviders.test(input),
+  async completeOnboarding() {
+    set({ onboarding: await window.api.onboarding.complete() })
+  },
 
   applyEvent(event) {
     switch (event.type) {

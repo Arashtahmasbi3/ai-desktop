@@ -98,6 +98,9 @@ export function registerIpc(services: AppServices, getWindow: () => BrowserWindo
     ['customProviders:remove', (id: string) => services.customProviders.remove(id)],
     ['customProviders:test', (input: CustomProviderInput) => services.customProviders.test(input)],
 
+    ['onboarding:get', () => services.onboarding.load()],
+    ['onboarding:complete', () => services.onboarding.complete()],
+
     ['files:list', (path: string | undefined) => services.files.list(path ?? '.')],
     ['files:read', (path: string) => services.files.read(path)],
     [
