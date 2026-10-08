@@ -1,10 +1,18 @@
 import { create } from 'zustand'
 import type { AgentLogEntry } from '@shared/agent'
 import type { LoopWarning } from '@shared/agent'
-import type { ProviderId } from '@shared/types'
+import type {
+  CustomProviderInput,
+  CustomProviderTestResult,
+  CustomProviderView,
+  ProviderId
+} from '@shared/types'
+import { DEFAULT_SELECTION, resolveSelection } from '@shared/selection'
+import type { OnboardingStatus } from '@shared/onboarding'
 import type {
   AgentEvent,
   FileEntry,
+  ModelSelection,
   RemoteStatus,
   SessionInfo,
   SettingsView,
@@ -19,6 +27,8 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'tool' | 'system'
   content: string
   at: number
+  /** Provider/model that produced an assistant message (display only). */
+  model?: string
 }
 
 const MAX_LOGS = 500
@@ -56,10 +66,23 @@ interface AppState {
   remote: RemoteStatus | null
   error: string | null
 
+  /** Model chosen in the chat header for the next message. */
+  selection: ModelSelection
+  /** User-defined OpenAI-compatible providers (secrets never reach the renderer). */
+  customProviders: CustomProviderView[]
+  /** First-run wizard state; null until loaded. */
+  onboarding: OnboardingStatus | null
+
   init: () => Promise<void>
   openSettings: () => void
   closeSettings: () => void
   setView: (view: ViewId) => void
+  setSelection: (patch: Partial<ModelSelection>) => void
+  refreshCustomProviders: () => Promise<void>
+  saveCustomProvider: (input: CustomProviderInput) => Promise<CustomProviderView>
+  removeCustomProvider: (id: string) => Promise<void>
+  testCustomProvider: (input: CustomProviderInput) => Promise<CustomProviderTestResult>
+  completeOnboarding: () => Promise<void>
   applyEvent: (event: AgentEvent) => void
   send: (text: string) => Promise<void>
   abort: () => void
@@ -113,15 +136,28 @@ export const useStore = create<AppState>((set, get) => ({
   worker: null,
   remote: null,
   error: null,
+  selection: DEFAULT_SELECTION,
+  customProviders: [],
+  onboarding: null,
 
   async init() {
     try {
-      const [settings, worker, remote] = await Promise.all([
+      const [settings, worker, remote, customProviders, onboarding] = await Promise.all([
         window.api.settings.get(),
         window.api.worker.status(),
-        window.api.remote.status()
+        window.api.remote.status(),
+        window.api.customProviders.list(),
+        window.api.onboarding.get()
       ])
-      set({ settings, worker, remote, ready: true })
+      set({
+        settings,
+        worker,
+        remote,
+        customProviders,
+        onboarding,
+        ready: true,
+        selection: resolveSelection(settings)
+      })
       await get().refreshFiles()
       await get().refreshSessions()
     } catch (error) {
@@ -132,6 +168,25 @@ export const useStore = create<AppState>((set, get) => ({
   openSettings: () => set({ settingsOpen: true }),
   closeSettings: () => set({ settingsOpen: false }),
   setView: (view) => set({ view }),
+  setSelection: (patch) => set({ selection: { ...get().selection, ...patch } }),
+
+  async refreshCustomProviders() {
+    set({ customProviders: await window.api.customProviders.list() })
+  },
+  async saveCustomProvider(input) {
+    const view = await window.api.customProviders.save(input)
+    await get().refreshCustomProviders()
+    return view
+  },
+  async removeCustomProvider(id) {
+    await window.api.customProviders.remove(id)
+    await get().refreshCustomProviders()
+    if (get().selection.customProviderId === id) set({ selection: DEFAULT_SELECTION })
+  },
+  testCustomProvider: (input) => window.api.customProviders.test(input),
+  async completeOnboarding() {
+    set({ onboarding: await window.api.onboarding.complete() })
+  },
 
   applyEvent(event) {
     switch (event.type) {
@@ -164,7 +219,13 @@ export const useStore = create<AppState>((set, get) => ({
         const text = event.finalAnswer ?? event.message ?? ''
         const messages = [...get().messages]
         if (text) {
-          messages.push({ id: newId(), role: 'assistant', content: text, at: event.at })
+          messages.push({
+            id: newId(),
+            role: 'assistant',
+            content: text,
+            at: event.at,
+            ...(event.model ? { model: event.model } : {})
+          })
         }
         set({
           running: false,
@@ -192,13 +253,20 @@ export const useStore = create<AppState>((set, get) => ({
   async send(text) {
     const trimmed = text.trim()
     if (!trimmed || get().running) return
+    const selection = get().selection
     set({
       messages: [...get().messages, { id: newId(), role: 'user', content: trimmed, at: Date.now() }],
       running: true,
       error: null
     })
     try {
-      await window.api.agent.run({ task: trimmed, sessionId: get().sessionId })
+      await window.api.agent.run({
+        task: trimmed,
+        sessionId: get().sessionId,
+        provider: selection.provider,
+        model: selection.model,
+        ...(selection.customProviderId ? { customProviderId: selection.customProviderId } : {})
+      })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       set({ running: false, error: message })

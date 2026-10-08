@@ -109,6 +109,46 @@ export interface ValidationResult {
   errors: string[]
 }
 
+/** A user-configured OpenAI-compatible endpoint ("Other" provider). */
+export interface CustomProvider {
+  id: string
+  label: string
+  baseUrl: string
+  model: string
+  /** Extra request headers (e.g. gateway routing). Never contains the API key. */
+  headers?: Record<string, string>
+  createdAt: number
+  updatedAt: number
+}
+
+/** Public (non-secret) view of a custom provider, safe for the renderer. */
+export interface CustomProviderView {
+  id: string
+  label: string
+  baseUrl: string
+  model: string
+  hasApiKey: boolean
+  headerCount: number
+}
+
+/** Payload for creating/updating a custom provider. */
+export interface CustomProviderInput {
+  /** Present when updating an existing provider. */
+  id?: string
+  label: string
+  baseUrl: string
+  model: string
+  /** Plaintext key, encrypted at rest. Omit to keep the stored key on update. */
+  apiKey?: string
+  headers?: Record<string, string>
+}
+
+export interface CustomProviderTestResult {
+  ok: boolean
+  latencyMs: number
+  message?: string
+}
+
 /** The contract every provider adapter must fulfil. */
 export interface BaseLLMAdapter {
   readonly provider: ProviderId

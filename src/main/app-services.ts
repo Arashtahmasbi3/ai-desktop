@@ -8,7 +8,16 @@ import { WorkerManager } from '@core/worker/worker-manager'
 import { RemoteServer } from '@core/remote/remote-server'
 import { AgentService } from './agent-service'
 import { FileService } from './file-service'
-import { appDataDir, createSessionStore, createSettingsStore, sandboxDir } from './stores'
+import {
+  appDataDir,
+  createCustomProviderStore,
+  createOnboardingStore,
+  createSessionStore,
+  createSettingsStore,
+  sandboxDir
+} from './stores'
+import type { CustomProviderStore } from './custom-providers'
+import type { OnboardingStore } from './onboarding-store'
 
 export type EventSender = (channel: string, payload: unknown) => void
 
@@ -18,6 +27,10 @@ export interface AppServicesOptions {
   dir?: string
   /** Optional remote port; 0 lets the OS choose a free port. */
   remotePort?: number
+  /** Optional injected custom-provider store (tests). */
+  customProviders?: CustomProviderStore
+  /** Optional injected onboarding store (tests). */
+  onboarding?: OnboardingStore
 }
 
 /**
@@ -28,6 +41,8 @@ export class AppServices {
   readonly dir: string
   readonly persistence: Persistence
   readonly sessions: SessionStore
+  readonly customProviders: CustomProviderStore
+  readonly onboarding: OnboardingStore
   readonly files = new FileService()
   readonly sandbox: SandboxManager
   readonly agent: AgentService
@@ -41,6 +56,8 @@ export class AppServices {
     this.dir = options.dir ?? appDataDir()
     this.persistence = createSettingsStore(this.dir)
     this.sessions = createSessionStore(this.dir)
+    this.customProviders = options.customProviders ?? createCustomProviderStore(this.dir)
+    this.onboarding = options.onboarding ?? createOnboardingStore(this.dir)
     this.sandbox =
       options.sandbox ??
       new SandboxManagerImpl({ baseDir: sandboxDir(this.dir) })
@@ -49,6 +66,7 @@ export class AppServices {
       sandbox: this.sandbox,
       persistence: this.persistence,
       sessionStore: this.sessions,
+      customProviders: this.customProviders,
       emit: (event: AgentEvent) => this.emit('agent:event', event)
     })
 
@@ -76,6 +94,8 @@ export class AppServices {
   /** Bring services up (currently: restore the active project). */
   async init(): Promise<void> {
     await this.persistence.load()
+    await this.customProviders.load()
+    await this.onboarding.load()
     const project = this.persistence.getActiveProject()
     this.files.setRoot(project?.path)
     this.worker.start()

@@ -1,8 +1,14 @@
+import { MODEL_CATALOG } from './models'
+import type { ModelTag } from './models'
 import type { ProviderId } from './types'
+
+export type { CatalogModel, ModelTag } from './models'
 
 export interface ModelInfo {
   id: string
   label: string
+  /** Capability hints ('cheap' | 'powerful' | 'fast' | 'free'). Display-only. */
+  tags: ModelTag[]
 }
 
 export interface ProviderDescriptor {
@@ -13,51 +19,19 @@ export interface ProviderDescriptor {
   models: ModelInfo[]
 }
 
-/** Static provider metadata (no adapter code), safe to use in the renderer. */
-export const PROVIDERS: Record<ProviderId, ProviderDescriptor> = {
-  openai: {
-    id: 'openai',
-    label: 'OpenAI',
-    defaultBaseUrl: 'https://api.openai.com/v1',
-    defaultModel: 'gpt-4o-mini',
-    models: [
-      { id: 'gpt-4o-mini', label: 'GPT-4o mini' },
-      { id: 'gpt-4o', label: 'GPT-4o' },
-      { id: 'gpt-4.1', label: 'GPT-4.1' }
-    ]
-  },
-  anthropic: {
-    id: 'anthropic',
-    label: 'Anthropic',
-    defaultBaseUrl: 'https://api.anthropic.com/v1',
-    defaultModel: 'claude-3-5-sonnet-latest',
-    models: [
-      { id: 'claude-3-5-sonnet-latest', label: 'Claude 3.5 Sonnet' },
-      { id: 'claude-3-5-haiku-latest', label: 'Claude 3.5 Haiku' },
-      { id: 'claude-3-opus-latest', label: 'Claude 3 Opus' }
-    ]
-  },
-  deepseek: {
-    id: 'deepseek',
-    label: 'DeepSeek',
-    defaultBaseUrl: 'https://api.deepseek.com/v1',
-    defaultModel: 'deepseek-chat',
-    models: [
-      { id: 'deepseek-chat', label: 'DeepSeek Chat' },
-      { id: 'deepseek-reasoner', label: 'DeepSeek Reasoner' }
-    ]
-  },
-  google: {
-    id: 'google',
-    label: 'Google Gemini',
-    defaultBaseUrl: 'https://generativelanguage.googleapis.com/v1beta',
-    defaultModel: 'gemini-2.0-flash',
-    models: [
-      { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash' },
-      { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
-      { id: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' }
-    ]
+function toDescriptor(group: (typeof MODEL_CATALOG)[number]): ProviderDescriptor {
+  return {
+    id: group.provider,
+    label: group.label,
+    defaultBaseUrl: group.defaultBaseUrl,
+    defaultModel: group.defaultModel,
+    models: group.models.map((model) => ({ ...model }))
   }
 }
 
-export const PROVIDER_IDS = Object.keys(PROVIDERS) as ProviderId[]
+/** Static provider metadata (no adapter code), derived from {@link MODEL_CATALOG}. */
+export const PROVIDERS = Object.fromEntries(
+  MODEL_CATALOG.map((group) => [group.provider, toDescriptor(group)])
+) as Record<ProviderId, ProviderDescriptor>
+
+export const PROVIDER_IDS = MODEL_CATALOG.map((group) => group.provider) as ProviderId[]

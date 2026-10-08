@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
-import type { ProviderId } from '@shared/types'
+import type { CustomProviderInput, CustomProviderTestResult, CustomProviderView, ProviderId } from '@shared/types'
+import type { OnboardingStatus } from '@shared/onboarding'
 import type {
   AgentRunRequest,
   AppEventMap,
@@ -41,6 +42,20 @@ export const api = {
 
   projects: {
     open: (id: string): Promise<SettingsView> => invoke('projects:open', id)
+  },
+
+  customProviders: {
+    list: (): Promise<CustomProviderView[]> => invoke('customProviders:list'),
+    save: (input: CustomProviderInput): Promise<CustomProviderView> =>
+      invoke('customProviders:save', input),
+    remove: (id: string): Promise<boolean> => invoke('customProviders:remove', id),
+    test: (input: CustomProviderInput): Promise<CustomProviderTestResult> =>
+      invoke('customProviders:test', input)
+  },
+
+  onboarding: {
+    get: (): Promise<OnboardingStatus> => invoke('onboarding:get'),
+    complete: (): Promise<OnboardingStatus> => invoke('onboarding:complete')
   },
 
   fs: {
