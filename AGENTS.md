@@ -371,3 +371,20 @@ from the plan are tagged `[AUTO-DECISION]` or `[BETTER-ALTERNATIVE]`.
 - Token stored with the same `safeStorage` cipher as provider keys and never sent to the renderer.
 - `parseGitStatus` and device-flow parsing are pure and unit-tested (`test/main/*`).
 - Tests: 47 files / 327 passed, 1 skipped. `typecheck` and `build` green.
+
+### Sprint 4 — v2.0 (branch `feature/v2.0-vps-remote`)
+
+- `[BETTER-ALTERNATIVE]` **`keytar` → `safeStorage`.** Credentials are encrypted with the same
+  OS-keystore cipher already used for provider keys (`src/main/secure-cipher.ts`); this avoids a
+  second native keystore module while keeping secrets out of the renderer and off disk in plaintext.
+- `ssh2` is the **only runtime dependency**. It is kept out of the Vite bundle (lazy
+  `import('ssh2')` so Rollup never resolves its optional `.node` binding) and is re-included
+  explicitly in `electron-builder.yml` (`ssh2` + `asn1`/`bcrypt-pbkdf`/`tweetnacl`/`safer-buffer`).
+  `ssh2-sftp-client` was dropped — `ssh2`'s own `sftp` covers list/read/write.
+- All security rules live in `SshManager` and are injected/clock-driven for tests: mandatory
+  host-key verification (`host-key-verify.ts`), deny list + rate limiter + JSON audit
+  (`src/core/agent/`), 30-minute idle disconnect, and a missing key/password **blocks** (never warns).
+- Host key is only pinned after explicit user approval; a changed fingerprint is always rejected.
+- Testability: `SshBackend` is an interface, so `test/main/ssh-manager.test.ts` and
+  `test/security/penetration.test.ts` run the real manager with a fake transport.
+- Tests: 53 files / 384 passed, 1 skipped. `typecheck` and `build` green.

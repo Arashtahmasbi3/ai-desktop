@@ -3,14 +3,12 @@
 An Electron desktop AI assistant — a local, Codex-like companion that connects to the
 DeepSeek API, VPS servers (SSH), GitHub (Git), and your local files.
 
-> Status: **Stage 9 — packaging & release (v1.0.0)**. The app ships a Codex-like agent
-> workspace: provider-agnostic LLM adapters (OpenAI/Anthropic/DeepSeek/Google), the
-> `SandboxManager` code-execution layer, the `AgentOrchestrator` Planning → Execution →
-> Observation → Reflection loop, token-budgeted context/session state, and the full renderer
-> UI (chat, tasks/logs, workspace explorer + code viewer with diff, settings, status bar),
-> plus a background worker queue and a localhost remote-access server. Stage 8 added
-> end-to-end integration tests; Stage 9 adds Windows packaging, build optimization and
-> release documentation.
+> Status: **v2.0.0 (pre-release)**. A Codex-like agent workspace: provider-agnostic LLM
+> adapters (OpenAI/Anthropic/DeepSeek/Google), the `SandboxManager` code-execution layer, the
+> `AgentOrchestrator` Planning → Execution → Observation → Reflection loop, token-budgeted
+> context/session state, and the full renderer UI (chat, tasks/logs, workspace explorer + code
+> viewer with diff, internal browser, GitHub, VPS/SSH remote, settings, status bar), plus a
+> background worker queue, a localhost remote-access server and Windows packaging.
 
 ## Requirements
 
@@ -42,7 +40,15 @@ npm run dev     # opens the Electron window
 On first run a short onboarding wizard suggests a model, then points you at Settings
 (`Ctrl+,`) to add a provider key and your first project folder.
 
-## What's new in v1.3
+## What's new in v2.0
+
+- **VPS / Remote** (Ctrl+6) — add SSH servers (key or password), connect with mandatory
+  host-key verification, run a live xterm terminal, browse/edit files over SFTP, and let the
+  agent run guarded commands. Every command is rate-limited (100/min), checked against a
+  dangerous-command deny list, audited to JSON, and connections auto-disconnect after 30
+  minutes idle. Secrets are encrypted with `safeStorage`; private keys are referenced by path.
+
+### v1.3
 
 - **GitHub** (Ctrl+5) — connect with an OAuth App client ID (device flow, token stored
   encrypted), commit/pull/push the active project, and browse your pull requests and issues.

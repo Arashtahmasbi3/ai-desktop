@@ -7,14 +7,21 @@ directories:
   output: release
 
 # Only the compiled app is shipped. The renderer is fully bundled by Vite and
-# the main/preload processes depend on Electron + Node built-ins only, so no
-# node_modules need to be packaged at all.
+# the main/preload processes use Electron + Node built-ins, except `ssh2` which
+# is loaded lazily and therefore listed below so it ships with the app.
 files:
   - out/**/*
   - package.json
   - '!**/*.map'
   - '!**/*.ts'
   - '!**/node_modules/**'
+  # ssh2 is the one runtime dependency: it is externalized out of the main
+  # bundle (so it is not statically resolvable) and must ship with the app.
+  - node_modules/ssh2/**/*
+  - node_modules/asn1/**/*
+  - node_modules/bcrypt-pbkdf/**/*
+  - node_modules/tweetnacl/**/*
+  - node_modules/safer-buffer/**/*
 
 asar: true
 compression: maximum
