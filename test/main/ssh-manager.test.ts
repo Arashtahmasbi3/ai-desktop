@@ -226,4 +226,36 @@ describe('ssh manager', () => {
     expect(raw).not.toContain('top-secret')
     expect(raw).toContain('enc:')
   })
+
+  it('enforces a read-only host policy on exec (B.3)', async () => {
+    const server = await store.save({
+      name: 'prod',
+      host: 'example.com',
+      username: 'root',
+      authType: 'key',
+      privateKeyPath: '/k',
+      trustFingerprint: KEY_FINGERPRINT,
+      policy: { vpsId: '', mode: 'read-only', allowCommands: [], denyCommands: [], requireApproval: 'never', allowedPaths: [] }
+    })
+    await manager.connect(server.id)
+    const read = await manager.exec(server.id, 'ls /srv')
+    expect(read.ok).toBe(true)
+    const write = await manager.exec(server.id, 'mkdir /srv/x')
+    expect(write.blocked).toBe(true)
+    expect(write.reason).toMatch(/read-only/)
+    expect(audit.entries().some((entry) => entry.type === 'blocked' && /policy/.test(entry.detail ?? ''))).toBe(true)
+  })
+
+  it('persists a host policy across store reloads (B.3)', async () => {
+    const created = await store.save({
+      name: 'stg',
+      host: 'h',
+      username: 'u',
+      authType: 'key',
+      privateKeyPath: '/k',
+      policy: { vpsId: '', mode: 'staging', allowCommands: ['deploy'], denyCommands: [], requireApproval: 'destructive', allowedPaths: [] }
+    })
+    const reloaded = new VpsServerStore({ file: join(dir, 'vps.json'), cipher })
+    expect(await reloaded.policyFor(created.id)).toMatchObject({ mode: 'staging', requireApproval: 'destructive' })
+  })
 })

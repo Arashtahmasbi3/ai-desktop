@@ -72,4 +72,26 @@ describe('penetration: agent remote shell tool', () => {
     expect(result.ok).toBe(false)
     expect(result.content).toMatch(/not connected/)
   })
+
+  it('surfaces a host-policy block to the chat (B.3)', async () => {
+    const blocked = {
+      exec: async () => ({ ok: false, stdout: '', stderr: '', exitCode: 126, blocked: true, reason: 'read-only hosts are read-only.' }),
+      connectedServers: () => ['srv-1']
+    }
+    const result = await executeRemoteShell(blocked, { server_id: 'srv-1', command: 'mkdir /x' })
+    expect(result.ok).toBe(false)
+    expect(result.blocked).toBe(true)
+    expect(result.content).toMatch(/Blocked by policy/)
+  })
+
+  it('surfaces a host-policy approval requirement to the chat (B.3)', async () => {
+    const needsApproval = {
+      exec: async () => ({ ok: false, stdout: '', stderr: '', exitCode: 126, requiresApproval: true, reason: 'This host requires approval.' }),
+      connectedServers: () => ['srv-1']
+    }
+    const result = await executeRemoteShell(needsApproval, { server_id: 'srv-1', command: 'mkdir /x' })
+    expect(result.ok).toBe(false)
+    expect(result.blocked).toBe(true)
+    expect(result.content).toMatch(/Approval required by host policy/)
+  })
 })

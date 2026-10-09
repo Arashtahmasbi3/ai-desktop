@@ -2,6 +2,22 @@
 
 export type VpsAuthType = 'key' | 'password'
 
+/** How much a host may be mutated (v2.3.1, B.3). */
+export type HostPolicyMode = 'read-only' | 'staging' | 'production'
+
+/** When the agent must ask before touching a host. */
+export type HostApprovalRequirement = 'never' | 'always' | 'destructive'
+
+/** Per-host command policy. Absent ⇒ the legacy deny-list-only behaviour. */
+export interface HostPolicy {
+  vpsId: string
+  mode: HostPolicyMode
+  allowCommands: string[]
+  denyCommands: string[]
+  requireApproval: HostApprovalRequirement
+  allowedPaths: string[]
+}
+
 export interface VpsServer {
   id: string
   name: string
@@ -14,6 +30,7 @@ export interface VpsServer {
   updatedAt: number
   trustedFingerprint?: string
   lastConnectedAt?: number
+  policy?: HostPolicy
 }
 
 export interface VpsServerInput {
@@ -30,6 +47,8 @@ export interface VpsServerInput {
   passphrase?: string
   /** Pin the presented fingerprint after the user confirms it. */
   trustFingerprint?: string
+  /** Replace this host's command policy (v2.3.1, B.3). */
+  policy?: HostPolicy
 }
 
 /** Secret-free server row for the renderer. */
@@ -46,6 +65,7 @@ export interface VpsServerView {
   createdAt: number
   updatedAt: number
   lastConnectedAt?: number
+  policy?: HostPolicy
 }
 
 export type VpsStatus = 'disconnected' | 'connecting' | 'connected' | 'error'
@@ -74,6 +94,8 @@ export interface VpsExecResult {
   exitCode: number
   blocked?: boolean
   rateLimited?: boolean
+  /** Set when this host's policy requires explicit approval before running. */
+  requiresApproval?: boolean
   reason?: string
 }
 

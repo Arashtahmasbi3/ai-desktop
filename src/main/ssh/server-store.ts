@@ -2,7 +2,8 @@ import { promises as fs } from 'node:fs'
 import { dirname } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import type { SecretCipher } from '@core/agent/persistence'
-import type { VpsServer, VpsServerInput, VpsServerView } from '@shared/vps'
+import { coerceHostPolicy } from '@core/remote/host-policy'
+import type { HostPolicy, VpsServer, VpsServerInput, VpsServerView } from '@shared/vps'
 
 export const VPS_SCHEMA_VERSION = 1
 
@@ -56,25 +57,30 @@ export class VpsServerStore {
     try {
       const raw = JSON.parse(await fs.readFile(this.file, 'utf8')) as unknown
       if (isRecord(raw) && Array.isArray(raw.servers)) {
-        this.servers = raw.servers.filter(isRecord).map((entry) => ({
-          id: String(entry.id ?? ''),
-          name: String(entry.name ?? ''),
-          host: String(entry.host ?? ''),
-          port: Number(entry.port ?? 22),
-          username: String(entry.username ?? ''),
-          authType: entry.authType === 'password' ? 'password' : 'key',
-          createdAt: Number(entry.createdAt ?? this.now()),
-          updatedAt: Number(entry.updatedAt ?? this.now()),
-          ...(asString(entry.privateKeyPath) ? { privateKeyPath: entry.privateKeyPath as string } : {}),
-          ...(asString(entry.trustedFingerprint)
-            ? { trustedFingerprint: entry.trustedFingerprint as string }
-            : {}),
-          ...(typeof entry.lastConnectedAt === 'number'
-            ? { lastConnectedAt: entry.lastConnectedAt }
-            : {}),
-          ...(asString(entry.passwordEnc) ? { passwordEnc: entry.passwordEnc as string } : {}),
-          ...(asString(entry.passphraseEnc) ? { passphraseEnc: entry.passphraseEnc as string } : {})
-        }))
+        this.servers = raw.servers.filter(isRecord).map((entry) => {
+          const id = String(entry.id ?? '')
+          const policy = coerceHostPolicy(entry.policy, id)
+          return {
+            id,
+            name: String(entry.name ?? ''),
+            host: String(entry.host ?? ''),
+            port: Number(entry.port ?? 22),
+            username: String(entry.username ?? ''),
+            authType: entry.authType === 'password' ? 'password' : 'key',
+            createdAt: Number(entry.createdAt ?? this.now()),
+            updatedAt: Number(entry.updatedAt ?? this.now()),
+            ...(asString(entry.privateKeyPath) ? { privateKeyPath: entry.privateKeyPath as string } : {}),
+            ...(asString(entry.trustedFingerprint)
+              ? { trustedFingerprint: entry.trustedFingerprint as string }
+              : {}),
+            ...(typeof entry.lastConnectedAt === 'number'
+              ? { lastConnectedAt: entry.lastConnectedAt }
+              : {}),
+            ...(policy ? { policy } : {}),
+            ...(asString(entry.passwordEnc) ? { passwordEnc: entry.passwordEnc as string } : {}),
+            ...(asString(entry.passphraseEnc) ? { passphraseEnc: entry.passphraseEnc as string } : {})
+          }
+        })
       }
     } catch (error) {
       const code = (error as NodeJS.ErrnoException).code
@@ -104,7 +110,8 @@ export class VpsServerStore {
       ...(server.trustedFingerprint ? { trustedFingerprint: server.trustedFingerprint } : {}),
       createdAt: server.createdAt,
       updatedAt: server.updatedAt,
-      ...(server.lastConnectedAt ? { lastConnectedAt: server.lastConnectedAt } : {})
+      ...(server.lastConnectedAt ? { lastConnectedAt: server.lastConnectedAt } : {}),
+      ...(server.policy ? { policy: server.policy } : {})
     }
   }
 
@@ -152,6 +159,11 @@ export class VpsServerStore {
       record.trustedFingerprint = input.trustFingerprint.trim()
     }
 
+    if (input.policy) {
+      const policy = coerceHostPolicy(input.policy, record.id)
+      if (policy) record.policy = policy
+    }
+
     const password = input.password?.trim()
     if (password) record.passwordEnc = await this.cipher.encrypt(password)
     const passphrase = input.passphrase?.trim()
@@ -186,6 +198,12 @@ export class VpsServerStore {
       ...(passwordEnc ? { password: await this.cipher.decrypt(passwordEnc) } : {}),
       ...(passphraseEnc ? { passphrase: await this.cipher.decrypt(passphraseEnc) } : {})
     }
+  }
+
+  /** The host's command policy, if configured (B.3). */
+  async policyFor(id: string): Promise<HostPolicy | undefined> {
+    await this.load()
+    return this.servers.find((entry) => entry.id === id)?.policy
   }
 
   async setTrustedFingerprint(id: string, fingerprint: string): Promise<void> {
