@@ -90,6 +90,14 @@ export function registerIpc(services: AppServices, getWindow: () => BrowserWindo
       }
     ],
     [
+      'settings:addRemoteProject',
+      async (name: string, path: string, vpsId: string) => {
+        await services.persistence.addProject(name, path, { type: 'remote', vpsId })
+        await services.openActiveProject()
+        return changed()
+      }
+    ],
+    [
       'settings:removeProject',
       async (id: string) => {
         await services.persistence.removeProject(id)

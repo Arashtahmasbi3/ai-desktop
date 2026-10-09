@@ -56,6 +56,7 @@ export interface Api {
     setModel(provider: ProviderId, model: string): Promise<SettingsView>
     setActiveProvider(provider: ProviderId): Promise<SettingsView>
     addProject(name: string, path: string): Promise<SettingsView>
+    addRemoteProject(name: string, path: string, vpsId: string): Promise<SettingsView>
     removeProject(id: string): Promise<SettingsView>
     updateProjectPath(id: string, path: string): Promise<SettingsView>
   }
@@ -109,6 +110,9 @@ export interface Api {
     approveFingerprint(id: string): Promise<VpsConnectionState>
     exec(id: string, command: string): Promise<VpsExecResult>
     audit(): Promise<AuditEntryView[]>
+    searchProject(id: string, name: string): Promise<string[]>
+    listDirs(id: string, path: string): Promise<string[]>
+    gitStatus(id: string, path: string): Promise<string>
     terminalOpen(id: string, cols?: number, rows?: number): Promise<string>
     terminalWrite(id: string, data: string): Promise<void>
     terminalResize(id: string, cols: number, rows: number): Promise<void>

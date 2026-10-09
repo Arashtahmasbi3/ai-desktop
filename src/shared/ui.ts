@@ -8,10 +8,15 @@ export interface ProjectRecord {
   name: string
   path: string
   createdAt: number
+  /** 'local' (default) or 'remote' (a folder on a connected VPS). */
+  type?: 'local' | 'remote'
+  /** VPS the remote project lives on. */
+  vpsId?: string
   /**
    * Computed at read time (never persisted): whether `path` exists on this
-   * machine/OS. Missing projects are shown with a warning instead of being
-   * deleted, so a project path from another OS survives a round-trip.
+   * machine/OS (for remote projects: whether the VPS is connected). Missing
+   * projects are shown with a warning instead of being deleted, so a project
+   * path from another OS survives a round-trip.
    */
   exists?: boolean
 }
@@ -29,6 +34,8 @@ export interface SettingsView {
   activeProjectId?: string
   providers: Partial<Record<ProviderId, ProviderSettingsView>>
   projects: ProjectRecord[]
+  /** Host platform (`process.platform`) so the UI can warn on foreign paths. */
+  platform?: string
 }
 
 /** A single entry in the workspace file explorer. */

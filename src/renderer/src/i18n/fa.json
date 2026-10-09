@@ -49,7 +49,10 @@
     "navBrowser": "مرورگر",
     "navGitHub": "گیت‌هاب",
     "navVps": "VPS",
-    "user": "کاربر"
+    "user": "کاربر",
+    "remote": "ریموت",
+    "searchOnVps": "جستجو روی VPS",
+    "remoteMissing": "VPS متصل نیست"
   },
   "chat": {
     "placeholder": "بپرس یا وظیفه بده…",
@@ -97,7 +100,11 @@
     "projectName": "نام",
     "projectPath": "مسیر (مثلاً C:\\Users\\me\\project)",
     "noProjects": "هنوز پروژه‌ای نداری.",
-    "missingPath": "مسیر روی این سیستم یافت نشد"
+    "missingPath": "مسیر روی این سیستم یافت نشد",
+    "addRemoteProject": "افزودن Workspace ریموت",
+    "remoteHint": "پوشه‌ای روی یک VPS متصل اضافه کن؛ دستیار می‌تواند از طریق SSH آن را بگردد.",
+    "selectServer": "سرور VPS",
+    "noVps": "هنوز VPS‌ای تنظیم نشده."
   },
   "toast": {
     "dismiss": "بستن",
@@ -127,5 +134,11 @@
     "stepOf": "گام {{current}} از {{total}}",
     "vpsTitle": "VPS و ریموت",
     "vpsBody": "با SSH به یک سرور وصل شو تا دستورهای ریموت اجرا شود. در هدر چت یک VPS متصل انتخاب کن تا دستیار از ابزار remote_shell استفاده کند."
+  },
+  "vps": {
+    "notConnected": "ابتدا به یک VPS وصل شو.",
+    "searching": "در حال جستجو روی VPS…",
+    "noMatches": "پوشه‌ای روی VPS پیدا نشد.",
+    "found": "{{count}} پوشه پیدا شد."
   }
 }

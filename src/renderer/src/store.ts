@@ -162,9 +162,11 @@ interface AppState {
   toggleRemote: () => Promise<void>
 
   addProject: (name: string, path: string) => Promise<void>
+  addRemoteProject: (name: string, path: string, vpsId: string) => Promise<void>
   removeProject: (id: string) => Promise<void>
   openProject: (id: string) => Promise<void>
   updateProjectPath: (id: string, path: string) => Promise<void>
+  searchVpsProject: (name: string) => Promise<string[]>
   setApiKey: (provider: ProviderId, apiKey: string) => Promise<void>
   removeApiKey: (provider: ProviderId) => Promise<void>
   setModel: (provider: ProviderId, model: string) => Promise<void>
@@ -543,6 +545,19 @@ export const useStore = create<AppState>((set, get) => ({
   async addProject(name, path) {
     set({ settings: await window.api.settings.addProject(name || basename(path), path) })
     await get().refreshFiles('.')
+  },
+
+  async addRemoteProject(name, path, vpsId) {
+    set({ settings: await window.api.settings.addRemoteProject(name || basename(path), path, vpsId) })
+  },
+
+  async searchVpsProject(name) {
+    const status = await window.api.vps.status()
+    if (status.status !== 'connected' || !status.serverId) {
+      get().pushToast('warning', i18n.t('vps.notConnected'))
+      return []
+    }
+    return window.api.vps.searchProject(status.serverId, name)
   },
 
   async removeProject(id) {

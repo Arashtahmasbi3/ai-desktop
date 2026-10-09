@@ -60,6 +60,8 @@ export const api = {
       invoke('settings:setActiveProvider', provider),
     addProject: (name: string, path: string): Promise<SettingsView> =>
       invoke('settings:addProject', name, path),
+    addRemoteProject: (name: string, path: string, vpsId: string): Promise<SettingsView> =>
+      invoke('settings:addRemoteProject', name, path, vpsId),
     removeProject: (id: string): Promise<SettingsView> => invoke('settings:removeProject', id),
     updateProjectPath: (id: string, path: string): Promise<SettingsView> =>
       invoke('settings:updateProjectPath', id, path)
@@ -132,6 +134,10 @@ export const api = {
       invoke('vps:approveFingerprint', id),
     exec: (id: string, command: string): Promise<VpsExecResult> => invoke('vps:exec', id, command),
     audit: (): Promise<AuditEntryView[]> => invoke('vps:audit'),
+    searchProject: (id: string, name: string): Promise<string[]> =>
+      invoke('vps:searchProject', id, name),
+    listDirs: (id: string, path: string): Promise<string[]> => invoke('vps:listDirs', id, path),
+    gitStatus: (id: string, path: string): Promise<string> => invoke('vps:gitStatus', id, path),
     terminalOpen: (id: string, cols?: number, rows?: number): Promise<string> =>
       invoke('vps:terminalOpen', id, cols, rows),
     terminalWrite: (id: string, data: string): Promise<void> => invoke('vps:terminalWrite', id, data),

@@ -1,8 +1,9 @@
 import { promises as fs } from 'node:fs'
 import { randomUUID } from 'node:crypto'
-import { dirname, isAbsolute, join, normalize } from 'node:path'
+import { dirname, isAbsolute, join, normalize, resolve } from 'node:path'
 import { homedir } from 'node:os'
 import type { ProviderId } from '@shared/types'
+import { isWindowsAbsolutePath } from '@shared/paths'
 
 /** Current on-disk settings schema version. */
 export const SETTINGS_SCHEMA_VERSION = 1
@@ -19,6 +20,10 @@ export interface ProjectRecord {
   name: string
   path: string
   createdAt: number
+  /** 'local' (default) or 'remote' (a folder on a connected VPS). */
+  type?: 'local' | 'remote'
+  /** VPS server this remote project lives on. */
+  vpsId?: string
 }
 
 export interface ProviderSettings {
@@ -65,17 +70,39 @@ export function resolveUserDataDir(options: UserDataDirOptions): string {
  * Normalize a user-supplied project path and reject anything that is not
  * absolute — relative paths would resolve against the process CWD and silently
  * point at the wrong folder. Throws a clear, user-facing error.
+ *
+ * The path is also resolved to a canonical absolute form. A Windows drive path
+ * keeps its native form on Windows; on POSIX (tests/CI) it is left normalized
+ * but untouched, since the desktop target is Windows.
  */
 export function normalizeProjectPath(path: string): string {
   const trimmed = path.trim()
   if (trimmed === '') throw new Error('Project path is required.')
   // Accept Windows drive paths even when the check runs on POSIX (tests/CI),
   // since the desktop app targets Windows.
-  const windowsAbsolute = /^[a-zA-Z]:[\\/]/.test(trimmed)
+  const windowsAbsolute = isWindowsAbsolutePath(trimmed)
   if (!windowsAbsolute && !isAbsolute(trimmed)) {
     throw new Error(`Project path must be absolute: ${trimmed}`)
   }
-  return normalize(trimmed)
+  const normalized = normalize(trimmed)
+  if (windowsAbsolute) {
+    return process.platform === 'win32' ? resolve(normalized) : normalized
+  }
+  return resolve(normalized)
+}
+
+/**
+ * Normalize a path that lives on a remote POSIX host. Unlike local paths it is
+ * always absolute-in-POSIX terms (`/opt/app`), even when this process runs on
+ * Windows, so the local `path.isAbsolute` check would reject it.
+ */
+export function normalizeRemoteProjectPath(path: string): string {
+  const trimmed = path.trim()
+  if (trimmed === '') throw new Error('Project path is required.')
+  if (!trimmed.startsWith('/')) {
+    throw new Error(`Remote project path must be absolute: ${trimmed}`)
+  }
+  return normalize(trimmed).replace(/\\/g, '/')
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -98,7 +125,9 @@ function normalizeProjects(value: unknown, now: number): ProjectRecord[] {
         id: typeof entry.id === 'string' ? entry.id : randomUUID(),
         name: typeof entry.name === 'string' ? entry.name : entry.path,
         path: entry.path,
-        createdAt: typeof entry.createdAt === 'number' ? entry.createdAt : now
+        createdAt: typeof entry.createdAt === 'number' ? entry.createdAt : now,
+        ...(entry.type === 'remote' ? { type: 'remote' as const } : {}),
+        ...(typeof entry.vpsId === 'string' ? { vpsId: entry.vpsId } : {})
       })
     }
   }
@@ -308,17 +337,27 @@ export class Persistence {
     return id ? this.settings.projects.find((project) => project.id === id) : undefined
   }
 
-  async addProject(name: string, path: string): Promise<ProjectRecord> {
+  async addProject(
+    name: string,
+    path: string,
+    options: { type?: 'local' | 'remote'; vpsId?: string } = {}
+  ): Promise<ProjectRecord> {
     await this.load()
-    const normalized = normalizeProjectPath(path)
+    const normalized =
+      options.type === 'remote' ? normalizeRemoteProjectPath(path) : normalizeProjectPath(path)
     const project: ProjectRecord = {
       id: this.idFactory(),
       name: name.trim() || normalized,
       path: normalized,
-      createdAt: this.now()
+      createdAt: this.now(),
+      ...(options.type === 'remote' ? { type: 'remote' as const } : {}),
+      ...(options.type === 'remote' && options.vpsId ? { vpsId: options.vpsId } : {})
     }
-    // Avoid duplicate entries for the same folder.
-    const existing = this.settings.projects.find((entry) => entry.path === project.path)
+    // Avoid duplicate entries for the same folder (and, for remote projects, the
+    // same server — the same path can exist on two different VPSs).
+    const existing = this.settings.projects.find(
+      (entry) => entry.path === project.path && (entry.vpsId ?? '') === (project.vpsId ?? '')
+    )
     if (existing) {
       this.settings.activeProjectId = existing.id
       await this.persist()

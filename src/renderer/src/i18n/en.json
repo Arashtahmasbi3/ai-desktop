@@ -49,7 +49,10 @@
     "navBrowser": "Browser",
     "navGitHub": "GitHub",
     "navVps": "VPS",
-    "user": "User"
+    "user": "User",
+    "remote": "Remote",
+    "searchOnVps": "Search on VPS",
+    "remoteMissing": "VPS not connected"
   },
   "chat": {
     "placeholder": "Ask anything or give a task…",
@@ -97,7 +100,11 @@
     "projectName": "Name",
     "projectPath": "Path (e.g. C:\\Users\\me\\project)",
     "noProjects": "No projects yet.",
-    "missingPath": "Path not found on this system"
+    "missingPath": "Path not found on this system",
+    "addRemoteProject": "Add remote workspace",
+    "remoteHint": "Add a folder that lives on a connected VPS. The assistant can explore it over SSH.",
+    "selectServer": "VPS server",
+    "noVps": "No VPS configured yet."
   },
   "toast": {
     "dismiss": "Dismiss",
@@ -127,5 +134,11 @@
     "stepOf": "Step {{current}} of {{total}}",
     "vpsTitle": "VPS & Remote",
     "vpsBody": "Connect a server over SSH to run remote commands. Pick a connected VPS in the chat header and the assistant can use the remote_shell tool."
+  },
+  "vps": {
+    "notConnected": "Connect a VPS first.",
+    "searching": "Searching on the VPS…",
+    "noMatches": "No matching folder found on the VPS.",
+    "found": "Found {{count}} folder(s)."
   }
 }

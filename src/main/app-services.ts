@@ -145,11 +145,16 @@ export class AppServices {
     const settings = await this.persistence.load()
     const activeId = settings.activeProjectId
     const view: SettingsView = {
+      platform: process.platform,
       providers: {},
       projects: settings.projects.map((project) => ({
         ...project,
         // Keep the record even when missing; the UI marks it instead of deleting.
-        exists: existsSync(project.path)
+        // Remote projects count as present while their VPS is connected.
+        exists:
+          project.type === 'remote'
+            ? Boolean(project.vpsId && this.vps.isConnected(project.vpsId))
+            : existsSync(project.path)
       }))
     }
     if (settings.activeProvider) view.activeProvider = settings.activeProvider
