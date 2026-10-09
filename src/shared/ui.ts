@@ -1,4 +1,4 @@
-import type { AgentLogEntry, AgentStatus, LoopWarning } from './agent'
+import type { AgentLogEntry, AgentStatus, LoopStopInfo, LoopWarning } from './agent'
 import type { ChatMessage, ProviderId } from './types'
 import type { VpsConnectionState } from './vps'
 import type { ApprovalMode } from './approval'
@@ -20,6 +20,12 @@ export interface ProjectRecord {
    * path from another OS survives a round-trip.
    */
   exists?: boolean
+  /**
+   * Computed at read time: whether a local project path clearly belongs to a
+   * different OS than the one the app is running on (for example a Linux path
+   * while running on Windows).
+   */
+  osMismatch?: boolean
 }
 
 /** Provider settings safe to display in the renderer (no key material). */
@@ -39,6 +45,7 @@ export interface SettingsView {
   platform?: string
   /** When the agent must ask before acting. */
   approvalMode?: ApprovalMode
+  rememberApprovalMode?: boolean
   /** Whether new chats start in Plan Mode. */
   planModeDefault?: boolean
 }
@@ -77,6 +84,16 @@ export interface ApprovalRequest {
   /** One-line, human-readable description of what the tool will do. */
   summary: string
   arguments: Record<string, unknown>
+  /** Coarse action class, used to style the preview. */
+  kind?: 'read' | 'write' | 'shell'
+  /** The command or file path shown large in the dialog. */
+  preview?: string
+  /** Working directory the action will run in, when known. */
+  workingDirectory?: string
+  /** Remote server label when the action targets a VPS. */
+  server?: string
+  /** True when the action matches the deny list (never auto-approved). */
+  dangerous?: boolean
 }
 
 /** The model the user has selected for the next/next messages. */
@@ -136,6 +153,8 @@ export type AgentEvent =
       finalAnswer: string | null
       message: string | null
       warnings: LoopWarning[]
+      /** Set when the run stopped early because it looked stuck. */
+      stop?: LoopStopInfo
       /** Provider/model that actually served the primary call (after fallback). */
       provider?: ProviderId
       model?: string
@@ -143,6 +162,7 @@ export type AgentEvent =
     }
   | { type: 'log'; entry: AgentLogEntry }
   | { type: 'approval:request'; request: ApprovalRequest }
+  | { type: 'approval:suggestion'; tool: string; count: number }
   | { type: 'file:change'; change: FileChangeView; at: number }
   | { type: 'file:change:resolved'; id: string; status: FileChangeStatus; at: number }
   | { type: 'error'; runId: string; message: string }

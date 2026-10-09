@@ -4,6 +4,8 @@ import type { SandboxManager } from '@shared/sandbox'
 import type { AgentEvent, RemoteStatus, SettingsView, WorkerStatus } from '@shared/ui'
 import type { Persistence } from '@core/agent/persistence'
 import type { SessionStore } from '@core/agent/session-store'
+import { ApprovedCommands } from '@core/agent/approved-commands'
+import { classifyLocalProject } from '@shared/paths'
 import { SandboxManagerImpl } from '@core/sandbox/manager'
 import { WorkerManager } from '@core/worker/worker-manager'
 import { RemoteServer } from '@core/remote/remote-server'
@@ -67,6 +69,7 @@ export class AppServices {
   readonly sandbox: SandboxManager
   readonly agent: AgentService
   readonly approvals: ApprovalBroker
+  readonly approvedCommands: ApprovedCommands
   readonly worker: WorkerManager
   readonly remote: RemoteServer
 
@@ -98,14 +101,19 @@ export class AppServices {
     this.approvals = new ApprovalBroker({
       emit: (event: AgentEvent) => this.emit('agent:event', event)
     })
+    this.approvedCommands = new ApprovedCommands({
+      file: join(this.dir, 'approved-commands.json')
+    })
     this.agent = new AgentService({
       sandbox: this.sandbox,
       persistence: this.persistence,
       sessionStore: this.sessions,
       customProviders: this.customProviders,
       vps: this.vps,
-      requestApproval: (runId, action) => this.approvals.request(runId, action),
+      requestApproval: async (runId, action) =>
+        this.approvals.request(runId, action, await this.approvalContext()),
       cancelApprovals: () => this.approvals.cancelAll(),
+      approvedCommands: this.approvedCommands,
       files: this.files,
       emit: (event: AgentEvent) => this.emit('agent:event', event)
     })
@@ -127,6 +135,20 @@ export class AppServices {
     this.sender = sender
   }
 
+  /** Working directory / server shown in the approval dialog. */
+  private async approvalContext(): Promise<{ workingDirectory?: string; server?: string }> {
+    const context: { workingDirectory?: string; server?: string } = {}
+    const project = this.persistence.getActiveProject()
+    if (project) {
+      context.workingDirectory = project.path
+      if (project.type === 'remote' && project.vpsId) {
+        const server = (await this.vpsServers.list()).find((entry) => entry.id === project.vpsId)
+        if (server) context.server = `${server.name} (${server.host})`
+      }
+    }
+    return context
+  }
+
   private emit(channel: string, payload: unknown): void {
     this.sender?.(channel, payload)
   }
@@ -137,6 +159,7 @@ export class AppServices {
     await this.customProviders.load()
     await this.onboarding.load()
     await this.github.load()
+    await this.approvedCommands.load()
     const project = this.persistence.getActiveProject()
     this.files.setRoot(project?.path)
     this.worker.start()
@@ -155,20 +178,29 @@ export class AppServices {
     const view: SettingsView = {
       platform: process.platform,
       providers: {},
-      projects: settings.projects.map((project) => ({
-        ...project,
+      projects: settings.projects.map((project) => {
         // Keep the record even when missing; the UI marks it instead of deleting.
         // Remote projects count as present while their VPS is connected.
-        exists:
+        const exists =
           project.type === 'remote'
             ? Boolean(project.vpsId && this.vps.isConnected(project.vpsId))
             : existsSync(project.path)
-      }))
+        return {
+          ...project,
+          exists,
+          osMismatch:
+            project.type !== 'remote' &&
+            classifyLocalProject(project.path, process.platform, exists) === 'os-mismatch'
+        }
+      })
     }
     if (settings.activeProvider) view.activeProvider = settings.activeProvider
     if (activeId) view.activeProjectId = activeId
     if (settings.approvalMode) view.approvalMode = settings.approvalMode
     if (settings.planModeDefault !== undefined) view.planModeDefault = settings.planModeDefault
+    if (settings.rememberApprovalMode !== undefined) {
+      view.rememberApprovalMode = settings.rememberApprovalMode
+    }
     for (const [provider, value] of Object.entries(settings.providers)) {
       if (!value) continue
       view.providers[provider as keyof SettingsView['providers']] = {

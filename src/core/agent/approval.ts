@@ -26,23 +26,29 @@ export function classifyAction(action: ClassifiableAction): ActionKind {
   return 'read'
 }
 
-/** True when a shell action (or any string argument) reads as a destructive command. */
-export function isDangerousAction(action: ClassifiableAction): boolean {
-  if (SHELL_TOOLS.has(action.name)) return true
+/** True when any string argument matches the deny list (never auto-approved). */
+export function isDenyListedAction(action: ClassifiableAction): boolean {
   for (const value of Object.values(action.arguments)) {
     if (typeof value === 'string' && checkDenyList(value).blocked) return true
   }
   return false
 }
 
+/** True when a shell action (or any string argument) reads as a destructive command. */
+export function isDangerousAction(action: ClassifiableAction): boolean {
+  if (SHELL_TOOLS.has(action.name)) return true
+  return isDenyListedAction(action)
+}
+
 /**
  * Pure decision function: with the given mode, does this action need explicit
- * user approval before it runs? Deny-listed actions are blocked outright by the
- * executor regardless, so this only governs the "ask" prompt.
+ * user approval before it runs? Deny-listed actions always ask, even in `full`,
+ * so a destructive command can never be auto-approved.
  */
 export function requiresApproval(mode: ApprovalMode, action: ClassifiableAction): boolean {
-  if (mode === 'auto') return false
+  if (isDenyListedAction(action)) return true
+  if (mode === 'full') return false
   const kind = classifyAction(action)
-  if (mode === 'writes') return kind === 'write' || kind === 'shell'
-  return kind === 'shell' || isDangerousAction(action)
+  if (mode === 'auto-write') return kind === 'write' || kind === 'shell'
+  return true
 }

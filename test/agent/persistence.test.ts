@@ -170,8 +170,15 @@ describe('migrateSettings', () => {
       7
     )
     expect(settings.version).toBe(SETTINGS_SCHEMA_VERSION)
-    expect(settings.approvalMode).toBe('writes')
+    expect(settings.approvalMode).toBe('auto-write')
     expect(settings.planModeDefault).toBe(true)
+  })
+
+  it('maps legacy v2.2 approval mode names onto v2.3', async () => {
+    const auto = await migrateSettings({ version: 1, approvalMode: 'auto' }, cipher, 7)
+    const dangerous = await migrateSettings({ version: 1, approvalMode: 'dangerous' }, cipher, 7)
+    expect(auto.approvalMode).toBe('full')
+    expect(dangerous.approvalMode).toBe('ask')
   })
 
   it('ignores an unknown approval mode', async () => {
@@ -183,13 +190,23 @@ describe('migrateSettings', () => {
 describe('approval preferences persistence', () => {
   it('round-trips approvalMode and planModeDefault', async () => {
     const store = new Persistence({ file, cipher })
-    await store.setApprovalMode('writes')
+    await store.setApprovalMode('auto-write')
     await store.setPlanModeDefault(true)
 
     const reloaded = new Persistence({ file, cipher })
     const settings = await reloaded.load()
-    expect(settings.approvalMode).toBe('writes')
+    expect(settings.approvalMode).toBe('auto-write')
     expect(settings.planModeDefault).toBe(true)
-    expect(reloaded.redacted()).toMatchObject({ approvalMode: 'writes', planModeDefault: true })
+    expect(reloaded.redacted()).toMatchObject({ approvalMode: 'auto-write', planModeDefault: true })
+  })
+
+  it('round-trips rememberApprovalMode', async () => {
+    const store = new Persistence({ file, cipher })
+    await store.setRememberApprovalMode(true)
+
+    const reloaded = new Persistence({ file, cipher })
+    const settings = await reloaded.load()
+    expect(settings.rememberApprovalMode).toBe(true)
+    expect(reloaded.redacted()).toMatchObject({ rememberApprovalMode: true })
   })
 })

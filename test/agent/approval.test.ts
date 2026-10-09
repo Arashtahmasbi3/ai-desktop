@@ -60,24 +60,28 @@ describe('approval policy', () => {
     ).toBe(true)
   })
 
-  it('auto mode never asks for anything', () => {
+  it('full mode never asks for ordinary actions', () => {
     for (const name of ['read_file', 'write_file', 'run_command']) {
-      expect(requiresApproval('auto', { name, arguments: {} })).toBe(false)
+      expect(requiresApproval('full', { name, arguments: {} })).toBe(false)
     }
   })
 
-  it('dangerous mode asks for shell tools but not plain reads', () => {
-    expect(requiresApproval('dangerous', { name: 'read_file', arguments: {} })).toBe(false)
-    expect(requiresApproval('dangerous', { name: 'write_file', arguments: { path: 'a' } })).toBe(
-      false
-    )
-    expect(requiresApproval('dangerous', { name: 'run_command', arguments: {} })).toBe(true)
+  it('auto-write asks for writes and shell commands but not reads', () => {
+    expect(requiresApproval('auto-write', { name: 'read_file', arguments: {} })).toBe(false)
+    expect(requiresApproval('auto-write', { name: 'write_file', arguments: {} })).toBe(true)
+    expect(requiresApproval('auto-write', { name: 'run_command', arguments: {} })).toBe(true)
   })
 
-  it('writes mode asks for writes and shell commands', () => {
-    expect(requiresApproval('writes', { name: 'read_file', arguments: {} })).toBe(false)
-    expect(requiresApproval('writes', { name: 'write_file', arguments: {} })).toBe(true)
-    expect(requiresApproval('writes', { name: 'run_command', arguments: {} })).toBe(true)
+  it('ask mode asks for every tool call, reads included', () => {
+    expect(requiresApproval('ask', { name: 'read_file', arguments: {} })).toBe(true)
+    expect(requiresApproval('ask', { name: 'write_file', arguments: {} })).toBe(true)
+    expect(requiresApproval('ask', { name: 'run_command', arguments: {} })).toBe(true)
+  })
+
+  it('never auto-approves a deny-listed command, even in full mode', () => {
+    const destructive = { name: 'run_command', arguments: { command: 'rm -rf /' } }
+    expect(requiresApproval('full', destructive)).toBe(true)
+    expect(requiresApproval('auto-write', destructive)).toBe(true)
   })
 })
 
@@ -94,7 +98,39 @@ describe('ApprovalBroker', () => {
     expect(request.request.summary).toContain('npm test')
 
     expect(broker.resolve(request.request.id, true)).toBe(true)
-    await expect(promise).resolves.toBe(true)
+    await expect(promise).resolves.toEqual({ approved: true })
+  })
+
+  it('carries a remember scope back through the outcome', async () => {
+    const events: AgentEvent[] = []
+    const broker = new ApprovalBroker({ emit: (event) => events.push(event) })
+    const promise = broker.request('run-1', action('read_file', { path: 'a.txt' }))
+    const request = events[0]
+    if (request.type !== 'approval:request') throw new Error('unreachable')
+    broker.resolve(request.request.id, { approved: true, remember: 'tool' })
+    await expect(promise).resolves.toEqual({ approved: true, remember: 'tool' })
+  })
+
+  it('records approvals in history, newest first', async () => {
+    const events: AgentEvent[] = []
+    const broker = new ApprovalBroker({
+      emit: (event) => events.push(event),
+      now: () => 1000
+    })
+    const first = broker.request('run-1', action('read_file', {}))
+    const second = broker.request('run-1', action('run_command', { command: 'ls' }))
+    const requests = events.filter(
+      (event): event is Extract<AgentEvent, { type: 'approval:request' }> =>
+        event.type === 'approval:request'
+    )
+    broker.resolve(requests[0].request.id, true)
+    broker.resolve(requests[1].request.id, false)
+    await first
+    await second
+    const history = broker.history()
+    expect(history).toHaveLength(2)
+    expect(history[0]).toMatchObject({ tool: 'run_command', approved: false, at: 1000 })
+    expect(history[1]).toMatchObject({ tool: 'read_file', approved: true })
   })
 
   it('resolves false for an unknown id', () => {
@@ -104,7 +140,9 @@ describe('ApprovalBroker', () => {
 
   it('fails closed on timeout', async () => {
     const broker = new ApprovalBroker({ emit: () => undefined, timeoutMs: 5 })
-    await expect(broker.request('run-1', action('write_file', {}))).resolves.toBe(false)
+    await expect(broker.request('run-1', action('write_file', {}))).resolves.toEqual({
+      approved: false
+    })
   })
 
   it('cancelAll denies outstanding requests', async () => {
@@ -112,7 +150,7 @@ describe('ApprovalBroker', () => {
     const promise = broker.request('run-1', action('run_command', { command: 'ls' }))
     expect(broker.pendingCount()).toBe(1)
     broker.cancelAll()
-    await expect(promise).resolves.toBe(false)
+    await expect(promise).resolves.toEqual({ approved: false })
     expect(broker.pendingCount()).toBe(0)
   })
 

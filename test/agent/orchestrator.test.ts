@@ -134,7 +134,7 @@ describe('AgentOrchestrator', () => {
     await manager.dispose()
   })
 
-  it('detects a repeated action after more than three identical calls', async () => {
+  it('detects a repeated action after three identical calls', async () => {
     const manager = createLocalManager(base)
     const same = (): ReturnType<typeof toolCall> =>
       toolCall('write_file', { path: 'same.txt', content: 'x' })
@@ -155,7 +155,7 @@ describe('AgentOrchestrator', () => {
     const result = await orchestrator.run('write the same file')
 
     expect(result.status).toBe('completed')
-    expect(result.warnings.find((w) => w.kind === 'repeated_action')).toMatchObject({ count: 4 })
+    expect(result.warnings.find((w) => w.kind === 'repeated_action')).toMatchObject({ count: 3 })
     expect(logger.find('loop.warning').length).toBeGreaterThan(0)
     await manager.dispose()
   })
@@ -419,6 +419,79 @@ describe('AgentOrchestrator context and sessions (Stage 5)', () => {
 
     expect(result.status).toBe('completed')
     expect(logger.count('session.save_failed')).toBe(1)
+    await manager.dispose()
+  })
+
+  it('stops immediately when the same action repeats beyond the stop threshold', async () => {
+    const manager = createLocalManager(base)
+    const same = (): ReturnType<typeof toolCall> =>
+      toolCall('write_file', { path: 'stuck.txt', content: 'x' })
+    const adapter = new ScriptedAdapter('deepseek', [
+      { toolCalls: [same()] },
+      { toolCalls: [same()] },
+      { toolCalls: [same()] },
+      { toolCalls: [same()] },
+      { toolCalls: [same()] },
+      { content: 'never reached' }
+    ])
+    const logger = new MemoryLogger()
+    const orchestrator = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(adapter)],
+      logger
+    })
+
+    const result = await orchestrator.run('get stuck')
+
+    expect(result.status).toBe('needs_input')
+    expect(result.finalAnswer).toBeNull()
+    expect(result.stop?.reason).toBe('repeated_action')
+    expect(result.stop?.message).toContain('stuck')
+    expect(result.stop?.recentActions.length).toBeGreaterThan(0)
+    expect(logger.count('loop.stop')).toBe(1)
+    await manager.dispose()
+  })
+
+  it('stops after consecutive steps whose actions all fail', async () => {
+    const manager = createLocalManager(base)
+    const failing = (): ReturnType<typeof toolCall> =>
+      toolCall('run_command', { command: 'exit 1' })
+    const adapter = new ScriptedAdapter('deepseek', [
+      { toolCalls: [failing()] },
+      { toolCalls: [failing()] },
+      { toolCalls: [failing()] },
+      { toolCalls: [failing()] }
+    ])
+    const orchestrator = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(adapter)],
+      loopPolicy: { repeatedActionThreshold: 100, noProgressThreshold: 100 }
+    })
+
+    const result = await orchestrator.run('keep failing')
+
+    expect(result.status).toBe('needs_input')
+    expect(result.stop?.reason).toBe('failure_streak')
+    expect(result.warnings.some((w) => w.kind === 'failure_streak')).toBe(true)
+    await manager.dispose()
+  })
+
+  it('stops a run that exceeds its turn time budget', async () => {
+    const manager = createLocalManager(base)
+    const adapter = new ScriptedAdapter('deepseek', [{ content: 'unused' }])
+    let clock = 0
+    const orchestrator = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(adapter)],
+      turnTimeoutMs: 1,
+      now: () => (clock += 1000)
+    })
+
+    const result = await orchestrator.run('take too long')
+
+    expect(result.status).toBe('needs_input')
+    expect(result.stop?.reason).toBe('turn_timeout')
+    expect(result.warnings.some((w) => w.kind === 'turn_timeout')).toBe(true)
     await manager.dispose()
   })
 })

@@ -40,6 +40,7 @@ export class ChatStore {
         updatedAt: typeof value.updatedAt === 'number' ? value.updatedAt : 0,
         ...(typeof value.workspaceId === 'string' ? { workspaceId: value.workspaceId } : {}),
         ...(typeof value.vpsServerId === 'string' ? { vpsServerId: value.vpsServerId } : {}),
+        ...(typeof value.forkedFromId === 'string' ? { forkedFromId: value.forkedFromId } : {}),
         ...(ChatStore.isRecord(value.model)
           ? { model: value.model as unknown as StoredChat['model'] }
           : {}),
@@ -66,7 +67,8 @@ export class ChatStore {
         title: chat.title,
         createdAt: chat.createdAt,
         updatedAt: chat.updatedAt,
-        ...(chat.workspaceId ? { workspaceId: chat.workspaceId } : {})
+        ...(chat.workspaceId ? { workspaceId: chat.workspaceId } : {}),
+        ...(chat.forkedFromId ? { forkedFromId: chat.forkedFromId } : {})
       })
     }
     return chats.sort((a, b) => b.updatedAt - a.updatedAt)
@@ -89,6 +91,7 @@ export class ChatStore {
       updatedAt: now,
       ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}),
       ...(input.vpsServerId ? { vpsServerId: input.vpsServerId } : {}),
+      ...(input.forkedFromId ? { forkedFromId: input.forkedFromId } : {}),
       ...(input.model ? { model: input.model } : {}),
       messages
     }
@@ -107,7 +110,8 @@ export class ChatStore {
       title: chat.title,
       createdAt: chat.createdAt,
       updatedAt: chat.updatedAt,
-      ...(chat.workspaceId ? { workspaceId: chat.workspaceId } : {})
+      ...(chat.workspaceId ? { workspaceId: chat.workspaceId } : {}),
+      ...(chat.forkedFromId ? { forkedFromId: chat.forkedFromId } : {})
     }
   }
 

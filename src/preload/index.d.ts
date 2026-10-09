@@ -5,7 +5,7 @@ import type {
   CustomProviderView
 } from '@shared/types'
 import type { OnboardingStatus } from '@shared/onboarding'
-import type { ApprovalMode } from '@shared/approval'
+import type { ApprovalMode, ApprovalHistoryEntry, ApprovalOutcome, ApprovedCommandView } from '@shared/approval'
 import type { ChatSaveInput, ChatSummary, StoredChat } from '@shared/chat'
 import type {
   AuditEntryView,
@@ -51,6 +51,7 @@ export interface Api {
     toggleMaximize(): Promise<boolean>
     close(): Promise<void>
     isMaximized(): Promise<boolean>
+    newWindow(): Promise<boolean>
   }
   settings: {
     get(): Promise<SettingsView>
@@ -60,6 +61,7 @@ export interface Api {
     setActiveProvider(provider: ProviderId): Promise<SettingsView>
     setApprovalMode(mode: ApprovalMode): Promise<SettingsView>
     setPlanModeDefault(enabled: boolean): Promise<SettingsView>
+    setRememberApprovalMode(enabled: boolean): Promise<SettingsView>
     addProject(name: string, path: string): Promise<SettingsView>
     addRemoteProject(name: string, path: string, vpsId: string): Promise<SettingsView>
     removeProject(id: string): Promise<SettingsView>
@@ -139,7 +141,11 @@ export interface Api {
   agent: {
     run(request: AgentRunRequest): Promise<unknown>
     abort(): Promise<void>
-    respondApproval(id: string, approved: boolean): Promise<boolean>
+    respondApproval(id: string, answer: boolean | ApprovalOutcome): Promise<boolean>
+    approvalHistory(): Promise<ApprovalHistoryEntry[]>
+    approvedCommands(): Promise<ApprovedCommandView[]>
+    revokeApprovedCommand(id: string): Promise<boolean>
+    rememberApprovalTool(tool: string): Promise<boolean>
     applyChange(id: string): Promise<boolean>
     rejectChange(id: string): Promise<boolean>
     sessions(): Promise<SessionInfo[]>

@@ -1,6 +1,6 @@
 import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import type { CustomProviderInput, ProviderId } from '@shared/types'
-import type { ApprovalMode } from '@shared/approval'
+import type { ApprovalMode, ApprovalOutcome } from '@shared/approval'
 import type { GitCommitInput } from '@shared/github'
 import type { AgentRunRequest, WorkerJobRequest } from '@shared/ui'
 import type { AppServices } from './app-services'
@@ -13,9 +13,16 @@ import { searchProject } from './project-search'
  * expose the curated service methods — the renderer never gets direct access to
  * Node, the filesystem or child processes.
  */
-export function registerIpc(services: AppServices, getWindow: () => BrowserWindow | null): () => void {
+export function registerIpc(
+  services: AppServices,
+  getWindow: () => BrowserWindow | null,
+  openWindow: () => void
+): () => void {
+  // Broadcast so every window (multi-window support, D.5) sees shared state.
   const send = (channel: string, payload: unknown): void => {
-    getWindow()?.webContents.send(channel, payload)
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) window.webContents.send(channel, payload)
+    }
   }
   services.setSender(send)
 
@@ -40,20 +47,6 @@ export function registerIpc(services: AppServices, getWindow: () => BrowserWindo
     ],
     ['chats:rename', (id: string, title: string) => services.chats.rename(id, title)],
     ['chats:remove', (id: string) => services.chats.remove(id)],
-
-    ['window:minimize', () => getWindow()?.minimize()],
-    [
-      'window:toggleMaximize',
-      () => {
-        const window = getWindow()
-        if (!window) return false
-        if (window.isMaximized()) window.unmaximize()
-        else window.maximize()
-        return window.isMaximized()
-      }
-    ],
-    ['window:close', () => getWindow()?.close()],
-    ['window:isMaximized', () => getWindow()?.isMaximized() ?? false],
 
     ['settings:get', () => services.settingsView()],
     [
@@ -95,6 +88,13 @@ export function registerIpc(services: AppServices, getWindow: () => BrowserWindo
       'settings:setPlanModeDefault',
       async (enabled: boolean) => {
         await services.persistence.setPlanModeDefault(enabled)
+        return changed()
+      }
+    ],
+    [
+      'settings:setRememberApprovalMode',
+      async (enabled: boolean) => {
+        await services.persistence.setRememberApprovalMode(enabled)
         return changed()
       }
     ],
@@ -231,7 +231,11 @@ export function registerIpc(services: AppServices, getWindow: () => BrowserWindo
 
     ['agent:run', (request: AgentRunRequest) => services.agent.run(request)],
     ['agent:abort', () => services.agent.abort()],
-    ['agent:respondApproval', (id: string, approved: boolean) => services.approvals.resolve(id, approved)],
+    ['agent:respondApproval', (id: string, answer: boolean | ApprovalOutcome) => services.approvals.resolve(id, answer)],
+    ['agent:approvalHistory', () => services.approvals.history()],
+    ['agent:approvedCommands', () => services.approvedCommands.list()],
+    ['agent:revokeApprovedCommand', (id: string) => services.approvedCommands.revoke(id)],
+    ['agent:rememberApprovalTool', (tool: string) => services.approvedCommands.rememberTool(tool)],
     ['agent:applyChange', (id: string) => services.agent.applyChange(id)],
     ['shell:exec', (command: string) => runLocalCommand(command, { cwd: services.files.getRoot() })],
     ['search:code', (query: string) => {
@@ -260,10 +264,38 @@ export function registerIpc(services: AppServices, getWindow: () => BrowserWindo
     ipcMain.handle(channel, (_event, ...args) => handler(...(args as never[])))
   }
 
+  const windowOf = (event: Electron.IpcMainInvokeEvent): BrowserWindow | null =>
+    BrowserWindow.fromWebContents(event.sender) ?? getWindow()
+
+  const windowChannels: Array<[string, (event: Electron.IpcMainInvokeEvent) => unknown]> = [
+    ['window:minimize', (event) => windowOf(event)?.minimize()],
+    [
+      'window:toggleMaximize',
+      (event) => {
+        const window = windowOf(event)
+        if (!window) return false
+        if (window.isMaximized()) window.unmaximize()
+        else window.maximize()
+        return window.isMaximized()
+      }
+    ],
+    ['window:close', (event) => windowOf(event)?.close()],
+    ['window:isMaximized', (event) => windowOf(event)?.isMaximized() ?? false],
+    ['window:new', () => {
+      openWindow()
+      return true
+    }]
+  ]
+
+  for (const [channel, handler] of windowChannels) {
+    ipcMain.handle(channel, (event) => handler(event))
+  }
+
   const disposeVps = registerVpsIpc(services)
 
   return () => {
     disposeVps()
     for (const [channel] of handlers) ipcMain.removeHandler(channel)
+    for (const [channel] of windowChannels) ipcMain.removeHandler(channel)
   }
 }

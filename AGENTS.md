@@ -34,13 +34,18 @@ exe, icon and version metadata), optimizes the production build (minify/tree-sha
 
 **Ready for manual Windows testing. Waiting for user feedback.** (2026-10-05)
 
-- Latest release: **v2.0.0 (pre-release)** — installer + portable exe published with
-  `SHA256SUMS.txt`; `master` at the v2.0.0 merge (all four sprint branches merged with `--no-ff`).
-- Test suite green: 53 files / 384 passed, 1 skipped; `typecheck` and `build` green.
+- Latest release: **v2.2.0 (pre-release)** tagged on `master`; **v2.3.0** is implemented on
+  `feature/v2.3-codex-ux` (Sprint v2.3 “Codex-Like UX & Approval System”) and awaiting the
+  Windows install/publish pass.
+- Test suite green: 76 files / 529 passed, 1 skipped; `typecheck` and `build` green.
+- Sprint v2.3 checklist: code tasks A.1–A.2, B.1–B.3, C.1–C.5, D.1–D.6 all done; version bumped
+  to `2.3.0`; `CHANGELOG`/`README`/`AGENTS.md` updated; `TESTING_GUIDE_v2.3.md` and
+  `FINAL_REPORT_v2.3.md` added. Installer + GitHub pre-release and before/after screenshots
+  still need a GUI/Windows runner.
 - Installers smoke-tested on Linux under `xvfb` (window loads, `window.api` complete, IPC
   handlers respond, no console errors) — a **clean Windows machine** install is still pending.
-- Next action: the user tests on Windows using [`TESTING_GUIDE_v2.0.0.md`](./TESTING_GUIDE_v2.0.0.md)
-  and reports back (known limitations in [`KNOWN_ISSUES_v2.0.0.md`](./KNOWN_ISSUES_v2.0.0.md)).
+- Next action: the user tests on Windows using [`TESTING_GUIDE_v2.3.md`](./TESTING_GUIDE_v2.3.md)
+  and reports back (known limitations in [`KNOWN_ISSUES.md`](./KNOWN_ISSUES.md)).
 - Backlog entry for v2.1: opt-in deny list for the manual VPS terminal (see **Backlog** below).
 
 ## Tech stack
@@ -298,6 +303,24 @@ Conventions that recur across the codebase — follow them when adding code.
   versioned payloads and migrate forward on read; keep that so old sessions/keys keep working.
 - **Time/limits are injected, not hard-coded.** TTL/idle sweeps, timeouts and token budgets
   come from config so tests can drive them deterministically.
+
+## Pattern: Cross-Host Migration via rsync
+
+How `migrate_project` copies a project between two saved VPS servers
+(`src/core/tools/migrate-project-tool.ts`). Follow this when adding any cross-host copy.
+
+- Use `rsync -az --info=stats2` with `-e 'ssh -p PORT -o BatchMode=yes -o StrictHostKeyChecking=accept-new'`.
+- **Never** pass `--delete` unless the user explicitly confirms (non-destructive by default).
+- Run the command **from the source** host — compression happens once and the transfer is
+  pushed to the target, which is cheaper than pulling.
+- Require **SSH key auth source→target**; `BatchMode=yes` fails fast instead of hanging on a
+  password prompt, and `StrictHostKeyChecking=accept-new` pins new hosts on first use.
+- Guard every argument: `shellQuote` values, reject control characters / shell metacharacters,
+  reject sensitive roots (`/etc`, `/var/log`, `/proc`, `/sys`, `/dev`, ...), and run
+  `checkDenyList` on the assembled command.
+- Write an entry to the **audit log** for every migration (`migrate <src> -> <server>:<dst>`).
+- Return the **rsync exit code** to the agent so it can react — e.g. `127` means `rsync` is not
+  installed on the source host, which the agent should surface as an actionable error.
 
 ## Lessons learned
 

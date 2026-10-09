@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { CustomProviderInput, CustomProviderTestResult, CustomProviderView, ProviderId } from '@shared/types'
 import type { OnboardingStatus } from '@shared/onboarding'
-import type { ApprovalMode } from '@shared/approval'
+import type { ApprovalMode, ApprovalHistoryEntry, ApprovalOutcome, ApprovedCommandView } from '@shared/approval'
 import type { ChatSaveInput, ChatSummary, StoredChat } from '@shared/chat'
 import type {
   AuditEntryView,
@@ -48,7 +48,8 @@ export const api = {
     minimize: (): Promise<void> => invoke('window:minimize'),
     toggleMaximize: (): Promise<boolean> => invoke('window:toggleMaximize'),
     close: (): Promise<void> => invoke('window:close'),
-    isMaximized: (): Promise<boolean> => invoke('window:isMaximized')
+    isMaximized: (): Promise<boolean> => invoke('window:isMaximized'),
+    newWindow: (): Promise<boolean> => invoke('window:new')
   },
 
   settings: {
@@ -65,6 +66,8 @@ export const api = {
       invoke('settings:setApprovalMode', mode),
     setPlanModeDefault: (enabled: boolean): Promise<SettingsView> =>
       invoke('settings:setPlanModeDefault', enabled),
+    setRememberApprovalMode: (enabled: boolean): Promise<SettingsView> =>
+      invoke('settings:setRememberApprovalMode', enabled),
     addProject: (name: string, path: string): Promise<SettingsView> =>
       invoke('settings:addProject', name, path),
     addRemoteProject: (name: string, path: string, vpsId: string): Promise<SettingsView> =>
@@ -173,8 +176,14 @@ export const api = {
   agent: {
     run: (request: AgentRunRequest): Promise<unknown> => invoke('agent:run', request),
     abort: (): Promise<void> => invoke('agent:abort'),
-    respondApproval: (id: string, approved: boolean): Promise<boolean> =>
-      invoke('agent:respondApproval', id, approved),
+    respondApproval: (id: string, answer: boolean | ApprovalOutcome): Promise<boolean> =>
+      invoke('agent:respondApproval', id, answer),
+    approvalHistory: (): Promise<ApprovalHistoryEntry[]> => invoke('agent:approvalHistory'),
+    approvedCommands: (): Promise<ApprovedCommandView[]> => invoke('agent:approvedCommands'),
+    revokeApprovedCommand: (id: string): Promise<boolean> =>
+      invoke('agent:revokeApprovedCommand', id),
+    rememberApprovalTool: (tool: string): Promise<boolean> =>
+      invoke('agent:rememberApprovalTool', tool),
     applyChange: (id: string): Promise<boolean> => invoke('agent:applyChange', id),
     rejectChange: (id: string): Promise<boolean> => invoke('agent:rejectChange', id),
     sessions: (): Promise<SessionInfo[]> => invoke('agent:sessions'),

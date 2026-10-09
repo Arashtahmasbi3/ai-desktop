@@ -76,6 +76,14 @@ export class SshManager {
     return this.connections.has(serverId)
   }
 
+  /** Connection details for a saved server, used by cross-server tools. */
+  async resolveServer(
+    id: string
+  ): Promise<{ host: string; port: number; username: string } | undefined> {
+    const server = (await this.store.list()).find((entry) => entry.id === id)
+    return server ? { host: server.host, port: server.port, username: server.username } : undefined
+  }
+
   auditEntries(): AuditEntry[] {
     return this.audit.entries()
   }

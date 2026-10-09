@@ -22,6 +22,8 @@ export interface StoredChat {
   workspaceId?: string
   /** VPS this chat runs remote commands on, if any. */
   vpsServerId?: string
+  /** Chat this one was forked from, if any. */
+  forkedFromId?: string
   model?: ModelSelection
   messages: StoredMessage[]
 }
@@ -33,6 +35,7 @@ export interface ChatSummary {
   createdAt: number
   updatedAt: number
   workspaceId?: string
+  forkedFromId?: string
 }
 
 export interface ChatSaveInput {
@@ -40,6 +43,7 @@ export interface ChatSaveInput {
   title?: string
   workspaceId?: string
   vpsServerId?: string
+  forkedFromId?: string
   model?: ModelSelection
   messages: StoredMessage[]
 }

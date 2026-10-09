@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import {
   AlertTriangle,
   ArrowDown,
+  Activity,
   Bot,
   Loader2,
   PanelLeft,
@@ -16,15 +17,26 @@ import {
 } from 'lucide-react'
 import { basename, useStore } from '../store'
 import MessageBubble from './MessageBubble'
-import FileChangeCard from './FileChangeCard'
+import FileChangesPanel from './FileChangesPanel'
+import TemplateMenu from './TemplateMenu'
 import TerminalPanel from './TerminalPanel'
 import ModelSwitcher from './ModelSwitcher'
 import VpsSelector from './VpsSelector'
 import ProviderWarning from './ProviderWarning'
+import LoopStopCard from './LoopStopCard'
+import ApprovalDialog from './ApprovalDialog'
+import ProgressTimeline from './ProgressTimeline'
+import MicButton from './MicButton'
+import { FullAccessBanner, FullAccessToggle } from './FullAccessToggle'
 import { filterSlashCommands, resolveSlashCommand } from '../lib/slash'
 import { contextBudget, estimateTokens } from '@shared/memory'
 
-const SUGGESTION_KEYS = ['chat.suggestion1', 'chat.suggestion2', 'chat.suggestion3']
+const SUGGESTION_KEYS = [
+  'chat.suggestion1',
+  'chat.suggestion2',
+  'chat.suggestion3',
+  'chat.suggestion4'
+]
 
 /** A composer slash-command: either runs an action or seeds a prompt template. */
 interface SlashCommand {
@@ -43,16 +55,19 @@ export default function ChatPanel(): JSX.Element {
   const abort = useStore((state) => state.abort)
   const newSession = useStore((state) => state.newSession)
   const projectMissing = useStore((state) => state.projectMissing)
+  const settings = useStore((state) => state.settings)
+  const addProject = useStore((state) => state.addProject)
   const showTokenCount = useStore((state) => state.showTokenCount)
   const openSettings = useStore((state) => state.openSettings)
   const setView = useStore((state) => state.setView)
   const planMode = useStore((state) => state.planMode)
   const setPlanMode = useStore((state) => state.setPlanMode)
-  const pendingApproval = useStore((state) => state.pendingApproval)
-  const respondApproval = useStore((state) => state.respondApproval)
+  const approvalSuggestion = useStore((state) => state.approvalSuggestion)
+  const rememberApprovalTool = useStore((state) => state.rememberApprovalTool)
+  const dismissApprovalSuggestion = useStore((state) => state.dismissApprovalSuggestion)
+  const loopStop = useStore((state) => state.loopStop)
+  const dismissLoopStop = useStore((state) => state.dismissLoopStop)
   const fileChanges = useStore((state) => state.fileChanges)
-  const applyFileChange = useStore((state) => state.applyFileChange)
-  const rejectFileChange = useStore((state) => state.rejectFileChange)
   const chatTreeOpen = useStore((state) => state.chatTreeOpen)
   const toggleChatTree = useStore((state) => state.toggleChatTree)
   const terminalOpen = useStore((state) => state.terminalOpen)
@@ -62,10 +77,14 @@ export default function ChatPanel(): JSX.Element {
   const [attached, setAttached] = useState<string[]>([])
   const [atBottom, setAtBottom] = useState(true)
   const [commandIndex, setCommandIndex] = useState(0)
+  const [timelineOpen, setTimelineOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const dir = i18n.language === 'fa' ? 'rtl' : 'ltr'
+  const activeProject = settings?.projects.find(
+    (project) => project.id === settings.activeProjectId
+  )
 
   const commands = useMemo<SlashCommand[]>(
     () => [
@@ -100,7 +119,7 @@ export default function ChatPanel(): JSX.Element {
     const node = textareaRef.current
     if (!node) return
     node.style.height = 'auto'
-    node.style.height = `${Math.min(node.scrollHeight, 160)}px`
+    node.style.height = `${Math.min(node.scrollHeight, 200)}px`
   }, [input])
 
   const onScroll = (): void => {
@@ -164,10 +183,15 @@ export default function ChatPanel(): JSX.Element {
         return
       }
     }
-    if (event.key === 'Enter' && !event.shiftKey && !event.ctrlKey && !event.metaKey) {
+    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey || !event.shiftKey)) {
       event.preventDefault()
       submit()
     }
+  }
+
+  const pickWorkspace = async (): Promise<void> => {
+    const picked = await window.api.dialog.pickDirectory()
+    if (picked) await addProject(basename(picked), picked)
   }
 
   const attach = async (): Promise<void> => {
@@ -192,8 +216,6 @@ export default function ChatPanel(): JSX.Element {
           >
             <PanelLeft className="h-3.5 w-3.5" />
           </button>
-          <ModelSwitcher />
-          <span className="text-neutral-700">·</span>
           <VpsSelector />
           <span className="text-neutral-700">·</span>
           <button
@@ -208,6 +230,19 @@ export default function ChatPanel(): JSX.Element {
           >
             <ShieldAlert className="h-3 w-3" />
             {planMode ? t('chat.planMode') : t('chat.codeMode')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setTimelineOpen((open) => !open)}
+            title={t('timeline.title')}
+            aria-label={t('timeline.title')}
+            className={`flex h-5 w-5 items-center justify-center rounded transition ${
+              timelineOpen
+                ? 'bg-accent/20 text-accent'
+                : 'text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300'
+            }`}
+          >
+            <Activity className="h-3.5 w-3.5" />
           </button>
           <button
             type="button"
@@ -245,8 +280,21 @@ export default function ChatPanel(): JSX.Element {
             {t('sidebar.locate')}
           </button>
         </div>
+      ) : !settings?.activeProjectId ? (
+        <div className="mx-3 mt-2 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-300">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+          <span className="flex-1">{t('chat.noWorkspaceWarning')}</span>
+          <button
+            type="button"
+            onClick={() => void pickWorkspace()}
+            className="rounded border border-amber-500/40 px-2 py-0.5 text-amber-200 hover:bg-amber-500/15"
+          >
+            {t('titlebar.openFolder')}
+          </button>
+        </div>
       ) : null}
 
+      <div className="flex min-h-0 flex-1">
       <div
         ref={scrollRef}
         onScroll={onScroll}
@@ -259,10 +307,14 @@ export default function ChatPanel(): JSX.Element {
               <Bot className="h-7 w-7 text-accent" />
             </div>
             <div>
-              <h1 className="text-lg font-semibold text-neutral-100">{t('chat.emptyTitle')}</h1>
+              <h1 className="text-lg font-semibold text-neutral-100">
+                {activeProject
+                  ? t('chat.emptyTitleProject', { project: activeProject.name })
+                  : t('chat.emptyTitle')}
+              </h1>
               <p className="mt-1 max-w-md text-sm text-neutral-400">{t('chat.emptyBody')}</p>
             </div>
-            <div className="flex max-w-lg flex-col gap-2">
+            <div className="grid max-w-lg grid-cols-1 gap-2 sm:grid-cols-2">
               {SUGGESTION_KEYS.map((key) => (
                 <button
                   key={key}
@@ -274,6 +326,7 @@ export default function ChatPanel(): JSX.Element {
                 </button>
               ))}
             </div>
+            <TemplateMenu currentInput={input} onPick={(text) => setInput(text)} />
           </div>
         ) : (
           messages.map((message) => <MessageBubble key={message.id} message={message} />)
@@ -285,6 +338,23 @@ export default function ChatPanel(): JSX.Element {
             {t('chat.typing')}
           </div>
         ) : null}
+
+        {loopStop && !running ? (
+          <LoopStopCard
+            stop={loopStop}
+            onContinue={() => {
+              dismissLoopStop()
+              void send(t('chat.loopStopContinuePrompt'))
+            }}
+            onCorrect={() => {
+              dismissLoopStop()
+              requestAnimationFrame(() => textareaRef.current?.focus())
+            }}
+            onStop={dismissLoopStop}
+          />
+        ) : null}
+      </div>
+      {timelineOpen ? <ProgressTimeline /> : null}
       </div>
 
       {!atBottom && messages.length > 0 ? (
@@ -314,21 +384,31 @@ export default function ChatPanel(): JSX.Element {
       {terminalOpen ? <TerminalPanel /> : null}
 
       <div className="shrink-0 border-t border-border bg-bg-secondary p-3">
-        {fileChanges.length > 0 ? (
-          <div className="mb-2 flex flex-col gap-2">
-            <p className="px-1 text-[10px] uppercase tracking-wide text-neutral-500">
-              {t('chat.changesTitle')}
-            </p>
-            {fileChanges.map((change) => (
-              <FileChangeCard
-                key={change.id}
-                change={change}
-                onApply={(id) => void applyFileChange(id)}
-                onReject={(id) => void rejectFileChange(id)}
-              />
-            ))}
+        <FullAccessBanner />
+        {approvalSuggestion ? (
+          <div className="mx-3 mb-1 flex items-center justify-between gap-2 rounded-lg border border-accent/40 bg-accent/10 px-2 py-1.5 text-[11px] text-neutral-200">
+            <span>
+              {t('chat.rememberSuggestion', { tool: approvalSuggestion.tool })}
+            </span>
+            <span className="flex shrink-0 gap-2">
+              <button
+                type="button"
+                onClick={() => dismissApprovalSuggestion()}
+                className="rounded border border-border px-1.5 py-0.5 text-neutral-400 hover:bg-bg-tertiary"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={() => void rememberApprovalTool(approvalSuggestion.tool)}
+                className="rounded bg-accent px-1.5 py-0.5 font-medium text-white hover:bg-accent-hover"
+              >
+                {t('chat.approvalAlways')}
+              </button>
+            </span>
           </div>
         ) : null}
+        <FileChangesPanel changes={fileChanges} />
 
         {attached.length > 0 ? (
           <div className="mb-2 flex flex-wrap gap-1">
@@ -375,57 +455,75 @@ export default function ChatPanel(): JSX.Element {
             </div>
           ) : null}
 
-          <div className="flex items-end gap-2 rounded-xl border border-border bg-bg-primary p-2">
-          <button
-            type="button"
-            onClick={() => void attach()}
-            title={t('chat.attach')}
-            aria-label={t('chat.attach')}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300"
-          >
-            <Paperclip className="h-4 w-4" />
-          </button>
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(event) => setInput(event.target.value)}
-            onKeyDown={onKeyDown}
-            rows={1}
-            dir={dir}
-            placeholder={t('chat.placeholder')}
-            className="max-h-40 min-h-[2.25rem] flex-1 resize-none bg-transparent px-1 py-1.5 text-sm text-neutral-100 outline-none placeholder:text-neutral-600"
-          />
-          {running ? (
+          <div className="rounded-xl border border-border bg-bg-primary p-2">
+          <div className="flex items-end gap-2">
             <button
               type="button"
-              onClick={abort}
-              title={t('chat.stop')}
-              aria-label={t('chat.stop')}
-              className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30"
+              onClick={() => void attach()}
+              title={t('chat.attach')}
+              aria-label={t('chat.attach')}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300"
             >
-              <Square className="h-4 w-4" />
+              <Paperclip className="h-4 w-4" />
             </button>
-          ) : (
-            <button
-              type="button"
-              onClick={submit}
-              disabled={!input.trim() && attached.length === 0}
-              title={t('chat.send')}
-              aria-label={t('chat.send')}
-              className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-white transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <Send className="h-4 w-4" />
-            </button>
-          )}
+            <MicButton
+              appLanguage={i18n.language}
+              onTranscript={(text) =>
+                setInput((current) => (current ? `${current} ${text}` : text))
+              }
+            />
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              onKeyDown={onKeyDown}
+              rows={1}
+              dir={dir}
+              placeholder={t('chat.placeholder')}
+              className="max-h-[200px] min-h-[2.25rem] flex-1 resize-none bg-transparent px-1 py-1.5 text-sm text-neutral-100 outline-none placeholder:text-neutral-600"
+            />
+            <span className="shrink-0">
+              <ModelSwitcher />
+            </span>
+            {running ? (
+              <button
+                type="button"
+                onClick={abort}
+                title={t('chat.stop')}
+                aria-label={t('chat.stop')}
+                className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30"
+              >
+                <Square className="h-4 w-4" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={submit}
+                disabled={!input.trim() && attached.length === 0}
+                title={t('chat.send')}
+                aria-label={t('chat.send')}
+                className={`flex h-8 w-8 items-center justify-center rounded-lg text-white transition ${
+                  input.trim() || attached.length > 0
+                    ? 'bg-accent hover:bg-accent-hover'
+                    : 'bg-bg-tertiary text-neutral-500'
+                } disabled:cursor-not-allowed`}
+              >
+                <Send className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          <div className="mt-1.5 flex items-center justify-between px-1">
+            <FullAccessToggle />
+            {showTokenCount ? (
+              <span className="font-mono text-[10px] text-neutral-600">
+                {t('chat.tokens', { count: estimateTokens(input) })}
+                {input.length > 0 ? ` · ${input.length}` : ''}
+              </span>
+            ) : null}
+          </div>
         </div>
         <div className="mt-1.5 flex items-center justify-between px-1 text-[10px] text-neutral-600">
-          <span>Enter = {t('chat.send')} · Shift+Enter = ↵</span>
-          {showTokenCount ? (
-            <span className="font-mono">
-              {t('chat.tokens', { count: estimateTokens(input) })}
-              {input.length > 0 ? ` · ${input.length}` : ''}
-            </span>
-          ) : null}
+          <span>Enter = {t('chat.send')} · Shift+Enter = ↵ · Ctrl+Enter = {t('chat.send')}</span>
         </div>
         {budget.overBudget ? (
           <p className="mt-1 px-1 text-[10px] text-amber-400">
@@ -434,41 +532,7 @@ export default function ChatPanel(): JSX.Element {
         ) : null}
       </div>
 
-      {pendingApproval ? (
-        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-border bg-bg-secondary p-4 shadow-2xl">
-            <h2 className="flex items-center gap-2 text-sm font-semibold text-neutral-100">
-              <ShieldAlert className="h-4 w-4 text-amber-400" />
-              {t('chat.approvalTitle')}
-            </h2>
-            <p className="mt-2 text-xs text-neutral-400">{t('chat.approvalBody')}</p>
-            <pre
-              dir="ltr"
-              className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-bg-primary p-2 font-mono text-[11px] text-neutral-200"
-            >
-              {pendingApproval.tool}
-              {'\n'}
-              {pendingApproval.summary}
-            </pre>
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => respondApproval(false)}
-                className="rounded-lg border border-border px-3 py-1.5 text-xs text-neutral-300 hover:bg-bg-tertiary"
-              >
-                {t('chat.deny')}
-              </button>
-              <button
-                type="button"
-                onClick={() => respondApproval(true)}
-                className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover"
-              >
-                {t('chat.approve')}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <ApprovalDialog />
     </section>
   )
 }

@@ -19,8 +19,13 @@ import { REMOTE_SHELL_TOOL } from '@core/tools/remote-shell-tool'
 import { RemoteShellToolExecutor } from '@core/tools/remote-shell-executor'
 import { REMOTE_FS_TOOLS, type RemoteFsDeps } from '@core/tools/remote-fs-tools'
 import { RemoteFsToolExecutor } from '@core/tools/remote-fs-executor'
+import { MIGRATE_PROJECT_TOOL, type MigrateProjectDeps } from '@core/tools/migrate-project-tool'
+import { MigrateProjectToolExecutor } from '@core/tools/migrate-project-executor'
 import { CompositeToolExecutor, type ToolRoute } from '@core/tools/composite-executor'
-import { DEFAULT_APPROVAL_MODE, requiresApproval } from '@core/agent/approval'
+import { DEFAULT_APPROVAL_MODE } from '@core/agent/approval'
+import { createApprovalGate } from './approval-gate'
+import type { ApprovalOutcome } from '@shared/approval'
+import type { ApprovedCommands } from '@core/agent/approved-commands'
 import type { Persistence } from '@core/agent/persistence'
 import type { SessionStore } from '@core/agent/session-store'
 import type { SandboxManager } from '@shared/sandbox'
@@ -44,7 +49,14 @@ export interface RemoteFsHost {
   recordAudit?(entry: Omit<AuditEntry, 'at'>): Promise<unknown>
 }
 
-export type RemoteHost = RemoteShellHost & Partial<RemoteFsHost>
+/** Hosts that can resolve a saved server's connection details (for migrations). */
+export interface RemoteServerResolver {
+  resolveServer(
+    id: string
+  ): Promise<{ host: string; port: number; username: string } | undefined>
+}
+
+export type RemoteHost = RemoteShellHost & Partial<RemoteFsHost> & Partial<RemoteServerResolver>
 /** Project-bound file access used to review and apply agent edits. */
 export interface ProjectFiles {
   read(relativePath: string): Promise<string>
@@ -134,6 +146,26 @@ export function planRemoteRuntime(
       'for reading, writing, listing, grepping and checking git status on that server.'
   }
 
+  // Cross-server project migration needs to resolve both saved servers' hosts.
+  if (typeof vps.resolveServer === 'function') {
+    const migrateDeps: MigrateProjectDeps = {
+      connectedServers: () => vps.connectedServers(),
+      resolveServer: (id) => vps.resolveServer!(id),
+      exec: (serverId, command) => vps.exec(serverId, command)
+    }
+    if (typeof vps.recordAudit === 'function') {
+      migrateDeps.audit = (entry) => vps.recordAudit!(entry).then(() => undefined)
+    }
+    extraTools.push(MIGRATE_PROJECT_TOOL)
+    routes.push({
+      names: new Set([MIGRATE_PROJECT_TOOL.name]),
+      executor: new MigrateProjectToolExecutor(migrateDeps)
+    })
+    hint +=
+      ` You can also call "migrate_project" to copy a project directory from a connected ` +
+      'source VPS to another saved VPS with rsync over SSH.'
+  }
+
   const executor: ToolExecutor =
     routes.length === 1 ? shellExecutor : new CompositeToolExecutor(routes)
 
@@ -160,9 +192,11 @@ export interface AgentServiceOptions {
   /** Optional: enables the `remote_shell` / remote-fs tools against connected VPS servers. */
   vps?: RemoteHost
   /** Ask the user to approve a tool call (Approval Modes). Defaults to allow. */
-  requestApproval?: (runId: string, action: AgentAction) => Promise<boolean>
+  requestApproval?: (runId: string, action: AgentAction) => Promise<ApprovalOutcome>
   /** Deny any outstanding approval requests (e.g. the user aborted). */
   cancelApprovals?: () => void
+  /** Learned approvals that suppress future prompts (Sprint v2.3, B.3). */
+  approvedCommands?: ApprovedCommands
   /** Optional: enables chat review of agent edits (apply/reject). */
   files?: ProjectFiles
 }
@@ -198,8 +232,9 @@ export class AgentService {
   private readonly now: () => number
   private readonly customProviders?: CustomProviderStore
   private readonly vps?: RemoteHost
-  private readonly requestApproval?: (runId: string, action: AgentAction) => Promise<boolean>
+  private readonly requestApproval?: (runId: string, action: AgentAction) => Promise<ApprovalOutcome>
   private readonly cancelApprovals?: () => void
+  private readonly approvedCommands?: ApprovedCommands
   private readonly files?: ProjectFiles
   private readonly controllers = new Set<AbortController>()
   private readonly changes = new Map<string, FileChangeView>()
@@ -216,6 +251,7 @@ export class AgentService {
     if (options.vps) this.vps = options.vps
     this.requestApproval = options.requestApproval
     this.cancelApprovals = options.cancelApprovals
+    if (options.approvedCommands) this.approvedCommands = options.approvedCommands
     if (options.files) this.files = options.files
   }
 
@@ -337,10 +373,13 @@ export class AgentService {
     const planMode = request.planMode ?? settings.planModeDefault ?? false
     const requestApproval = this.requestApproval
     const approvalGate = requestApproval
-      ? async (action: AgentAction): Promise<boolean> => {
-          if (!requiresApproval(approvalMode, action)) return true
-          return requestApproval(runId, action)
-        }
+      ? createApprovalGate({
+          mode: approvalMode,
+          ...(this.approvedCommands ? { approvedCommands: this.approvedCommands } : {}),
+          ...(request.sessionId ? { sessionId: request.sessionId } : {}),
+          requestApproval: (action) => requestApproval(runId, action),
+          onSuggestion: (tool, count) => this.emit({ type: 'approval:suggestion', tool, count })
+        })
       : undefined
 
     const orchestrator = new AgentOrchestrator({
@@ -377,6 +416,7 @@ export class AgentService {
         finalAnswer: result.finalAnswer,
         message: result.message,
         warnings: result.warnings,
+        ...(result.stop ? { stop: result.stop } : {}),
         provider: providers[0].provider,
         model: providers[0].config.model,
         at: this.now()

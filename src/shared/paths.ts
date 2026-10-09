@@ -36,3 +36,19 @@ export function crossPlatformPathWarning(
   }
   return undefined
 }
+
+export type LocalProjectStatus = 'ok' | 'missing' | 'os-mismatch'
+
+/**
+ * Classify a local project folder for the settings UI. A path from another OS
+ * is reported as `os-mismatch` even though it also cannot exist on disk, so the
+ * UI can suggest reconnecting through a VPS rather than just "locate".
+ */
+export function classifyLocalProject(
+  path: string,
+  platform: string,
+  exists: boolean
+): LocalProjectStatus {
+  if (exists) return 'ok'
+  return crossPlatformPathWarning(path, platform) ? 'os-mismatch' : 'missing'
+}

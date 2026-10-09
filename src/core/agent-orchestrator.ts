@@ -23,6 +23,7 @@ import type {
   AgentStep,
   AgentToolResult,
   LoopDetectionPolicy,
+  LoopStopInfo,
   LoopWarning,
   ProviderEntry
 } from '@shared/agent'
@@ -67,6 +68,11 @@ export interface AgentOrchestratorOptions {
   contextMaxChars?: number
   /** Default per-command timeout inside the sandbox (ms). */
   commandTimeoutMs?: number
+  /**
+   * Wall-clock budget for one run() call (ms). 0 disables the turn timeout.
+   * Defaults to {@link DEFAULT_TURN_TIMEOUT_MS}.
+   */
+  turnTimeoutMs?: number
   loopPolicy?: Partial<LoopDetectionPolicy>
   recoveryPolicy?: Partial<AgentRecoveryPolicy>
   /** Extra options merged into `createSandbox`. */
@@ -101,7 +107,9 @@ export interface AgentOrchestratorOptions {
 }
 
 const DEFAULT_MAX_STEPS = 12
-const DEFAULT_COMMAND_TIMEOUT_MS = 30_000
+// A single shell command may run for up to a minute; a whole turn for five.
+const DEFAULT_COMMAND_TIMEOUT_MS = 60_000
+const DEFAULT_TURN_TIMEOUT_MS = 5 * 60 * 1000
 
 function addUsage(total: Usage | undefined, next: Usage | undefined): Usage | undefined {
   if (!next) return total
@@ -243,6 +251,7 @@ export class AgentOrchestrator {
   private readonly maxSteps: number
   private readonly contextMaxChars?: number
   private readonly commandTimeoutMs: number
+  private readonly turnTimeoutMs: number
   private readonly loopPolicy: Partial<LoopDetectionPolicy>
   private readonly recovery: ErrorRecovery
   private readonly sandboxOptions: CreateSandboxOptions
@@ -274,6 +283,7 @@ export class AgentOrchestrator {
     this.maxSteps = options.maxSteps ?? DEFAULT_MAX_STEPS
     this.contextMaxChars = options.contextMaxChars
     this.commandTimeoutMs = options.commandTimeoutMs ?? DEFAULT_COMMAND_TIMEOUT_MS
+    this.turnTimeoutMs = options.turnTimeoutMs ?? DEFAULT_TURN_TIMEOUT_MS
     this.loopPolicy = options.loopPolicy ?? {}
     this.recovery = new ErrorRecovery(options.recoveryPolicy)
     this.sandboxOptions = options.sandboxOptions ?? {}
@@ -310,6 +320,8 @@ export class AgentOrchestrator {
     let usage: Usage | undefined
     let providerUsed: ProviderId | undefined
     let sandboxId: string | null = null
+    let stopInfo: LoopStopInfo | undefined
+    const deadline = this.turnTimeoutMs > 0 ? startedAt + this.turnTimeoutMs : null
 
     this.log('info', 'run.start', runId, { task })
 
@@ -338,6 +350,7 @@ export class AgentOrchestrator {
         message,
         { sandboxId },
         warnings,
+        stopInfo,
         usage,
         startedAt
       )
@@ -404,6 +417,19 @@ export class AgentOrchestrator {
         if (options.signal?.aborted) {
           status = 'aborted'
           message = 'Run aborted by caller'
+          break
+        }
+        if (deadline !== null && this.now() >= deadline) {
+          this.log('warn', 'loop.turn_timeout', runId, { step: index })
+          warnings.push({
+            kind: 'turn_timeout',
+            count: index,
+            message: `Turn exceeded ${Math.round(this.turnTimeoutMs / 1000)}s budget`
+          })
+          stopInfo = this.buildStopInfo('turn_timeout', steps)
+          status = 'needs_input'
+          message = stopInfo.message
+          finalAnswer = null
           break
         }
 
@@ -473,7 +499,14 @@ export class AgentOrchestrator {
         }
 
         // ---- Observation + Reflection ----
+        const attemptedBefore = new Set(observedSignatures)
         const productive = this.isProductive(actions, observations, observedSignatures)
+        const newAction = observations.some(
+          (result, index) =>
+            result.ok && !attemptedBefore.has(actions[index]?.signature ?? '')
+        )
+        const failures = observations.filter((result) => !result.ok).length
+        const reasoningSignature = assistantText ? assistantText.trim().slice(0, 200) : undefined
         const reflection = this.reflect(actions, observations, productive)
         this.log('debug', 'step.reflection', runId, {
           step: index,
@@ -496,7 +529,10 @@ export class AgentOrchestrator {
         // ---- Loop detection ----
         const loop = loopDetector.observe({
           signatures: actions.map((action) => action.signature),
-          productive
+          productive,
+          failures,
+          newAction,
+          ...(reasoningSignature ? { reasoningSignature } : {})
         })
         if (loop.warnings.length > 0) {
           warnings.push(...loop.warnings)
@@ -510,6 +546,15 @@ export class AgentOrchestrator {
           }
         }
         if (loop.hint) context.appendHint(loop.hint)
+        if (loop.stop) {
+          const reason = loop.stopReason ?? 'repeated_action'
+          this.log('warn', 'loop.stop', runId, { step: index, reason })
+          stopInfo = this.buildStopInfo(reason, steps)
+          status = 'needs_input'
+          message = stopInfo.message
+          finalAnswer = null
+          break
+        }
         if (loop.shouldAskUser) {
           this.log('warn', 'loop.needs_input', runId, {
             step: index,
@@ -559,6 +604,7 @@ export class AgentOrchestrator {
       message,
       { provider: providerUsed, sandboxId },
       warnings,
+      stopInfo,
       usage,
       startedAt
     )
@@ -634,6 +680,7 @@ export class AgentOrchestrator {
     message: string | null,
     ctx: { provider?: ProviderId; sandboxId: string | null },
     warnings: LoopWarning[],
+    stop: LoopStopInfo | undefined,
     usage: Usage | undefined,
     startedAt: number
   ): AgentRunResult {
@@ -653,9 +700,37 @@ export class AgentOrchestrator {
       message,
       sandboxId: ctx.sandboxId,
       warnings,
+      ...(stop ? { stop } : {}),
       ...(usage ? { usage } : {}),
       startedAt,
       finishedAt
+    }
+  }
+
+  /** Build the user-facing stop summary, including the most recent actions. */
+  private buildStopInfo(reason: LoopStopInfo['reason'], steps: AgentStep[]): LoopStopInfo {
+    const last = steps[steps.length - 1]
+    const recentActions =
+      last?.actions.map((action) => {
+        const first = Object.entries(action.arguments)
+          .map(([key, value]) => `${key}=${String(value).slice(0, 60)}`)
+          .join(', ')
+        return `${action.name}${first ? `(${first})` : ''}`
+      }) ?? []
+    const label: Record<LoopStopInfo['reason'], string> = {
+      repeated_action: 'the same action was repeated too many times',
+      failure_streak: 'several steps in a row failed',
+      reasoning_loop: 'the same reasoning was repeated without a new action',
+      no_progress: 'several steps in a row made no progress',
+      turn_timeout: 'the turn exceeded its time budget'
+    }
+    return {
+      reason,
+      message:
+        `⚠️ It looks like I got stuck: ${label[reason]}. ` +
+        'I stopped so I do not keep repeating myself. Review the recent actions and ' +
+        'reply with **Continue**, **Correct**, or **Stop**.',
+      recentActions
     }
   }
 

@@ -11,6 +11,7 @@ import FileExplorer from './components/FileExplorer'
 import GitHubPanel from './components/GitHubPanel'
 import VpsPanel from './components/Vps/VpsPanel'
 import Onboarding from './components/Onboarding'
+import MigrationDialog from './components/MigrationDialog'
 import SettingsPanel from './components/SettingsPanel'
 import Sidebar from './components/Sidebar'
 import StatusBar from './components/StatusBar'
@@ -79,6 +80,9 @@ export default function App(): JSX.Element {
       } else if (event.ctrlKey && (event.key === 'b' || event.key === 'B')) {
         event.preventDefault()
         state.toggleSidebar()
+      } else if (event.ctrlKey && event.shiftKey && (event.key === 'n' || event.key === 'N')) {
+        event.preventDefault()
+        void window.api.window.newWindow()
       } else if (event.ctrlKey && (event.key === 'n' || event.key === 'N')) {
         event.preventDefault()
         state.newSession()
@@ -179,6 +183,8 @@ export default function App(): JSX.Element {
       <Onboarding />
 
       <SettingsPanel />
+
+      <MigrationDialog />
 
       <CommandPalette />
 

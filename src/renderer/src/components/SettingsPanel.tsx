@@ -2,36 +2,88 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   AlertTriangle,
-  Check,
-  Cpu,
+  BarChart3,
   FolderPlus,
   GitFork,
+  GitPullRequest,
+  Globe,
   KeyRound,
   Languages,
   MapPin,
-  Server,
+  MemoryStick,
+  Plug,
   Search,
+  Server,
   Settings2,
+  ShieldCheck,
   Trash2,
+  Wrench,
   X
 } from 'lucide-react'
-import { PROVIDERS, PROVIDER_IDS } from '@shared/providers'
-import type { ProviderId } from '@shared/types'
 import type { VpsConnectionState, VpsServerView } from '@shared/vps'
 import { SUPPORTED_LOCALES } from '../i18n/locale'
 import { useStore } from '../store'
-import CustomProvidersSection from './CustomProvidersSection'
+import ProvidersSection from './ProvidersSection'
 import GitHubSection from './GitHubSection'
+import SettingsPlugins from './SettingsPlugins'
+import SettingsBrowser from './SettingsBrowser'
+import SettingsConnections from './SettingsConnections'
+import SettingsCodeReview from './SettingsCodeReview'
+import SettingsApproval from './SettingsApproval'
+import SettingsMemory from './SettingsMemory'
+import SettingsUsage from './SettingsUsage'
+import SettingsDeveloper from './SettingsDeveloper'
 
-type TabId = 'general' | 'providers' | 'projects' | 'github' | 'vps' | 'advanced'
+type TabId =
+  | 'general'
+  | 'providers'
+  | 'apikeys'
+  | 'plugins'
+  | 'browser'
+  | 'github'
+  | 'projects'
+  | 'connections'
+  | 'codereview'
+  | 'approval'
+  | 'memory'
+  | 'usage'
+  | 'developer'
 
-const TABS: Array<{ id: TabId; labelKey: string; icon: typeof Settings2 }> = [
-  { id: 'general', labelKey: 'settings.general', icon: Settings2 },
-  { id: 'providers', labelKey: 'settings.providers', icon: KeyRound },
-  { id: 'projects', labelKey: 'settings.projects', icon: FolderPlus },
-  { id: 'github', labelKey: 'settings.github', icon: GitFork },
-  { id: 'vps', labelKey: 'settings.vps', icon: Server },
-  { id: 'advanced', labelKey: 'settings.advanced', icon: Cpu }
+interface NavItem {
+  id: TabId
+  labelKey: string
+  icon: typeof Settings2
+}
+
+const NAV_GROUPS: Array<{ labelKey?: string; items: NavItem[] }> = [
+  { items: [{ id: 'general', labelKey: 'settings.general', icon: Settings2 }] },
+  {
+    labelKey: 'settings.groupIntegrations',
+    items: [
+      { id: 'providers', labelKey: 'settings.providers', icon: Server },
+      { id: 'plugins', labelKey: 'settings.plugins', icon: Plug },
+      { id: 'apikeys', labelKey: 'settings.apiKeys', icon: KeyRound },
+      { id: 'browser', labelKey: 'settings.browser', icon: Globe },
+      { id: 'github', labelKey: 'settings.github', icon: GitPullRequest }
+    ]
+  },
+  {
+    labelKey: 'settings.groupCoding',
+    items: [
+      { id: 'projects', labelKey: 'settings.projects', icon: FolderPlus },
+      { id: 'connections', labelKey: 'settings.connections', icon: Server },
+      { id: 'codereview', labelKey: 'settings.codeReview', icon: GitFork },
+      { id: 'approval', labelKey: 'settings.approvalMode', icon: ShieldCheck }
+    ]
+  },
+  {
+    labelKey: 'settings.groupAdvanced',
+    items: [
+      { id: 'memory', labelKey: 'settings.memory', icon: MemoryStick },
+      { id: 'usage', labelKey: 'settings.usage', icon: BarChart3 },
+      { id: 'developer', labelKey: 'settings.developer', icon: Wrench }
+    ]
+  }
 ]
 
 export default function SettingsPanel(): JSX.Element | null {
@@ -39,10 +91,6 @@ export default function SettingsPanel(): JSX.Element | null {
   const open = useStore((state) => state.settingsOpen)
   const settings = useStore((state) => state.settings)
   const close = useStore((state) => state.closeSettings)
-  const setApiKey = useStore((state) => state.setApiKey)
-  const removeApiKey = useStore((state) => state.removeApiKey)
-  const setModel = useStore((state) => state.setModel)
-  const setActiveProvider = useStore((state) => state.setActiveProvider)
   const addProject = useStore((state) => state.addProject)
   const addRemoteProject = useStore((state) => state.addRemoteProject)
   const pushToast = useStore((state) => state.pushToast)
@@ -53,12 +101,8 @@ export default function SettingsPanel(): JSX.Element | null {
   const setLocale = useStore((state) => state.setLocale)
   const showTokenCount = useStore((state) => state.showTokenCount)
   const setShowTokenCount = useStore((state) => state.setShowTokenCount)
-  const setApprovalMode = useStore((state) => state.setApprovalMode)
-  const setPlanModeDefault = useStore((state) => state.setPlanModeDefault)
-  const setView = useStore((state) => state.setView)
 
   const [tab, setTab] = useState<TabId>('general')
-  const [keys, setKeys] = useState<Partial<Record<ProviderId, string>>>({})
   const [projectName, setProjectName] = useState('')
   const [projectPath, setProjectPath] = useState('')
   const [remoteName, setRemoteName] = useState('')
@@ -67,7 +111,6 @@ export default function SettingsPanel(): JSX.Element | null {
   const [servers, setServers] = useState<VpsServerView[]>([])
   const [vpsStatus, setVpsStatus] = useState<VpsConnectionState>({ status: 'disconnected' })
   const [discovering, setDiscovering] = useState(false)
-  const [savingKey, setSavingKey] = useState<ProviderId | null>(null)
 
   useEffect(() => {
     void window.api.vps.list().then(setServers)
@@ -78,15 +121,6 @@ export default function SettingsPanel(): JSX.Element | null {
   if (!open) return null
 
   const projects = settings?.projects ?? []
-
-  const saveKey = async (provider: ProviderId): Promise<void> => {
-    const value = keys[provider]?.trim()
-    if (!value) return
-    setSavingKey(provider)
-    await setApiKey(provider, value)
-    setSavingKey(null)
-    setKeys((current) => ({ ...current, [provider]: '' }))
-  }
 
   const browse = async (): Promise<void> => {
     const picked = await window.api.dialog.pickDirectory()
@@ -151,24 +185,33 @@ export default function SettingsPanel(): JSX.Element | null {
             aria-label={t('settings.title')}
             className="flex w-44 shrink-0 flex-col gap-0.5 border-r border-border p-2"
           >
-            {TABS.map((item) => {
-              const Icon = item.icon
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => setTab(item.id)}
-                  className={`flex items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs transition ${
-                    tab === item.id
-                      ? 'bg-accent/15 text-accent'
-                      : 'text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200'
-                  }`}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  {t(item.labelKey)}
-                </button>
-              )
-            })}
+            {NAV_GROUPS.map((group, groupIndex) => (
+              <div key={group.labelKey ?? `group-${groupIndex}`} className="flex flex-col gap-0.5">
+                {group.labelKey ? (
+                  <span className="px-2.5 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wide text-neutral-600">
+                    {t(group.labelKey)}
+                  </span>
+                ) : null}
+                {group.items.map((item) => {
+                  const Icon = item.icon
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setTab(item.id)}
+                      className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition ${
+                        tab === item.id
+                          ? 'bg-accent/15 text-accent'
+                          : 'text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200'
+                      }`}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      {t(item.labelKey)}
+                    </button>
+                  )
+                })}
+              </div>
+            ))}
           </nav>
 
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
@@ -211,110 +254,7 @@ export default function SettingsPanel(): JSX.Element | null {
               </section>
             ) : null}
 
-            {tab === 'providers' ? (
-              <section>
-                <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
-                  <KeyRound className="h-3.5 w-3.5" />
-                  {t('settings.apiKeys')}
-                </h3>
-                <div className="flex flex-col gap-3">
-                  {PROVIDER_IDS.map((provider) => {
-                    const descriptor = PROVIDERS[provider]
-                    const view = settings?.providers?.[provider]
-                    const active = settings?.activeProvider === provider
-                    const model = view?.model ?? descriptor.defaultModel
-                    return (
-                      <div
-                        key={provider}
-                        className="rounded-xl border border-border bg-bg-primary p-3"
-                      >
-                        <div className="mb-2 flex items-center justify-between">
-                          <span className="flex items-center gap-2 text-sm font-medium text-neutral-200">
-                            {descriptor.label}
-                            {view?.hasApiKey ? (
-                              <span className="flex items-center gap-1 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] text-emerald-400">
-                                <Check className="h-3 w-3" />
-                                {t('settings.keySaved')}
-                              </span>
-                            ) : (
-                              <span className="rounded bg-bg-tertiary px-1.5 py-0.5 text-[10px] text-neutral-500">
-                                {t('settings.noKey')}
-                              </span>
-                            )}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => void setActiveProvider(provider)}
-                            disabled={active}
-                            className={`rounded px-2 py-0.5 text-[11px] ${
-                              active
-                                ? 'bg-accent/20 text-accent'
-                                : 'border border-border text-neutral-400 hover:bg-bg-tertiary'
-                            }`}
-                          >
-                            {active ? t('common.active') : t('common.setActive')}
-                          </button>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="password"
-                            value={keys[provider] ?? ''}
-                            onChange={(event) =>
-                              setKeys((current) => ({ ...current, [provider]: event.target.value }))
-                            }
-                            onKeyDown={(event) => {
-                              if (event.key === 'Enter') void saveKey(provider)
-                            }}
-                            placeholder={t('settings.apiKeyPlaceholder')}
-                            dir="ltr"
-                            autoComplete="off"
-                            className="flex-1 rounded border border-border bg-bg-secondary px-2 py-1 font-mono text-xs text-neutral-200 outline-none focus:border-accent/50"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => void saveKey(provider)}
-                            disabled={!keys[provider]?.trim() || savingKey === provider}
-                            className="rounded bg-accent px-3 py-1 text-xs text-white hover:bg-accent-hover disabled:opacity-40"
-                          >
-                            {t('common.save')}
-                          </button>
-                          {view?.hasApiKey ? (
-                            <button
-                              type="button"
-                              onClick={() => void removeApiKey(provider)}
-                              title={t('common.remove')}
-                              aria-label={t('common.remove')}
-                              className="rounded border border-border p-1 text-neutral-500 hover:bg-bg-tertiary hover:text-red-400"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          ) : null}
-                        </div>
-
-                        <div className="mt-2 flex items-center gap-2">
-                          <label className="text-[11px] text-neutral-500">
-                            {t('settings.model')}
-                          </label>
-                          <select
-                            value={model}
-                            onChange={(event) => void setModel(provider, event.target.value)}
-                            className="flex-1 rounded border border-border bg-bg-secondary px-2 py-1 text-xs text-neutral-200 outline-none focus:border-accent/50"
-                          >
-                            {descriptor.models.map((option) => (
-                              <option key={option.id} value={option.id}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-                <CustomProvidersSection />
-              </section>
-            ) : null}
+            {tab === 'providers' || tab === 'apikeys' ? <ProvidersSection /> : null}
 
             {tab === 'projects' ? (
               <section>
@@ -468,87 +408,21 @@ export default function SettingsPanel(): JSX.Element | null {
 
             {tab === 'github' ? <GitHubSection /> : null}
 
-            {tab === 'vps' ? (
-              <section className="flex flex-col gap-3">
-                <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
-                  <Server className="h-3.5 w-3.5" />
-                  {t('settings.vps')}
-                </h3>
-                <p className="text-xs leading-relaxed text-neutral-400">{t('onboarding.vpsBody')}</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setView('vps')
-                    close()
-                  }}
-                  className="w-fit rounded bg-accent px-3 py-1.5 text-xs text-white hover:bg-accent-hover"
-                >
-                  {t('sidebar.navVps')}
-                </button>
-              </section>
-            ) : null}
+            {tab === 'connections' ? <SettingsConnections /> : null}
 
-            {tab === 'advanced' ? (
-              <section className="flex flex-col gap-3">
-                <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
-                  <Cpu className="h-3.5 w-3.5" />
-                  {t('settings.advanced')}
-                </h3>
-                <label className="flex cursor-pointer items-center gap-2 text-xs text-neutral-300">
-                  <input
-                    type="checkbox"
-                    checked={showTokenCount}
-                    onChange={(event) => setShowTokenCount(event.target.checked)}
-                    className="accent-accent"
-                  />
-                  {t('settings.showTokenCount')}
-                </label>
+            {tab === 'plugins' ? <SettingsPlugins /> : null}
 
-                <div className="flex flex-col gap-2 rounded-lg border border-border bg-bg-primary p-3">
-                  <div>
-                    <p className="text-xs font-medium text-neutral-200">
-                      {t('settings.approvalMode')}
-                    </p>
-                    <p className="mt-0.5 text-[11px] text-neutral-500">
-                      {t('settings.approvalHint')}
-                    </p>
-                  </div>
-                  {(
-                    [
-                      ['auto', 'settings.approvalAuto'],
-                      ['dangerous', 'settings.approvalDangerous'],
-                      ['writes', 'settings.approvalWrites']
-                    ] as const
-                  ).map(([value, labelKey]) => (
-                    <label
-                      key={value}
-                      className="flex cursor-pointer items-center gap-2 text-xs text-neutral-300"
-                    >
-                      <input
-                        type="radio"
-                        name="approval-mode"
-                        checked={(settings?.approvalMode ?? 'dangerous') === value}
-                        onChange={() => void setApprovalMode(value)}
-                        className="accent-accent"
-                      />
-                      {t(labelKey)}
-                    </label>
-                  ))}
-                </div>
+            {tab === 'browser' ? <SettingsBrowser /> : null}
 
-                <label className="flex cursor-pointer items-center gap-2 text-xs text-neutral-300">
-                  <input
-                    type="checkbox"
-                    checked={settings?.planModeDefault ?? false}
-                    onChange={(event) => void setPlanModeDefault(event.target.checked)}
-                    className="accent-accent"
-                  />
-                  {t('settings.planModeDefault')}
-                </label>
+            {tab === 'codereview' ? <SettingsCodeReview /> : null}
 
-                <p className="text-[11px] text-neutral-600">AI Desktop v2.2.0</p>
-              </section>
-            ) : null}
+            {tab === 'approval' ? <SettingsApproval /> : null}
+
+            {tab === 'memory' ? <SettingsMemory /> : null}
+
+            {tab === 'usage' ? <SettingsUsage /> : null}
+
+            {tab === 'developer' ? <SettingsDeveloper /> : null}
           </div>
         </div>
       </div>

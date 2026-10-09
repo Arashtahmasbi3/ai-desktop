@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { AgentLogEntry } from '@shared/agent'
-import type { LoopWarning } from '@shared/agent'
+import type { LoopStopInfo, LoopWarning } from '@shared/agent'
 import type {
   CustomProviderInput,
   CustomProviderTestResult,
@@ -8,7 +8,7 @@ import type {
   ProviderId
 } from '@shared/types'
 import { DEFAULT_SELECTION, resolveSelection } from '@shared/selection'
-import type { ApprovalMode } from '@shared/approval'
+import type { ApprovalMode, ApprovalOutcome } from '@shared/approval'
 import type { OnboardingStatus } from '@shared/onboarding'
 import type { ChatSummary, StoredMessage } from '@shared/chat'
 import type { Locale } from './i18n/locale'
@@ -63,6 +63,9 @@ const TOKEN_SETTINGS_KEY = 'ai-desktop:show-token-count'
 const CHAT_TREE_KEY = 'ai-desktop:chat-tree-open'
 const LAST_CHAT_KEY = 'ai-desktop:last-chat'
 const AUTOSAVE_INTERVAL_MS = 30_000
+/** Full access auto-reverts to Ask after this much idle time (v2.3, B.2). */
+const FULL_ACCESS_TTL_MS = 30 * 60 * 1000
+let fullAccessTimer: ReturnType<typeof setTimeout> | null = null
 
 function newId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `id-${Math.random().toString(36).slice(2)}`
@@ -121,6 +124,8 @@ interface AppState {
   sessionId: string
   logs: AgentLogEntry[]
   warnings: LoopWarning[]
+  /** Set when the last run stopped early because the agent looked stuck. */
+  loopStop: LoopStopInfo | null
   sessions: SessionInfo[]
 
   entries: FileEntry[]
@@ -142,6 +147,8 @@ interface AppState {
   customProviders: CustomProviderView[]
   /** First-run wizard state; null until loaded. */
   onboarding: OnboardingStatus | null
+  /** Startup project-migration modal visibility. */
+  migrationOpen: boolean
 
   /** Interface language (drives dir + all t() text). */
   locale: Locale
@@ -159,6 +166,10 @@ interface AppState {
   planMode: boolean
   /** Tool call awaiting the user's approval, if any. */
   pendingApproval: ApprovalRequest | null
+  /** A tool approved 3+ times; the UI suggests remembering it (v2.3, B.3). */
+  approvalSuggestion: { tool: string; count: number } | null
+  /** A "Deny & Explain" prompt to send once the current run settles. */
+  queuedExplain: string | null
   /** Agent file edits awaiting the user's apply/reject decision. */
   fileChanges: FileChangeView[]
   /** Transient toast notifications. */
@@ -184,11 +195,17 @@ interface AppState {
   persistChat: () => Promise<void>
   renameChat: (id: string, title: string) => Promise<void>
   deleteChat: (id: string) => Promise<void>
+  duplicateChat: (id: string) => Promise<void>
+  /** Fork a chat from a message (inclusive); returns the new chat id. */
+  forkChat: (id: string, messageId: string) => Promise<string | null>
   setVpsServerId: (id: string | undefined) => void
   setPlanMode: (value: boolean) => void
   setApprovalMode: (mode: ApprovalMode) => Promise<void>
   setPlanModeDefault: (value: boolean) => Promise<void>
-  respondApproval: (approved: boolean) => void
+  respondApproval: (answer: boolean | ApprovalOutcome) => void
+  rememberApprovalTool: (tool: string) => Promise<void>
+  dismissApprovalSuggestion: () => void
+  setRememberApprovalMode: (enabled: boolean) => Promise<void>
   applyFileChange: (id: string) => Promise<void>
   rejectFileChange: (id: string) => Promise<void>
   pushToast: (kind: ToastKind, message: string) => void
@@ -203,6 +220,7 @@ interface AppState {
   init: () => Promise<void>
   openSettings: () => void
   closeSettings: () => void
+  closeMigration: () => void
   setView: (view: ViewId) => void
   setSelection: (patch: Partial<ModelSelection>) => void
   refreshCustomProviders: () => Promise<void>
@@ -240,6 +258,7 @@ interface AppState {
   setActiveProvider: (provider: ProviderId) => Promise<void>
 
   clearError: () => void
+  dismissLoopStop: () => void
 }
 
 let autosaveTimer: ReturnType<typeof setInterval> | null = null
@@ -264,6 +283,7 @@ export const useStore = create<AppState>((set, get) => ({
   sessionId: newId(),
   logs: [],
   warnings: [],
+  loopStop: null,
   sessions: [],
 
   entries: [],
@@ -280,6 +300,7 @@ export const useStore = create<AppState>((set, get) => ({
   selection: DEFAULT_SELECTION,
   customProviders: [],
   onboarding: null,
+  migrationOpen: false,
 
   locale: detectLocale(),
   sidebarCollapsed: false,
@@ -289,6 +310,8 @@ export const useStore = create<AppState>((set, get) => ({
   vpsServerId: undefined,
   planMode: false,
   pendingApproval: null,
+  approvalSuggestion: null,
+  queuedExplain: null,
   fileChanges: [],
   toasts: [],
   chatTreeOpen: readChatTreeOpen(),
@@ -356,15 +379,46 @@ export const useStore = create<AppState>((set, get) => ({
   setPlanMode: (value) => set({ planMode: value }),
   async setApprovalMode(mode) {
     set({ settings: await window.api.settings.setApprovalMode(mode) })
+    if (mode === 'full') {
+      if (fullAccessTimer) clearTimeout(fullAccessTimer)
+      fullAccessTimer = setTimeout(() => {
+        void get().setApprovalMode('ask')
+        get().pushToast('warning', 'Full access turned off after 30 minutes of inactivity.')
+      }, FULL_ACCESS_TTL_MS)
+      fullAccessTimer.unref?.()
+    } else if (fullAccessTimer) {
+      clearTimeout(fullAccessTimer)
+      fullAccessTimer = null
+    }
+  },
+  async setRememberApprovalMode(enabled) {
+    set({ settings: await window.api.settings.setRememberApprovalMode(enabled) })
   },
   async setPlanModeDefault(value) {
     set({ settings: await window.api.settings.setPlanModeDefault(value) })
   },
-  respondApproval(approved) {
+  respondApproval(answer) {
     const pending = get().pendingApproval
     if (!pending) return
+    const outcome: ApprovalOutcome =
+      typeof answer === 'boolean' ? { approved: answer } : answer
+    if (outcome.explain) {
+      set({
+        queuedExplain:
+          `You tried to ${pending.summary}, but I denied it. ` +
+          'Explain why you wanted to do that and propose a safer alternative.'
+      })
+    }
     set({ pendingApproval: null })
-    void window.api.agent.respondApproval(pending.id, approved)
+    void window.api.agent.respondApproval(pending.id, answer)
+  },
+  async rememberApprovalTool(tool) {
+    await window.api.agent.rememberApprovalTool(tool)
+    set({ approvalSuggestion: null })
+    get().pushToast('success', `Always allowing ${tool}.`)
+  },
+  dismissApprovalSuggestion() {
+    set({ approvalSuggestion: null })
   },
   async applyFileChange(id) {
     const ok = await window.api.agent.applyChange(id)
@@ -439,6 +493,39 @@ export const useStore = create<AppState>((set, get) => ({
     await get().refreshChats()
   },
 
+  async duplicateChat(id) {
+    const source = await window.api.chats.load(id)
+    if (!source) return
+    const saved = await window.api.chats.save({
+      title: `${source.title} (copy)`,
+      ...(source.workspaceId ? { workspaceId: source.workspaceId } : {}),
+      ...(source.vpsServerId ? { vpsServerId: source.vpsServerId } : {}),
+      ...(source.forkedFromId ? { forkedFromId: source.forkedFromId } : {}),
+      ...(source.model ? { model: source.model } : {}),
+      messages: source.messages
+    })
+    await get().refreshChats()
+    await get().loadSession(saved.id)
+  },
+
+  async forkChat(id, messageId) {
+    const source = await window.api.chats.load(id)
+    if (!source) return null
+    const index = source.messages.findIndex((message) => message.id === messageId)
+    if (index < 0) return null
+    const saved = await window.api.chats.save({
+      title: `${source.title} (fork)`,
+      forkedFromId: id,
+      ...(source.workspaceId ? { workspaceId: source.workspaceId } : {}),
+      ...(source.vpsServerId ? { vpsServerId: source.vpsServerId } : {}),
+      ...(source.model ? { model: source.model } : {}),
+      messages: source.messages.slice(0, index + 1)
+    })
+    await get().refreshChats()
+    await get().loadSession(saved.id)
+    return saved.id
+  },
+
   async init() {
     try {
       const [settings, worker, remote, customProviders, onboarding, chats] = await Promise.all([
@@ -463,6 +550,14 @@ export const useStore = create<AppState>((set, get) => ({
       await get().refreshFiles()
       await get().refreshSessions()
 
+      // Offer to fix projects whose folder is missing (e.g. a path from another OS).
+      if (
+        (onboarding?.completed ?? false) &&
+        settings.projects.some((project) => project.exists === false && project.type !== 'remote')
+      ) {
+        set({ migrationOpen: true })
+      }
+
       // Resume where the user left off, then keep the open chat saved so a
       // crash mid-run does not lose the conversation.
       const lastChatId = readLastChatId()
@@ -477,6 +572,7 @@ export const useStore = create<AppState>((set, get) => ({
 
   openSettings: () => set({ settingsOpen: true }),
   closeSettings: () => set({ settingsOpen: false }),
+  closeMigration: () => set({ migrationOpen: false }),
   setView: (view) => set({ view }),
   setSelection: (patch) => set({ selection: { ...get().selection, ...patch } }),
 
@@ -501,10 +597,24 @@ export const useStore = create<AppState>((set, get) => ({
   applyEvent(event) {
     switch (event.type) {
       case 'run:start':
-        set({ running: true, currentRunId: event.runId, error: null, logs: [], pendingApproval: null })
+        set({
+          running: true,
+          currentRunId: event.runId,
+          error: null,
+          logs: [],
+          pendingApproval: null,
+          loopStop: null
+        })
         break
       case 'approval:request':
         set({ pendingApproval: event.request })
+        break
+      case 'approval:suggestion':
+        set({ approvalSuggestion: { tool: event.tool, count: event.count } })
+        get().pushToast(
+          'warning',
+          `You approved ${event.tool} ${event.count} times. Remember it to skip prompts?`
+        )
         break
       case 'file:change':
         set({ fileChanges: [...get().fileChanges, event.change] })
@@ -554,9 +664,15 @@ export const useStore = create<AppState>((set, get) => ({
           running: false,
           currentRunId: null,
           warnings: event.warnings,
+          loopStop: event.stop ?? null,
           pendingApproval: null,
           messages
         })
+        const explain = get().queuedExplain
+        if (explain) {
+          set({ queuedExplain: null })
+          void get().send(explain)
+        }
         void get().persistChat()
         void get().refreshSessions()
         break
@@ -567,6 +683,7 @@ export const useStore = create<AppState>((set, get) => ({
           currentRunId: null,
           pendingApproval: null,
           error: event.message,
+          loopStop: null,
           messages: [
             ...get().messages,
             { id: newId(), role: 'system', content: `Error: ${event.message}`, at: Date.now() }
@@ -609,19 +726,27 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   newSession() {
+    const settings = get().settings
     set({
       sessionId: newId(),
       activeChatId: null,
       messages: [],
       logs: [],
       warnings: [],
+      loopStop: null,
       running: false,
       currentRunId: null,
       error: null,
       pendingApproval: null,
+      approvalSuggestion: null,
+      queuedExplain: null,
       fileChanges: [],
       view: 'chat'
     })
+    // Full access is per-session unless the user asked to remember it.
+    if (settings?.approvalMode === 'full' && !settings.rememberApprovalMode) {
+      void get().setApprovalMode('ask')
+    }
   },
 
   async loadSession(id) {
@@ -644,6 +769,7 @@ export const useStore = create<AppState>((set, get) => ({
         })),
       logs: [],
       warnings: [],
+      loopStop: null,
       view: 'chat'
     })
   },
@@ -768,7 +894,8 @@ export const useStore = create<AppState>((set, get) => ({
     set({ settings: await window.api.settings.setActiveProvider(provider) })
   },
 
-  clearError: () => set({ error: null })
+  clearError: () => set({ error: null }),
+  dismissLoopStop: () => set({ loopStop: null })
 }))
 
 let unsubscribe: (() => void) | null = null
