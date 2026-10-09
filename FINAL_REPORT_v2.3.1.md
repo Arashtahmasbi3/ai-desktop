@@ -62,7 +62,7 @@ New test files:
 - `test/shared/approval.test.ts`
 - `test/e2e/v2.3.1-critical-fixes.e2e.test.ts`
 
-## 3. Commits (oldest → newest)
+## 3. Commits and release
 
 ```
 7e38936 fix(loop): fuzzy per-tool-call sliding-window loop detection
@@ -74,7 +74,18 @@ fed6a54 test(approval): lock full-access global-state sync (Task A.5)
 ad48bbf test(security): verify mandatory host-key verification (Task B.2)
 a444ac6 feat(security): per-host command policy (Task B.3)
 bf950e3 test(v2.3.1): integration coverage + Linux smoke screenshot (Tasks C.2, C.4)
+f31d4a8 docs(release): v2.3.1 changelog, patterns, troubleshooting and testing guide (Section D)
 ```
+
+Release:
+
+- Merge commit **`4c88b0b`** `Merge v2.3.1: Critical Fixes & Security` on `master`
+  (PR [#1](https://github.com/Arashtahmasbi3/ai-desktop/pull/1), merged).
+- Annotated tag **`v2.3.1`**.
+- **GitHub Release v2.3.1** (full, not pre-release):
+  <https://github.com/Arashtahmasbi3/ai-desktop/releases/tag/v2.3.1> with assets
+  `AI.Desktop.Setup.2.3.1.exe`, `AI.Desktop.2.3.1.Portable.exe` and `SHA256SUMS.txt`.
+- `3c2c3d5` docs(agents): v2.3.1 released. Sprint complete. Next: user testing on Windows.
 
 ## 4. Smoke test (C.4)
 
@@ -88,16 +99,25 @@ Result: Electron window rendered (1200×800 content area), only benign D-Bus/X
 warnings, no renderer errors. Screenshot saved to
 `docs/screenshots/v2.3.1/01-chat-empty.png`.
 
-## 5. Not done / blocked
+## 5. Windows build (Wine)
 
-- **Merge to `master`, tag `v2.3.1`, push, GitHub release** — not performed.
-  These are outward-facing and destructible actions; waiting for explicit go-ahead.
-- **Windows build (`npm run build:win`)** — cannot run in this Linux sandbox.
-  Requires a Windows machine (or Wine) to produce `Setup 2.3.1.exe`,
-  `Portable 2.3.1.exe` and `SHA256SUMS`.
-- **SHA256 of artifacts** — depends on the Windows build above.
+`npm run build:win` completed successfully on Linux via Wine 10.0
+(electron-builder 26.15.3):
 
-## 6. Suggested work for v2.4
+| File | Size (bytes) | SHA-256 |
+| --- | --- | --- |
+| `AI Desktop Setup 2.3.1.exe` | 112,445,537 | `07cba756...f86bde64` |
+| `AI Desktop 2.3.1 Portable.exe` | 112,162,700 | `4984bff1...ccbcc2` |
+| `SHA256SUMS.txt` | 189 | - |
+
+Verify with `sha256sum -c SHA256SUMS.txt`.
+
+## 6. Remaining
+
+- **Clean Windows install/run test** by the user
+  ([`TESTING_GUIDE_v2.3.1.md`](./TESTING_GUIDE_v2.3.1.md)).
+
+## 7. Suggested work for v2.4
 
 - Interactive approval prompt for host-policy `requiresApproval` (today it fails
   closed with a clear message rather than prompting).
