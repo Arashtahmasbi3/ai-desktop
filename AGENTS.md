@@ -32,21 +32,25 @@ exe, icon and version metadata), optimizes the production build (minify/tree-sha
 
 ## Status
 
-**Ready for manual Windows testing. Waiting for user feedback.** (2026-10-05)
+**v2.3.1 released. Sprint complete. Next: user testing on Windows.** (2026-10-05)
 
-- Latest release: **v2.2.0 (pre-release)** formerly; **v2.3.0 released (private)** — installer +
-  portable exe published on a private GitHub Release with `SHA256SUMS.txt`; `master` at the
-  v2.3.0 merge (`6ca9c26`), tag `v2.3.0`.
-- **v2.3.0 released (private). Installer built and published. Next: await user testing feedback.**
-- Test suite green: 78 files / 566 passed, 1 skipped; `typecheck` and `build` green.
-- Sprint v2.3 checklist: code tasks A.1–A.2, B.1–B.3, C.1–C.5, D.1–D.6 all done; plus the
-  **`migrate_project`** cross-VPS rsync tool with security hardening and 22 injection tests;
-  version bumped to `2.3.0`; `CHANGELOG`/`README`/`AGENTS.md` updated; `TESTING_GUIDE_v2.3.md`
-  and `FINAL_REPORT_v2.3.md` added. Before/after screenshots still need a GUI runner.
-- Installers smoke-tested on Linux under `xvfb` (window loads, `window.api` complete, IPC
-  handlers respond, no console errors) — a **clean Windows machine** install is still pending.
-- Next action: the user tests on Windows using [`TESTING_GUIDE_v2.3.md`](./TESTING_GUIDE_v2.3.md)
-  and reports back (known limitations in [`KNOWN_ISSUES.md`](./KNOWN_ISSUES.md)).
+- Latest release: **v2.3.1 (full release)** — installer + portable exe published on a GitHub
+  Release with `SHA256SUMS.txt`
+  (<https://github.com/Arashtahmasbi3/ai-desktop/releases/tag/v2.3.1>); `master` at the
+  v2.3.1 merge (`4c88b0b`), tag `v2.3.1`.
+- **v2.3.1 — Critical Fixes & Security Hardening**: 5 critical fixes (A.1 loop detection,
+  A.2 local/remote workspaces, A.3 DeepSeek V4, A.4 VPS connection state, A.5 Full Access
+  sync) + 3 security layers (B.1 secret redaction, B.2 host-key verification, B.3 per-host
+  command policy).
+- Test suite green: **86 files / 648 passed, 1 skipped**; `typecheck` (node + web) and
+  production `build` green.
+- Windows artifacts built from Linux via Wine (`electron-builder`): `AI Desktop Setup 2.3.1.exe`
+  (~107 MB) and `AI Desktop 2.3.1 Portable.exe` (~107 MB), `SHA256SUMS.txt` (189 B).
+- Smoke-tested on Linux under `xvfb` (`docs/screenshots/v2.3.1/01-chat-empty.png`) — a **clean
+  Windows machine** install is still pending.
+- Next action: the user tests on Windows using
+  [`TESTING_GUIDE_v2.3.1.md`](./TESTING_GUIDE_v2.3.1.md) and reports back (known limitations
+  in [`KNOWN_ISSUES.md`](./KNOWN_ISSUES.md)).
 - Backlog entry for v2.1: opt-in deny list for the manual VPS terminal (see **Backlog** below).
 
 ## Tech stack
