@@ -497,3 +497,8 @@ Autonomous decisions logged per the sprint's golden rule (`[AUTO-DECISION]`, no 
 - `[AUTO-DECISION]` **Keyboard shortcuts (Task H).** Existing: `Ctrl+K/P` palette, `Ctrl+B` sidebar, `Ctrl+N` new
   chat, `Ctrl+,` settings, `Ctrl+1..6` views. Added: `Ctrl+Shift+F` search, `Ctrl+Shift+E` file tree,
   `Ctrl+Shift+T`/`` Ctrl+` `` terminal, `Ctrl+S` save the open file, and `Esc` now also closes the search modal.
+- `[AUTO-DECISION]` **v2.1/v2.2 release topology.** Branch analysis showed `feature/v2.1-ux-overhaul` was
+  **already merged and tagged `v2.1.0`** (merge commit `02b95c9`), and `feature/v2.2-codex-features` was cut from
+  master (`634a6d4`), i.e. it already contained both v2.1 and master. So the v2.1→master merge/tag step was a
+  no-op and v2.2 needed no rebase — only the v2.2 merge. Released as `v2.2.0`: merge commit `110d6d4` on master,
+  annotated tag `v2.2.0`, and a GitHub **pre-release** with the NSIS setup, portable exe, and `SHA256SUMS.txt`.
