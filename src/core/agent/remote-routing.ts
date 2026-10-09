@@ -1,0 +1,134 @@
+/**
+ * Remote-first file routing.
+ *
+ * When the active project lives on a VPS, the local sandbox file tools must not
+ * run — they would either fail (`sandbox_error`) or touch the wrong machine.
+ * This module maps the local tool names onto their `remote_*` equivalents and
+ * rewrites the arguments (relative paths are rebased onto the remote project
+ * root, and the server id is attached) before the action reaches an executor.
+ *
+ * The logic is a pure function so it can be unit-tested without SSH or an LLM.
+ */
+
+/** Local tool name → remote tool name. */
+export const LOCAL_TO_REMOTE_TOOL: Readonly<Record<string, string>> = {
+  read_file: 'remote_read_file',
+  write_file: 'remote_write_file',
+  list_dir: 'remote_list_dir',
+  exists: 'remote_exists',
+  grep: 'remote_grep',
+  run_command: 'remote_shell'
+}
+
+/** Tool names this router knows how to redirect. */
+export const ROUTABLE_TOOLS = new Set(Object.keys(LOCAL_TO_REMOTE_TOOL))
+
+export interface RoutingContext {
+  /** Workspace kind of the active project (absent ⇒ local). */
+  workspaceType?: 'local' | 'remote'
+  /** VPS the remote project lives on (`project.vpsId`). */
+  serverId?: string
+  /** Absolute project root on the VPS (`project.path`). */
+  remotePath?: string
+  /** Whether that server is currently connected. */
+  connected: boolean
+}
+
+export type RoutingDecision =
+  | { kind: 'passthrough' }
+  | { kind: 'redirect'; tool: string; args: Record<string, unknown> }
+  | { kind: 'error'; message: string }
+
+/** Join a possibly-relative workspace path onto the remote project root. */
+export function resolveRemotePath(root: string, input: unknown): string {
+  const raw = typeof input === 'string' ? input.trim() : ''
+  const base = root.replace(/\/+$/, '') || '/'
+  if (!raw || raw === '.') return base
+  if (raw.startsWith('/')) return raw
+  return `${base}/${raw.replace(/^\.\/+/, '')}`
+}
+
+
+/**
+ * Decide what to do with a tool call. Local projects and unknown tools pass
+ * through untouched; a remote project with a connected VPS is redirected to the
+ * matching `remote_*` tool; a remote project without a usable VPS yields a clear
+ * error instead of silently hitting the local sandbox.
+ */
+export function routeToolCall(
+  toolName: string,
+  args: Record<string, unknown>,
+  context: RoutingContext
+): RoutingDecision {
+  if (context.workspaceType !== 'remote') return { kind: 'passthrough' }
+
+  const remoteTool = LOCAL_TO_REMOTE_TOOL[toolName]
+  if (!remoteTool) return { kind: 'passthrough' }
+
+  if (!context.serverId) {
+    return {
+      kind: 'error',
+      message:
+        'This is a remote project with no VPS selected. Choose a VPS for it in ' +
+        'Settings -> Projects, then retry.'
+    }
+  }
+  if (!context.connected) {
+    return {
+      kind: 'error',
+      message:
+        `VPS "${context.serverId}" is not connected, so "${toolName}" cannot run remotely. ` +
+        'Connect the VPS in Settings -> Connections, then retry.'
+    }
+  }
+
+  const root = context.remotePath ?? '.'
+  const server: Record<string, unknown> = { server_id: context.serverId }
+  let remoteArgs: Record<string, unknown>
+
+  switch (toolName) {
+    case 'read_file':
+    case 'list_dir':
+    case 'exists':
+      remoteArgs = { ...server, path: resolveRemotePath(root, args.path) }
+      break
+    case 'write_file':
+      remoteArgs = {
+        ...server,
+        path: resolveRemotePath(root, args.path),
+        content: args.content
+      }
+      break
+    case 'grep':
+      remoteArgs = {
+        ...server,
+        pattern: args.pattern,
+        path: resolveRemotePath(root, args.path)
+      }
+      break
+    case 'run_command':
+      remoteArgs = { ...server, command: args.command }
+      break
+    default:
+      return { kind: 'passthrough' }
+  }
+
+  return { kind: 'redirect', tool: remoteTool, args: remoteArgs }
+}
+
+/**
+ * System-prompt fragment telling the model it is on a remote workspace and must
+ * use `remote_*` tools (and `remote_shell` for shell commands) exclusively.
+ */
+export function remoteWorkspaceHint(serverId: string, remotePath: string): string {
+  return (
+    `You are working on a REMOTE workspace at ${remotePath} on VPS ${serverId}. ` +
+    'Do NOT use local file tools. Use remote_* tools only. ' +
+    'For any shell command, use remote_shell.'
+  )
+}
+
+/** Whether a tool name is a local file/shell tool that A.1 knows how to reroute. */
+export function isRoutableLocalTool(toolName: string): boolean {
+  return ROUTABLE_TOOLS.has(toolName)
+}

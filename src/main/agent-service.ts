@@ -23,6 +23,8 @@ import { RemoteFsToolExecutor } from '@core/tools/remote-fs-executor'
 import { MIGRATE_PROJECT_TOOL, type MigrateProjectDeps } from '@core/tools/migrate-project-tool'
 import { MigrateProjectToolExecutor } from '@core/tools/migrate-project-executor'
 import { CompositeToolExecutor, type ToolRoute } from '@core/tools/composite-executor'
+import { routeToolCall, remoteWorkspaceHint } from '@core/agent/remote-routing'
+import type { RoutingDecision } from '@core/agent/remote-routing'
 import { DEFAULT_APPROVAL_MODE } from '@core/agent/approval'
 import { createApprovalGate } from './approval-gate'
 import type { ApprovalOutcome } from '@shared/approval'
@@ -71,6 +73,8 @@ interface RemoteRuntime {
   extraTools?: ToolDefinition[]
   extraExecutor?: ToolExecutor
   systemHint?: string
+  /** Remote-first routing for local file/shell tools (v2.3.2, A.1). */
+  toolRouting?: (toolName: string, args: Record<string, unknown>) => RoutingDecision
 }
 
 /**
@@ -297,10 +301,35 @@ export class AgentService {
   ): Promise<RemoteRuntime> {
     const settings = await this.persistence.load()
     const active = settings.projects.find((project) => project.id === settings.activeProjectId)
-    const hint = activeRemoteProjectHint(active, this.vps ? this.vps.connectedServers() : [])
-    if (hint) return { systemHint: hint }
-    const pinned = vpsServerId ?? (active?.type === 'remote' ? active.vpsId : undefined)
-    return planRemoteRuntime(task, pinned, this.vps)
+    const connectedServers = this.vps ? this.vps.connectedServers() : []
+    const isRemote = active?.type === 'remote'
+    const serverId = active?.vpsId
+    const connected = Boolean(serverId && connectedServers.includes(serverId))
+
+    // A1: for a remote project, always install routing so a stray local tool call
+    // is rewritten (when the VPS is connected) or answered with a clear error.
+    const routing: RemoteRuntime = isRemote
+      ? {
+          toolRouting: (toolName, args) =>
+            routeToolCall(toolName, args, {
+              workspaceType: 'remote',
+              ...(serverId ? { serverId } : {}),
+              ...(active?.path ? { remotePath: active.path } : {}),
+              connected
+            })
+        }
+      : {}
+
+    const hint = activeRemoteProjectHint(active, connectedServers)
+    if (hint) return { systemHint: hint, ...routing }
+
+    const pinned = vpsServerId ?? (isRemote ? serverId : undefined)
+    const runtime = planRemoteRuntime(task, pinned, this.vps)
+    if (isRemote && connected && serverId && active?.path) {
+      const remoteHint = remoteWorkspaceHint(serverId, active.path)
+      runtime.systemHint = [runtime.systemHint, remoteHint].filter(Boolean).join(' ')
+    }
+    return { ...runtime, ...routing }
   }
 
   /**
