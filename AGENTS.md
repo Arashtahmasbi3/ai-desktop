@@ -429,3 +429,37 @@ Decisions taken conservatively without blocking on questions (per the sprint's g
 - `[AUTO-DECISION]` **Shortcuts:** `Ctrl+K`/`Ctrl+P` palette, `Ctrl+B` sidebar, `Ctrl+N` new chat, `Ctrl+,` settings,
   `Ctrl+1..6` views, `Esc` closes palette → settings → error.
 - Tests: 58 files / 411 passed, 1 skipped. `typecheck` (node + web) and `build` green.
+
+## v2.2 — Codex-like features & deep fixes (branch `feature/v2.2-codex-features`)
+
+Autonomous decisions logged per the sprint's golden rule (`[AUTO-DECISION]`, no blocking questions).
+
+- `[AUTO-DECISION]` **Automatic path discovery / missing-project recovery (Task 1).** Projects are never
+  deleted when their path is missing; `exists` is computed at read time (`settingsView()`), the Sidebar shows
+  a missing-path warning with **Locate** (pick a new folder) and remote projects can be searched on a connected
+  VPS (`vps:searchProject` -> `settings:addRemoteProject`). Cross-OS paths survive a round-trip.
+- `[AUTO-DECISION]` **Model catalog (Task 7).** Tags extended to `cheap|powerful|fast|free|coding|reasoning|vision`;
+  catalog refreshed with current OpenAI/Anthropic/DeepSeek/Google Gemini ids. Model picker badges reuse these tags.
+- `[AUTO-DECISION]` **RTL & typography (Task 5).** Font stack is `Inter, Vazirmatn, ...` (menus English / chat RTL via
+  `<html dir>`), markdown code blocks force LTR, and dark themed scrollbars replace the OS default. Inter is added as
+  the primary Latin face but is not bundled -- it falls back to Vazirmatn/system when unavailable (no new dependency).
+- `[AUTO-DECISION]` **GitHub auth (Task 4).** Kept the OAuth **device flow** and added a zero-config
+  **Personal Access Token** path (`GitHubService.setToken` -> validated with `GET /user` *before* persisting, so a
+  bad token never leaves a half-connected state). UI has a Device-flow / Access-token toggle with guide links.
+  IPC: `github:setToken`. The device flow still needs a client id (env `AI_DESKTOP_GITHUB_CLIENT_ID` or the in-app
+  field) because GitHub has no public client id to embed; the PAT path is the no-setup fallback.
+- `[AUTO-DECISION]` **Chats organised by project (Task 3).** New chats inherit `settings.activeProjectId` as
+  `workspaceId`; the Sidebar groups history under the project name. Chats with no project (or a deleted one) fall
+  into a trailing **No project** bucket -- the migration path for pre-v2.2 history (no file rewrite needed).
+- `[AUTO-DECISION]` **Memory (Task 6).** `AI_CONTEXT.md` and `AGENTS.md` from the active *local* project are read at
+  run time and appended to the agent system prompt, truncated to a 12 000-char budget so they cannot crowd out the
+  task (`src/shared/memory.ts` + `src/main/project-memory.ts`). Remote projects are skipped (files are not local).
+  The composer shows an amber over-budget notice once the conversation estimate crosses ~32k tokens.
+- `[AUTO-DECISION]` **Slash commands (Task 8, partial).** `/new /clear /settings /workspace /vps /github` run actions;
+  `/plan /explain /fix /test` seed prompt templates; `/help` lists everything. Menu supports arrows/Tab/Enter/Esc.
+  Tool **approval modes** and a Plan/Code system-prompt switch are **deferred** -- they require orchestrator-level
+  tool gating that is too risky to land without a larger refactor and dedicated tests.
+- `[AUTO-DECISION]` **Remote workspace (Task 2, partial).** Remote projects, VPS discovery IPC and the Settings
+  add-remote UI ship. A dedicated `read_file/write_file/list_dir` **remote** fs tool for the agent is **deferred**
+  (today the agent reaches a VPS through `remote_shell`); doing it properly needs an SFTP-backed tool executor.
+- Tests: 64 files / 439 passed, 1 skipped. `typecheck` (node + web) and `build` green.
