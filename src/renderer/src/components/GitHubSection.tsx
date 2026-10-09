@@ -16,6 +16,8 @@ export default function GitHubSection(): JSX.Element {
   const [device, setDevice] = useState<GitHubDeviceCode | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [mode, setMode] = useState<'device' | 'token'>('device')
+  const [token, setToken] = useState('')
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -70,6 +72,19 @@ export default function GitHubSection(): JSX.Element {
     }
   }
 
+  const connectToken = async (): Promise<void> => {
+    setBusy(true)
+    setError(null)
+    try {
+      setStatus(await window.api.github.setToken(token))
+      setToken('')
+    } catch (cause) {
+      setError(errorMessage(cause))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const disconnect = async (): Promise<void> => {
     if (timer.current) clearTimeout(timer.current)
     setDevice(null)
@@ -97,29 +112,96 @@ export default function GitHubSection(): JSX.Element {
           </button>
         </div>
       ) : (
-        <div className="space-y-2">
-          <p className="text-[11px] leading-relaxed text-neutral-500">
-            Create a GitHub OAuth App (Device Flow enabled) and paste its client ID. The token is
-            stored encrypted on this machine and never leaves the main process.
-          </p>
-          <input
-            value={clientId}
-            onChange={(event) => setClientId(event.target.value)}
-            placeholder="OAuth App client ID"
-            dir="ltr"
-            className={inputClass}
-          />
-          <button
-            type="button"
-            onClick={() => void connect()}
-            disabled={busy}
-            className="flex items-center gap-1 rounded bg-accent px-3 py-1.5 text-xs text-white hover:bg-accent-hover disabled:opacity-40"
-          >
-            {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <GitFork className="h-3 w-3" />}
-            Connect GitHub
-          </button>
-        </div>
-      )}
+          <div className="space-y-2">
+            <div className="flex gap-1 rounded-lg border border-border bg-bg-secondary p-0.5 text-[11px]">
+              <button
+                type="button"
+                onClick={() => setMode('device')}
+                className={`flex-1 rounded-md px-2 py-1 transition ${
+                  mode === 'device' ? 'bg-bg-tertiary text-neutral-100' : 'text-neutral-500'
+                }`}
+              >
+                Device flow
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('token')}
+                className={`flex-1 rounded-md px-2 py-1 transition ${
+                  mode === 'token' ? 'bg-bg-tertiary text-neutral-100' : 'text-neutral-500'
+                }`}
+              >
+                Access token
+              </button>
+            </div>
+
+            {mode === 'device' ? (
+              <>
+                <p className="text-[11px] leading-relaxed text-neutral-500">
+                  Create a GitHub OAuth App with Device Flow enabled, paste its client ID, then
+                  approve the code on github.com. The token is stored encrypted and never leaves the
+                  main process.
+                </p>
+                <a
+                  href="https://github.com/settings/developers"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-[11px] text-accent underline"
+                >
+                  Create an OAuth App <ExternalLink className="h-3 w-3" />
+                </a>
+                <input
+                  value={clientId}
+                  onChange={(event) => setClientId(event.target.value)}
+                  placeholder="OAuth App client ID"
+                  dir="ltr"
+                  className={inputClass}
+                />
+                <button
+                  type="button"
+                  onClick={() => void connect()}
+                  disabled={busy}
+                  className="flex items-center gap-1 rounded bg-accent px-3 py-1.5 text-xs text-white hover:bg-accent-hover disabled:opacity-40"
+                >
+                  {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <GitFork className="h-3 w-3" />}
+                  Connect GitHub
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-[11px] leading-relaxed text-neutral-500">
+                  Fastest option: create a Personal Access Token with the <code>repo</code> and{' '}
+                  <code>read:user</code> scopes and paste it here. Stored encrypted on this machine.
+                </p>
+                <a
+                  href="https://github.com/settings/tokens"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-[11px] text-accent underline"
+                >
+                  Create a token <ExternalLink className="h-3 w-3" />
+                </a>
+                <input
+                  type="password"
+                  value={token}
+                  onChange={(event) => setToken(event.target.value)}
+                  placeholder="ghp_… or github_pat_…"
+                  dir="ltr"
+                  autoComplete="off"
+                  className={inputClass}
+                />
+                <button
+                  type="button"
+                  onClick={() => void connectToken()}
+                  disabled={busy || token.trim() === ''}
+                  className="flex items-center gap-1 rounded bg-accent px-3 py-1.5 text-xs text-white hover:bg-accent-hover disabled:opacity-40"
+                >
+                  {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <GitFork className="h-3 w-3" />}
+                  Connect with token
+                </button>
+              </>
+            )}
+          </div>
+        )}
 
       {device ? (
         <div className="mt-2 rounded border border-accent/40 bg-accent/10 p-3 text-xs text-neutral-200">

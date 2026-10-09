@@ -156,6 +156,7 @@ export function registerIpc(services: AppServices, getWindow: () => BrowserWindo
 
     ['github:status', () => services.github.status()],
     ['github:setClientId', (clientId: string) => services.github.setClientId(clientId)],
+    ['github:setToken', (token: string) => services.github.setToken(token)],
     ['github:startAuth', () => services.github.startAuth()],
     ['github:pollAuth', (deviceCode: string) => services.github.pollAuth(deviceCode)],
     ['github:logout', () => services.github.logout()],

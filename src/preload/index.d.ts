@@ -87,6 +87,7 @@ export interface Api {
   github: {
     status(): Promise<GitHubAuthStatus>
     setClientId(clientId: string): Promise<GitHubAuthStatus>
+    setToken(token: string): Promise<GitHubAuthStatus>
     startAuth(): Promise<GitHubDeviceCode>
     pollAuth(deviceCode: string): Promise<GitHubAuthPollResult>
     logout(): Promise<GitHubAuthStatus>

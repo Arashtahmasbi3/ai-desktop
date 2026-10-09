@@ -125,6 +125,28 @@ export class GitHubService {
     return this.statusFromState()
   }
 
+  /**
+   * Connect directly with a Personal Access Token (no OAuth app needed). The
+   * token is validated with `GET /user` *before* anything is persisted, so a
+   * rejected token never leaves a half-connected state behind.
+   */
+  async setToken(token: string): Promise<GitHubAuthStatus> {
+    await this.load()
+    const trimmed = token.trim()
+    if (!trimmed) throw new Error('A GitHub token is required.')
+    this.lastError = undefined
+    this.client.setToken(trimmed)
+    try {
+      this.state.user = await this.client.user()
+    } catch (error) {
+      await this.refreshClient()
+      throw new Error(error instanceof Error ? error.message : String(error))
+    }
+    this.state.tokenEnc = await this.cipher.encrypt(trimmed)
+    await this.persist()
+    return this.statusFromState()
+  }
+
   private requireClientId(): string {
     if (!this.state.clientId) {
       throw new Error('Add a GitHub OAuth App client ID first (Settings → GitHub).')

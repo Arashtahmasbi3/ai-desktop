@@ -103,6 +103,7 @@ export const api = {
     status: (): Promise<GitHubAuthStatus> => invoke('github:status'),
     setClientId: (clientId: string): Promise<GitHubAuthStatus> =>
       invoke('github:setClientId', clientId),
+    setToken: (token: string): Promise<GitHubAuthStatus> => invoke('github:setToken', token),
     startAuth: (): Promise<GitHubDeviceCode> => invoke('github:startAuth'),
     pollAuth: (deviceCode: string): Promise<GitHubAuthPollResult> =>
       invoke('github:pollAuth', deviceCode),
