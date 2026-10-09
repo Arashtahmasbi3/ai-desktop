@@ -19,7 +19,8 @@
     "setActive": "فعال کن",
     "none": "هیچ",
     "more": "بیشتر",
-    "clear": "پاک‌کردن"
+    "clear": "پاک‌کردن",
+    "duplicate": "تکثیر"
   },
   "titlebar": {
     "newChat": "چت جدید",
@@ -55,7 +56,8 @@
     "searchOnVps": "جستجو روی VPS",
     "remoteMissing": "VPS متصل نیست",
     "noProject": "بدون پروژه",
-    "osMismatch": "مسیر از سیستم‌عامل دیگر"
+    "osMismatch": "مسیر از سیستم‌عامل دیگر",
+    "recents": "اخیر"
   },
   "chat": {
     "placeholder": "بپرس یا وظیفه بده…",

@@ -19,7 +19,8 @@
     "setActive": "Set active",
     "none": "None",
     "more": "More",
-    "clear": "Clear"
+    "clear": "Clear",
+    "duplicate": "Duplicate"
   },
   "titlebar": {
     "newChat": "New chat",
@@ -55,7 +56,8 @@
     "searchOnVps": "Search on VPS",
     "remoteMissing": "VPS not connected",
     "noProject": "No project",
-    "osMismatch": "Path from another OS"
+    "osMismatch": "Path from another OS",
+    "recents": "Recents"
   },
   "chat": {
     "placeholder": "Ask anything or give a task…",

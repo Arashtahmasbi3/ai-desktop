@@ -81,4 +81,22 @@ describe('ChatStore', () => {
     const list = await store.list()
     expect(list).toHaveLength(1)
   })
+
+  it('round-trips forkedFromId through save, list and load', async () => {
+    const store = new ChatStore(await tempDir(), () => 2000)
+    const source = await store.save({
+      title: 'Original',
+      messages: [{ id: 'm1', role: 'user', content: 'hi', at: 1 }]
+    })
+    const fork = await store.save({
+      title: 'Original (fork)',
+      forkedFromId: source.id,
+      messages: [{ id: 'm1', role: 'user', content: 'hi', at: 1 }]
+    })
+
+    expect(fork.forkedFromId).toBe(source.id)
+    expect((await store.list()).find((entry) => entry.id === fork.id)?.forkedFromId).toBe(source.id)
+    expect((await store.load(fork.id))?.forkedFromId).toBe(source.id)
+    expect((await store.load(source.id))?.forkedFromId).toBeUndefined()
+  })
 })

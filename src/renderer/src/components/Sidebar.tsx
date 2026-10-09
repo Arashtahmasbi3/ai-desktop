@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  AlertTriangle,
+  Bell,
+  ChevronDown,
+  Copy,
   Download,
   FolderTree,
   GitFork,
@@ -10,6 +12,7 @@ import {
   MapPin,
   MessageSquare,
   MoreHorizontal,
+  Plug,
   Plus,
   Search,
   Server,
@@ -17,9 +20,10 @@ import {
   Trash2,
   User
 } from 'lucide-react'
-import { groupChatsByProject, type ChatSummary } from '@shared/chat'
-import { basename, useStore, type ViewId } from '../store'
+import type { ChatSummary } from '@shared/chat'
 import type { ProjectRecord } from '@shared/ui'
+import type { VpsServerView } from '@shared/vps'
+import { basename, useStore, type ViewId } from '../store'
 
 const NAV: Array<{ id: ViewId; labelKey: string; icon: typeof MessageSquare }> = [
   { id: 'chat', labelKey: 'sidebar.navChat', icon: MessageSquare },
@@ -56,6 +60,14 @@ function exportChat(chat: { id: string; title: string }): void {
   })
 }
 
+type DotState = 'connected' | 'disconnected' | 'missing'
+
+function dotClass(state: DotState): string {
+  if (state === 'connected') return 'bg-emerald-500'
+  if (state === 'missing') return 'bg-amber-500'
+  return 'bg-red-500'
+}
+
 export default function Sidebar(): JSX.Element {
   const { t } = useTranslation()
   const collapsed = useStore((state) => state.sidebarCollapsed)
@@ -68,6 +80,7 @@ export default function Sidebar(): JSX.Element {
   const loadSession = useStore((state) => state.loadSession)
   const renameChat = useStore((state) => state.renameChat)
   const deleteChat = useStore((state) => state.deleteChat)
+  const duplicateChat = useStore((state) => state.duplicateChat)
   const newSession = useStore((state) => state.newSession)
   const settings = useStore((state) => state.settings)
   const openProject = useStore((state) => state.openProject)
@@ -77,34 +90,66 @@ export default function Sidebar(): JSX.Element {
   const pushToast = useStore((state) => state.pushToast)
 
   const [query, setQuery] = useState('')
-  const [menuFor, setMenuFor] = useState<string | null>(null)
+  const [chatMenuFor, setChatMenuFor] = useState<string | null>(null)
+  const [projectMenuFor, setProjectMenuFor] = useState<string | null>(null)
+  const [workspaceOpen, setWorkspaceOpen] = useState(false)
   const [searchingId, setSearchingId] = useState<string | null>(null)
+  const [servers, setServers] = useState<VpsServerView[]>([])
+  const [vpsConnectedId, setVpsConnectedId] = useState<string | null>(null)
   const [vpsSearch, setVpsSearch] = useState<{
     id: string
     serverId: string
     paths: string[]
   } | null>(null)
 
+  const searchRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    void window.api.vps.list().then(setServers).catch(() => setServers([]))
+    void window.api.vps
+      .status()
+      .then((status) =>
+        setVpsConnectedId(status.status === 'connected' ? status.serverId ?? null : null)
+      )
+      .catch(() => setVpsConnectedId(null))
+  }, [])
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        searchRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
   const filtered = useMemo(
     () => chats.filter((chat) => chat.title.toLowerCase().includes(query.trim().toLowerCase())),
     [chats, query]
   )
   const projects = settings?.projects ?? []
-  const groups = useMemo(
-    () => groupChatsByProject(filtered, projects.map((project) => project.id)),
-    [filtered, projects]
-  )
-  const projectName = (id?: string): string =>
-    projects.find((project) => project.id === id)?.name ?? t('sidebar.noProject')
+  const activeProject = projects.find((project) => project.id === settings?.activeProjectId)
+  const serverName = (serverId?: string): string | undefined =>
+    servers.find((server) => server.id === serverId)?.name
+
+  const projectState = (project: ProjectRecord): DotState => {
+    if (project.exists === false) return 'missing'
+    if (project.type === 'remote') {
+      return project.vpsId === vpsConnectedId ? 'connected' : 'disconnected'
+    }
+    return 'connected'
+  }
 
   const onRename = (chat: ChatSummary): void => {
-    setMenuFor(null)
+    setChatMenuFor(null)
     const next = window.prompt(t('common.rename'), chat.title)
     if (next && next.trim()) void renameChat(chat.id, next.trim())
   }
 
   const onDelete = (chat: ChatSummary): void => {
-    setMenuFor(null)
+    setChatMenuFor(null)
     if (window.confirm(`${t('common.delete')} "${chat.title}"?`)) void deleteChat(chat.id)
   }
 
@@ -115,6 +160,7 @@ export default function Sidebar(): JSX.Element {
 
   /** Ask the connected VPS to find folders matching a missing project's name. */
   const searchOnVps = async (project: ProjectRecord): Promise<void> => {
+    setProjectMenuFor(null)
     const status = await window.api.vps.status()
     if (status.status !== 'connected' || !status.serverId) {
       pushToast('warning', t('vps.notConnected'))
@@ -192,241 +238,317 @@ export default function Sidebar(): JSX.Element {
       className="flex w-64 shrink-0 flex-col border-r border-border bg-bg-secondary transition-all duration-200"
     >
       <div className="flex shrink-0 flex-col gap-2 p-2">
-        <button
-          type="button"
-          onClick={() => newSession()}
-          className="flex items-center justify-center gap-2 rounded-lg border border-border bg-bg-primary px-3 py-2 text-xs font-medium text-neutral-200 transition hover:border-accent/50 hover:bg-bg-tertiary"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          {t('sidebar.newChat')}
-        </button>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setWorkspaceOpen((open) => !open)}
+            className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-bg-tertiary"
+          >
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-accent/15 text-accent">
+              <FolderTree className="h-3.5 w-3.5" />
+            </span>
+            <span className="min-w-0 flex-1 truncate text-xs font-medium text-neutral-200">
+              {activeProject?.name ?? 'AI Desktop'}
+            </span>
+            <ChevronDown className="h-3.5 w-3.5 shrink-0 text-neutral-500" />
+          </button>
+          {workspaceOpen ? (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setWorkspaceOpen(false)}
+                aria-hidden="true"
+              />
+              <div className="absolute left-1 right-1 top-10 z-50 overflow-hidden rounded-lg border border-border bg-bg-secondary py-1 text-xs shadow-2xl">
+                {projects.map((project) => (
+                  <button
+                    key={project.id}
+                    type="button"
+                    onClick={() => {
+                      setWorkspaceOpen(false)
+                      void openProject(project.id)
+                    }}
+                    className="block w-full truncate px-3 py-1.5 text-left text-neutral-300 hover:bg-bg-tertiary"
+                  >
+                    {project.name}
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : null}
+        </div>
+
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => newSession()}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border bg-bg-primary px-2 py-1.5 text-xs font-medium text-neutral-200 transition hover:border-accent/50 hover:bg-bg-tertiary"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            {t('sidebar.newChat')}
+          </button>
+          <button
+            type="button"
+            title={t('sidebar.navTasks')}
+            onClick={() => setView('tasks')}
+            className="relative flex h-7 w-7 items-center justify-center rounded-lg text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300"
+          >
+            <Bell className="h-3.5 w-3.5" />
+            {(worker?.active ?? 0) > 0 ? (
+              <span className="absolute right-1 top-1 h-1.5 w-1.5 animate-pulse rounded-full bg-sky-400" />
+            ) : null}
+          </button>
+        </div>
+
         <label className="flex items-center gap-1.5 rounded-lg border border-border bg-bg-primary px-2 py-1.5 focus-within:border-accent/50">
           <Search className="h-3.5 w-3.5 text-neutral-500" />
           <input
+            ref={searchRef}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={t('common.search')}
             aria-label={t('common.search')}
             className="w-full bg-transparent text-xs text-neutral-200 outline-none placeholder:text-neutral-600"
           />
+          <kbd className="shrink-0 rounded border border-border px-1 text-[9px] text-neutral-600">
+            Ctrl K
+          </kbd>
         </label>
-        <div className="flex items-center justify-between gap-0.5">
-          {NAV.map((item) => {
-            const Icon = item.icon
-            const active = view === item.id
-            return (
-              <button
-                key={item.id}
-                type="button"
-                title={t(item.labelKey)}
-                aria-label={t(item.labelKey)}
-                onClick={() => setView(item.id)}
-                className={`relative flex h-7 w-7 items-center justify-center rounded-lg transition ${
-                  active
-                    ? 'bg-accent/20 text-accent'
-                    : 'text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300'
-                }`}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                {item.id === 'tasks' && (worker?.active ?? 0) > 0 ? (
-                  <span className="absolute right-1 top-1 h-1.5 w-1.5 animate-pulse rounded-full bg-sky-400" />
-                ) : null}
-              </button>
-            )
-          })}
-        </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-2">
-        {chats.length === 0 ? (
-          <p className="px-2 py-3 text-[11px] leading-relaxed text-neutral-600">
-            {t('sidebar.emptyChats')}
-          </p>
-        ) : filtered.length === 0 ? (
-          <p className="px-2 py-3 text-[11px] text-neutral-600">{t('palette.noResults')}</p>
-        ) : (
-          groups.map((group) => (
-              <section key={group.projectId ?? '__none__'} className="mb-2">
-                <h3 className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
-                  {projectName(group.projectId)}
-                </h3>
-                {group.chats.map((chat) => (
-                  <div key={chat.id} className="relative">
-                    <button
-                      type="button"
-                      onClick={() => void loadSession(chat.id)}
-                      className={`group flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition ${
-                        activeChatId === chat.id
-                          ? 'bg-accent/15 text-neutral-100'
-                          : 'text-neutral-300 hover:bg-bg-tertiary'
-                      }`}
-                    >
-                      <MessageSquare className="h-3.5 w-3.5 shrink-0 text-neutral-500" />
-                      <span className="min-w-0 flex-1 truncate text-xs">{chat.title}</span>
-                      <span className="shrink-0 text-[10px] text-neutral-600">
-                        {relativeTime(chat.updatedAt)}
-                      </span>
-                                              <span
-                        role="button"
-                        tabIndex={0}
-                        aria-label={t('common.more')}
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          setMenuFor(menuFor === chat.id ? null : chat.id)
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter') {
-                            event.stopPropagation()
-                            setMenuFor(chat.id)
-                          }
-                        }}
-                        className="hidden shrink-0 rounded p-0.5 text-neutral-500 hover:bg-bg-primary hover:text-neutral-200 group-hover:block"
-                      >
-                        <MoreHorizontal className="h-3.5 w-3.5" />
-                      </span>
-                    </button>
-
-                    {menuFor === chat.id ? (
-                      <>
-                        <div
-                          className="fixed inset-0 z-40"
-                          onClick={() => setMenuFor(null)}
-                          aria-hidden="true"
-                        />
-                        <div
-                          role="menu"
-                          className="absolute right-1 top-7 z-50 w-32 overflow-hidden rounded-lg border border-border bg-bg-secondary py-1 text-xs shadow-2xl"
-                        >
-                          <button
-                            type="button"
-                            role="menuitem"
-                            onClick={() => onRename(chat)}
-                            className="block w-full px-3 py-1.5 text-left text-neutral-300 hover:bg-bg-tertiary"
-                          >
-                            {t('common.rename')}
-                          </button>
-                          <button
-                            type="button"
-                            role="menuitem"
-                            onClick={() => {
-                              setMenuFor(null)
-                              exportChat(chat)
-                            }}
-                            className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-neutral-300 hover:bg-bg-tertiary"
-                          >
-                            <Download className="h-3 w-3" />
-                            {t('common.export')}
-                          </button>
-                          <button
-                            type="button"
-                            role="menuitem"
-                            onClick={() => onDelete(chat)}
-                            className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-red-400 hover:bg-bg-tertiary"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                            {t('common.delete')}
-                          </button>
-                        </div>
-                      </>
-                    ) : null}
-                  </div>
-                ))}
-              </section>
-          )))}
-
-        <section className="mb-2 border-t border-border pt-2">
+        <section className="mb-2">
           <h3 className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
             {t('sidebar.projects')}
           </h3>
           {projects.length === 0 ? (
             <p className="px-2 py-1 text-[11px] text-neutral-600">{t('settings.noProjects')}</p>
           ) : (
-            projects.map((project) => (
-              <div key={project.id} className="group mb-0.5">
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => void openProject(project.id)}
-                    className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left transition ${
-                      project.id === settings?.activeProjectId
-                        ? 'bg-accent/15 text-neutral-100'
-                        : 'text-neutral-300 hover:bg-bg-tertiary'
-                    }`}
-                  >
-                    {project.exists === false ? (
-                      <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-400" />
-                    ) : project.type === 'remote' ? (
-                      <Server className="h-3.5 w-3.5 shrink-0 text-sky-400" />
-                    ) : (
-                      <FolderTree className="h-3.5 w-3.5 shrink-0 text-neutral-500" />
-                    )}
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-xs">{project.name}</span>
-                      {project.exists === false ? (
-                        <span className="block truncate text-[10px] text-amber-400/90">
-                          {project.osMismatch ? t('sidebar.osMismatch') : t('sidebar.missingPath')}
-                        </span>
-                      ) : project.type === 'remote' ? (
-                        <span className="block truncate text-[10px] text-sky-400/80">
-                          {t('sidebar.remote')}
-                        </span>
-                      ) : (
-                        <span className="block truncate text-[10px] text-neutral-600" dir="ltr">
-                          {basename(project.path)}
-                        </span>
-                      )}
-                    </span>
-                  </button>
-                  {project.exists === false ? (
+            projects.map((project) => {
+              const state = projectState(project)
+              const server = serverName(project.vpsId)
+              return (
+                <div key={project.id} className="group relative mb-0.5">
+                  <div className="flex items-center gap-1">
                     <button
                       type="button"
-                      onClick={() => void searchOnVps(project)}
-                      disabled={searchingId === project.id}
-                      title={t('sidebar.searchOnVps')}
-                      aria-label={t('sidebar.searchOnVps')}
-                      className="shrink-0 rounded p-1 text-neutral-500 hover:bg-bg-tertiary hover:text-sky-400 disabled:opacity-40"
+                      onClick={() => void openProject(project.id)}
+                      className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left transition ${
+                        project.id === settings?.activeProjectId
+                          ? 'bg-accent/15 text-neutral-100'
+                          : 'text-neutral-300 hover:bg-bg-tertiary'
+                      }`}
                     >
-                      <Server className={`h-3.5 w-3.5 ${searchingId === project.id ? 'animate-pulse' : ''}`} />
+                      <span className={`h-2 w-2 shrink-0 rounded-full ${dotClass(state)}`} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-xs">
+                          {project.name}
+                          {server ? <span className="text-neutral-500"> ({server})</span> : null}
+                        </span>
+                        {state === 'missing' ? (
+                          <span className="block truncate text-[10px] text-amber-400/90">
+                            {project.osMismatch ? t('sidebar.osMismatch') : t('sidebar.missingPath')}
+                          </span>
+                        ) : (
+                          <span
+                            className="block truncate text-[10px] text-neutral-600"
+                            dir="ltr"
+                          >
+                            {basename(project.path)}
+                          </span>
+                        )}
+                      </span>
                     </button>
-                  ) : null}
-                  {project.exists === false ? (
                     <button
                       type="button"
-                      onClick={() => void locate(project.id)}
-                      title={t('sidebar.locate')}
-                      aria-label={t('sidebar.locate')}
-                      className="shrink-0 rounded p-1 text-neutral-500 hover:bg-bg-tertiary hover:text-accent"
+                      aria-label={t('common.more')}
+                      onClick={() =>
+                        setProjectMenuFor(projectMenuFor === project.id ? null : project.id)
+                      }
+                      className="hidden shrink-0 rounded p-1 text-neutral-500 hover:bg-bg-primary hover:text-neutral-200 group-hover:block"
                     >
-                      <MapPin className="h-3.5 w-3.5" />
+                      <MoreHorizontal className="h-3.5 w-3.5" />
                     </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={() => void removeProject(project.id)}
-                    title={t('common.remove')}
-                    aria-label={t('common.remove')}
-                    className="hidden shrink-0 rounded p-1 text-neutral-500 hover:bg-bg-tertiary hover:text-red-400 group-hover:block"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-                {vpsSearch?.id === project.id ? (
-                  <div className="ml-2 mt-0.5 rounded-lg border border-border bg-bg-primary p-1">
-                    <p className="px-1 py-0.5 text-[10px] text-neutral-500">
-                      {t('vps.found', { count: vpsSearch.paths.length })}
-                    </p>
-                    {vpsSearch.paths.map((remotePath) => (
-                      <button
-                        key={remotePath}
-                        type="button"
-                        dir="ltr"
-                        onClick={() => void addFoundRemote(project.name, remotePath)}
-                        className="block w-full truncate rounded px-1.5 py-1 text-left text-[11px] text-neutral-300 hover:bg-bg-tertiary"
-                      >
-                        {remotePath}
-                      </button>
-                    ))}
                   </div>
+
+                  {projectMenuFor === project.id ? (
+                    <>
+                      <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setProjectMenuFor(null)}
+                        aria-hidden="true"
+                      />
+                      <div
+                        role="menu"
+                        className="absolute right-1 top-8 z-50 w-40 overflow-hidden rounded-lg border border-border bg-bg-secondary py-1 text-xs shadow-2xl"
+                      >
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setProjectMenuFor(null)
+                            void locate(project.id)
+                          }}
+                          className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-neutral-300 hover:bg-bg-tertiary"
+                        >
+                          <MapPin className="h-3 w-3" />
+                          {t('sidebar.locate')}
+                        </button>
+                        {state === 'missing' ? (
+                          <button
+                            type="button"
+                            role="menuitem"
+                            disabled={searchingId === project.id}
+                            onClick={() => void searchOnVps(project)}
+                            className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-neutral-300 hover:bg-bg-tertiary disabled:opacity-40"
+                          >
+                            <Server className="h-3 w-3" />
+                            {t('sidebar.searchOnVps')}
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setProjectMenuFor(null)
+                            if (window.confirm(`${t('common.remove')} "${project.name}"?`)) {
+                              void removeProject(project.id)
+                            }
+                          }}
+                          className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-red-400 hover:bg-bg-tertiary"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                          {t('common.remove')}
+                        </button>
+                      </div>
+                    </>
+                  ) : null}
+
+                  {vpsSearch?.id === project.id ? (
+                    <div className="ml-2 mt-0.5 rounded-lg border border-border bg-bg-primary p-1">
+                      <p className="px-1 py-0.5 text-[10px] text-neutral-500">
+                        {t('vps.found', { count: vpsSearch.paths.length })}
+                      </p>
+                      {vpsSearch.paths.map((remotePath) => (
+                        <button
+                          key={remotePath}
+                          type="button"
+                          dir="ltr"
+                          onClick={() => void addFoundRemote(project.name, remotePath)}
+                          className="block w-full truncate rounded px-1.5 py-1 text-left text-[11px] text-neutral-300 hover:bg-bg-tertiary"
+                        >
+                          {remotePath}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              )
+            })
+          )}
+        </section>
+
+        <section>
+          <h3 className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
+            {t('sidebar.recents')}
+          </h3>
+          {chats.length === 0 ? (
+            <p className="px-2 py-3 text-[11px] leading-relaxed text-neutral-600">
+              {t('sidebar.emptyChats')}
+            </p>
+          ) : filtered.length === 0 ? (
+            <p className="px-2 py-3 text-[11px] text-neutral-600">{t('palette.noResults')}</p>
+          ) : (
+            filtered.map((chat) => (
+              <div key={chat.id} className="group relative">
+                <button
+                  type="button"
+                  onClick={() => void loadSession(chat.id)}
+                  className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition ${
+                    activeChatId === chat.id
+                      ? 'bg-accent/15 text-neutral-100'
+                      : 'text-neutral-300 hover:bg-bg-tertiary'
+                  }`}
+                >
+                  <MessageSquare className="h-3.5 w-3.5 shrink-0 text-neutral-500" />
+                  <span className="min-w-0 flex-1 truncate text-xs">{chat.title}</span>
+                  <span className="shrink-0 text-[10px] text-neutral-600">
+                    {relativeTime(chat.updatedAt)}
+                  </span>
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    aria-label={t('common.more')}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      setChatMenuFor(chatMenuFor === chat.id ? null : chat.id)
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.stopPropagation()
+                        setChatMenuFor(chat.id)
+                      }
+                    }}
+                    className="hidden shrink-0 rounded p-0.5 text-neutral-500 hover:bg-bg-primary hover:text-neutral-200 group-hover:block"
+                  >
+                    <MoreHorizontal className="h-3.5 w-3.5" />
+                  </span>
+                </button>
+
+                {chatMenuFor === chat.id ? (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setChatMenuFor(null)}
+                      aria-hidden="true"
+                    />
+                    <div
+                      role="menu"
+                      className="absolute right-1 top-7 z-50 w-32 overflow-hidden rounded-lg border border-border bg-bg-secondary py-1 text-xs shadow-2xl"
+                    >
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => onRename(chat)}
+                        className="block w-full px-3 py-1.5 text-left text-neutral-300 hover:bg-bg-tertiary"
+                      >
+                        {t('common.rename')}
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setChatMenuFor(null)
+                          void duplicateChat(chat.id)
+                        }}
+                        className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-neutral-300 hover:bg-bg-tertiary"
+                      >
+                        <Copy className="h-3 w-3" />
+                        {t('common.duplicate')}
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setChatMenuFor(null)
+                          exportChat(chat)
+                        }}
+                        className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-neutral-300 hover:bg-bg-tertiary"
+                      >
+                        <Download className="h-3 w-3" />
+                        {t('common.export')}
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => onDelete(chat)}
+                        className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-red-400 hover:bg-bg-tertiary"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        {t('common.delete')}
+                      </button>
+                    </div>
+                  </>
                 ) : null}
               </div>
             ))
@@ -434,22 +556,40 @@ export default function Sidebar(): JSX.Element {
         </section>
       </div>
 
-      <div className="flex shrink-0 items-center justify-between gap-1 border-t border-border p-2">
-        <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-bg-tertiary text-neutral-300">
-            <User className="h-3.5 w-3.5" />
+      <div className="shrink-0 border-t border-border p-2">
+        <div className="mb-1 flex items-center gap-0.5">
+          <button
+            type="button"
+            onClick={() => setView('files')}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200"
+          >
+            <FolderTree className="h-3 w-3" />
+            {t('sidebar.navWorkspace')}
+          </button>
+          <button
+            type="button"
+            onClick={openSettings}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200"
+          >
+            <Plug className="h-3 w-3" />
+            Plugins
+          </button>
+          <button
+            type="button"
+            title={`${t('common.settings')} (Ctrl+,)`}
+            aria-label={t('common.settings')}
+            onClick={openSettings}
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300"
+          >
+            <Settings2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
+        <div className="flex items-center gap-2 px-1">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-bg-tertiary text-neutral-300">
+            <User className="h-3 w-3" />
           </span>
           <span className="text-xs text-neutral-400">{t('sidebar.user')}</span>
         </div>
-        <button
-          type="button"
-          onClick={openSettings}
-          title={`${t('common.settings')} (Ctrl+,)`}
-          aria-label={t('common.settings')}
-          className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300"
-        >
-          <Settings2 className="h-3.5 w-3.5" />
-        </button>
       </div>
     </nav>
   )

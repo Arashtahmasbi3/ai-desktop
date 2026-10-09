@@ -195,6 +195,9 @@ interface AppState {
   persistChat: () => Promise<void>
   renameChat: (id: string, title: string) => Promise<void>
   deleteChat: (id: string) => Promise<void>
+  duplicateChat: (id: string) => Promise<void>
+  /** Fork a chat from a message (inclusive); returns the new chat id. */
+  forkChat: (id: string, messageId: string) => Promise<string | null>
   setVpsServerId: (id: string | undefined) => void
   setPlanMode: (value: boolean) => void
   setApprovalMode: (mode: ApprovalMode) => Promise<void>
@@ -488,6 +491,39 @@ export const useStore = create<AppState>((set, get) => ({
       set({ activeChatId: null, messages: [], logs: [], warnings: [] })
     }
     await get().refreshChats()
+  },
+
+  async duplicateChat(id) {
+    const source = await window.api.chats.load(id)
+    if (!source) return
+    const saved = await window.api.chats.save({
+      title: `${source.title} (copy)`,
+      ...(source.workspaceId ? { workspaceId: source.workspaceId } : {}),
+      ...(source.vpsServerId ? { vpsServerId: source.vpsServerId } : {}),
+      ...(source.forkedFromId ? { forkedFromId: source.forkedFromId } : {}),
+      ...(source.model ? { model: source.model } : {}),
+      messages: source.messages
+    })
+    await get().refreshChats()
+    await get().loadSession(saved.id)
+  },
+
+  async forkChat(id, messageId) {
+    const source = await window.api.chats.load(id)
+    if (!source) return null
+    const index = source.messages.findIndex((message) => message.id === messageId)
+    if (index < 0) return null
+    const saved = await window.api.chats.save({
+      title: `${source.title} (fork)`,
+      forkedFromId: id,
+      ...(source.workspaceId ? { workspaceId: source.workspaceId } : {}),
+      ...(source.vpsServerId ? { vpsServerId: source.vpsServerId } : {}),
+      ...(source.model ? { model: source.model } : {}),
+      messages: source.messages.slice(0, index + 1)
+    })
+    await get().refreshChats()
+    await get().loadSession(saved.id)
+    return saved.id
   },
 
   async init() {
