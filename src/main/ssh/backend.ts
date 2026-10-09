@@ -18,6 +18,8 @@ export interface SshExecResult {
   stdout: string
   stderr: string
   exitCode: number
+  /** Set when the command was killed because it exceeded its timeout. */
+  timedOut?: boolean
 }
 
 export interface SshShell {
@@ -36,7 +38,7 @@ export interface SftpEntry {
 }
 
 export interface SshConnection {
-  exec(command: string): Promise<SshExecResult>
+  exec(command: string, timeoutMs?: number): Promise<SshExecResult>
   shell(cols: number, rows: number): Promise<SshShell>
   sftpList(path: string): Promise<SftpEntry[]>
   sftpRead(path: string): Promise<string>

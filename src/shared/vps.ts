@@ -103,6 +103,8 @@ export interface VpsExecResult {
   rateLimited?: boolean
   /** Set when this host's policy requires explicit approval before running. */
   requiresApproval?: boolean
+  /** Set when the command was killed for exceeding its timeout (v2.3.2, A.4). */
+  timedOut?: boolean
   reason?: string
 }
 

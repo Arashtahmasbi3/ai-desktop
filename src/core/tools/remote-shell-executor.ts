@@ -46,7 +46,14 @@ export class RemoteShellToolExecutor implements ToolExecutor {
         output: result.content,
         ...(result.ok
           ? {}
-          : { error: result.content, code: result.blocked ? ('blocked' as const) : ('remote_error' as const) }),
+          : {
+              error: result.content,
+              code: result.timedOut
+                ? ('timeout' as const)
+                : result.blocked
+                  ? ('blocked' as const)
+                  : ('remote_error' as const)
+            }),
         durationMs: Date.now() - startedAt
       }
     } catch (error) {

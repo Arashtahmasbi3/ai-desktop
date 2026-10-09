@@ -18,6 +18,8 @@ interface Ssh2Stream {
   setWindow(rows: number, cols: number, height: number, width: number): void
   close(): void
   end(): void
+  /** Send a POSIX signal to the remote process (used to KILL on timeout). */
+  signal(name: string): void
 }
 
 interface Ssh2Sftp {
@@ -75,7 +77,7 @@ class Ssh2Connection implements SshConnection {
     this.client = client
   }
 
-  exec(command: string): Promise<SshExecResult> {
+  exec(command: string, timeoutMs?: number): Promise<SshExecResult> {
     return new Promise((resolve, reject) => {
       this.client.exec(command, (error, stream) => {
         if (error) {
@@ -84,6 +86,30 @@ class Ssh2Connection implements SshConnection {
         }
         let stdout = ''
         let stderr = ''
+        let settled = false
+        let timer: ReturnType<typeof setTimeout> | undefined
+
+        const finish = (result: SshExecResult | Error): void => {
+          if (settled) return
+          settled = true
+          if (timer) clearTimeout(timer)
+          result instanceof Error ? reject(result) : resolve(result)
+        }
+
+        if (timeoutMs && timeoutMs > 0) {
+          timer = setTimeout(() => {
+            // Ask the remote shell to terminate, then settle as timed out so the
+            // caller never waits forever on a hung command (v2.3.2, A.4).
+            try {
+              stream.signal('KILL')
+            } catch {
+              // The stream may already be gone; the timeout still applies.
+            }
+            stream.close()
+            finish({ stdout, stderr, exitCode: 124, timedOut: true })
+          }, timeoutMs)
+        }
+
         stream.on('data', (chunk) => {
           stdout += chunk.toString()
         })
@@ -92,9 +118,9 @@ class Ssh2Connection implements SshConnection {
         })
         stream.on('close', (code) => {
           stream.end()
-          resolve({ stdout, stderr, exitCode: typeof code === 'number' ? code : 0 })
+          finish({ stdout, stderr, exitCode: typeof code === 'number' ? code : 0 })
         })
-        stream.on('error', reject)
+        stream.on('error', (streamError) => finish(streamError))
       })
     })
   }

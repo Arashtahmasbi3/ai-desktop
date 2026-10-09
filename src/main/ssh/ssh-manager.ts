@@ -3,6 +3,7 @@ import { AuditLog, type AuditEntry } from '@core/agent/audit-log'
 import { checkDenyList } from '@core/agent/deny-list'
 import { RateLimiter } from '@core/agent/rate-limiter'
 import { evaluateHostPolicy } from '@core/remote/host-policy'
+import { getCommandTimeout } from '@core/tools/remote-shell-tool'
 import type { RemoteFileEntry, VpsConnectionState, VpsExecResult } from '@shared/vps'
 import { evaluateHostKey, fingerprintFromKey } from './host-key-verify'
 import type { SftpEntry, SshBackend, SshConnection } from './backend'
@@ -220,7 +221,7 @@ export class SshManager {
     for (const serverId of [...this.connections.keys()]) await this.disconnect(serverId)
   }
 
-  async exec(serverId: string, command: string): Promise<VpsExecResult> {
+  async exec(serverId: string, command: string, timeoutMs?: number): Promise<VpsExecResult> {
     const entry = this.connections.get(serverId)
     if (!entry) {
       return { ok: false, stdout: '', stderr: '', exitCode: -1, reason: 'Not connected' }
@@ -289,7 +290,20 @@ export class SshManager {
     }
     this.touch(serverId)
     try {
-      const result = await entry.connection.exec(command)
+      const effectiveTimeout = timeoutMs ?? getCommandTimeout(command)
+      const result = await entry.connection.exec(command, effectiveTimeout)
+      if (result.timedOut) {
+        const reason = `Command timed out after ${effectiveTimeout}ms.`
+        await this.audit.record({ type: 'exec', ok: false, serverId, command: denied.command, detail: reason })
+        return {
+          ok: false,
+          stdout: result.stdout,
+          stderr: reason,
+          exitCode: 124,
+          timedOut: true,
+          reason
+        }
+      }
       await this.audit.record({
         type: 'exec',
         ok: result.exitCode === 0,
