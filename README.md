@@ -195,6 +195,28 @@ await settings.setApiKey('deepseek', apiKey)
 
 See [`AGENTS.md`](./AGENTS.md) for architecture notes and conventions.
 
+### Tools
+
+Beyond the sandbox tools (`write_file`, `read_file`, `list_dir`, `run_command`) and the VPS
+tools (`remote_shell`, `remote_read_file`, ...), the agent exposes **`migrate_project`** to
+copy a project directory from one saved VPS to another with **rsync over SSH**. The command
+runs on the source host and pushes to the target, so the source must be connected and able to
+reach the target with key auth:
+
+```
+migrate_project(
+  source_vps_id: 'vps-eu',
+  source_path:   '/var/www/app',
+  target_vps_id: 'vps-us',
+  target_path:   '/srv/app'
+)
+```
+
+It is non-destructive (no `--delete`), quotes every argument, rejects sensitive paths and
+shell metacharacters, records an entry in the SSH audit log, and returns the rsync exit code
+(e.g. `127` when rsync is missing on the source). See
+[`AGENTS.md`](./AGENTS.md#pattern-cross-host-migration-via-rsync) for the full recipe.
+
 ## Packaging & release
 
 ```bash

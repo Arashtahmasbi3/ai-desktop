@@ -304,6 +304,24 @@ Conventions that recur across the codebase — follow them when adding code.
 - **Time/limits are injected, not hard-coded.** TTL/idle sweeps, timeouts and token budgets
   come from config so tests can drive them deterministically.
 
+## Pattern: Cross-Host Migration via rsync
+
+How `migrate_project` copies a project between two saved VPS servers
+(`src/core/tools/migrate-project-tool.ts`). Follow this when adding any cross-host copy.
+
+- Use `rsync -az --info=stats2` with `-e 'ssh -p PORT -o BatchMode=yes -o StrictHostKeyChecking=accept-new'`.
+- **Never** pass `--delete` unless the user explicitly confirms (non-destructive by default).
+- Run the command **from the source** host — compression happens once and the transfer is
+  pushed to the target, which is cheaper than pulling.
+- Require **SSH key auth source→target**; `BatchMode=yes` fails fast instead of hanging on a
+  password prompt, and `StrictHostKeyChecking=accept-new` pins new hosts on first use.
+- Guard every argument: `shellQuote` values, reject control characters / shell metacharacters,
+  reject sensitive roots (`/etc`, `/var/log`, `/proc`, `/sys`, `/dev`, ...), and run
+  `checkDenyList` on the assembled command.
+- Write an entry to the **audit log** for every migration (`migrate <src> -> <server>:<dst>`).
+- Return the **rsync exit code** to the agent so it can react — e.g. `127` means `rsync` is not
+  installed on the source host, which the agent should surface as an actionable error.
+
 ## Lessons learned
 
 - **Verify the packaged artifact, not just the build.** `npm run build` passing says nothing
