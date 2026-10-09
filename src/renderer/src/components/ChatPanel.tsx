@@ -17,6 +17,7 @@ import {
 import { basename, useStore } from '../store'
 import MessageBubble from './MessageBubble'
 import FileChangesPanel from './FileChangesPanel'
+import TemplateMenu from './TemplateMenu'
 import TerminalPanel from './TerminalPanel'
 import ModelSwitcher from './ModelSwitcher'
 import VpsSelector from './VpsSelector'
@@ -27,7 +28,12 @@ import { FullAccessBanner, FullAccessToggle } from './FullAccessToggle'
 import { filterSlashCommands, resolveSlashCommand } from '../lib/slash'
 import { contextBudget, estimateTokens } from '@shared/memory'
 
-const SUGGESTION_KEYS = ['chat.suggestion1', 'chat.suggestion2', 'chat.suggestion3']
+const SUGGESTION_KEYS = [
+  'chat.suggestion1',
+  'chat.suggestion2',
+  'chat.suggestion3',
+  'chat.suggestion4'
+]
 
 /** A composer slash-command: either runs an action or seeds a prompt template. */
 interface SlashCommand {
@@ -72,6 +78,9 @@ export default function ChatPanel(): JSX.Element {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const dir = i18n.language === 'fa' ? 'rtl' : 'ltr'
+  const activeProject = settings?.projects.find(
+    (project) => project.id === settings.activeProjectId
+  )
 
   const commands = useMemo<SlashCommand[]>(
     () => [
@@ -280,10 +289,14 @@ export default function ChatPanel(): JSX.Element {
               <Bot className="h-7 w-7 text-accent" />
             </div>
             <div>
-              <h1 className="text-lg font-semibold text-neutral-100">{t('chat.emptyTitle')}</h1>
+              <h1 className="text-lg font-semibold text-neutral-100">
+                {activeProject
+                  ? t('chat.emptyTitleProject', { project: activeProject.name })
+                  : t('chat.emptyTitle')}
+              </h1>
               <p className="mt-1 max-w-md text-sm text-neutral-400">{t('chat.emptyBody')}</p>
             </div>
-            <div className="flex max-w-lg flex-col gap-2">
+            <div className="grid max-w-lg grid-cols-1 gap-2 sm:grid-cols-2">
               {SUGGESTION_KEYS.map((key) => (
                 <button
                   key={key}
@@ -295,6 +308,7 @@ export default function ChatPanel(): JSX.Element {
                 </button>
               ))}
             </div>
+            <TemplateMenu currentInput={input} onPick={(text) => setInput(text)} />
           </div>
         ) : (
           messages.map((message) => <MessageBubble key={message.id} message={message} />)
