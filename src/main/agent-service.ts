@@ -1,14 +1,18 @@
 import type { AgentLogEntry, AgentLogger } from '@shared/agent'
 import type { AgentRunResult } from '@shared/agent'
 import type { ProviderId, ToolDefinition } from '@shared/types'
-import type { VpsExecResult } from '@shared/vps'
+import type { RemoteFileEntry, VpsExecResult } from '@shared/vps'
 import type { AgentEvent, AgentRunRequest, SessionInfo, SessionRecordView } from '@shared/ui'
 import { AgentOrchestrator } from '@core/agent-orchestrator'
 import type { ProviderEntry } from '@core/agent-orchestrator'
 import type { ToolExecutor } from '@core/agent/tools'
 import { PROVIDERS, createAdapterForConfig } from '@core/llm-adapters/registry'
+import type { AuditEntry } from '@core/agent/audit-log'
 import { REMOTE_SHELL_TOOL } from '@core/tools/remote-shell-tool'
 import { RemoteShellToolExecutor } from '@core/tools/remote-shell-executor'
+import { REMOTE_FS_TOOLS, type RemoteFsDeps } from '@core/tools/remote-fs-tools'
+import { RemoteFsToolExecutor } from '@core/tools/remote-fs-executor'
+import { CompositeToolExecutor, type ToolRoute } from '@core/tools/composite-executor'
 import type { Persistence } from '@core/agent/persistence'
 import type { SessionStore } from '@core/agent/session-store'
 import type { SandboxManager } from '@shared/sandbox'
@@ -23,6 +27,16 @@ export interface RemoteShellHost {
   connectedServers(): string[]
   exec(serverId: string, command: string): Promise<VpsExecResult>
 }
+
+/** SFTP surface the remote-fs tools use. Optional so older hosts still work. */
+export interface RemoteFsHost {
+  readFile(serverId: string, path: string): Promise<string>
+  writeFile(serverId: string, path: string, content: string): Promise<void>
+  listFiles(serverId: string, path: string): Promise<RemoteFileEntry[]>
+  recordAudit?(entry: Omit<AuditEntry, 'at'>): Promise<unknown>
+}
+
+export type RemoteHost = RemoteShellHost & Partial<RemoteFsHost>
 
 /** Keywords that make the agent reach for `remote_shell` on a default chat. */
 const VPS_KEYWORDS = /\b(vps|ssh|server|remote|سرور|ریموت)\b/i
@@ -41,7 +55,7 @@ interface RemoteRuntime {
 export function planRemoteRuntime(
   task: string,
   vpsServerId: string | undefined,
-  vps: RemoteShellHost | undefined
+  vps: RemoteHost | undefined
 ): RemoteRuntime {
   if (!vps) return {}
   const connected = vps.connectedServers()
@@ -60,25 +74,57 @@ export function planRemoteRuntime(
   }
 
   const target = pinned ?? connected[0]
-  const tool: ToolDefinition = {
+  const shellTool: ToolDefinition = {
     ...REMOTE_SHELL_TOOL,
     description: `${REMOTE_SHELL_TOOL.description} Use server_id="${target}".`
   }
-  const executor = new RemoteShellToolExecutor(
+  const shellExecutor = new RemoteShellToolExecutor(
     {
       exec: (serverId, command) => vps.exec(serverId, command),
       connectedServers: () => vps.connectedServers()
     },
     target
   )
-  return {
-    extraTools: [tool],
-    extraExecutor: executor,
-    systemHint:
-      `You have access to the "remote_shell" tool on the connected VPS "${target}". ` +
-      'Use it for tasks about that server; call it with server_id ' +
-      `"${target}" and the shell command to run.`
+
+  const extraTools: ToolDefinition[] = [shellTool]
+  const routes: ToolRoute[] = [
+    { names: new Set([REMOTE_SHELL_TOOL.name]), executor: shellExecutor }
+  ]
+  let hint =
+    `You have access to the "remote_shell" tool on the connected VPS "${target}". ` +
+    'Use it for tasks about that server; call it with server_id ' +
+    `"${target}" and the shell command to run.`
+
+  // Remote file tools are only offered when the host exposes SFTP.
+  if (typeof vps.readFile === 'function') {
+    const fsDeps: RemoteFsDeps = {
+      connectedServers: () => vps.connectedServers(),
+      readFile: (serverId, path) => vps.readFile!(serverId, path),
+      writeFile: (serverId, path, content) => vps.writeFile!(serverId, path, content),
+      listFiles: (serverId, path) => vps.listFiles!(serverId, path),
+      exec: (serverId, command) => vps.exec(serverId, command)
+    }
+    if (typeof vps.recordAudit === 'function') {
+      fsDeps.audit = (entry) => vps.recordAudit!(entry).then(() => undefined)
+    }
+    const fsTools = REMOTE_FS_TOOLS.map((tool) => ({
+      ...tool,
+      description: `${tool.description} Target server: "${target}".`
+    }))
+    extraTools.push(...fsTools)
+    routes.push({
+      names: new Set(fsTools.map((tool) => tool.name)),
+      executor: new RemoteFsToolExecutor(fsDeps, target)
+    })
+    hint +=
+      ` You also have the remote file tools ${fsTools.map((tool) => tool.name).join(', ')} ` +
+      'for reading, writing, listing, grepping and checking git status on that server.'
   }
+
+  const executor: ToolExecutor =
+    routes.length === 1 ? shellExecutor : new CompositeToolExecutor(routes)
+
+  return { extraTools, extraExecutor: executor, systemHint: hint }
 }
 
 /** Forwards orchestrator log entries to a sink (the renderer, in the app). */
@@ -98,8 +144,8 @@ export interface AgentServiceOptions {
   now?: () => number
   /** Optional: enables user-defined OpenAI-compatible providers. */
   customProviders?: CustomProviderStore
-  /** Optional: enables the `remote_shell` tool against connected VPS servers. */
-  vps?: RemoteShellHost
+  /** Optional: enables the `remote_shell` / remote-fs tools against connected VPS servers. */
+  vps?: RemoteHost
 }
 
 /** Which provider/model to put first for an agent run. */
@@ -132,7 +178,7 @@ export class AgentService {
   private readonly emit: (event: AgentEvent) => void
   private readonly now: () => number
   private readonly customProviders?: CustomProviderStore
-  private readonly vps?: RemoteShellHost
+  private readonly vps?: RemoteHost
   private readonly controllers = new Set<AbortController>()
   private runCounter = 0
 

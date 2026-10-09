@@ -65,6 +65,25 @@ describe('remote_shell tool injection', () => {
     expect(runtime.extraTools).toBeUndefined()
     expect(runtime.systemHint).toMatch(/Settings/i)
   })
+
+  it('adds the remote-fs tools when the host exposes SFTP', () => {
+    const host = {
+      ...fakeHost(['srv-1']),
+      readFile: async () => 'x',
+      writeFile: async () => undefined,
+      listFiles: async () => []
+    }
+    const runtime = planRemoteRuntime('edit files on my vps', 'srv-1', host)
+    const names = runtime.extraTools?.map((tool) => tool.name) ?? []
+    expect(names).toContain('remote_shell')
+    expect(names).toContain('remote_read_file')
+    expect(names).toContain('remote_write_file')
+    expect(names).toContain('remote_list_dir')
+    expect(names).toContain('remote_exists')
+    expect(names).toContain('remote_grep')
+    expect(names).toContain('remote_git_status')
+    expect(runtime.systemHint).toContain('remote_read_file')
+  })
 })
 
 describe('RemoteShellToolExecutor', () => {
