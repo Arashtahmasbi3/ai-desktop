@@ -19,6 +19,8 @@ import { REMOTE_SHELL_TOOL } from '@core/tools/remote-shell-tool'
 import { RemoteShellToolExecutor } from '@core/tools/remote-shell-executor'
 import { REMOTE_FS_TOOLS, type RemoteFsDeps } from '@core/tools/remote-fs-tools'
 import { RemoteFsToolExecutor } from '@core/tools/remote-fs-executor'
+import { MIGRATE_PROJECT_TOOL, type MigrateProjectDeps } from '@core/tools/migrate-project-tool'
+import { MigrateProjectToolExecutor } from '@core/tools/migrate-project-executor'
 import { CompositeToolExecutor, type ToolRoute } from '@core/tools/composite-executor'
 import { DEFAULT_APPROVAL_MODE } from '@core/agent/approval'
 import { createApprovalGate } from './approval-gate'
@@ -47,7 +49,14 @@ export interface RemoteFsHost {
   recordAudit?(entry: Omit<AuditEntry, 'at'>): Promise<unknown>
 }
 
-export type RemoteHost = RemoteShellHost & Partial<RemoteFsHost>
+/** Hosts that can resolve a saved server's connection details (for migrations). */
+export interface RemoteServerResolver {
+  resolveServer(
+    id: string
+  ): Promise<{ host: string; port: number; username: string } | undefined>
+}
+
+export type RemoteHost = RemoteShellHost & Partial<RemoteFsHost> & Partial<RemoteServerResolver>
 /** Project-bound file access used to review and apply agent edits. */
 export interface ProjectFiles {
   read(relativePath: string): Promise<string>
@@ -135,6 +144,26 @@ export function planRemoteRuntime(
     hint +=
       ` You also have the remote file tools ${fsTools.map((tool) => tool.name).join(', ')} ` +
       'for reading, writing, listing, grepping and checking git status on that server.'
+  }
+
+  // Cross-server project migration needs to resolve both saved servers' hosts.
+  if (typeof vps.resolveServer === 'function') {
+    const migrateDeps: MigrateProjectDeps = {
+      connectedServers: () => vps.connectedServers(),
+      resolveServer: (id) => vps.resolveServer!(id),
+      exec: (serverId, command) => vps.exec(serverId, command)
+    }
+    if (typeof vps.recordAudit === 'function') {
+      migrateDeps.audit = (entry) => vps.recordAudit!(entry).then(() => undefined)
+    }
+    extraTools.push(MIGRATE_PROJECT_TOOL)
+    routes.push({
+      names: new Set([MIGRATE_PROJECT_TOOL.name]),
+      executor: new MigrateProjectToolExecutor(migrateDeps)
+    })
+    hint +=
+      ` You can also call "migrate_project" to copy a project directory from a connected ` +
+      'source VPS to another saved VPS with rsync over SSH.'
   }
 
   const executor: ToolExecutor =
