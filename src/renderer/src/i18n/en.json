@@ -60,7 +60,7 @@
     "recents": "Recents"
   },
   "chat": {
-    "placeholder": "Ask anything or give a task…",
+    "placeholder": "Do anything",
     "typing": "Typing…",
     "emptyTitle": "AI Desktop",
     "emptyBody": "Your desktop assistant for chat, coding, sandboxed commands and project files.",

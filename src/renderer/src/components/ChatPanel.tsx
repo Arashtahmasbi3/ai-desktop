@@ -108,7 +108,7 @@ export default function ChatPanel(): JSX.Element {
     const node = textareaRef.current
     if (!node) return
     node.style.height = 'auto'
-    node.style.height = `${Math.min(node.scrollHeight, 160)}px`
+    node.style.height = `${Math.min(node.scrollHeight, 200)}px`
   }, [input])
 
   const onScroll = (): void => {
@@ -172,7 +172,7 @@ export default function ChatPanel(): JSX.Element {
         return
       }
     }
-    if (event.key === 'Enter' && !event.shiftKey && !event.ctrlKey && !event.metaKey) {
+    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey || !event.shiftKey)) {
       event.preventDefault()
       submit()
     }
@@ -205,8 +205,6 @@ export default function ChatPanel(): JSX.Element {
           >
             <PanelLeft className="h-3.5 w-3.5" />
           </button>
-          <ModelSwitcher />
-          <span className="text-neutral-700">·</span>
           <VpsSelector />
           <span className="text-neutral-700">·</span>
           <button
@@ -439,60 +437,69 @@ export default function ChatPanel(): JSX.Element {
             </div>
           ) : null}
 
-          <div className="flex items-end gap-2 rounded-xl border border-border bg-bg-primary p-2">
-          <button
-            type="button"
-            onClick={() => void attach()}
-            title={t('chat.attach')}
-            aria-label={t('chat.attach')}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300"
-          >
-            <Paperclip className="h-4 w-4" />
-          </button>
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(event) => setInput(event.target.value)}
-            onKeyDown={onKeyDown}
-            rows={1}
-            dir={dir}
-            placeholder={t('chat.placeholder')}
-            className="max-h-40 min-h-[2.25rem] flex-1 resize-none bg-transparent px-1 py-1.5 text-sm text-neutral-100 outline-none placeholder:text-neutral-600"
-          />
-          {running ? (
+          <div className="rounded-xl border border-border bg-bg-primary p-2">
+          <div className="flex items-end gap-2">
             <button
               type="button"
-              onClick={abort}
-              title={t('chat.stop')}
-              aria-label={t('chat.stop')}
-              className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30"
+              onClick={() => void attach()}
+              title={t('chat.attach')}
+              aria-label={t('chat.attach')}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300"
             >
-              <Square className="h-4 w-4" />
+              <Paperclip className="h-4 w-4" />
             </button>
-          ) : (
-            <button
-              type="button"
-              onClick={submit}
-              disabled={!input.trim() && attached.length === 0}
-              title={t('chat.send')}
-              aria-label={t('chat.send')}
-              className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-white transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <Send className="h-4 w-4" />
-            </button>
-          )}
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              onKeyDown={onKeyDown}
+              rows={1}
+              dir={dir}
+              placeholder={t('chat.placeholder')}
+              className="max-h-[200px] min-h-[2.25rem] flex-1 resize-none bg-transparent px-1 py-1.5 text-sm text-neutral-100 outline-none placeholder:text-neutral-600"
+            />
+            <span className="shrink-0">
+              <ModelSwitcher />
+            </span>
+            {running ? (
+              <button
+                type="button"
+                onClick={abort}
+                title={t('chat.stop')}
+                aria-label={t('chat.stop')}
+                className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30"
+              >
+                <Square className="h-4 w-4" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={submit}
+                disabled={!input.trim() && attached.length === 0}
+                title={t('chat.send')}
+                aria-label={t('chat.send')}
+                className={`flex h-8 w-8 items-center justify-center rounded-lg text-white transition ${
+                  input.trim() || attached.length > 0
+                    ? 'bg-accent hover:bg-accent-hover'
+                    : 'bg-bg-tertiary text-neutral-500'
+                } disabled:cursor-not-allowed`}
+              >
+                <Send className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          <div className="mt-1.5 flex items-center justify-between px-1">
+            <FullAccessToggle />
+            {showTokenCount ? (
+              <span className="font-mono text-[10px] text-neutral-600">
+                {t('chat.tokens', { count: estimateTokens(input) })}
+                {input.length > 0 ? ` · ${input.length}` : ''}
+              </span>
+            ) : null}
+          </div>
         </div>
         <div className="mt-1.5 flex items-center justify-between px-1 text-[10px] text-neutral-600">
-          <span className="flex items-center gap-2">
-            <span>Enter = {t('chat.send')} · Shift+Enter = ↵</span>
-            <FullAccessToggle />
-          </span>
-          {showTokenCount ? (
-            <span className="font-mono">
-              {t('chat.tokens', { count: estimateTokens(input) })}
-              {input.length > 0 ? ` · ${input.length}` : ''}
-            </span>
-          ) : null}
+          <span>Enter = {t('chat.send')} · Shift+Enter = ↵ · Ctrl+Enter = {t('chat.send')}</span>
         </div>
         {budget.overBudget ? (
           <p className="mt-1 px-1 text-[10px] text-amber-400">

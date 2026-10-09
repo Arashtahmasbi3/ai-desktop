@@ -16,7 +16,9 @@ export default function ModelSwitcher(): JSX.Element {
   const running = useStore((state) => state.running)
 
   const descriptor = PROVIDERS[selection.provider]
-  const knownModel = descriptor?.models.some((model) => model.id === selection.model) ?? false
+  const modelEntry = descriptor?.models.find((model) => model.id === selection.model)
+  const knownModel = modelEntry !== undefined
+  const capabilities = modelEntry?.tags.length ? modelEntry.tags.join(', ') : 'general purpose'
   const value = selection.customProviderId
     ? `${CUSTOM_PREFIX}${selection.customProviderId}`
     : encodeSelection(selection.provider, selection.model)
@@ -37,7 +39,7 @@ export default function ModelSwitcher(): JSX.Element {
   return (
     <label
       className="flex items-center gap-1 text-[11px] text-neutral-400"
-      title="Model used for the next message"
+      title={`Model used for the next message — capabilities: ${capabilities}`}
     >
       <Cpu className="h-3 w-3 text-neutral-500" />
       <select
