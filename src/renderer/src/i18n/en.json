@@ -112,7 +112,22 @@
     "rejectAll": "Reject all",
     "emptyWelcomeProject": "Working in {project}",
     "emptyTagline": "Ask me to write code, run commands, or explore your project.",
-    "noWorkspaceWarning": "No workspace folder is open. Open a project before running tools so the agent has a safe place to work."
+    "noWorkspaceWarning": "No workspace folder is open. Open a project before running tools so the agent has a safe place to work.",
+    "approvalDenyExplain": "Deny & explain",
+    "approvalAlwaysButton": "Always allow",
+    "approvalDangerous": "This command matches the deny list and will always require approval.",
+    "approvalWorkingDir": "Working directory",
+    "approvalServer": "Server",
+    "approvalKindRead": "Read",
+    "approvalKindWrite": "Write",
+    "approvalKindShell": "Command",
+    "approvalHistoryEmpty": "No approvals yet.",
+    "rememberSuggestion": "Remember \"{{tool}}\" to skip these prompts?",
+    "fullAccessRemember": "Remember",
+    "fullAccessTurnOff": "Turn off",
+    "approvalRememberCommand": "Remember this command",
+    "approvalRememberTool": "Remember all commands from this tool",
+    "approvalApproveAll": "Approve all (this session)"
   },
   "vpsSelector": {
     "label": "VPS",
@@ -159,7 +174,15 @@
     "approvalDangerous": "Ask before shell commands",
     "approvalWrites": "Ask before every write",
     "approvalHint": "Controls when the agent pauses for your approval before running a tool.",
-    "planModeDefault": "Start new chats in Plan Mode"
+    "planModeDefault": "Start new chats in Plan Mode",
+    "approvalAsk": "Ask — approve every tool call",
+    "approvalAutoWrite": "Auto-write — ask before writes & commands",
+    "approvalFull": "Full access — run everything",
+    "rememberApprovalMode": "Remember my approval mode across restarts",
+    "approvedCommands": "Approved commands",
+    "approvedCommandsHint": "Actions you chose to always allow. Revoke one to be asked again.",
+    "approvedCommandsEmpty": "No remembered approvals.",
+    "revoke": "Revoke"
   },
   "toast": {
     "dismiss": "Dismiss",

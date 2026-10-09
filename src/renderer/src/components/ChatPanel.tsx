@@ -22,6 +22,8 @@ import ModelSwitcher from './ModelSwitcher'
 import VpsSelector from './VpsSelector'
 import ProviderWarning from './ProviderWarning'
 import LoopStopCard from './LoopStopCard'
+import ApprovalDialog from './ApprovalDialog'
+import { FullAccessBanner, FullAccessToggle } from './FullAccessToggle'
 import { filterSlashCommands, resolveSlashCommand } from '../lib/slash'
 import { contextBudget, estimateTokens } from '@shared/memory'
 
@@ -51,8 +53,9 @@ export default function ChatPanel(): JSX.Element {
   const setView = useStore((state) => state.setView)
   const planMode = useStore((state) => state.planMode)
   const setPlanMode = useStore((state) => state.setPlanMode)
-  const pendingApproval = useStore((state) => state.pendingApproval)
-  const respondApproval = useStore((state) => state.respondApproval)
+  const approvalSuggestion = useStore((state) => state.approvalSuggestion)
+  const rememberApprovalTool = useStore((state) => state.rememberApprovalTool)
+  const dismissApprovalSuggestion = useStore((state) => state.dismissApprovalSuggestion)
   const loopStop = useStore((state) => state.loopStop)
   const dismissLoopStop = useStore((state) => state.dismissLoopStop)
   const fileChanges = useStore((state) => state.fileChanges)
@@ -351,6 +354,30 @@ export default function ChatPanel(): JSX.Element {
       {terminalOpen ? <TerminalPanel /> : null}
 
       <div className="shrink-0 border-t border-border bg-bg-secondary p-3">
+        <FullAccessBanner />
+        {approvalSuggestion ? (
+          <div className="mx-3 mb-1 flex items-center justify-between gap-2 rounded-lg border border-accent/40 bg-accent/10 px-2 py-1.5 text-[11px] text-neutral-200">
+            <span>
+              {t('chat.rememberSuggestion', { tool: approvalSuggestion.tool })}
+            </span>
+            <span className="flex shrink-0 gap-2">
+              <button
+                type="button"
+                onClick={() => dismissApprovalSuggestion()}
+                className="rounded border border-border px-1.5 py-0.5 text-neutral-400 hover:bg-bg-tertiary"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={() => void rememberApprovalTool(approvalSuggestion.tool)}
+                className="rounded bg-accent px-1.5 py-0.5 font-medium text-white hover:bg-accent-hover"
+              >
+                {t('chat.approvalAlways')}
+              </button>
+            </span>
+          </div>
+        ) : null}
         {fileChanges.length > 0 ? (
           <div className="mb-2 flex flex-col gap-2">
             <p className="px-1 text-[10px] uppercase tracking-wide text-neutral-500">
@@ -456,7 +483,10 @@ export default function ChatPanel(): JSX.Element {
           )}
         </div>
         <div className="mt-1.5 flex items-center justify-between px-1 text-[10px] text-neutral-600">
-          <span>Enter = {t('chat.send')} · Shift+Enter = ↵</span>
+          <span className="flex items-center gap-2">
+            <span>Enter = {t('chat.send')} · Shift+Enter = ↵</span>
+            <FullAccessToggle />
+          </span>
           {showTokenCount ? (
             <span className="font-mono">
               {t('chat.tokens', { count: estimateTokens(input) })}
@@ -471,41 +501,7 @@ export default function ChatPanel(): JSX.Element {
         ) : null}
       </div>
 
-      {pendingApproval ? (
-        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-border bg-bg-secondary p-4 shadow-2xl">
-            <h2 className="flex items-center gap-2 text-sm font-semibold text-neutral-100">
-              <ShieldAlert className="h-4 w-4 text-amber-400" />
-              {t('chat.approvalTitle')}
-            </h2>
-            <p className="mt-2 text-xs text-neutral-400">{t('chat.approvalBody')}</p>
-            <pre
-              dir="ltr"
-              className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-bg-primary p-2 font-mono text-[11px] text-neutral-200"
-            >
-              {pendingApproval.tool}
-              {'\n'}
-              {pendingApproval.summary}
-            </pre>
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => respondApproval(false)}
-                className="rounded-lg border border-border px-3 py-1.5 text-xs text-neutral-300 hover:bg-bg-tertiary"
-              >
-                {t('chat.deny')}
-              </button>
-              <button
-                type="button"
-                onClick={() => respondApproval(true)}
-                className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover"
-              >
-                {t('chat.approve')}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <ApprovalDialog />
     </section>
   )
 }

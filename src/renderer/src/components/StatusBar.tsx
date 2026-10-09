@@ -1,4 +1,4 @@
-import { Cpu, Globe, HardDrive, Languages, Server, Wifi, WifiOff } from 'lucide-react'
+import { Cpu, Globe, HardDrive, Languages, Server, ShieldCheck, Zap, Wifi, WifiOff } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useStore } from '../store'
 
@@ -17,6 +17,7 @@ export default function StatusBar(): JSX.Element {
   const selection = useStore((state) => state.selection)
   const locale = useStore((state) => state.locale)
   const setLocale = useStore((state) => state.setLocale)
+  const approvalMode = useStore((state) => state.settings?.approvalMode ?? 'ask')
 
   const online = worker?.online ?? true
 
@@ -44,6 +45,22 @@ export default function StatusBar(): JSX.Element {
           <Globe className="h-3 w-3" />
           {selection.provider}/{selection.model}
         </span>
+        <button
+          type="button"
+          onClick={() => {
+            const next = approvalMode === 'ask' ? 'auto-write' : approvalMode === 'auto-write' ? 'full' : 'ask'
+            void useStore.getState().setApprovalMode(next)
+          }}
+          title={t('settings.approvalMode')}
+          className={`flex items-center gap-1 rounded px-1.5 py-0.5 ${
+            approvalMode === 'full'
+              ? 'text-red-400 hover:bg-bg-tertiary'
+              : 'hover:bg-bg-tertiary hover:text-neutral-200'
+          }`}
+        >
+          {approvalMode === 'full' ? <Zap className="h-3 w-3" /> : <ShieldCheck className="h-3 w-3" />}
+          {approvalMode}
+        </button>
         <span className="text-neutral-600">session {sessionId.slice(0, 8)}</span>
       </div>
 

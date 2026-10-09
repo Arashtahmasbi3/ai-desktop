@@ -8,7 +8,7 @@ import type {
   ProviderId
 } from '@shared/types'
 import { DEFAULT_SELECTION, resolveSelection } from '@shared/selection'
-import type { ApprovalMode } from '@shared/approval'
+import type { ApprovalMode, ApprovalOutcome } from '@shared/approval'
 import type { OnboardingStatus } from '@shared/onboarding'
 import type { ChatSummary, StoredMessage } from '@shared/chat'
 import type { Locale } from './i18n/locale'
@@ -63,6 +63,9 @@ const TOKEN_SETTINGS_KEY = 'ai-desktop:show-token-count'
 const CHAT_TREE_KEY = 'ai-desktop:chat-tree-open'
 const LAST_CHAT_KEY = 'ai-desktop:last-chat'
 const AUTOSAVE_INTERVAL_MS = 30_000
+/** Full access auto-reverts to Ask after this much idle time (v2.3, B.2). */
+const FULL_ACCESS_TTL_MS = 30 * 60 * 1000
+let fullAccessTimer: ReturnType<typeof setTimeout> | null = null
 
 function newId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `id-${Math.random().toString(36).slice(2)}`
@@ -163,6 +166,10 @@ interface AppState {
   planMode: boolean
   /** Tool call awaiting the user's approval, if any. */
   pendingApproval: ApprovalRequest | null
+  /** A tool approved 3+ times; the UI suggests remembering it (v2.3, B.3). */
+  approvalSuggestion: { tool: string; count: number } | null
+  /** A "Deny & Explain" prompt to send once the current run settles. */
+  queuedExplain: string | null
   /** Agent file edits awaiting the user's apply/reject decision. */
   fileChanges: FileChangeView[]
   /** Transient toast notifications. */
@@ -192,7 +199,10 @@ interface AppState {
   setPlanMode: (value: boolean) => void
   setApprovalMode: (mode: ApprovalMode) => Promise<void>
   setPlanModeDefault: (value: boolean) => Promise<void>
-  respondApproval: (approved: boolean) => void
+  respondApproval: (answer: boolean | ApprovalOutcome) => void
+  rememberApprovalTool: (tool: string) => Promise<void>
+  dismissApprovalSuggestion: () => void
+  setRememberApprovalMode: (enabled: boolean) => Promise<void>
   applyFileChange: (id: string) => Promise<void>
   rejectFileChange: (id: string) => Promise<void>
   pushToast: (kind: ToastKind, message: string) => void
@@ -297,6 +307,8 @@ export const useStore = create<AppState>((set, get) => ({
   vpsServerId: undefined,
   planMode: false,
   pendingApproval: null,
+  approvalSuggestion: null,
+  queuedExplain: null,
   fileChanges: [],
   toasts: [],
   chatTreeOpen: readChatTreeOpen(),
@@ -364,15 +376,46 @@ export const useStore = create<AppState>((set, get) => ({
   setPlanMode: (value) => set({ planMode: value }),
   async setApprovalMode(mode) {
     set({ settings: await window.api.settings.setApprovalMode(mode) })
+    if (mode === 'full') {
+      if (fullAccessTimer) clearTimeout(fullAccessTimer)
+      fullAccessTimer = setTimeout(() => {
+        void get().setApprovalMode('ask')
+        get().pushToast('warning', 'Full access turned off after 30 minutes of inactivity.')
+      }, FULL_ACCESS_TTL_MS)
+      fullAccessTimer.unref?.()
+    } else if (fullAccessTimer) {
+      clearTimeout(fullAccessTimer)
+      fullAccessTimer = null
+    }
+  },
+  async setRememberApprovalMode(enabled) {
+    set({ settings: await window.api.settings.setRememberApprovalMode(enabled) })
   },
   async setPlanModeDefault(value) {
     set({ settings: await window.api.settings.setPlanModeDefault(value) })
   },
-  respondApproval(approved) {
+  respondApproval(answer) {
     const pending = get().pendingApproval
     if (!pending) return
+    const outcome: ApprovalOutcome =
+      typeof answer === 'boolean' ? { approved: answer } : answer
+    if (outcome.explain) {
+      set({
+        queuedExplain:
+          `You tried to ${pending.summary}, but I denied it. ` +
+          'Explain why you wanted to do that and propose a safer alternative.'
+      })
+    }
     set({ pendingApproval: null })
-    void window.api.agent.respondApproval(pending.id, approved)
+    void window.api.agent.respondApproval(pending.id, answer)
+  },
+  async rememberApprovalTool(tool) {
+    await window.api.agent.rememberApprovalTool(tool)
+    set({ approvalSuggestion: null })
+    get().pushToast('success', `Always allowing ${tool}.`)
+  },
+  dismissApprovalSuggestion() {
+    set({ approvalSuggestion: null })
   },
   async applyFileChange(id) {
     const ok = await window.api.agent.applyChange(id)
@@ -530,6 +573,13 @@ export const useStore = create<AppState>((set, get) => ({
       case 'approval:request':
         set({ pendingApproval: event.request })
         break
+      case 'approval:suggestion':
+        set({ approvalSuggestion: { tool: event.tool, count: event.count } })
+        get().pushToast(
+          'warning',
+          `You approved ${event.tool} ${event.count} times. Remember it to skip prompts?`
+        )
+        break
       case 'file:change':
         set({ fileChanges: [...get().fileChanges, event.change] })
         break
@@ -582,6 +632,11 @@ export const useStore = create<AppState>((set, get) => ({
           pendingApproval: null,
           messages
         })
+        const explain = get().queuedExplain
+        if (explain) {
+          set({ queuedExplain: null })
+          void get().send(explain)
+        }
         void get().persistChat()
         void get().refreshSessions()
         break
@@ -635,6 +690,7 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   newSession() {
+    const settings = get().settings
     set({
       sessionId: newId(),
       activeChatId: null,
@@ -646,9 +702,15 @@ export const useStore = create<AppState>((set, get) => ({
       currentRunId: null,
       error: null,
       pendingApproval: null,
+      approvalSuggestion: null,
+      queuedExplain: null,
       fileChanges: [],
       view: 'chat'
     })
+    // Full access is per-session unless the user asked to remember it.
+    if (settings?.approvalMode === 'full' && !settings.rememberApprovalMode) {
+      void get().setApprovalMode('ask')
+    }
   },
 
   async loadSession(id) {

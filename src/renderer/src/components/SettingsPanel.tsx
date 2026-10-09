@@ -12,12 +12,14 @@ import {
   Server,
   Search,
   Settings2,
+  ShieldCheck,
   Trash2,
   X
 } from 'lucide-react'
 import { PROVIDERS, PROVIDER_IDS } from '@shared/providers'
 import type { ProviderId } from '@shared/types'
 import type { VpsConnectionState, VpsServerView } from '@shared/vps'
+import type { ApprovedCommandView } from '@shared/approval'
 import { SUPPORTED_LOCALES } from '../i18n/locale'
 import { useStore } from '../store'
 import CustomProvidersSection from './CustomProvidersSection'
@@ -54,6 +56,7 @@ export default function SettingsPanel(): JSX.Element | null {
   const showTokenCount = useStore((state) => state.showTokenCount)
   const setShowTokenCount = useStore((state) => state.setShowTokenCount)
   const setApprovalMode = useStore((state) => state.setApprovalMode)
+  const setRememberApprovalMode = useStore((state) => state.setRememberApprovalMode)
   const setPlanModeDefault = useStore((state) => state.setPlanModeDefault)
   const setView = useStore((state) => state.setView)
 
@@ -515,9 +518,9 @@ export default function SettingsPanel(): JSX.Element | null {
                   </div>
                   {(
                     [
-                      ['auto', 'settings.approvalAuto'],
-                      ['dangerous', 'settings.approvalDangerous'],
-                      ['writes', 'settings.approvalWrites']
+                      ['ask', 'settings.approvalAsk'],
+                      ['auto-write', 'settings.approvalAutoWrite'],
+                      ['full', 'settings.approvalFull']
                     ] as const
                   ).map(([value, labelKey]) => (
                     <label
@@ -527,14 +530,26 @@ export default function SettingsPanel(): JSX.Element | null {
                       <input
                         type="radio"
                         name="approval-mode"
-                        checked={(settings?.approvalMode ?? 'dangerous') === value}
+                        checked={(settings?.approvalMode ?? 'ask') === value}
                         onChange={() => void setApprovalMode(value)}
                         className="accent-accent"
                       />
                       {t(labelKey)}
                     </label>
                   ))}
+                  <label className="flex cursor-pointer items-center gap-2 text-xs text-neutral-300">
+                    <input
+                      type="checkbox"
+                      checked={settings?.rememberApprovalMode ?? false}
+                      onChange={(event) => void setRememberApprovalMode(event.target.checked)}
+                      className="accent-accent"
+                    />
+                    {t('settings.rememberApprovalMode')}
+                  </label>
                 </div>
+
+                <ApprovedCommandsSection />
+                <p className="text-[11px] text-neutral-600">AI Desktop v2.3.0</p>
 
                 <label className="flex cursor-pointer items-center gap-2 text-xs text-neutral-300">
                   <input
@@ -546,12 +561,67 @@ export default function SettingsPanel(): JSX.Element | null {
                   {t('settings.planModeDefault')}
                 </label>
 
-                <p className="text-[11px] text-neutral-600">AI Desktop v2.2.0</p>
               </section>
             ) : null}
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+function ApprovedCommandsSection(): JSX.Element {
+  const { t } = useTranslation()
+  const [items, setItems] = useState<ApprovedCommandView[]>([])
+
+  const refresh = async (): Promise<void> => {
+    try {
+      setItems(await window.api.agent.approvedCommands())
+    } catch {
+      setItems([])
+    }
+  }
+
+  useEffect(() => {
+    void refresh()
+  }, [])
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-border bg-bg-primary p-3">
+      <div>
+        <p className="flex items-center gap-1.5 text-xs font-medium text-neutral-200">
+          <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+          {t('settings.approvedCommands')}
+        </p>
+        <p className="mt-0.5 text-[11px] text-neutral-500">
+          {t('settings.approvedCommandsHint')}
+        </p>
+      </div>
+      {items.length === 0 ? (
+        <p className="text-[11px] text-neutral-600">{t('settings.approvedCommandsEmpty')}</p>
+      ) : (
+        <ul className="flex flex-col gap-1">
+          {items.map((item) => (
+            <li
+              key={item.id}
+              className="flex items-center justify-between gap-2 rounded border border-border bg-bg-secondary px-2 py-1 text-[11px] text-neutral-300"
+            >
+              <span className="truncate" dir="ltr">
+                {item.label}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  void window.api.agent.revokeApprovedCommand(item.id).then(refresh)
+                }}
+                className="shrink-0 rounded px-1.5 py-0.5 text-neutral-500 hover:bg-bg-tertiary hover:text-red-400"
+              >
+                {t('settings.revoke')}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }

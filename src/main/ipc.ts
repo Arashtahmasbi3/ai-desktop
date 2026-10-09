@@ -1,6 +1,6 @@
 import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import type { CustomProviderInput, ProviderId } from '@shared/types'
-import type { ApprovalMode } from '@shared/approval'
+import type { ApprovalMode, ApprovalOutcome } from '@shared/approval'
 import type { GitCommitInput } from '@shared/github'
 import type { AgentRunRequest, WorkerJobRequest } from '@shared/ui'
 import type { AppServices } from './app-services'
@@ -95,6 +95,13 @@ export function registerIpc(services: AppServices, getWindow: () => BrowserWindo
       'settings:setPlanModeDefault',
       async (enabled: boolean) => {
         await services.persistence.setPlanModeDefault(enabled)
+        return changed()
+      }
+    ],
+    [
+      'settings:setRememberApprovalMode',
+      async (enabled: boolean) => {
+        await services.persistence.setRememberApprovalMode(enabled)
         return changed()
       }
     ],
@@ -231,7 +238,11 @@ export function registerIpc(services: AppServices, getWindow: () => BrowserWindo
 
     ['agent:run', (request: AgentRunRequest) => services.agent.run(request)],
     ['agent:abort', () => services.agent.abort()],
-    ['agent:respondApproval', (id: string, approved: boolean) => services.approvals.resolve(id, approved)],
+    ['agent:respondApproval', (id: string, answer: boolean | ApprovalOutcome) => services.approvals.resolve(id, answer)],
+    ['agent:approvalHistory', () => services.approvals.history()],
+    ['agent:approvedCommands', () => services.approvedCommands.list()],
+    ['agent:revokeApprovedCommand', (id: string) => services.approvedCommands.revoke(id)],
+    ['agent:rememberApprovalTool', (tool: string) => services.approvedCommands.rememberTool(tool)],
     ['agent:applyChange', (id: string) => services.agent.applyChange(id)],
     ['shell:exec', (command: string) => runLocalCommand(command, { cwd: services.files.getRoot() })],
     ['search:code', (query: string) => {

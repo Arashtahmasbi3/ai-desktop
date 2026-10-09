@@ -20,7 +20,10 @@ import { RemoteShellToolExecutor } from '@core/tools/remote-shell-executor'
 import { REMOTE_FS_TOOLS, type RemoteFsDeps } from '@core/tools/remote-fs-tools'
 import { RemoteFsToolExecutor } from '@core/tools/remote-fs-executor'
 import { CompositeToolExecutor, type ToolRoute } from '@core/tools/composite-executor'
-import { DEFAULT_APPROVAL_MODE, requiresApproval } from '@core/agent/approval'
+import { DEFAULT_APPROVAL_MODE } from '@core/agent/approval'
+import { createApprovalGate } from './approval-gate'
+import type { ApprovalOutcome } from '@shared/approval'
+import type { ApprovedCommands } from '@core/agent/approved-commands'
 import type { Persistence } from '@core/agent/persistence'
 import type { SessionStore } from '@core/agent/session-store'
 import type { SandboxManager } from '@shared/sandbox'
@@ -160,9 +163,11 @@ export interface AgentServiceOptions {
   /** Optional: enables the `remote_shell` / remote-fs tools against connected VPS servers. */
   vps?: RemoteHost
   /** Ask the user to approve a tool call (Approval Modes). Defaults to allow. */
-  requestApproval?: (runId: string, action: AgentAction) => Promise<boolean>
+  requestApproval?: (runId: string, action: AgentAction) => Promise<ApprovalOutcome>
   /** Deny any outstanding approval requests (e.g. the user aborted). */
   cancelApprovals?: () => void
+  /** Learned approvals that suppress future prompts (Sprint v2.3, B.3). */
+  approvedCommands?: ApprovedCommands
   /** Optional: enables chat review of agent edits (apply/reject). */
   files?: ProjectFiles
 }
@@ -198,8 +203,9 @@ export class AgentService {
   private readonly now: () => number
   private readonly customProviders?: CustomProviderStore
   private readonly vps?: RemoteHost
-  private readonly requestApproval?: (runId: string, action: AgentAction) => Promise<boolean>
+  private readonly requestApproval?: (runId: string, action: AgentAction) => Promise<ApprovalOutcome>
   private readonly cancelApprovals?: () => void
+  private readonly approvedCommands?: ApprovedCommands
   private readonly files?: ProjectFiles
   private readonly controllers = new Set<AbortController>()
   private readonly changes = new Map<string, FileChangeView>()
@@ -216,6 +222,7 @@ export class AgentService {
     if (options.vps) this.vps = options.vps
     this.requestApproval = options.requestApproval
     this.cancelApprovals = options.cancelApprovals
+    if (options.approvedCommands) this.approvedCommands = options.approvedCommands
     if (options.files) this.files = options.files
   }
 
@@ -337,10 +344,13 @@ export class AgentService {
     const planMode = request.planMode ?? settings.planModeDefault ?? false
     const requestApproval = this.requestApproval
     const approvalGate = requestApproval
-      ? async (action: AgentAction): Promise<boolean> => {
-          if (!requiresApproval(approvalMode, action)) return true
-          return requestApproval(runId, action)
-        }
+      ? createApprovalGate({
+          mode: approvalMode,
+          ...(this.approvedCommands ? { approvedCommands: this.approvedCommands } : {}),
+          ...(request.sessionId ? { sessionId: request.sessionId } : {}),
+          requestApproval: (action) => requestApproval(runId, action),
+          onSuggestion: (tool, count) => this.emit({ type: 'approval:suggestion', tool, count })
+        })
       : undefined
 
     const orchestrator = new AgentOrchestrator({

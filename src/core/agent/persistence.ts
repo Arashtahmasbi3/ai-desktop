@@ -4,7 +4,7 @@ import { dirname, isAbsolute, join, normalize, resolve } from 'node:path'
 import { homedir } from 'node:os'
 import type { ProviderId } from '@shared/types'
 import { isWindowsAbsolutePath } from '@shared/paths'
-import { isApprovalMode, type ApprovalMode } from '@shared/approval'
+import { coerceApprovalMode, type ApprovalMode } from '@shared/approval'
 
 /** Current on-disk settings schema version. */
 export const SETTINGS_SCHEMA_VERSION = 2
@@ -44,6 +44,8 @@ export interface AppSettings {
   approvalMode?: ApprovalMode
   /** Start new chats in Plan Mode by default (v2). */
   planModeDefault?: boolean
+  /** Keep the chosen approval mode across restarts instead of resetting to Ask (v2.3). */
+  rememberApprovalMode?: boolean
   updatedAt: number
 }
 
@@ -156,8 +158,12 @@ export async function migrateSettings(
   const next: AppSettings = emptySettings(now)
 
   const applyPrefs = (settings: AppSettings): void => {
-    if (isApprovalMode(raw.approvalMode)) settings.approvalMode = raw.approvalMode
+    const mode = coerceApprovalMode(raw.approvalMode)
+    if (mode) settings.approvalMode = mode
     if (typeof raw.planModeDefault === 'boolean') settings.planModeDefault = raw.planModeDefault
+    if (typeof raw.rememberApprovalMode === 'boolean') {
+      settings.rememberApprovalMode = raw.rememberApprovalMode
+    }
   }
 
   if (version < 1) {
@@ -220,6 +226,7 @@ export interface RedactedSettings {
   projects: ProjectRecord[]
   approvalMode?: ApprovalMode
   planModeDefault?: boolean
+  rememberApprovalMode?: boolean
 }
 
 /**
@@ -299,6 +306,9 @@ export class Persistence {
       ...(this.settings.approvalMode ? { approvalMode: this.settings.approvalMode } : {}),
       ...(this.settings.planModeDefault !== undefined
         ? { planModeDefault: this.settings.planModeDefault }
+        : {}),
+      ...(this.settings.rememberApprovalMode !== undefined
+        ? { rememberApprovalMode: this.settings.rememberApprovalMode }
         : {})
     }
   }
@@ -359,6 +369,12 @@ export class Persistence {
   async setPlanModeDefault(enabled: boolean): Promise<void> {
     await this.load()
     this.settings.planModeDefault = enabled
+    await this.persist()
+  }
+
+  async setRememberApprovalMode(enabled: boolean): Promise<void> {
+    await this.load()
+    this.settings.rememberApprovalMode = enabled
     await this.persist()
   }
 

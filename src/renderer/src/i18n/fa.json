@@ -112,7 +112,22 @@
     "rejectAll": "رد همه",
     "emptyWelcomeProject": "در حال کار در {project}",
     "emptyTagline": "از من بخواه کد بنویسم، دستور اجرا کنم یا پروژه را بررسی کنم.",
-    "noWorkspaceWarning": "هیچ پوشه کاری باز نیست. قبل از اجرای ابزارها یک پروژه باز کنید تا Agent جای امنی برای کار داشته باشد."
+    "noWorkspaceWarning": "هیچ پوشه کاری باز نیست. قبل از اجرای ابزارها یک پروژه باز کنید تا Agent جای امنی برای کار داشته باشد.",
+    "approvalDenyExplain": "رد و توضیح",
+    "approvalAlwaysButton": "همیشه مجاز کن",
+    "approvalDangerous": "این دستور در فهرست ممنوعه است و همیشه نیاز به تأیید دارد.",
+    "approvalWorkingDir": "پوشه کاری",
+    "approvalServer": "سرور",
+    "approvalKindRead": "خواندن",
+    "approvalKindWrite": "نوشتن",
+    "approvalKindShell": "دستور",
+    "approvalHistoryEmpty": "هنوز تأییدی نیست.",
+    "rememberSuggestion": "«{{tool}}» را به خاطر بسپار تا این پرسش‌ها رد شود؟",
+    "fullAccessRemember": "به خاطر بسپار",
+    "fullAccessTurnOff": "خاموش کن",
+    "approvalRememberCommand": "این دستور را به خاطر بسپار",
+    "approvalRememberTool": "همه دستورهای این ابزار را به خاطر بسپار",
+    "approvalApproveAll": "تأیید همه (این نشست)"
   },
   "vpsSelector": {
     "label": "VPS",
@@ -159,7 +174,15 @@
     "approvalDangerous": "قبل از دستورات شل بپرس",
     "approvalWrites": "قبل از هر نوشتن بپرس",
     "approvalHint": "تعیین می‌کند عامل چه زمانی قبل از اجرای ابزار برای تأیید متوقف شود.",
-    "planModeDefault": "شروع گفتگوهای جدید در حالت برنامه‌ریزی"
+    "planModeDefault": "شروع گفتگوهای جدید در حالت برنامه‌ریزی",
+    "approvalAsk": "پرسیدن — تأیید همه فراخوانی‌های ابزار",
+    "approvalAutoWrite": "نوشتن خودکار — پرسیدن قبل از نوشتن و دستورها",
+    "approvalFull": "دسترسی کامل — اجرای همه‌چیز",
+    "rememberApprovalMode": "حالت تأیید را بین اجراها به خاطر بسپار",
+    "approvedCommands": "دستورهای تأییدشده",
+    "approvedCommandsHint": "کارهایی که همیشه مجاز کرده‌اید. برای پرسیدن دوباره یکی را لغو کنید.",
+    "approvedCommandsEmpty": "هیچ تأیید ذخیره‌شده‌ای نیست.",
+    "revoke": "لغو"
   },
   "toast": {
     "dismiss": "بستن",
