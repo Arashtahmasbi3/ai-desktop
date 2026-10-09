@@ -13,7 +13,7 @@ export interface ToolExecutor {
   execute(action: AgentAction, options?: ToolExecOptions): Promise<AgentToolResult>
 }
 
-const DEFAULT_COMMAND_TIMEOUT_MS = 30_000
+const DEFAULT_COMMAND_TIMEOUT_MS = 60_000
 
 /** Tools exposed to the model. They map 1:1 onto SandboxManager capabilities. */
 export const SANDBOX_TOOLS: ToolDefinition[] = [

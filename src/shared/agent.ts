@@ -60,7 +60,12 @@ export interface AgentStep {
   productive: boolean
 }
 
-export type LoopWarningKind = 'repeated_action' | 'no_progress'
+export type LoopWarningKind =
+  | 'repeated_action'
+  | 'no_progress'
+  | 'failure_streak'
+  | 'reasoning_loop'
+  | 'turn_timeout'
 
 export interface LoopWarning {
   kind: LoopWarningKind
@@ -70,16 +75,42 @@ export interface LoopWarning {
   message: string
 }
 
+/** Why a run was stopped early because it looked stuck. */
+export type LoopStopReason = LoopWarningKind
+
+export interface LoopStopInfo {
+  reason: LoopStopReason
+  message: string
+  /** Recent actions (tool name + short args) so the user can see what happened. */
+  recentActions: string[]
+}
+
 export interface LoopDetectionPolicy {
   /** Warn when a single identical action is seen more than this many times. */
   repeatedActionThreshold: number
+  /** Stop the run when a single identical action is seen at least this many times. */
+  repeatedStopThreshold: number
+  /** Stop after this many consecutive steps whose actions all failed. */
+  failureThreshold: number
+  /** Stop when the model repeats the same reasoning with no new action this many steps. */
+  reasoningThreshold: number
   /** Ask the user when this many consecutive steps make no progress. */
   noProgressThreshold: number
+  /** Number of recent action signatures retained for loop analysis. */
+  windowSize: number
+  /** Stop a run that exceeds this wall-clock budget (ms). 0 disables it. */
+  turnTimeoutMs: number
 }
 
 export const DEFAULT_LOOP_POLICY: LoopDetectionPolicy = {
-  repeatedActionThreshold: 3,
-  noProgressThreshold: 5
+  // Warns on the 3rd identical action, stops on the 5th.
+  repeatedActionThreshold: 2,
+  repeatedStopThreshold: 5,
+  failureThreshold: 3,
+  reasoningThreshold: 2,
+  noProgressThreshold: 5,
+  windowSize: 10,
+  turnTimeoutMs: 5 * 60 * 1000
 }
 
 export interface AgentRunResult {
@@ -92,6 +123,8 @@ export interface AgentRunResult {
   message: string | null
   sandboxId: string | null
   warnings: LoopWarning[]
+  /** Set when the run stopped early because it looked stuck. */
+  stop?: LoopStopInfo
   usage?: Usage
   startedAt: number
   finishedAt: number

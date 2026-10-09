@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { AgentLogEntry } from '@shared/agent'
-import type { LoopWarning } from '@shared/agent'
+import type { LoopStopInfo, LoopWarning } from '@shared/agent'
 import type {
   CustomProviderInput,
   CustomProviderTestResult,
@@ -121,6 +121,8 @@ interface AppState {
   sessionId: string
   logs: AgentLogEntry[]
   warnings: LoopWarning[]
+  /** Set when the last run stopped early because the agent looked stuck. */
+  loopStop: LoopStopInfo | null
   sessions: SessionInfo[]
 
   entries: FileEntry[]
@@ -240,6 +242,7 @@ interface AppState {
   setActiveProvider: (provider: ProviderId) => Promise<void>
 
   clearError: () => void
+  dismissLoopStop: () => void
 }
 
 let autosaveTimer: ReturnType<typeof setInterval> | null = null
@@ -264,6 +267,7 @@ export const useStore = create<AppState>((set, get) => ({
   sessionId: newId(),
   logs: [],
   warnings: [],
+  loopStop: null,
   sessions: [],
 
   entries: [],
@@ -501,7 +505,14 @@ export const useStore = create<AppState>((set, get) => ({
   applyEvent(event) {
     switch (event.type) {
       case 'run:start':
-        set({ running: true, currentRunId: event.runId, error: null, logs: [], pendingApproval: null })
+        set({
+          running: true,
+          currentRunId: event.runId,
+          error: null,
+          logs: [],
+          pendingApproval: null,
+          loopStop: null
+        })
         break
       case 'approval:request':
         set({ pendingApproval: event.request })
@@ -554,6 +565,7 @@ export const useStore = create<AppState>((set, get) => ({
           running: false,
           currentRunId: null,
           warnings: event.warnings,
+          loopStop: event.stop ?? null,
           pendingApproval: null,
           messages
         })
@@ -567,6 +579,7 @@ export const useStore = create<AppState>((set, get) => ({
           currentRunId: null,
           pendingApproval: null,
           error: event.message,
+          loopStop: null,
           messages: [
             ...get().messages,
             { id: newId(), role: 'system', content: `Error: ${event.message}`, at: Date.now() }
@@ -615,6 +628,7 @@ export const useStore = create<AppState>((set, get) => ({
       messages: [],
       logs: [],
       warnings: [],
+      loopStop: null,
       running: false,
       currentRunId: null,
       error: null,
@@ -644,6 +658,7 @@ export const useStore = create<AppState>((set, get) => ({
         })),
       logs: [],
       warnings: [],
+      loopStop: null,
       view: 'chat'
     })
   },
@@ -768,7 +783,8 @@ export const useStore = create<AppState>((set, get) => ({
     set({ settings: await window.api.settings.setActiveProvider(provider) })
   },
 
-  clearError: () => set({ error: null })
+  clearError: () => set({ error: null }),
+  dismissLoopStop: () => set({ loopStop: null })
 }))
 
 let unsubscribe: (() => void) | null = null

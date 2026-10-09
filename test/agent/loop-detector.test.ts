@@ -66,4 +66,105 @@ describe('LoopDetector', () => {
     expect(detector.noProgressSteps).toBe(0)
     expect(detector.observe({ signatures: ['a'], productive: false }).warnings).toHaveLength(0)
   })
+
+  it('warns on the 3rd identical action and stops on the 5th (sliding window)', () => {
+    const detector = new LoopDetector({ noProgressThreshold: 100, windowSize: 10 })
+    const events = [1, 2, 3, 4, 5].map(() =>
+      detector.observe({ signatures: ['run_command:{"command":"ls"}'], productive: false })
+    )
+
+    const third = events[2]
+    expect(third.warnings.map((w) => w.kind)).toContain('repeated_action')
+    expect(third.stop).toBe(false)
+
+    const fourth = events[3]
+    expect(fourth.stop).toBe(false)
+
+    const fifth = events[4]
+    expect(fifth.stop).toBe(true)
+    expect(fifth.stopReason).toBe('repeated_action')
+    expect(detector.isStopped).toBe(true)
+  })
+
+  it('keeps only the last N signatures in the sliding window', () => {
+    const detector = new LoopDetector({ noProgressThreshold: 100, windowSize: 3, repeatedStopThreshold: 99 })
+    for (const sig of ['a', 'b', 'c', 'd', 'e']) {
+      detector.observe({ signatures: [sig], productive: false })
+    }
+    expect(detector.windowSize).toBe(3)
+  })
+
+  it('stops after 3 consecutive steps with failing actions', () => {
+    const detector = new LoopDetector({
+      repeatedActionThreshold: 100,
+      noProgressThreshold: 100,
+      failureThreshold: 3
+    })
+    const first = detector.observe({ signatures: ['a'], productive: false, failures: 1 })
+    const second = detector.observe({ signatures: ['b'], productive: false, failures: 2 })
+    const third = detector.observe({ signatures: ['c'], productive: false, failures: 1 })
+
+    expect(first.stop).toBe(false)
+    expect(second.stop).toBe(false)
+    expect(third.stop).toBe(true)
+    expect(third.stopReason).toBe('failure_streak')
+    expect(third.warnings.map((w) => w.kind)).toContain('failure_streak')
+  })
+
+  it('clears the failure streak after a step with no failures', () => {
+    const detector = new LoopDetector({
+      repeatedActionThreshold: 100,
+      noProgressThreshold: 100,
+      failureThreshold: 3
+    })
+    detector.observe({ signatures: ['a'], productive: false, failures: 1 })
+    detector.observe({ signatures: ['b'], productive: false, failures: 0 })
+    const result = detector.observe({ signatures: ['c'], productive: false, failures: 1 })
+    expect(result.stop).toBe(false)
+  })
+
+  it('stops when the same reasoning repeats without a new action', () => {
+    const detector = new LoopDetector({
+      repeatedActionThreshold: 100,
+      noProgressThreshold: 100,
+      reasoningThreshold: 2
+    })
+    const first = detector.observe({
+      signatures: ['read_file:{}'],
+      productive: false,
+      newAction: false,
+      reasoningSignature: 'let me try reading the file'
+    })
+    const second = detector.observe({
+      signatures: ['read_file:{}'],
+      productive: false,
+      newAction: false,
+      reasoningSignature: 'let me try reading the file'
+    })
+
+    expect(first.stop).toBe(false)
+    expect(second.stop).toBe(true)
+    expect(second.stopReason).toBe('reasoning_loop')
+  })
+
+  it('does not flag a reasoning loop when a new action is taken', () => {
+    const detector = new LoopDetector({
+      repeatedActionThreshold: 100,
+      noProgressThreshold: 100,
+      reasoningThreshold: 2
+    })
+    detector.observe({
+      signatures: ['a'],
+      productive: true,
+      newAction: true,
+      reasoningSignature: 'same text'
+    })
+    const result = detector.observe({
+      signatures: ['b'],
+      productive: true,
+      newAction: true,
+      reasoningSignature: 'same text'
+    })
+    expect(result.stop).toBe(false)
+  })
 })

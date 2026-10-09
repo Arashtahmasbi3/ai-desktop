@@ -1,4 +1,4 @@
-import type { AgentLogEntry, AgentStatus, LoopWarning } from './agent'
+import type { AgentLogEntry, AgentStatus, LoopStopInfo, LoopWarning } from './agent'
 import type { ChatMessage, ProviderId } from './types'
 import type { VpsConnectionState } from './vps'
 import type { ApprovalMode } from './approval'
@@ -136,6 +136,8 @@ export type AgentEvent =
       finalAnswer: string | null
       message: string | null
       warnings: LoopWarning[]
+      /** Set when the run stopped early because it looked stuck. */
+      stop?: LoopStopInfo
       /** Provider/model that actually served the primary call (after fallback). */
       provider?: ProviderId
       model?: string

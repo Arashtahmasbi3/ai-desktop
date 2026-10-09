@@ -377,6 +377,7 @@ export class AgentService {
         finalAnswer: result.finalAnswer,
         message: result.message,
         warnings: result.warnings,
+        ...(result.stop ? { stop: result.stop } : {}),
         provider: providers[0].provider,
         model: providers[0].config.model,
         at: this.now()

@@ -21,6 +21,7 @@ import TerminalPanel from './TerminalPanel'
 import ModelSwitcher from './ModelSwitcher'
 import VpsSelector from './VpsSelector'
 import ProviderWarning from './ProviderWarning'
+import LoopStopCard from './LoopStopCard'
 import { filterSlashCommands, resolveSlashCommand } from '../lib/slash'
 import { contextBudget, estimateTokens } from '@shared/memory'
 
@@ -50,6 +51,8 @@ export default function ChatPanel(): JSX.Element {
   const setPlanMode = useStore((state) => state.setPlanMode)
   const pendingApproval = useStore((state) => state.pendingApproval)
   const respondApproval = useStore((state) => state.respondApproval)
+  const loopStop = useStore((state) => state.loopStop)
+  const dismissLoopStop = useStore((state) => state.dismissLoopStop)
   const fileChanges = useStore((state) => state.fileChanges)
   const applyFileChange = useStore((state) => state.applyFileChange)
   const rejectFileChange = useStore((state) => state.rejectFileChange)
@@ -284,6 +287,21 @@ export default function ChatPanel(): JSX.Element {
             <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" />
             {t('chat.typing')}
           </div>
+        ) : null}
+
+        {loopStop && !running ? (
+          <LoopStopCard
+            stop={loopStop}
+            onContinue={() => {
+              dismissLoopStop()
+              void send(t('chat.loopStopContinuePrompt'))
+            }}
+            onCorrect={() => {
+              dismissLoopStop()
+              requestAnimationFrame(() => textareaRef.current?.focus())
+            }}
+            onStop={dismissLoopStop}
+          />
         ) : null}
       </div>
 
