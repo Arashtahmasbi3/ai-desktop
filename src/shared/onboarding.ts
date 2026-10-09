@@ -19,7 +19,7 @@ export const USE_CASES: UseCase[] = ['quick', 'balanced', 'powerful']
 const RECOMMENDATIONS: Record<UseCase, ModelRecommendation> = {
   quick: {
     provider: 'deepseek',
-    model: 'deepseek-chat',
+    model: 'deepseek-v4-flash',
     reason: 'Fast and inexpensive for everyday chat.'
   },
   balanced: {

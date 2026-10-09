@@ -1,6 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { CUSTOM_MODEL_SUGGESTIONS, MODEL_CATALOG, MODEL_TAGS } from '@shared/models'
+import {
+  CUSTOM_MODEL_SUGGESTIONS,
+  MODEL_CATALOG,
+  MODEL_TAGS,
+  findCatalogModel,
+  isDeprecatedModel,
+  migrationTargetFor
+} from '@shared/models'
 import { PROVIDERS, PROVIDER_IDS } from '@shared/providers'
+import { DEFAULT_SELECTION } from '@shared/selection'
 import type { ProviderId } from '@shared/types'
 
 const REQUIRED: ProviderId[] = ['openai', 'anthropic', 'deepseek', 'google']
@@ -57,5 +65,47 @@ describe('PROVIDERS (derived)', () => {
         group.models.map((model) => model.id)
       )
     }
+  })
+})
+
+describe('DeepSeek V4 catalog (Task A.3)', () => {
+  const deepseek = MODEL_CATALOG.find((group) => group.provider === 'deepseek')
+
+  it('1. lists both V4 models and both legacy models', () => {
+    const ids = deepseek?.models.map((model) => model.id) ?? []
+    expect(ids).toContain('deepseek-v4-flash')
+    expect(ids).toContain('deepseek-v4-pro')
+    expect(ids).toContain('deepseek-chat')
+    expect(ids).toContain('deepseek-reasoner')
+    expect(ids).toHaveLength(4)
+  })
+
+  it('2. marks the legacy models deprecated and V4 current', () => {
+    expect(isDeprecatedModel('deepseek', 'deepseek-chat')).toBe(true)
+    expect(isDeprecatedModel('deepseek', 'deepseek-reasoner')).toBe(true)
+    expect(isDeprecatedModel('deepseek', 'deepseek-v4-flash')).toBe(false)
+    expect(isDeprecatedModel('deepseek', 'deepseek-v4-pro')).toBe(false)
+  })
+
+  it('3. suggests a migration target for each legacy model', () => {
+    expect(migrationTargetFor('deepseek', 'deepseek-chat')).toBe('deepseek-v4-flash')
+    expect(migrationTargetFor('deepseek', 'deepseek-reasoner')).toBe('deepseek-v4-pro')
+    expect(migrationTargetFor('deepseek', 'deepseek-v4-flash')).toBeUndefined()
+  })
+
+  it('4. defaults DeepSeek to V4 Flash', () => {
+    expect(deepseek?.defaultModel).toBe('deepseek-v4-flash')
+    expect(PROVIDERS.deepseek.defaultModel).toBe('deepseek-v4-flash')
+    expect(DEFAULT_SELECTION).toEqual({ provider: 'deepseek', model: 'deepseek-v4-flash' })
+  })
+
+  it('5. exposes the 128k context window on the V4 models', () => {
+    expect(findCatalogModel('deepseek', 'deepseek-v4-flash')?.contextWindow).toBe(128_000)
+    expect(findCatalogModel('deepseek', 'deepseek-v4-pro')?.contextWindow).toBe(128_000)
+  })
+
+  it('6. returns undefined for an unknown provider/model', () => {
+    expect(findCatalogModel('deepseek', 'deepseek-v9-ghost')).toBeUndefined()
+    expect(isDeprecatedModel('deepseek', 'deepseek-v9-ghost')).toBe(false)
   })
 })

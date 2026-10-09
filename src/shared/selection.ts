@@ -2,7 +2,7 @@ import { PROVIDERS } from './providers'
 import type { ModelSelection, SettingsView } from './ui'
 
 /** Fallback when no provider/key has been configured yet. */
-export const DEFAULT_SELECTION: ModelSelection = { provider: 'deepseek', model: 'deepseek-chat' }
+export const DEFAULT_SELECTION: ModelSelection = { provider: 'deepseek', model: 'deepseek-v4-flash' }
 
 /**
  * Derive the initial model selection from the persisted settings: prefer the
