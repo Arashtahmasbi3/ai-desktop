@@ -61,6 +61,8 @@ const MAX_LOGS = 500
 const MAX_TERMINAL_LINES = 500
 const TOKEN_SETTINGS_KEY = 'ai-desktop:show-token-count'
 const CHAT_TREE_KEY = 'ai-desktop:chat-tree-open'
+const LAST_CHAT_KEY = 'ai-desktop:last-chat'
+const AUTOSAVE_INTERVAL_MS = 30_000
 
 function newId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `id-${Math.random().toString(36).slice(2)}`
@@ -79,6 +81,22 @@ function readChatTreeOpen(): boolean {
     return globalThis.localStorage?.getItem(CHAT_TREE_KEY) === '1'
   } catch {
     return false
+  }
+}
+
+function readLastChatId(): string | null {
+  try {
+    return globalThis.localStorage?.getItem(LAST_CHAT_KEY)
+  } catch {
+    return null
+  }
+}
+
+function rememberChatId(id: string): void {
+  try {
+    globalThis.localStorage?.setItem(LAST_CHAT_KEY, id)
+  } catch {
+    // Best-effort: forgetting the last chat only skips restore.
   }
 }
 
@@ -222,6 +240,16 @@ interface AppState {
   setActiveProvider: (provider: ProviderId) => Promise<void>
 
   clearError: () => void
+}
+
+let autosaveTimer: ReturnType<typeof setInterval> | null = null
+
+function startAutosave(get: () => AppState): void {
+  if (autosaveTimer || typeof setInterval !== 'function') return
+  autosaveTimer = setInterval(() => {
+    const state = get()
+    if (state.messages.length > 0) void state.persistChat()
+  }, AUTOSAVE_INTERVAL_MS)
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -391,6 +419,7 @@ export const useStore = create<AppState>((set, get) => ({
         ...(workspaceId ? { workspaceId } : {})
       })
       set({ activeChatId: chat.id })
+      rememberChatId(chat.id)
       await get().refreshChats()
     } catch (error) {
       set({ error: error instanceof Error ? error.message : String(error) })
@@ -433,6 +462,14 @@ export const useStore = create<AppState>((set, get) => ({
       })
       await get().refreshFiles()
       await get().refreshSessions()
+
+      // Resume where the user left off, then keep the open chat saved so a
+      // crash mid-run does not lose the conversation.
+      const lastChatId = readLastChatId()
+      if (lastChatId && chats.some((chat) => chat.id === lastChatId) && get().messages.length === 0) {
+        await get().loadSession(lastChatId)
+      }
+      startAutosave(get)
     } catch (error) {
       set({ error: error instanceof Error ? error.message : String(error), ready: true })
     }
@@ -590,6 +627,7 @@ export const useStore = create<AppState>((set, get) => ({
   async loadSession(id) {
     const record = await window.api.chats.load(id)
     if (!record) return
+    rememberChatId(id)
     set({
       sessionId: id,
       activeChatId: id,

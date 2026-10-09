@@ -483,3 +483,17 @@ Autonomous decisions logged per the sprint's golden rule (`[AUTO-DECISION]`, no 
   each pending edit as a collapsible split diff (`FileChangeCard` + `DiffViewer`) with **Apply** / **Reject**.
   Rationale: applying to the project is an explicit, user-initiated action, so agent writes can never touch real
   files without consent — safer than pointing the sandbox at the project.
+- `[AUTO-DECISION]` **Chat file tree + terminal (Tasks D/E).** The chat header gains two toggles: a file tree
+  (`FileExplorer` rendered in an aside, preference persisted in `localStorage`) and a local terminal panel.
+  The terminal is **one-shot, not a PTY**: `shell:exec` runs a command via `child_process.exec` with a 30s timeout,
+  a 4MB cap and `cwd` = the active project root (`src/main/local-shell.ts`), keeping history/clear/close in the UI.
+  Chose one-shot exec over a PTY because it reuses the existing IPC/typed boundary and avoids vending a raw shell.
+- `[AUTO-DECISION]` **Codebase search (Task F).** `Ctrl+Shift+F` opens a modal backed by `search:code` →
+  `src/main/project-search.ts`, a literal case-insensitive walker that skips `node_modules`/`.git`/build dirs,
+  caps files (5k), file size (512KB) and results (200). Clicking a hit opens it in the code viewer.
+- `[AUTO-DECISION]` **Session restore (Task G).** The active chat id is remembered in `localStorage`; `init()`
+  restores the most recent chat after a restart, and a 30s interval autosaves the open conversation
+  (`persistChat`) so a crash mid-run does not lose messages.
+- `[AUTO-DECISION]` **Keyboard shortcuts (Task H).** Existing: `Ctrl+K/P` palette, `Ctrl+B` sidebar, `Ctrl+N` new
+  chat, `Ctrl+,` settings, `Ctrl+1..6` views. Added: `Ctrl+Shift+F` search, `Ctrl+Shift+E` file tree,
+  `Ctrl+Shift+T`/`` Ctrl+` `` terminal, `Ctrl+S` save the open file, and `Esc` now also closes the search modal.

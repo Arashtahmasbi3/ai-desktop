@@ -51,6 +51,23 @@ export default function App(): JSX.Element {
         state.setSearchOpen(true)
         return
       }
+      if (event.ctrlKey && event.shiftKey && (event.key === 'e' || event.key === 'E')) {
+        event.preventDefault()
+        state.toggleChatTree()
+        return
+      }
+      if (event.ctrlKey && event.shiftKey && (event.key === 't' || event.key === 'T')) {
+        event.preventDefault()
+        state.toggleTerminal()
+        return
+      }
+      if (event.ctrlKey && (event.key === 's' || event.key === 'S')) {
+        if (state.selectedFile) {
+          event.preventDefault()
+          void state.saveFile()
+        }
+        return
+      }
       if (event.ctrlKey && event.key === '`' && !typing) {
         event.preventDefault()
         state.toggleTerminal()
@@ -76,7 +93,8 @@ export default function App(): JSX.Element {
           ]
         )
       } else if (event.key === 'Escape') {
-        if (state.paletteOpen) state.setPaletteOpen(false)
+        if (state.searchOpen) state.setSearchOpen(false)
+        else if (state.paletteOpen) state.setPaletteOpen(false)
         else if (state.settingsOpen) state.closeSettings()
         else clearError()
       }
