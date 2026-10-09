@@ -8,6 +8,7 @@ import type {
   ProviderId
 } from '@shared/types'
 import { DEFAULT_SELECTION, resolveSelection } from '@shared/selection'
+import type { ApprovalMode } from '@shared/approval'
 import type { OnboardingStatus } from '@shared/onboarding'
 import type { ChatSummary, StoredMessage } from '@shared/chat'
 import type { Locale } from './i18n/locale'
@@ -15,6 +16,7 @@ import { detectLocale } from './i18n/locale'
 import i18n from './i18n'
 import type {
   AgentEvent,
+  ApprovalRequest,
   FileEntry,
   ModelSelection,
   RemoteStatus,
@@ -115,6 +117,10 @@ interface AppState {
   activeChatId: string | null
   /** Connected VPS selected for remote_shell in this chat. */
   vpsServerId: string | undefined
+  /** Plan Mode: the agent drafts a plan without running tools. */
+  planMode: boolean
+  /** Tool call awaiting the user's approval, if any. */
+  pendingApproval: ApprovalRequest | null
   /** Transient toast notifications. */
   toasts: Toast[]
   /** Command palette visibility. */
@@ -129,6 +135,10 @@ interface AppState {
   renameChat: (id: string, title: string) => Promise<void>
   deleteChat: (id: string) => Promise<void>
   setVpsServerId: (id: string | undefined) => void
+  setPlanMode: (value: boolean) => void
+  setApprovalMode: (mode: ApprovalMode) => Promise<void>
+  setPlanModeDefault: (value: boolean) => Promise<void>
+  respondApproval: (approved: boolean) => void
   pushToast: (kind: ToastKind, message: string) => void
   dismissToast: (id: string) => void
   setPaletteOpen: (open: boolean) => void
@@ -210,6 +220,8 @@ export const useStore = create<AppState>((set, get) => ({
   chats: [],
   activeChatId: null,
   vpsServerId: undefined,
+  planMode: false,
+  pendingApproval: null,
   toasts: [],
   paletteOpen: false,
 
@@ -227,6 +239,19 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
   setVpsServerId: (id) => set({ vpsServerId: id }),
+  setPlanMode: (value) => set({ planMode: value }),
+  async setApprovalMode(mode) {
+    set({ settings: await window.api.settings.setApprovalMode(mode) })
+  },
+  async setPlanModeDefault(value) {
+    set({ settings: await window.api.settings.setPlanModeDefault(value) })
+  },
+  respondApproval(approved) {
+    const pending = get().pendingApproval
+    if (!pending) return
+    set({ pendingApproval: null })
+    void window.api.agent.respondApproval(pending.id, approved)
+  },
   pushToast(kind, message) {
     const id = newId()
     set({ toasts: [...get().toasts, { id, kind, message }] })
@@ -306,6 +331,7 @@ export const useStore = create<AppState>((set, get) => ({
         onboarding,
         chats,
         ready: true,
+        planMode: settings.planModeDefault ?? false,
         selection: resolveSelection(settings)
       })
       await get().refreshFiles()
@@ -341,7 +367,10 @@ export const useStore = create<AppState>((set, get) => ({
   applyEvent(event) {
     switch (event.type) {
       case 'run:start':
-        set({ running: true, currentRunId: event.runId, error: null, logs: [] })
+        set({ running: true, currentRunId: event.runId, error: null, logs: [], pendingApproval: null })
+        break
+      case 'approval:request':
+        set({ pendingApproval: event.request })
         break
       case 'log': {
         const logs = [...get().logs, event.entry]
@@ -385,6 +414,7 @@ export const useStore = create<AppState>((set, get) => ({
           running: false,
           currentRunId: null,
           warnings: event.warnings,
+          pendingApproval: null,
           messages
         })
         void get().persistChat()
@@ -395,6 +425,7 @@ export const useStore = create<AppState>((set, get) => ({
         set({
           running: false,
           currentRunId: null,
+          pendingApproval: null,
           error: event.message,
           messages: [
             ...get().messages,
@@ -423,7 +454,8 @@ export const useStore = create<AppState>((set, get) => ({
         provider: selection.provider,
         model: selection.model,
         ...(selection.customProviderId ? { customProviderId: selection.customProviderId } : {}),
-        ...(get().vpsServerId ? { vpsServerId: get().vpsServerId } : {})
+        ...(get().vpsServerId ? { vpsServerId: get().vpsServerId } : {}),
+        planMode: get().planMode
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)

@@ -1,4 +1,4 @@
-import type { AgentLogEntry, AgentLogger } from '@shared/agent'
+import type { AgentAction, AgentLogEntry, AgentLogger } from '@shared/agent'
 import type { AgentRunResult } from '@shared/agent'
 import type { ProviderId, ToolDefinition } from '@shared/types'
 import type { RemoteFileEntry, VpsExecResult } from '@shared/vps'
@@ -13,6 +13,7 @@ import { RemoteShellToolExecutor } from '@core/tools/remote-shell-executor'
 import { REMOTE_FS_TOOLS, type RemoteFsDeps } from '@core/tools/remote-fs-tools'
 import { RemoteFsToolExecutor } from '@core/tools/remote-fs-executor'
 import { CompositeToolExecutor, type ToolRoute } from '@core/tools/composite-executor'
+import { DEFAULT_APPROVAL_MODE, requiresApproval } from '@core/agent/approval'
 import type { Persistence } from '@core/agent/persistence'
 import type { SessionStore } from '@core/agent/session-store'
 import type { SandboxManager } from '@shared/sandbox'
@@ -146,6 +147,10 @@ export interface AgentServiceOptions {
   customProviders?: CustomProviderStore
   /** Optional: enables the `remote_shell` / remote-fs tools against connected VPS servers. */
   vps?: RemoteHost
+  /** Ask the user to approve a tool call (Approval Modes). Defaults to allow. */
+  requestApproval?: (runId: string, action: AgentAction) => Promise<boolean>
+  /** Deny any outstanding approval requests (e.g. the user aborted). */
+  cancelApprovals?: () => void
 }
 
 /** Which provider/model to put first for an agent run. */
@@ -179,6 +184,8 @@ export class AgentService {
   private readonly now: () => number
   private readonly customProviders?: CustomProviderStore
   private readonly vps?: RemoteHost
+  private readonly requestApproval?: (runId: string, action: AgentAction) => Promise<boolean>
+  private readonly cancelApprovals?: () => void
   private readonly controllers = new Set<AbortController>()
   private runCounter = 0
 
@@ -190,6 +197,8 @@ export class AgentService {
     this.now = options.now ?? (() => Date.now())
     if (options.customProviders) this.customProviders = options.customProviders
     if (options.vps) this.vps = options.vps
+    this.requestApproval = options.requestApproval
+    this.cancelApprovals = options.cancelApprovals
   }
 
   isRunning(): boolean {
@@ -303,6 +312,19 @@ export class AgentService {
     const remote = this.buildRemoteRuntime(request.task, request.vpsServerId)
     const memory = await this.projectMemoryHint()
     const systemHint = [remote.systemHint, memory].filter(Boolean).join('\n\n')
+
+    const runId = `run-${++this.runCounter}`
+    const settings = await this.persistence.load()
+    const approvalMode = settings.approvalMode ?? DEFAULT_APPROVAL_MODE
+    const planMode = request.planMode ?? settings.planModeDefault ?? false
+    const requestApproval = this.requestApproval
+    const approvalGate = requestApproval
+      ? async (action: AgentAction): Promise<boolean> => {
+          if (!requiresApproval(approvalMode, action)) return true
+          return requestApproval(runId, action)
+        }
+      : undefined
+
     const orchestrator = new AgentOrchestrator({
       sandbox: this.sandbox,
       providers,
@@ -310,7 +332,9 @@ export class AgentService {
       sessionStore: this.sessionStore,
       ...(request.sessionId ? { sessionId: request.sessionId } : {}),
       ...remote,
-      ...(systemHint ? { systemHint } : {})
+      ...(systemHint ? { systemHint } : {}),
+      ...(planMode ? { planMode: true } : {}),
+      ...(approvalGate ? { approvalGate } : {})
     })
 
     const controller = new AbortController()
@@ -318,7 +342,6 @@ export class AgentService {
     const onExternalAbort = (): void => controller.abort()
     externalSignal?.addEventListener('abort', onExternalAbort, { once: true })
 
-    const runId = `run-${++this.runCounter}`
     this.emit({ type: 'run:start', runId, task: request.task, at: this.now() })
 
     try {
@@ -350,6 +373,7 @@ export class AgentService {
 
   abort(): void {
     for (const controller of this.controllers) controller.abort()
+    this.cancelApprovals?.()
   }
 
   async loadSession(id: string): Promise<SessionRecordView | null> {

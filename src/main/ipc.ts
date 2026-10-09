@@ -1,5 +1,6 @@
 import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import type { CustomProviderInput, ProviderId } from '@shared/types'
+import type { ApprovalMode } from '@shared/approval'
 import type { GitCommitInput } from '@shared/github'
 import type { AgentRunRequest, WorkerJobRequest } from '@shared/ui'
 import type { AppServices } from './app-services'
@@ -78,6 +79,20 @@ export function registerIpc(services: AppServices, getWindow: () => BrowserWindo
       'settings:setActiveProvider',
       async (provider: ProviderId) => {
         await services.persistence.setActiveProvider(provider)
+        return changed()
+      }
+    ],
+    [
+      'settings:setApprovalMode',
+      async (mode: ApprovalMode) => {
+        await services.persistence.setApprovalMode(mode)
+        return changed()
+      }
+    ],
+    [
+      'settings:setPlanModeDefault',
+      async (enabled: boolean) => {
+        await services.persistence.setPlanModeDefault(enabled)
         return changed()
       }
     ],
@@ -214,6 +229,7 @@ export function registerIpc(services: AppServices, getWindow: () => BrowserWindo
 
     ['agent:run', (request: AgentRunRequest) => services.agent.run(request)],
     ['agent:abort', () => services.agent.abort()],
+    ['agent:respondApproval', (id: string, approved: boolean) => services.approvals.resolve(id, approved)],
     ['agent:sessions', () => services.agent.listSessions()],
     ['agent:loadSession', (id: string) => services.agent.loadSession(id)],
 

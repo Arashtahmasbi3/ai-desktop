@@ -53,6 +53,8 @@ export default function SettingsPanel(): JSX.Element | null {
   const setLocale = useStore((state) => state.setLocale)
   const showTokenCount = useStore((state) => state.showTokenCount)
   const setShowTokenCount = useStore((state) => state.setShowTokenCount)
+  const setApprovalMode = useStore((state) => state.setApprovalMode)
+  const setPlanModeDefault = useStore((state) => state.setPlanModeDefault)
   const setView = useStore((state) => state.setView)
 
   const [tab, setTab] = useState<TabId>('general')
@@ -501,7 +503,50 @@ export default function SettingsPanel(): JSX.Element | null {
                   />
                   {t('settings.showTokenCount')}
                 </label>
-                <p className="text-[11px] text-neutral-600">AI Desktop v2.1.0</p>
+
+                <div className="flex flex-col gap-2 rounded-lg border border-border bg-bg-primary p-3">
+                  <div>
+                    <p className="text-xs font-medium text-neutral-200">
+                      {t('settings.approvalMode')}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-neutral-500">
+                      {t('settings.approvalHint')}
+                    </p>
+                  </div>
+                  {(
+                    [
+                      ['auto', 'settings.approvalAuto'],
+                      ['dangerous', 'settings.approvalDangerous'],
+                      ['writes', 'settings.approvalWrites']
+                    ] as const
+                  ).map(([value, labelKey]) => (
+                    <label
+                      key={value}
+                      className="flex cursor-pointer items-center gap-2 text-xs text-neutral-300"
+                    >
+                      <input
+                        type="radio"
+                        name="approval-mode"
+                        checked={(settings?.approvalMode ?? 'dangerous') === value}
+                        onChange={() => void setApprovalMode(value)}
+                        className="accent-accent"
+                      />
+                      {t(labelKey)}
+                    </label>
+                  ))}
+                </div>
+
+                <label className="flex cursor-pointer items-center gap-2 text-xs text-neutral-300">
+                  <input
+                    type="checkbox"
+                    checked={settings?.planModeDefault ?? false}
+                    onChange={(event) => void setPlanModeDefault(event.target.checked)}
+                    className="accent-accent"
+                  />
+                  {t('settings.planModeDefault')}
+                </label>
+
+                <p className="text-[11px] text-neutral-600">AI Desktop v2.2.0</p>
               </section>
             ) : null}
           </div>

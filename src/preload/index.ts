@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { CustomProviderInput, CustomProviderTestResult, CustomProviderView, ProviderId } from '@shared/types'
 import type { OnboardingStatus } from '@shared/onboarding'
+import type { ApprovalMode } from '@shared/approval'
 import type { ChatSaveInput, ChatSummary, StoredChat } from '@shared/chat'
 import type {
   AuditEntryView,
@@ -58,6 +59,10 @@ export const api = {
       invoke('settings:setModel', provider, model),
     setActiveProvider: (provider: ProviderId): Promise<SettingsView> =>
       invoke('settings:setActiveProvider', provider),
+    setApprovalMode: (mode: ApprovalMode): Promise<SettingsView> =>
+      invoke('settings:setApprovalMode', mode),
+    setPlanModeDefault: (enabled: boolean): Promise<SettingsView> =>
+      invoke('settings:setPlanModeDefault', enabled),
     addProject: (name: string, path: string): Promise<SettingsView> =>
       invoke('settings:addProject', name, path),
     addRemoteProject: (name: string, path: string, vpsId: string): Promise<SettingsView> =>
@@ -166,6 +171,8 @@ export const api = {
   agent: {
     run: (request: AgentRunRequest): Promise<unknown> => invoke('agent:run', request),
     abort: (): Promise<void> => invoke('agent:abort'),
+    respondApproval: (id: string, approved: boolean): Promise<boolean> =>
+      invoke('agent:respondApproval', id, approved),
     sessions: (): Promise<SessionInfo[]> => invoke('agent:sessions'),
     loadSession: (id: string): Promise<SessionRecordView | null> => invoke('agent:loadSession', id)
   },

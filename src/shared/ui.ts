@@ -1,6 +1,7 @@
 import type { AgentLogEntry, AgentStatus, LoopWarning } from './agent'
 import type { ChatMessage, ProviderId } from './types'
 import type { VpsConnectionState } from './vps'
+import type { ApprovalMode } from './approval'
 
 /** A project (folder) the user has added to the app. */
 export interface ProjectRecord {
@@ -36,6 +37,10 @@ export interface SettingsView {
   projects: ProjectRecord[]
   /** Host platform (`process.platform`) so the UI can warn on foreign paths. */
   platform?: string
+  /** When the agent must ask before acting. */
+  approvalMode?: ApprovalMode
+  /** Whether new chats start in Plan Mode. */
+  planModeDefault?: boolean
 }
 
 /** A single entry in the workspace file explorer. */
@@ -60,6 +65,18 @@ export interface AgentRunRequest {
   resumeSessionId?: string
   /** Connected VPS to run `remote_shell` on (chosen in the chat header). */
   vpsServerId?: string
+  /** Plan Mode: no tools are exposed; the model only drafts a plan. */
+  planMode?: boolean
+}
+
+/** A tool call awaiting the user's approval (Approval Modes). */
+export interface ApprovalRequest {
+  id: string
+  runId: string
+  tool: string
+  /** One-line, human-readable description of what the tool will do. */
+  summary: string
+  arguments: Record<string, unknown>
 }
 
 /** The model the user has selected for the next/next messages. */
@@ -102,6 +119,7 @@ export type AgentEvent =
       at: number
     }
   | { type: 'log'; entry: AgentLogEntry }
+  | { type: 'approval:request'; request: ApprovalRequest }
   | { type: 'error'; runId: string; message: string }
 
 export type WorkerState = 'stopped' | 'idle' | 'running'

@@ -72,7 +72,14 @@
     "suggestion2": "Write and test a TypeScript email validator.",
     "suggestion3": "Open package.json and report outdated dependencies.",
     "usedRemote": "Used remote shell",
-    "overBudget": "≈{{count}} tokens — this conversation is over the context budget. Start a new chat to keep replies accurate."
+    "overBudget": "≈{{count}} tokens — this conversation is over the context budget. Start a new chat to keep replies accurate.",
+    "planMode": "Plan",
+    "codeMode": "Code",
+    "planModeHint": "Plan Mode: the agent describes the steps but does not run any tools.",
+    "approvalTitle": "Approve agent action?",
+    "approvalBody": "The agent wants to run:",
+    "approve": "Approve",
+    "deny": "Deny"
   },
   "vpsSelector": {
     "label": "VPS",
@@ -113,7 +120,13 @@
     "remotePickServer": "Select server…",
     "discover": "Discover",
     "remoteNotFound": "No matching folder found on the server",
-    "remoteBadge": "remote"
+    "remoteBadge": "remote",
+    "approvalMode": "Approval mode",
+    "approvalAuto": "Auto — run everything",
+    "approvalDangerous": "Ask before shell commands",
+    "approvalWrites": "Ask before every write",
+    "approvalHint": "Controls when the agent pauses for your approval before running a tool.",
+    "planModeDefault": "Start new chats in Plan Mode"
   },
   "toast": {
     "dismiss": "Dismiss",

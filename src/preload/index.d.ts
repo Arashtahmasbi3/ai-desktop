@@ -5,6 +5,7 @@ import type {
   CustomProviderView
 } from '@shared/types'
 import type { OnboardingStatus } from '@shared/onboarding'
+import type { ApprovalMode } from '@shared/approval'
 import type { ChatSaveInput, ChatSummary, StoredChat } from '@shared/chat'
 import type {
   AuditEntryView,
@@ -55,6 +56,8 @@ export interface Api {
     removeApiKey(provider: ProviderId): Promise<SettingsView>
     setModel(provider: ProviderId, model: string): Promise<SettingsView>
     setActiveProvider(provider: ProviderId): Promise<SettingsView>
+    setApprovalMode(mode: ApprovalMode): Promise<SettingsView>
+    setPlanModeDefault(enabled: boolean): Promise<SettingsView>
     addProject(name: string, path: string): Promise<SettingsView>
     addRemoteProject(name: string, path: string, vpsId: string): Promise<SettingsView>
     removeProject(id: string): Promise<SettingsView>
@@ -134,6 +137,7 @@ export interface Api {
   agent: {
     run(request: AgentRunRequest): Promise<unknown>
     abort(): Promise<void>
+    respondApproval(id: string, approved: boolean): Promise<boolean>
     sessions(): Promise<SessionInfo[]>
     loadSession(id: string): Promise<SessionRecordView | null>
   }

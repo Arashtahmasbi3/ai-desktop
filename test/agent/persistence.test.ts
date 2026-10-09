@@ -162,4 +162,34 @@ describe('migrateSettings', () => {
     expect(settings.projects).toHaveLength(1)
     expect(settings.activeProvider).toBe('deepseek')
   })
+
+  it('carries the v2 approval preferences through migration', async () => {
+    const settings = await migrateSettings(
+      { version: 1, approvalMode: 'writes', planModeDefault: true },
+      cipher,
+      7
+    )
+    expect(settings.version).toBe(SETTINGS_SCHEMA_VERSION)
+    expect(settings.approvalMode).toBe('writes')
+    expect(settings.planModeDefault).toBe(true)
+  })
+
+  it('ignores an unknown approval mode', async () => {
+    const settings = await migrateSettings({ version: 1, approvalMode: 'yolo' }, cipher, 7)
+    expect(settings.approvalMode).toBeUndefined()
+  })
+})
+
+describe('approval preferences persistence', () => {
+  it('round-trips approvalMode and planModeDefault', async () => {
+    const store = new Persistence({ file, cipher })
+    await store.setApprovalMode('writes')
+    await store.setPlanModeDefault(true)
+
+    const reloaded = new Persistence({ file, cipher })
+    const settings = await reloaded.load()
+    expect(settings.approvalMode).toBe('writes')
+    expect(settings.planModeDefault).toBe(true)
+    expect(reloaded.redacted()).toMatchObject({ approvalMode: 'writes', planModeDefault: true })
+  })
 })

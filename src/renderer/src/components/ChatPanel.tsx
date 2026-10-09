@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AlertTriangle, ArrowDown, Bot, Loader2, Paperclip, Send, Square, Trash2, X } from 'lucide-react'
+import { AlertTriangle, ArrowDown, Bot, Loader2, Paperclip, Send, ShieldAlert, Square, Trash2, X } from 'lucide-react'
 import { basename, useStore } from '../store'
 import MessageBubble from './MessageBubble'
 import ModelSwitcher from './ModelSwitcher'
@@ -31,6 +31,10 @@ export default function ChatPanel(): JSX.Element {
   const showTokenCount = useStore((state) => state.showTokenCount)
   const openSettings = useStore((state) => state.openSettings)
   const setView = useStore((state) => state.setView)
+  const planMode = useStore((state) => state.planMode)
+  const setPlanMode = useStore((state) => state.setPlanMode)
+  const pendingApproval = useStore((state) => state.pendingApproval)
+  const respondApproval = useStore((state) => state.respondApproval)
 
   const [input, setInput] = useState('')
   const [attached, setAttached] = useState<string[]>([])
@@ -156,6 +160,20 @@ export default function ChatPanel(): JSX.Element {
           <ModelSwitcher />
           <span className="text-neutral-700">·</span>
           <VpsSelector />
+          <span className="text-neutral-700">·</span>
+          <button
+            type="button"
+            onClick={() => setPlanMode(!planMode)}
+            title={t('chat.planModeHint')}
+            className={`flex items-center gap-1 rounded px-1.5 py-0.5 transition ${
+              planMode
+                ? 'bg-accent/20 text-accent'
+                : 'text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300'
+            }`}
+          >
+            <ShieldAlert className="h-3 w-3" />
+            {planMode ? t('chat.planMode') : t('chat.codeMode')}
+          </button>
         </div>
         <button
           type="button"
@@ -349,6 +367,42 @@ export default function ChatPanel(): JSX.Element {
           </p>
         ) : null}
       </div>
+
+      {pendingApproval ? (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-xl border border-border bg-bg-secondary p-4 shadow-2xl">
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-neutral-100">
+              <ShieldAlert className="h-4 w-4 text-amber-400" />
+              {t('chat.approvalTitle')}
+            </h2>
+            <p className="mt-2 text-xs text-neutral-400">{t('chat.approvalBody')}</p>
+            <pre
+              dir="ltr"
+              className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-bg-primary p-2 font-mono text-[11px] text-neutral-200"
+            >
+              {pendingApproval.tool}
+              {'\n'}
+              {pendingApproval.summary}
+            </pre>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => respondApproval(false)}
+                className="rounded-lg border border-border px-3 py-1.5 text-xs text-neutral-300 hover:bg-bg-tertiary"
+              >
+                {t('chat.deny')}
+              </button>
+              <button
+                type="button"
+                onClick={() => respondApproval(true)}
+                className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover"
+              >
+                {t('chat.approve')}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   )
 }

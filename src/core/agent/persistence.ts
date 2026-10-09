@@ -4,9 +4,10 @@ import { dirname, isAbsolute, join, normalize, resolve } from 'node:path'
 import { homedir } from 'node:os'
 import type { ProviderId } from '@shared/types'
 import { isWindowsAbsolutePath } from '@shared/paths'
+import { isApprovalMode, type ApprovalMode } from '@shared/approval'
 
 /** Current on-disk settings schema version. */
-export const SETTINGS_SCHEMA_VERSION = 1
+export const SETTINGS_SCHEMA_VERSION = 2
 
 /** Symmetric secret cipher. In the app it is backed by Electron `safeStorage`. */
 export interface SecretCipher {
@@ -39,6 +40,10 @@ export interface AppSettings {
   activeProjectId?: string
   providers: Partial<Record<ProviderId, ProviderSettings>>
   projects: ProjectRecord[]
+  /** When the agent must ask before acting (v2). */
+  approvalMode?: ApprovalMode
+  /** Start new chats in Plan Mode by default (v2). */
+  planModeDefault?: boolean
   updatedAt: number
 }
 
@@ -150,6 +155,11 @@ export async function migrateSettings(
   const version = typeof raw.version === 'number' ? raw.version : 0
   const next: AppSettings = emptySettings(now)
 
+  const applyPrefs = (settings: AppSettings): void => {
+    if (isApprovalMode(raw.approvalMode)) settings.approvalMode = raw.approvalMode
+    if (typeof raw.planModeDefault === 'boolean') settings.planModeDefault = raw.planModeDefault
+  }
+
   if (version < 1) {
     const provider = raw.provider as ProviderId | undefined
     const model = typeof raw.model === 'string' ? raw.model : undefined
@@ -165,10 +175,11 @@ export async function migrateSettings(
       next.activeProvider = provider
     }
     next.projects = normalizeProjects(raw.projects, now)
+    applyPrefs(next)
     return next
   }
 
-  // v1 (current).
+  // v1+ (current).
   if (typeof raw.activeProvider === 'string') next.activeProvider = raw.activeProvider as ProviderId
   if (typeof raw.activeProjectId === 'string') next.activeProjectId = raw.activeProjectId
   if (isRecord(raw.providers)) {
@@ -182,6 +193,7 @@ export async function migrateSettings(
     }
   }
   next.projects = normalizeProjects(raw.projects, now)
+  applyPrefs(next)
   return next
 }
 
@@ -206,6 +218,8 @@ export interface RedactedSettings {
   activeProjectId?: string
   providers: Partial<Record<ProviderId, RedactedProviderSettings>>
   projects: ProjectRecord[]
+  approvalMode?: ApprovalMode
+  planModeDefault?: boolean
 }
 
 /**
@@ -281,7 +295,11 @@ export class Persistence {
       ...(this.settings.activeProvider ? { activeProvider: this.settings.activeProvider } : {}),
       ...(this.settings.activeProjectId ? { activeProjectId: this.settings.activeProjectId } : {}),
       providers,
-      projects: this.settings.projects
+      projects: this.settings.projects,
+      ...(this.settings.approvalMode ? { approvalMode: this.settings.approvalMode } : {}),
+      ...(this.settings.planModeDefault !== undefined
+        ? { planModeDefault: this.settings.planModeDefault }
+        : {})
     }
   }
 
@@ -329,6 +347,18 @@ export class Persistence {
     } else {
       this.settings.activeProjectId = id
     }
+    await this.persist()
+  }
+
+  async setApprovalMode(mode: ApprovalMode): Promise<void> {
+    await this.load()
+    this.settings.approvalMode = mode
+    await this.persist()
+  }
+
+  async setPlanModeDefault(enabled: boolean): Promise<void> {
+    await this.load()
+    this.settings.planModeDefault = enabled
     await this.persist()
   }
 

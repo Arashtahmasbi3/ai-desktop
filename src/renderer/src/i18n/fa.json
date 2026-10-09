@@ -72,7 +72,14 @@
     "suggestion2": "یک تابع TypeScript برای اعتبارسنجی ایمیل بنویس و تستش کن.",
     "suggestion3": "package.json را باز کن و وابستگی‌های قدیمی را گزارش کن.",
     "usedRemote": "از remote shell استفاده شد",
-    "overBudget": "≈{{count}} توکن — این گفتگو از بودجه‌ی context گذشته است. برای دقت پاسخ‌ها چت جدیدی شروع کنید."
+    "overBudget": "≈{{count}} توکن — این گفتگو از بودجه‌ی context گذشته است. برای دقت پاسخ‌ها چت جدیدی شروع کنید.",
+    "planMode": "برنامه",
+    "codeMode": "کد",
+    "planModeHint": "حالت برنامه‌ریزی: عامل مراحل را توضیح می‌دهد اما هیچ ابزاری اجرا نمی‌کند.",
+    "approvalTitle": "تأیید اقدام عامل؟",
+    "approvalBody": "عامل می‌خواهد اجرا کند:",
+    "approve": "تأیید",
+    "deny": "رد"
   },
   "vpsSelector": {
     "label": "VPS",
@@ -113,7 +120,13 @@
     "remotePickServer": "انتخاب سرور…",
     "discover": "جست‌وجو",
     "remoteNotFound": "پوشه‌ای با این نام روی سرور پیدا نشد",
-    "remoteBadge": "ریموت"
+    "remoteBadge": "ریموت",
+    "approvalMode": "حالت تأیید",
+    "approvalAuto": "خودکار — همه چیز اجرا شود",
+    "approvalDangerous": "قبل از دستورات شل بپرس",
+    "approvalWrites": "قبل از هر نوشتن بپرس",
+    "approvalHint": "تعیین می‌کند عامل چه زمانی قبل از اجرای ابزار برای تأیید متوقف شود.",
+    "planModeDefault": "شروع گفتگوهای جدید در حالت برنامه‌ریزی"
   },
   "toast": {
     "dismiss": "بستن",

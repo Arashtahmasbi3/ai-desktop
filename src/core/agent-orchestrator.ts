@@ -39,6 +39,7 @@ import { LoopDetector } from './agent/loop-detector'
 import { silentLogger } from './agent/logger'
 import { SESSION_SCHEMA_VERSION, type AgentSession, type SessionStore } from './agent/session-store'
 import { SANDBOX_TOOLS, SandboxToolExecutor, actionFromToolCall } from './agent/tools'
+import { PLAN_MODE_HINT } from './agent/approval'
 import type { ToolExecutor, ToolExecOptions } from './agent/tools'
 
 export interface AgentOrchestratorOptions {
@@ -76,6 +77,13 @@ export interface AgentOrchestratorOptions {
   sessionStore?: SessionStore
   /** Base session id, reused across runs so resumes update the same session. */
   sessionId?: string
+  /** Plan Mode: expose no tools and only produce a plan. */
+  planMode?: boolean
+  /**
+   * Consulted before every action executes. Return false to block the action
+   * (recorded as a `blocked` observation) without running it.
+   */
+  approvalGate?: (action: AgentAction) => Promise<boolean>
   now?: () => number
   runIdFactory?: () => string
 }
@@ -233,6 +241,8 @@ export class AgentOrchestrator {
   private readonly summarizer?: ContextSummarizer
   private readonly sessionStore?: SessionStore
   private readonly sessionId?: string
+  private readonly planMode: boolean
+  private readonly approvalGate?: (action: AgentAction) => Promise<boolean>
   private readonly now: () => number
   private readonly runIdFactory: () => string
   private runCounter = 0
@@ -262,6 +272,8 @@ export class AgentOrchestrator {
     this.summarizer = options.summarizer
     this.sessionStore = options.sessionStore
     this.sessionId = options.sessionId
+    this.planMode = options.planMode ?? false
+    this.approvalGate = options.approvalGate
     this.now = options.now ?? (() => Date.now())
     this.runCounter = 0
     this.runIdFactory = options.runIdFactory ?? (() => `run-${++this.runCounter}`)
@@ -318,11 +330,17 @@ export class AgentOrchestrator {
     }
 
     const executor = this.buildExecutor(sandboxId)
+    // Plan Mode exposes no tools so the model can only describe what it would do.
+    const tools = this.planMode ? [] : this.tools
     // Per-run state so sequential or concurrent `run()` calls never share loop state.
     const loopDetector = new LoopDetector(this.loopPolicy)
     const observedSignatures = new Set<string>()
     const context = new ContextManager({
-      systemPrompt: buildSystemPrompt(provider, this.tools, this.systemHint),
+      systemPrompt: buildSystemPrompt(
+        provider,
+        tools,
+        this.planMode ? [this.systemHint, PLAN_MODE_HINT].filter(Boolean).join('\n\n') : this.systemHint
+      ),
       maxTokens: this.contextWindowTokens,
       compactionThreshold: this.compactionThreshold,
       ...(this.contextMaxChars !== undefined ? { maxChars: this.contextMaxChars } : {}),
@@ -382,7 +400,7 @@ export class AgentOrchestrator {
         await this.maybeCompact(context, summarizer, runId, index)
 
         // ---- Planning: ask the model (with provider fallback) ----
-        const outcome = await this.callLlm(context, runId, index, options)
+        const outcome = await this.callLlm(context, runId, index, options, tools)
         providerUsed = outcome.provider
         usage = addUsage(usage, outcome.response.usage)
         const assistantText = outcome.response.content
@@ -423,7 +441,7 @@ export class AgentOrchestrator {
         const observations: AgentToolResult[] = []
         for (const action of actions) {
           if (options.signal?.aborted) break
-          const result = await this.executeAction(executor, action, runId, index, options)
+          const result = await this.guardedExecute(executor, action, runId, index, options)
           observations.push(result)
           context.appendToolResult({
             toolCallId: action.id,
@@ -624,7 +642,8 @@ export class AgentOrchestrator {
     context: ContextManager,
     runId: string,
     step: number,
-    options: AgentRunOptions
+    options: AgentRunOptions,
+    tools: ToolDefinition[] = this.tools
   ): Promise<LlmCallOutcome> {
     const messages = context.buildMessages()
     this.log('debug', 'context.sent', runId, {
@@ -644,8 +663,8 @@ export class AgentOrchestrator {
             {
               model: entry.config.model,
               messages,
-              tools: this.tools,
-              toolChoice: 'auto',
+              tools,
+              toolChoice: this.planMode ? 'none' : 'auto',
               ...(options.signal ? { signal: options.signal } : {})
             },
             entry.config
@@ -704,6 +723,38 @@ export class AgentOrchestrator {
           ? extra.execute(action, options)
           : sandboxExecutor.execute(action, options)
     }
+  }
+
+  /** Ask the approval gate (when present), then execute or block the action. */
+  private async guardedExecute(
+    executor: ToolExecutor,
+    action: AgentAction,
+    runId: string,
+    step: number,
+    options: AgentRunOptions
+  ): Promise<AgentToolResult> {
+    if (this.approvalGate) {
+      let allowed = false
+      try {
+        allowed = await this.approvalGate(action)
+      } catch {
+        allowed = false
+      }
+      if (!allowed) {
+        this.log('warn', 'action.denied', runId, { step, tool: action.name })
+        return {
+          actionId: action.id,
+          name: action.name,
+          ok: false,
+          output: '',
+          error: `Action "${action.name}" was not approved by the user.`,
+          code: 'blocked',
+          attempts: 1,
+          durationMs: 0
+        }
+      }
+    }
+    return this.executeAction(executor, action, runId, step, options)
   }
 
   /** Execute one action, retrying transient sandbox failures. */
