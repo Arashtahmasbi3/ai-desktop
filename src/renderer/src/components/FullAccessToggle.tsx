@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AlertTriangle, ShieldCheck, Zap } from 'lucide-react'
 import { useStore } from '../store'
-import { APPROVAL_MODES, type ApprovalMode } from '@shared/approval'
+import { APPROVAL_MODES, isFullAccess, type ApprovalMode } from '@shared/approval'
 
 const MODE_LABEL: Record<ApprovalMode, string> = {
   ask: 'chat.fullAccessAsk',
@@ -16,7 +16,7 @@ export function FullAccessToggle(): JSX.Element {
   const mode = useStore((state) => state.settings?.approvalMode ?? 'ask')
   const setApprovalMode = useStore((state) => state.setApprovalMode)
   const [open, setOpen] = useState(false)
-  const full = mode === 'full'
+  const full = isFullAccess(mode)
 
   return (
     <div className="relative">
@@ -66,7 +66,7 @@ export function FullAccessBanner(): JSX.Element | null {
   const remember = useStore((state) => state.settings?.rememberApprovalMode ?? false)
   const setRememberApprovalMode = useStore((state) => state.setRememberApprovalMode)
 
-  if (mode !== 'full') return null
+  if (!isFullAccess(mode)) return null
 
   return (
     <div className="mx-3 mb-1 flex items-center justify-between gap-2 rounded-lg border border-red-500/50 bg-red-500/10 px-2 py-1.5 text-[11px] text-red-300">

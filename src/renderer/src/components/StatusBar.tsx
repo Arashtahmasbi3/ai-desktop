@@ -1,5 +1,6 @@
 import { Cpu, Globe, HardDrive, Languages, Server, ShieldCheck, Zap, Wifi, WifiOff } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { nextApprovalMode } from '@shared/approval'
 import { useStore } from '../store'
 import { vpsIndicator, vpsServerName } from '../lib/vps-state'
 
@@ -54,8 +55,7 @@ export default function StatusBar(): JSX.Element {
         <button
           type="button"
           onClick={() => {
-            const next = approvalMode === 'ask' ? 'auto-write' : approvalMode === 'auto-write' ? 'full' : 'ask'
-            void useStore.getState().setApprovalMode(next)
+            void useStore.getState().setApprovalMode(nextApprovalMode(approvalMode))
           }}
           title={t('settings.approvalMode')}
           className={`flex items-center gap-1 rounded px-1.5 py-0.5 ${
