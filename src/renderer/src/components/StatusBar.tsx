@@ -1,6 +1,7 @@
 import { Cpu, Globe, HardDrive, Languages, Server, ShieldCheck, Zap, Wifi, WifiOff } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useStore } from '../store'
+import { vpsIndicator, vpsServerName } from '../lib/vps-state'
 
 function Dot({ ok }: { ok: boolean }): JSX.Element {
   return <span className={`h-1.5 w-1.5 rounded-full ${ok ? 'bg-emerald-500' : 'bg-neutral-600'}`} />
@@ -18,8 +19,13 @@ export default function StatusBar(): JSX.Element {
   const locale = useStore((state) => state.locale)
   const setLocale = useStore((state) => state.setLocale)
   const approvalMode = useStore((state) => state.settings?.approvalMode ?? 'ask')
+  const vpsServerId = useStore((state) => state.vpsServerId)
+  const vpsStatus = useStore((state) => state.vpsStatus)
+  const vpsServers = useStore((state) => state.vpsServers)
 
   const online = worker?.online ?? true
+  const vps = vpsIndicator(vpsServerId, vpsStatus)
+  const vpsName = vpsServerName(vpsServers, vpsServerId) ?? vpsServerId
 
   return (
     <footer className="flex h-7 shrink-0 items-center justify-between border-t border-border bg-bg-secondary px-3 text-[11px] text-neutral-400">
@@ -62,6 +68,21 @@ export default function StatusBar(): JSX.Element {
           {approvalMode}
         </button>
         <span className="text-neutral-600">session {sessionId.slice(0, 8)}</span>
+        {vps !== 'off' ? (
+          <span
+            className={`flex items-center gap-1 ${
+              vps === 'connected'
+                ? 'text-emerald-400'
+                : vps === 'connecting'
+                  ? 'text-amber-400'
+                  : 'text-red-400'
+            }`}
+            title={`VPS: ${vpsName ?? ''} (${vps})`}
+          >
+            <Server className="h-3 w-3" />
+            vps: {vpsName ?? ''} · {vps}
+          </span>
+        ) : null}
       </div>
 
       <div className="flex items-center gap-2">

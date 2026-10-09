@@ -22,7 +22,6 @@ import {
 } from 'lucide-react'
 import type { ChatSummary } from '@shared/chat'
 import type { ProjectRecord } from '@shared/ui'
-import type { VpsServerView } from '@shared/vps'
 import { basename, useStore, type ViewId } from '../store'
 
 const NAV: Array<{ id: ViewId; labelKey: string; icon: typeof MessageSquare }> = [
@@ -94,8 +93,10 @@ export default function Sidebar(): JSX.Element {
   const [projectMenuFor, setProjectMenuFor] = useState<string | null>(null)
   const [workspaceOpen, setWorkspaceOpen] = useState(false)
   const [searchingId, setSearchingId] = useState<string | null>(null)
-  const [servers, setServers] = useState<VpsServerView[]>([])
-  const [vpsConnectedId, setVpsConnectedId] = useState<string | null>(null)
+  const servers = useStore((state) => state.vpsServers)
+  const vpsStatus = useStore((state) => state.vpsStatus)
+  const refreshVps = useStore((state) => state.refreshVps)
+  const vpsConnectedId = vpsStatus.status === 'connected' ? (vpsStatus.serverId ?? null) : null
   const [vpsSearch, setVpsSearch] = useState<{
     id: string
     serverId: string
@@ -105,14 +106,8 @@ export default function Sidebar(): JSX.Element {
   const searchRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    void window.api.vps.list().then(setServers).catch(() => setServers([]))
-    void window.api.vps
-      .status()
-      .then((status) =>
-        setVpsConnectedId(status.status === 'connected' ? status.serverId ?? null : null)
-      )
-      .catch(() => setVpsConnectedId(null))
-  }, [])
+    void refreshVps()
+  }, [refreshVps])
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
