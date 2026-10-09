@@ -34,14 +34,15 @@ exe, icon and version metadata), optimizes the production build (minify/tree-sha
 
 **Ready for manual Windows testing. Waiting for user feedback.** (2026-10-05)
 
-- Latest release: **v2.2.0 (pre-release)** tagged on `master`; **v2.3.0** is implemented on
-  `feature/v2.3-codex-ux` (Sprint v2.3 “Codex-Like UX & Approval System”) and awaiting the
-  Windows install/publish pass.
-- Test suite green: 76 files / 529 passed, 1 skipped; `typecheck` and `build` green.
-- Sprint v2.3 checklist: code tasks A.1–A.2, B.1–B.3, C.1–C.5, D.1–D.6 all done; version bumped
-  to `2.3.0`; `CHANGELOG`/`README`/`AGENTS.md` updated; `TESTING_GUIDE_v2.3.md` and
-  `FINAL_REPORT_v2.3.md` added. Installer + GitHub pre-release and before/after screenshots
-  still need a GUI/Windows runner.
+- Latest release: **v2.2.0 (pre-release)** formerly; **v2.3.0 released (private)** — installer +
+  portable exe published on a private GitHub Release with `SHA256SUMS.txt`; `master` at the
+  v2.3.0 merge (`6ca9c26`), tag `v2.3.0`.
+- **v2.3.0 released (private). Installer built and published. Next: await user testing feedback.**
+- Test suite green: 78 files / 566 passed, 1 skipped; `typecheck` and `build` green.
+- Sprint v2.3 checklist: code tasks A.1–A.2, B.1–B.3, C.1–C.5, D.1–D.6 all done; plus the
+  **`migrate_project`** cross-VPS rsync tool with security hardening and 22 injection tests;
+  version bumped to `2.3.0`; `CHANGELOG`/`README`/`AGENTS.md` updated; `TESTING_GUIDE_v2.3.md`
+  and `FINAL_REPORT_v2.3.md` added. Before/after screenshots still need a GUI runner.
 - Installers smoke-tested on Linux under `xvfb` (window loads, `window.api` complete, IPC
   handlers respond, no console errors) — a **clean Windows machine** install is still pending.
 - Next action: the user tests on Windows using [`TESTING_GUIDE_v2.3.md`](./TESTING_GUIDE_v2.3.md)
