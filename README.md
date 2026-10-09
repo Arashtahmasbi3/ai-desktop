@@ -273,6 +273,33 @@ npx vitest run test/e2e   # end-to-end flows only
 | `agent-flow.e2e.test.ts` | Create + run a project in the sandbox, file change → renderer diff, session save/resume |
 | `error-scenarios.e2e.test.ts` | API cut (bounded retries), provider fallback on auth error, unavailable sandbox, transient sandbox retry, path-escape rejection, context overflow with deterministic compaction fallback |
 | `performance.e2e.test.ts` | Renderer tokenize/diff budgets, no sandbox leaks across many runs, bounded heap growth and bounded persisted transcript under overflow |
+| `v2.3.1-critical-fixes.e2e.test.ts` | Chat → tool → approval → apply → audit, realistic loop stop, VPS connect → chat → `remote_shell` |
+
+## Troubleshooting
+
+- **"Host key verification failed" / `MITM` warning on connect.** The presented SSH host key
+  does not match the pinned fingerprint. Confirm the server was not reinstalled or intercepted;
+  only then clear the trust in **Settings → Connections → SSH** and reconnect to re-approve.
+- **"Blocked by policy: …" in chat.** The target host's `HostPolicy` denied the command. On
+  `read-only`/`production` hosts writes are refused and unknown commands count as writes; check
+  **Settings → Connections → SSH → <server>** and adjust the mode, allow list or allowed paths.
+- **"Approval required by host policy: …".** The command is allowed but the host's approval
+  requirement stopped it. Approve it, switch the mode, or add it to the host's allow list.
+- **The agent stops with "I got stuck".** Loop detection cut a repeated action (warn at the
+  threshold, stop at the hard limit). Rephrase the task or make the failing step different.
+- **"Path not found" for a project after upgrading.** Legacy projects with a POSIX path saved on
+  Windows are migrated to *remote*; open the project and pick the VPS it lives on.
+- **Nothing sensitive in logs.** API keys, tokens and passwords are redacted before they reach
+  the log, audit log or UI. If you see a raw secret, that is a bug — report it.
+
+## Documentation
+
+| Document | What it covers |
+| --- | --- |
+| [`TESTING_GUIDE.md`](./TESTING_GUIDE.md) | Current Windows test checklist and troubleshooting |
+| [`CHANGELOG.md`](./CHANGELOG.md) | Release notes per version |
+| [`AGENTS.md`](./AGENTS.md) | Architecture notes, conventions and the sprint log |
+| [`CONTRIBUTING.md`](./CONTRIBUTING.md) | Release checklist (maintainers) |
 
 ## License
 

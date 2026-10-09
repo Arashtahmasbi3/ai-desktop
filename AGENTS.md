@@ -323,6 +323,57 @@ How `migrate_project` copies a project between two saved VPS servers
 - Return the **rsync exit code** to the agent so it can react — e.g. `127` means `rsync` is not
   installed on the source host, which the agent should surface as an actionable error.
 
+## Pattern: Agent Loop Detection
+
+How the orchestrator stops a stuck run (`src/core/agent/loop-detector.ts`).
+
+- Detection is **fuzzy and per-tool-call**, over a sliding window (`windowSize`), so repeated
+  `remote_shell` calls are caught even when the arguments differ slightly — not just byte-identical
+  repeats.
+- Severity is **layered**: the first repeats emit a WARN the model can self-correct from
+  (`repeatedActionThreshold`), a hard threshold **STOPs** the run (`repeatedStopThreshold`).
+  Separate counters cover failure streaks, repeated reasoning and no-progress turns.
+- The orchestrator checks **before** a tool call (`beforeToolCall`) to cut a loop early and
+  **after** it (`afterToolCall` / `markProgress`) to update progress. New "progress" tools must be
+  registered, otherwise a productive tool looks like a stall.
+- A stop produces a `LoopStopInfo` on `AgentRunResult.stop` plus a user-facing warning, so tests
+  assert `result.stop?.reason` rather than counting steps.
+
+## Pattern: Local vs Remote Workspaces
+
+Projects carry an explicit workspace type (`src/core/agent/persistence.ts`).
+
+- A `ProjectRecord` is `local` (a folder on this machine) or `remote` (a folder on a connected
+  VPS, with an optional `vpsId`). Never infer it from a string at use sites.
+- Records written by older builds are **migrated on read** (`migrateProjectRecord`): a POSIX path
+  saved while running on Windows is almost certainly remote, so it is promoted to `remote` with no
+  VPS chosen yet. The UI then prompts for a VPS instead of reporting "Path not found".
+- Remote project paths are normalized separately (`normalizeRemoteProjectPath`) from local ones.
+
+## Pattern: Secret Redaction
+
+Never log or persist a raw secret (`src/core/agent/redact.ts`).
+
+- The `redact()` helper scrubs API keys, bearer tokens, passwords and PEM/private-key material.
+- Redaction is applied at the **boundaries** that reach disk or the UI: `logger.ts`,
+  `audit-log.ts` (both `command` and `detail`) and renderer error strings in `store.ts`.
+- New logging or audit call sites must route through these helpers; do not hand-format values
+  that may contain credentials.
+
+## Pattern: Per-Host Command Policy
+
+Every remote command passes a fail-closed policy (`src/core/remote/host-policy.ts`).
+
+- A host may carry a `HostPolicy` (`read-only` / `staging` / `production`, an approval requirement,
+  allow/deny lists and allowed paths). Hosts without a policy keep the legacy deny-list behaviour.
+- Classification is **fail-closed**: `commandIntent` returns `write` for anything it cannot prove is
+  a read, so read-only/production hosts block unknown commands. Precedence is
+  deny list → read-only mode → allowed paths → explicit allowlist → approval.
+- `SshManager.exec` evaluates the policy after `checkDenyList` and before SSH; a block or an
+  approval requirement is audited and returned on `VpsExecResult` (`blocked` / `requiresApproval`),
+  which `executeRemoteShell` surfaces to the model as `Blocked by policy:` /
+  `Approval required by host policy:`.
+
 ## Lessons learned
 
 - **Verify the packaged artifact, not just the build.** `npm run build` passing says nothing

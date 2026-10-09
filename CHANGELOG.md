@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.1] - 2026-10-05
+
+Sprint v2.3.1 "Critical Fixes & Security Hardening" — a hardened agent loop,
+strict local/remote separation, per-host command policy and secret redaction.
+
+### Added
+
+- **Per-host command policy (B.3)** — every VPS can carry a `HostPolicy`
+  (`read-only` / `staging` / `production`, approval requirement, allow/deny lists
+  and allowed paths). `SshManager.exec` evaluates it fail-closed (unknown commands
+  count as writes) before SSH; blocked and approval-required commands are audited
+  and surfaced in chat as `Blocked by policy:` / `Approval required by host policy:`.
+  Edit it in **Settings → Connections → SSH → <server>**.
+- **Secret redaction (B.1)** — new `core/agent/redact.ts` scrubs API keys, tokens,
+  passwords and private-key material before anything reaches logs, the audit log or
+  the UI.
+- **DeepSeek V4 catalog + migration (A.3)** — current model list and a legacy
+  migration path for stored model selections.
+- **Workspace type (A.2)** — projects are explicitly `local` or `remote`; legacy
+  POSIX paths saved on Windows are promoted to remote instead of failing with
+  "Path not found".
+- **Full Access global state (A.5)** — shared approval helpers keep the status bar
+  and full-access toggle in sync across windows.
+
+### Changed
+
+- **Loop detection (A.1)** — fuzzy, per-tool-call sliding-window detection catches
+  repeated actions even when arguments vary slightly, with warn-then-stop severity.
+- **VPS connection state (A.4)** — a single centralized connection state with
+  auto-reconnect and keepalive, reflected consistently in the sidebar, status bar
+  and settings.
+
+### Security
+
+- **Mandatory host-key verification (B.2)** — first-use approval, pinned
+  fingerprint persistence, and hard failure on mismatch/MITM, covered by tests.
+- Policy evaluation is fail-closed: anything that cannot be proven a read is
+  treated as a write on read-only/production hosts.
+
+### Tests
+
+- New: `test/security/redaction.test.ts`, `test/security/host-key.test.ts`,
+  `test/security/policy-engine.test.ts`, `test/renderer/vps-state.test.ts`,
+  `test/shared/approval.test.ts`, `test/e2e/v2.3.1-critical-fixes.e2e.test.ts`.
+
 ## [2.3.0] ‚Äî 2026-10-05
 
 Sprint v2.3 ‚ÄúCodex-Like UX & Approval System‚Äù ‚Äî a Codex-style workspace, an approval system
