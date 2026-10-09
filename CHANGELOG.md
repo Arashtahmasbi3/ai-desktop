@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0] — 2026-10-05
+
+Sprint v2.3 “Codex-Like UX & Approval System” — a Codex-style workspace, an approval system
+that learns, and advanced chat capabilities.
+
+### Added
+
+- **Sidebar redesign** — workspace switcher, projects-first list with connection status dots,
+  per-project hover menu, flat Recents list (rename/duplicate/export/delete) and `Ctrl+K` search.
+- **Composer redesign** — inline model switcher with a capabilities tooltip, inline full-access
+  toggle, auto-resize up to 200px, `Ctrl/Cmd+Enter` to send and active/grey send states.
+- **File changes panel** — per-file `+/-` stats with file-type icons, first-three preview,
+  click-to-review split diff and Apply all / Reject all / Review individually.
+- **Empty state & chat templates** — project-aware greeting, four quick suggestions and a
+  Templates menu with six built-ins plus user-saved templates.
+- **Code block runner** — fenced `bash`/`python`/`js` blocks get Copy and Run buttons; output
+  and exit code render under the block (ask-mode confirms first).
+- **Session fork** — “Fork from here” on any message creates a linked chat from that point.
+- **Voice input** — Web Speech API mic button in the composer (locale-aware, hidden if
+  unsupported).
+- **Multi-window** — `Ctrl+Shift+N` opens a new window; window IPC is sender-scoped and
+  settings changes broadcast to every window.
+- **Progress timeline** — collapsible vertical timeline beside the chat with animated
+  active/pending steps projected from the agent log.
+- **Codex-style Settings** — grouped two-column nav (General / Integrations / Coding /
+  Advanced) with Providers, API Keys, Plugins (tabs + search + directory), Browser website
+  permissions (default “Always ask”), Code Review per-repo auto-review, Connections
+  (Control this PC / other devices / SSH), Approval Mode, Memory, Usage and Developer pages.
+
+### Notes
+
+- Existing v2.2 features (session restore, codebase search, terminal, diff review, approval
+  modes, remote SFTP tools, project memory) remain unchanged.
+
+## [2.2.0] — 2026-10-05
+
+Codex-like feature pass: session restore and autosave, codebase search (`Ctrl+Shift+F`), file
+tree toggle and integrated terminal, inline diff review for agent file writes, approval modes
+with a plan/code switch, remote SFTP file tools for connected VPS servers, project
+`AI_CONTEXT.md`/`AGENTS.md` injection with context-budget warnings, chats organized by
+project, and composer slash commands.
+
 ## [2.1.0] — 2026-10-05
 
 UX overhaul, bilingual UI and critical bug fixes.

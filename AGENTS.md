@@ -34,13 +34,18 @@ exe, icon and version metadata), optimizes the production build (minify/tree-sha
 
 **Ready for manual Windows testing. Waiting for user feedback.** (2026-10-05)
 
-- Latest release: **v2.0.0 (pre-release)** — installer + portable exe published with
-  `SHA256SUMS.txt`; `master` at the v2.0.0 merge (all four sprint branches merged with `--no-ff`).
-- Test suite green: 53 files / 384 passed, 1 skipped; `typecheck` and `build` green.
+- Latest release: **v2.2.0 (pre-release)** tagged on `master`; **v2.3.0** is implemented on
+  `feature/v2.3-codex-ux` (Sprint v2.3 “Codex-Like UX & Approval System”) and awaiting the
+  Windows install/publish pass.
+- Test suite green: 76 files / 529 passed, 1 skipped; `typecheck` and `build` green.
+- Sprint v2.3 checklist: code tasks A.1–A.2, B.1–B.3, C.1–C.5, D.1–D.6 all done; version bumped
+  to `2.3.0`; `CHANGELOG`/`README`/`AGENTS.md` updated; `TESTING_GUIDE_v2.3.md` and
+  `FINAL_REPORT_v2.3.md` added. Installer + GitHub pre-release and before/after screenshots
+  still need a GUI/Windows runner.
 - Installers smoke-tested on Linux under `xvfb` (window loads, `window.api` complete, IPC
   handlers respond, no console errors) — a **clean Windows machine** install is still pending.
-- Next action: the user tests on Windows using [`TESTING_GUIDE_v2.0.0.md`](./TESTING_GUIDE_v2.0.0.md)
-  and reports back (known limitations in [`KNOWN_ISSUES_v2.0.0.md`](./KNOWN_ISSUES_v2.0.0.md)).
+- Next action: the user tests on Windows using [`TESTING_GUIDE_v2.3.md`](./TESTING_GUIDE_v2.3.md)
+  and reports back (known limitations in [`KNOWN_ISSUES.md`](./KNOWN_ISSUES.md)).
 - Backlog entry for v2.1: opt-in deny list for the manual VPS terminal (see **Backlog** below).
 
 ## Tech stack
