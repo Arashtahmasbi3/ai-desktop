@@ -50,13 +50,54 @@ function fail(content: string, blocked = false): MigrateProjectResult {
   return { ok: false, content, ...(blocked ? { blocked } : {}) }
 }
 
-/** Reject paths that are empty or contain control characters (NUL/newline). */
-function cleanPath(value: unknown): string | undefined {
-  if (typeof value !== 'string') return undefined
-  const path = value.trim()
-  if (!path || /[\u0000\n\r]/.test(path)) return undefined
-  return path
+/** Control characters (NUL, newlines, tabs, ...) are never valid in a path. */
+const CONTROL_CHARS = /[\u0000-\u001f\u007f]/
+/** Shell metacharacters that must never appear in a path/username we hand to a shell. */
+const SHELL_METACHARACTERS = /[;&|`$(){}[\]<>*?!\\'"]/
+
+/**
+ * System directories that must never be migrated wholesale. `/var/log`, `/etc`,
+ * `/proc`, `/sys` and `/dev` are listed explicitly; the rest are obvious extras.
+ */
+const SENSITIVE_ROOTS = [
+  '/etc',
+  '/proc',
+  '/sys',
+  '/dev',
+  '/boot',
+  '/var/log',
+  '/root',
+  '/bin',
+  '/sbin',
+  '/lib'
+]
+
+/** True when `path` is one of the sensitive system roots (or lives inside one). */
+export function isSensitivePath(path: string): boolean {
+  const normalized = path.replace(/\/+$/, '') || '/'
+  return SENSITIVE_ROOTS.some((root) => normalized === root || normalized.startsWith(`${root}/`))
 }
+
+interface PathCheck {
+  path?: string
+  reason?: string
+  blocked?: boolean
+}
+
+/** Validate a migration path: no control chars/metacharacters, not a system root. */
+export function checkMigrationPath(raw: unknown): PathCheck {
+  if (typeof raw !== 'string') return { reason: 'must be a string' }
+  const path = raw.trim()
+  if (!path) return { reason: 'must not be empty' }
+  if (CONTROL_CHARS.test(path)) return { reason: 'must not contain control characters' }
+  if (SHELL_METACHARACTERS.test(path)) return { reason: 'must not contain shell metacharacters' }
+  if (isSensitivePath(path)) {
+    return { reason: `refusing to migrate sensitive system path ${path}`, blocked: true }
+  }
+  return { path }
+}
+
+const USERNAME_RE = /^[A-Za-z0-9._-]+$/
 
 /**
  * Build the rsync command that runs on the source host and pushes the source
@@ -85,20 +126,30 @@ export async function executeMigrateProject(
 ): Promise<MigrateProjectResult> {
   const sourceId = String(args.source_vps_id ?? '').trim()
   const targetId = String(args.target_vps_id ?? '').trim()
-  const sourcePath = cleanPath(args.source_path)
-  const targetPath = cleanPath(args.target_path)
   const connected = deps.connectedServers()
 
   if (!sourceId) return fail(`source_vps_id is required. Connected: ${connected.join(', ') || 'none'}`)
   if (!targetId) return fail('target_vps_id is required.')
-  if (!sourcePath) return fail('migrate_project requires a single-line "source_path".')
-  if (!targetPath) return fail('migrate_project requires a single-line "target_path".')
   if (!connected.includes(sourceId)) {
     return fail(`Source server ${sourceId} is not connected. Connect it first.`)
   }
 
+  const sourceCheck = checkMigrationPath(args.source_path)
+  if (sourceCheck.reason) {
+    return fail(`Invalid source_path: ${sourceCheck.reason}`, sourceCheck.blocked === true)
+  }
+  const targetCheck = checkMigrationPath(args.target_path)
+  if (targetCheck.reason) {
+    return fail(`Invalid target_path: ${targetCheck.reason}`, targetCheck.blocked === true)
+  }
+  const sourcePath = sourceCheck.path!
+  const targetPath = targetCheck.path!
+
   const target = await deps.resolveServer(targetId)
   if (!target) return fail(`Unknown target server ${targetId}.`)
+  if (!USERNAME_RE.test(target.username)) {
+    return fail(`Target server ${targetId} has an unsafe username.`)
+  }
 
   const command = buildRsyncCommand(sourcePath, target, targetPath)
   const denial = checkDenyList(command)
