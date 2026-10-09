@@ -6,6 +6,7 @@ import type {
   AgentEvent,
   AgentRunRequest,
   FileChangeView,
+  ProjectRecord,
   SessionInfo,
   SessionRecordView
 } from '@shared/ui'
@@ -70,6 +71,33 @@ interface RemoteRuntime {
   extraTools?: ToolDefinition[]
   extraExecutor?: ToolExecutor
   systemHint?: string
+}
+
+/**
+ * When the active project is remote but its VPS is missing or disconnected,
+ * return a system hint telling the model to relay a clear message instead of
+ * falling back to local file tools. Returns `undefined` for local projects or a
+ * connected remote project (the caller then plans the normal remote runtime).
+ */
+export function activeRemoteProjectHint(
+  project: ProjectRecord | undefined,
+  connectedServers: string[]
+): string | undefined {
+  if (project?.type !== 'remote') return undefined
+  if (!project.vpsId) {
+    return (
+      `The active project "${project.name}" is a remote project with no VPS selected. ` +
+      'Tell the user to choose a VPS for it in Settings -> Projects, then retry.'
+    )
+  }
+  if (!connectedServers.includes(project.vpsId)) {
+    return (
+      `The active project "${project.name}" lives on VPS "${project.vpsId}", which is not ` +
+      'connected. Tell the user: "VPS متصل نیست. در Settings -> Connections وصل شوید." ' +
+      'Do not attempt local file operations for this project.'
+    )
+  }
+  return undefined
 }
 
 /**
@@ -263,8 +291,16 @@ export class AgentService {
    * Decide whether this run gets the `remote_shell` tool and, if so, build the
    * runtime that pins it to a server.
    */
-  private buildRemoteRuntime(task: string, vpsServerId?: string): RemoteRuntime {
-    return planRemoteRuntime(task, vpsServerId, this.vps)
+  private async buildRemoteRuntime(
+    task: string,
+    vpsServerId?: string
+  ): Promise<RemoteRuntime> {
+    const settings = await this.persistence.load()
+    const active = settings.projects.find((project) => project.id === settings.activeProjectId)
+    const hint = activeRemoteProjectHint(active, this.vps ? this.vps.connectedServers() : [])
+    if (hint) return { systemHint: hint }
+    const pinned = vpsServerId ?? (active?.type === 'remote' ? active.vpsId : undefined)
+    return planRemoteRuntime(task, pinned, this.vps)
   }
 
   /**
@@ -363,7 +399,7 @@ export class AgentService {
       ...(request.model ? { model: request.model } : {}),
       ...(request.customProviderId ? { customProviderId: request.customProviderId } : {})
     })
-    const remote = this.buildRemoteRuntime(request.task, request.vpsServerId)
+    const remote = await this.buildRemoteRuntime(request.task, request.vpsServerId)
     const memory = await this.projectMemoryHint()
     const systemHint = [remote.systemHint, memory].filter(Boolean).join('\n\n')
 

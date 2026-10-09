@@ -120,22 +120,66 @@ function emptySettings(now: number): AppSettings {
   return { version: SETTINGS_SCHEMA_VERSION, providers: {}, projects: [], updatedAt: now }
 }
 
-function normalizeProjects(value: unknown, now: number): ProjectRecord[] {
+/**
+ * Shape of a persisted project record as it may appear on disk (any field could
+ * be missing for records written by older builds).
+ */
+export interface PersistedProjectRecord {
+  id?: unknown
+  name?: unknown
+  path?: unknown
+  createdAt?: unknown
+  type?: unknown
+  vpsId?: unknown
+}
+
+/**
+ * Normalize one persisted project record, migrating legacy records that predate
+ * the `type` field. A POSIX path (`/opt/app`) stored while running on Windows is
+ * almost certainly a project on a remote Linux VPS rather than a local folder,
+ * so it is promoted to a `remote` project with no VPS chosen yet. The UI then
+ * asks the user to pick a VPS instead of reporting "Path not found".
+ */
+export function migrateProjectRecord(
+  old: PersistedProjectRecord,
+  platform: string,
+  now: number
+): ProjectRecord {
+  const path = typeof old.path === 'string' ? old.path : ''
+  const record: ProjectRecord = {
+    id: typeof old.id === 'string' ? old.id : randomUUID(),
+    name: typeof old.name === 'string' ? old.name : path,
+    path,
+    createdAt: typeof old.createdAt === 'number' ? old.createdAt : now
+  }
+
+  if (old.type === 'remote') {
+    record.type = 'remote'
+    if (typeof old.vpsId === 'string') record.vpsId = old.vpsId
+    return record
+  }
+  if (old.type === 'local') return record
+
+  if (platform === 'win32' && path.startsWith('/')) {
+    record.type = 'remote'
+    if (typeof old.vpsId === 'string') record.vpsId = old.vpsId
+  }
+  return record
+}
+
+function normalizeProjects(
+  value: unknown,
+  now: number,
+  platform: string = process.platform
+): ProjectRecord[] {
   if (!Array.isArray(value)) return []
   const projects: ProjectRecord[] = []
   for (const entry of value) {
     if (typeof entry === 'string') {
       // v0 stored bare path strings.
-      projects.push({ id: randomUUID(), name: entry, path: entry, createdAt: now })
+      projects.push(migrateProjectRecord({ path: entry }, platform, now))
     } else if (isRecord(entry) && typeof entry.path === 'string') {
-      projects.push({
-        id: typeof entry.id === 'string' ? entry.id : randomUUID(),
-        name: typeof entry.name === 'string' ? entry.name : entry.path,
-        path: entry.path,
-        createdAt: typeof entry.createdAt === 'number' ? entry.createdAt : now,
-        ...(entry.type === 'remote' ? { type: 'remote' as const } : {}),
-        ...(typeof entry.vpsId === 'string' ? { vpsId: entry.vpsId } : {})
-      })
+      projects.push(migrateProjectRecord(entry, platform, now))
     }
   }
   return projects

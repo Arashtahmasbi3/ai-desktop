@@ -345,7 +345,11 @@ export default function Sidebar(): JSX.Element {
                           {project.name}
                           {server ? <span className="text-neutral-500"> ({server})</span> : null}
                         </span>
-                        {state === 'missing' ? (
+                        {project.type === 'remote' && !project.vpsId ? (
+                          <span className="block truncate text-[10px] text-amber-400/90">
+                            ⚠ VPS را انتخاب کنید
+                          </span>
+                        ) : state === 'missing' ? (
                           <span className="block truncate text-[10px] text-amber-400/90">
                             {project.osMismatch ? t('sidebar.osMismatch') : t('sidebar.missingPath')}
                           </span>
