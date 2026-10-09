@@ -17,6 +17,7 @@ import i18n from './i18n'
 import type {
   AgentEvent,
   ApprovalRequest,
+  CodeMatch,
   FileChangeView,
   FileEntry,
   ModelSelection,
@@ -148,6 +149,10 @@ interface AppState {
   chatTreeOpen: boolean
   /** Whether the local terminal panel is open under the chat. */
   terminalOpen: boolean
+  /** Whether the codebase search modal is open. */
+  searchOpen: boolean
+  /** Results of the last codebase search. */
+  searchResults: CodeMatch[]
   /** Output lines of the local terminal panel. */
   terminalLines: TerminalLine[]
   /** Command palette visibility. */
@@ -174,6 +179,8 @@ interface AppState {
   toggleChatTree: () => void
   toggleTerminal: () => void
   runTerminalCommand: (command: string) => Promise<void>
+  setSearchOpen: (open: boolean) => void
+  runCodeSearch: (query: string) => Promise<void>
 
   init: () => Promise<void>
   openSettings: () => void
@@ -259,6 +266,8 @@ export const useStore = create<AppState>((set, get) => ({
   chatTreeOpen: readChatTreeOpen(),
   terminalOpen: false,
   terminalLines: [],
+  searchOpen: false,
+  searchResults: [],
   paletteOpen: false,
 
   setLocale(locale) {
@@ -276,6 +285,19 @@ export const useStore = create<AppState>((set, get) => ({
   },
   setVpsServerId: (id) => set({ vpsServerId: id }),
   toggleTerminal: () => set({ terminalOpen: !get().terminalOpen }),
+  setSearchOpen: (open) => set({ searchOpen: open, ...(open ? {} : { searchResults: [] }) }),
+  async runCodeSearch(query) {
+    const trimmed = query.trim()
+    if (!trimmed) {
+      set({ searchResults: [] })
+      return
+    }
+    try {
+      set({ searchResults: await window.api.search.code(trimmed) })
+    } catch {
+      set({ searchResults: [] })
+    }
+  },
   async runTerminalCommand(command) {
     const trimmed = command.trim()
     if (!trimmed) return

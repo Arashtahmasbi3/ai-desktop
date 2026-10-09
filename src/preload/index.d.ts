@@ -29,6 +29,7 @@ import type {
 import type {
   AgentRunRequest,
   AppEventMap,
+  CodeMatch,
   FileEntry,
   LocalShellResult,
   RemoteStatus,
@@ -146,6 +147,9 @@ export interface Api {
   }
   shell: {
     exec(command: string): Promise<LocalShellResult>
+  }
+  search: {
+    code(query: string): Promise<CodeMatch[]>
   }
   worker: {
     submit(request: WorkerJobRequest): Promise<WorkerJobView>

@@ -6,6 +6,7 @@ import type { AgentRunRequest, WorkerJobRequest } from '@shared/ui'
 import type { AppServices } from './app-services'
 import { registerVpsIpc } from './vps-ipc'
 import { runLocalCommand } from './local-shell'
+import { searchProject } from './project-search'
 
 /**
  * Registers every IPC channel the renderer is allowed to call. Handlers only
@@ -233,6 +234,11 @@ export function registerIpc(services: AppServices, getWindow: () => BrowserWindo
     ['agent:respondApproval', (id: string, approved: boolean) => services.approvals.resolve(id, approved)],
     ['agent:applyChange', (id: string) => services.agent.applyChange(id)],
     ['shell:exec', (command: string) => runLocalCommand(command, { cwd: services.files.getRoot() })],
+    ['search:code', (query: string) => {
+      const root = services.files.getRoot()
+      if (!root) throw new Error('No active project. Add or select a project first.')
+      return searchProject(root, query)
+    }],
     ['agent:rejectChange', (id: string) => services.agent.rejectChange(id)],
     ['agent:sessions', () => services.agent.listSessions()],
     ['agent:loadSession', (id: string) => services.agent.loadSession(id)],

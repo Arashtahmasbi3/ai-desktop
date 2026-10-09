@@ -4,6 +4,7 @@ import { Bot, AlertTriangle, UploadCloud, X } from 'lucide-react'
 import BrowserPanel from './components/BrowserPanel'
 import ChatPanel from './components/ChatPanel'
 import CodeViewer from './components/CodeViewer'
+import CodeSearchModal from './components/CodeSearchModal'
 import CommandPalette from './components/CommandPalette'
 import ErrorBoundary from './components/ErrorBoundary'
 import FileExplorer from './components/FileExplorer'
@@ -43,6 +44,16 @@ export default function App(): JSX.Element {
 
       if (event.ctrlKey && event.key === 'Enter' && !typing) {
         event.preventDefault()
+        return
+      }
+      if (event.ctrlKey && event.shiftKey && (event.key === 'f' || event.key === 'F')) {
+        event.preventDefault()
+        state.setSearchOpen(true)
+        return
+      }
+      if (event.ctrlKey && event.key === '`' && !typing) {
+        event.preventDefault()
+        state.toggleTerminal()
         return
       }
       if (event.ctrlKey && (event.key === 'k' || event.key === 'K' || event.key === 'p' || event.key === 'P')) {
@@ -152,6 +163,8 @@ export default function App(): JSX.Element {
       <SettingsPanel />
 
       <CommandPalette />
+
+      <CodeSearchModal />
 
       <ToastHost />
 

@@ -27,6 +27,7 @@ import type {
   AppEventMap,
   RemoteStatus,
   SessionInfo,
+  CodeMatch,
   LocalShellResult,
   SessionRecordView,
   SettingsView,
@@ -182,6 +183,10 @@ export const api = {
 
   shell: {
     exec: (command: string): Promise<LocalShellResult> => invoke('shell:exec', command)
+  },
+
+  search: {
+    code: (query: string): Promise<CodeMatch[]> => invoke('search:code', query)
   },
 
   worker: {

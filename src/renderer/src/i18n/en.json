@@ -182,5 +182,10 @@
     "fix": "Find and fix a bug",
     "test": "Write tests",
     "help": "Show all commands"
+  },
+  "search": {
+    "placeholder": "Search the codebase…",
+    "hint": "Type to search across the active project.",
+    "empty": "No matches found."
   }
 }

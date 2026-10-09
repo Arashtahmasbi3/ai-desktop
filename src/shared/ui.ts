@@ -105,6 +105,11 @@ export interface SessionRecordView {
 
 /** Events streamed main -> renderer while an agent run is in progress. */
 /** A file the agent wrote, captured for review in the chat. */
+export interface CodeMatch {
+  path: string
+  line: number
+  text: string
+}
 export interface LocalShellResult {
   stdout: string
   stderr: string
