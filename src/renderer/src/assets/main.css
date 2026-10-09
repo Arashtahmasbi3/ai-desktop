@@ -16,8 +16,35 @@
   body {
     @apply bg-bg-primary text-neutral-100 antialiased;
     margin: 0;
-    font-family: 'Vazirmatn', ui-sans-serif, system-ui, sans-serif;
+    font-family: 'Inter', 'Vazirmatn', ui-sans-serif, system-ui, sans-serif;
     overflow: hidden;
+  }
+
+  /* Slim, dark scrollbars that match the app instead of the OS default. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #2f2f2f transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #2f2f2f;
+    border: 2px solid transparent;
+    background-clip: content-box;
+    border-radius: 9999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #3f3f3f;
+    background-clip: content-box;
   }
 }
 
