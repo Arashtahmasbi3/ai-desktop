@@ -15,6 +15,7 @@ import type { ChatSummary, StoredMessage } from '@shared/chat'
 import type { Locale } from './i18n/locale'
 import { detectLocale } from './i18n/locale'
 import { VPS_RECONNECT_KEY } from './lib/vps-state'
+import { redact } from '@core/agent/redact'
 import i18n from './i18n'
 import type {
   AgentEvent,
@@ -488,7 +489,7 @@ export const useStore = create<AppState>((set, get) => ({
   },
   pushToast(kind, message) {
     const id = newId()
-    set({ toasts: [...get().toasts, { id, kind, message }] })
+    set({ toasts: [...get().toasts, { id, kind, message: redact(message) }] })
     const ttl = kind === 'error' ? 5000 : 3000
     setTimeout(() => get().dismissToast(id), ttl)
   },
@@ -737,11 +738,11 @@ export const useStore = create<AppState>((set, get) => ({
           running: false,
           currentRunId: null,
           pendingApproval: null,
-          error: event.message,
+          error: redact(event.message),
           loopStop: null,
           messages: [
             ...get().messages,
-            { id: newId(), role: 'system', content: `Error: ${event.message}`, at: Date.now() }
+            { id: newId(), role: 'system', content: `Error: ${redact(event.message)}`, at: Date.now() }
           ]
         })
         get().pushToast('error', event.message)

@@ -1,5 +1,6 @@
 import { promises as fs } from 'node:fs'
 import { dirname } from 'node:path'
+import { redact } from './redact'
 
 export type AuditEventType =
   | 'connect'
@@ -61,7 +62,12 @@ export class AuditLog {
 
   async record(entry: Omit<AuditEntry, 'at'>): Promise<AuditEntry> {
     await this.load()
-    const full: AuditEntry = { at: this.now().toISOString(), ...entry }
+    const full: AuditEntry = {
+      at: this.now().toISOString(),
+      ...entry,
+      ...(entry.command !== undefined ? { command: redact(entry.command) } : {}),
+      ...(entry.detail !== undefined ? { detail: redact(entry.detail) } : {})
+    }
     this.entries_.push(full)
     if (this.entries_.length > this.maxEntries) {
       this.entries_ = this.entries_.slice(-this.maxEntries)
