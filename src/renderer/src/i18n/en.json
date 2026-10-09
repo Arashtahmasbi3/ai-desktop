@@ -52,7 +52,8 @@
     "user": "User",
     "remote": "Remote",
     "searchOnVps": "Search on VPS",
-    "remoteMissing": "VPS not connected"
+    "remoteMissing": "VPS not connected",
+    "noProject": "No project"
   },
   "chat": {
     "placeholder": "Ask anything or give a task…",

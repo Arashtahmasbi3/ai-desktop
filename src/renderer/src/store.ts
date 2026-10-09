@@ -260,11 +260,13 @@ export const useStore = create<AppState>((set, get) => ({
       }))
     if (stored.length === 0) return
     try {
+      const workspaceId = get().settings?.activeProjectId
       const chat = await window.api.chats.save({
         ...(activeChatId ? { id: activeChatId } : {}),
         messages: stored,
         model: selection,
-        ...(vpsServerId ? { vpsServerId } : {})
+        ...(vpsServerId ? { vpsServerId } : {}),
+        ...(workspaceId ? { workspaceId } : {})
       })
       set({ activeChatId: chat.id })
       await get().refreshChats()

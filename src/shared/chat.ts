@@ -85,3 +85,33 @@ export function titleFromMessages(messages: Array<{ role: string; content: strin
   const text = first.content.replace(/\s+/g, ' ').trim()
   return text.length > 48 ? `${text.slice(0, 48)}…` : text
 }
+
+/** Chats belonging to one project (or the trailing "no project" bucket). */
+export interface ProjectChatGroup<T> {
+  projectId?: string
+  chats: T[]
+}
+
+/**
+ * Group chats under their project. Chats whose `workspaceId` is unset — or
+ * points at a project that no longer exists — land in a trailing bucket, so
+ * history saved before projects existed still shows up.
+ */
+export function groupChatsByProject<T extends { workspaceId?: string; updatedAt: number }>(
+  chats: T[],
+  projectIds: string[]
+): ProjectChatGroup<T>[] {
+  const known = new Set(projectIds)
+  const byProject = new Map<string, T[]>()
+  for (const id of projectIds) byProject.set(id, [])
+  const unassigned: T[] = []
+  for (const chat of [...chats].sort((a, b) => b.updatedAt - a.updatedAt)) {
+    if (chat.workspaceId && known.has(chat.workspaceId)) byProject.get(chat.workspaceId)!.push(chat)
+    else unassigned.push(chat)
+  }
+  const groups: ProjectChatGroup<T>[] = projectIds
+    .filter((id) => (byProject.get(id) ?? []).length > 0)
+    .map((id) => ({ projectId: id, chats: byProject.get(id)! }))
+  if (unassigned.length > 0) groups.push({ chats: unassigned })
+  return groups
+}

@@ -52,7 +52,8 @@
     "user": "کاربر",
     "remote": "ریموت",
     "searchOnVps": "جستجو روی VPS",
-    "remoteMissing": "VPS متصل نیست"
+    "remoteMissing": "VPS متصل نیست",
+    "noProject": "بدون پروژه"
   },
   "chat": {
     "placeholder": "بپرس یا وظیفه بده…",

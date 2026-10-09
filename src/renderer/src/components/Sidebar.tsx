@@ -17,7 +17,7 @@ import {
   Trash2,
   User
 } from 'lucide-react'
-import { CHAT_GROUPS, groupChats, type ChatGroupId, type ChatSummary } from '@shared/chat'
+import { groupChatsByProject, type ChatSummary } from '@shared/chat'
 import { basename, useStore, type ViewId } from '../store'
 import type { ProjectRecord } from '@shared/ui'
 
@@ -29,13 +29,6 @@ const NAV: Array<{ id: ViewId; labelKey: string; icon: typeof MessageSquare }> =
   { id: 'github', labelKey: 'sidebar.navGitHub', icon: GitFork },
   { id: 'vps', labelKey: 'sidebar.navVps', icon: Server }
 ]
-
-const GROUP_LABEL: Record<ChatGroupId, string> = {
-  today: 'sidebar.today',
-  yesterday: 'sidebar.yesterday',
-  thisWeek: 'sidebar.thisWeek',
-  older: 'sidebar.older'
-}
 
 /** Short relative time such as "3m", "2h", "5d" for the chat rows. */
 export function relativeTime(at: number, now = Date.now()): string {
@@ -96,9 +89,13 @@ export default function Sidebar(): JSX.Element {
     () => chats.filter((chat) => chat.title.toLowerCase().includes(query.trim().toLowerCase())),
     [chats, query]
   )
-  const grouped = useMemo(() => groupChats(filtered, Date.now()), [filtered])
-
   const projects = settings?.projects ?? []
+  const groups = useMemo(
+    () => groupChatsByProject(filtered, projects.map((project) => project.id)),
+    [filtered, projects]
+  )
+  const projectName = (id?: string): string =>
+    projects.find((project) => project.id === id)?.name ?? t('sidebar.noProject')
 
   const onRename = (chat: ChatSummary): void => {
     setMenuFor(null)
@@ -248,13 +245,12 @@ export default function Sidebar(): JSX.Element {
         ) : filtered.length === 0 ? (
           <p className="px-2 py-3 text-[11px] text-neutral-600">{t('palette.noResults')}</p>
         ) : (
-          CHAT_GROUPS.map((group) =>
-            grouped[group].length === 0 ? null : (
-              <section key={group} className="mb-2">
+          groups.map((group) => (
+              <section key={group.projectId ?? '__none__'} className="mb-2">
                 <h3 className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
-                  {t(GROUP_LABEL[group])}
+                  {projectName(group.projectId)}
                 </h3>
-                {grouped[group].map((chat) => (
+                {group.chats.map((chat) => (
                   <div key={chat.id} className="relative">
                     <button
                       type="button"
@@ -336,9 +332,7 @@ export default function Sidebar(): JSX.Element {
                   </div>
                 ))}
               </section>
-            )
-          )
-        )}
+          )))}
 
         <section className="mb-2 border-t border-border pt-2">
           <h3 className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
