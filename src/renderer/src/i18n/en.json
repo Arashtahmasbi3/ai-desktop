@@ -71,7 +71,8 @@
     "suggestion1": "Read the project folder and explain its structure.",
     "suggestion2": "Write and test a TypeScript email validator.",
     "suggestion3": "Open package.json and report outdated dependencies.",
-    "usedRemote": "Used remote shell"
+    "usedRemote": "Used remote shell",
+    "overBudget": "≈{{count}} tokens — this conversation is over the context budget. Start a new chat to keep replies accurate."
   },
   "vpsSelector": {
     "label": "VPS",

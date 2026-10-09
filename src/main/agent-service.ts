@@ -13,6 +13,7 @@ import type { Persistence } from '@core/agent/persistence'
 import type { SessionStore } from '@core/agent/session-store'
 import type { SandboxManager } from '@shared/sandbox'
 import type { CustomProviderStore } from './custom-providers'
+import { loadProjectMemory } from './project-memory'
 
 /**
  * The slice of the SSH manager the agent needs to run remote commands. Kept as
@@ -157,6 +158,23 @@ export class AgentService {
     return planRemoteRuntime(task, vpsServerId, this.vps)
   }
 
+  /**
+   * System hint built from the active project's AI_CONTEXT.md / AGENTS.md.
+   * Remote projects are skipped (their files are not on this machine).
+   */
+  private async projectMemoryHint(): Promise<string | undefined> {
+    try {
+      const settings = await this.persistence.load()
+      const active = settings.projects.find(
+        (project) => project.id === settings.activeProjectId
+      )
+      if (!active || active.type === 'remote') return undefined
+      return await loadProjectMemory(active.path)
+    } catch {
+      return undefined
+    }
+  }
+
   /** Build provider entries (with keys) ordered by preference. */
   async buildProviders(options: ProviderSelection = {}): Promise<ProviderEntry[]> {
     const settings = await this.persistence.load()
@@ -236,13 +254,17 @@ export class AgentService {
       ...(request.model ? { model: request.model } : {}),
       ...(request.customProviderId ? { customProviderId: request.customProviderId } : {})
     })
+    const remote = this.buildRemoteRuntime(request.task, request.vpsServerId)
+    const memory = await this.projectMemoryHint()
+    const systemHint = [remote.systemHint, memory].filter(Boolean).join('\n\n')
     const orchestrator = new AgentOrchestrator({
       sandbox: this.sandbox,
       providers,
       logger: new EmittingLogger(this.emit),
       sessionStore: this.sessionStore,
       ...(request.sessionId ? { sessionId: request.sessionId } : {}),
-      ...this.buildRemoteRuntime(request.task, request.vpsServerId)
+      ...remote,
+      ...(systemHint ? { systemHint } : {})
     })
 
     const controller = new AbortController()

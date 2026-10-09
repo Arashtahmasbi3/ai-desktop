@@ -71,7 +71,8 @@
     "suggestion1": "لیست فایل‌های پوشه پروژه را بخوان و ساختار آن را توضیح بده.",
     "suggestion2": "یک تابع TypeScript برای اعتبارسنجی ایمیل بنویس و تستش کن.",
     "suggestion3": "package.json را باز کن و وابستگی‌های قدیمی را گزارش کن.",
-    "usedRemote": "از remote shell استفاده شد"
+    "usedRemote": "از remote shell استفاده شد",
+    "overBudget": "≈{{count}} توکن — این گفتگو از بودجه‌ی context گذشته است. برای دقت پاسخ‌ها چت جدیدی شروع کنید."
   },
   "vpsSelector": {
     "label": "VPS",

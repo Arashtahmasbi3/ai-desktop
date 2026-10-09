@@ -7,6 +7,7 @@ import ModelSwitcher from './ModelSwitcher'
 import VpsSelector from './VpsSelector'
 import ProviderWarning from './ProviderWarning'
 import { filterSlashCommands, resolveSlashCommand } from '../lib/slash'
+import { contextBudget, estimateTokens } from '@shared/memory'
 
 const SUGGESTION_KEYS = ['chat.suggestion1', 'chat.suggestion2', 'chat.suggestion3']
 
@@ -16,11 +17,6 @@ interface SlashCommand {
   descKey: string
   run?: () => void
   insert?: string
-}
-
-/** Rough token estimate (~4 chars/token) for the composer counter. */
-export function estimateTokens(text: string): number {
-  return Math.ceil(text.trim().length / 4)
 }
 
 export default function ChatPanel(): JSX.Element {
@@ -67,6 +63,7 @@ export default function ChatPanel(): JSX.Element {
   )
 
   const matches = useMemo(() => filterSlashCommands(commands, input), [commands, input])
+  const budget = useMemo(() => contextBudget(messages, input), [messages, input])
 
   useEffect(() => {
     const node = scrollRef.current
@@ -346,6 +343,11 @@ export default function ChatPanel(): JSX.Element {
             </span>
           ) : null}
         </div>
+        {budget.overBudget ? (
+          <p className="mt-1 px-1 text-[10px] text-amber-400">
+            {t('chat.overBudget', { count: budget.tokens })}
+          </p>
+        ) : null}
       </div>
     </section>
   )
