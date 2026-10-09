@@ -51,6 +51,7 @@ export interface Api {
     toggleMaximize(): Promise<boolean>
     close(): Promise<void>
     isMaximized(): Promise<boolean>
+    newWindow(): Promise<boolean>
   }
   settings: {
     get(): Promise<SettingsView>

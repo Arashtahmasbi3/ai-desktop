@@ -80,6 +80,9 @@ export default function App(): JSX.Element {
       } else if (event.ctrlKey && (event.key === 'b' || event.key === 'B')) {
         event.preventDefault()
         state.toggleSidebar()
+      } else if (event.ctrlKey && event.shiftKey && (event.key === 'n' || event.key === 'N')) {
+        event.preventDefault()
+        void window.api.window.newWindow()
       } else if (event.ctrlKey && (event.key === 'n' || event.key === 'N')) {
         event.preventDefault()
         state.newSession()

@@ -48,7 +48,8 @@ export const api = {
     minimize: (): Promise<void> => invoke('window:minimize'),
     toggleMaximize: (): Promise<boolean> => invoke('window:toggleMaximize'),
     close: (): Promise<void> => invoke('window:close'),
-    isMaximized: (): Promise<boolean> => invoke('window:isMaximized')
+    isMaximized: (): Promise<boolean> => invoke('window:isMaximized'),
+    newWindow: (): Promise<boolean> => invoke('window:new')
   },
 
   settings: {

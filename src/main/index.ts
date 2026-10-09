@@ -9,8 +9,8 @@ const isDev = !app.isPackaged
 let mainWindow: BrowserWindow | null = null
 let services: AppServices | null = null
 
-function createWindow(): void {
-  mainWindow = new BrowserWindow({
+function createWindow(): BrowserWindow {
+  const window = new BrowserWindow({
     width: 1200,
     height: 800,
     minWidth: 900,
@@ -28,12 +28,12 @@ function createWindow(): void {
     }
   })
 
-  const window = mainWindow
+  if (!mainWindow) mainWindow = window
   window.on('ready-to-show', () => window.show())
   window.on('maximize', () => window.webContents.send('window:maximized', true))
   window.on('unmaximize', () => window.webContents.send('window:maximized', false))
   window.on('closed', () => {
-    if (mainWindow === window) mainWindow = null
+    if (mainWindow === window) mainWindow = BrowserWindow.getAllWindows()[0] ?? null
   })
 
   window.webContents.setWindowOpenHandler((details) => {
@@ -54,13 +54,21 @@ function createWindow(): void {
   } else {
     void window.loadFile(join(__dirname, '../renderer/index.html'))
   }
+
+  return window
 }
 
 app.whenReady().then(async () => {
   installWebviewPolicy(app)
   services = new AppServices()
   await services.init()
-  registerIpc(services, () => mainWindow)
+  registerIpc(
+    services,
+    () => mainWindow,
+    () => {
+      createWindow()
+    }
+  )
 
   createWindow()
 

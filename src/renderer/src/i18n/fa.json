@@ -153,7 +153,9 @@
     "runCodeConfirm": "این کد روی سیستم شما اجرا شود؟",
     "output": "خروجی",
     "noOutput": "(بدون خروجی)",
-    "forkFrom": "انشعاب از اینجا"
+    "forkFrom": "انشعاب از اینجا",
+    "voiceInput": "ورودی صوتی",
+    "listening": "در حال شنیدن..."
   },
   "vpsSelector": {
     "label": "VPS",
@@ -274,5 +276,15 @@
     "osMismatch": "سیستم‌عامل متفاوت",
     "located": "پوشه پروژه به‌روزرسانی شد.",
     "autoMapped": "روی VPS پیدا شد: {path}"
+  },
+  "timeline": {
+    "title": "پیشرفت",
+    "start": "شروع شد",
+    "thought": "در حال فکر کردن",
+    "tool": "اجرای {{tool}}",
+    "error": "خطا",
+    "done": "تمام شد",
+    "stopped": "توقف برای ورودی",
+    "empty": "هنوز فعالیتی نیست."
   }
 }

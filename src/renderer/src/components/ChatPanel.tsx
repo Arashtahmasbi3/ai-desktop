@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import {
   AlertTriangle,
   ArrowDown,
+  Activity,
   Bot,
   Loader2,
   PanelLeft,
@@ -24,6 +25,8 @@ import VpsSelector from './VpsSelector'
 import ProviderWarning from './ProviderWarning'
 import LoopStopCard from './LoopStopCard'
 import ApprovalDialog from './ApprovalDialog'
+import ProgressTimeline from './ProgressTimeline'
+import MicButton from './MicButton'
 import { FullAccessBanner, FullAccessToggle } from './FullAccessToggle'
 import { filterSlashCommands, resolveSlashCommand } from '../lib/slash'
 import { contextBudget, estimateTokens } from '@shared/memory'
@@ -74,6 +77,7 @@ export default function ChatPanel(): JSX.Element {
   const [attached, setAttached] = useState<string[]>([])
   const [atBottom, setAtBottom] = useState(true)
   const [commandIndex, setCommandIndex] = useState(0)
+  const [timelineOpen, setTimelineOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -229,6 +233,19 @@ export default function ChatPanel(): JSX.Element {
           </button>
           <button
             type="button"
+            onClick={() => setTimelineOpen((open) => !open)}
+            title={t('timeline.title')}
+            aria-label={t('timeline.title')}
+            className={`flex h-5 w-5 items-center justify-center rounded transition ${
+              timelineOpen
+                ? 'bg-accent/20 text-accent'
+                : 'text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300'
+            }`}
+          >
+            <Activity className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
             onClick={toggleTerminal}
             title={t('chat.terminalTitle')}
             aria-label={t('chat.terminalTitle')}
@@ -277,6 +294,7 @@ export default function ChatPanel(): JSX.Element {
         </div>
       ) : null}
 
+      <div className="flex min-h-0 flex-1">
       <div
         ref={scrollRef}
         onScroll={onScroll}
@@ -335,6 +353,8 @@ export default function ChatPanel(): JSX.Element {
             onStop={dismissLoopStop}
           />
         ) : null}
+      </div>
+      {timelineOpen ? <ProgressTimeline /> : null}
       </div>
 
       {!atBottom && messages.length > 0 ? (
@@ -446,6 +466,12 @@ export default function ChatPanel(): JSX.Element {
             >
               <Paperclip className="h-4 w-4" />
             </button>
+            <MicButton
+              appLanguage={i18n.language}
+              onTranscript={(text) =>
+                setInput((current) => (current ? `${current} ${text}` : text))
+              }
+            />
             <textarea
               ref={textareaRef}
               value={input}
