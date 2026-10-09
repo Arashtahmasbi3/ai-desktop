@@ -129,7 +129,10 @@
     "fullAccessTurnOff": "Turn off",
     "approvalRememberCommand": "Remember this command",
     "approvalRememberTool": "Remember all commands from this tool",
-    "approvalApproveAll": "Approve all (this session)"
+    "approvalApproveAll": "Approve all (this session)",
+    "showMoreFiles": "Show {{count}} more files",
+    "reviewIndividually": "Review individually",
+    "applyChangesConfirm": "Apply {{count}} file change(s) to your project?"
   },
   "vpsSelector": {
     "label": "VPS",

@@ -129,7 +129,10 @@
     "fullAccessTurnOff": "خاموش کن",
     "approvalRememberCommand": "این دستور را به خاطر بسپار",
     "approvalRememberTool": "همه دستورهای این ابزار را به خاطر بسپار",
-    "approvalApproveAll": "تأیید همه (این نشست)"
+    "approvalApproveAll": "تأیید همه (این نشست)",
+    "showMoreFiles": "نمایش {{count}} فایل بیشتر",
+    "reviewIndividually": "بررسی تک‌تک",
+    "applyChangesConfirm": "{{count}} تغییر فایل در پروژه اعمال شود؟"
   },
   "vpsSelector": {
     "label": "VPS",

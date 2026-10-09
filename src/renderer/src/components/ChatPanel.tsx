@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 import { basename, useStore } from '../store'
 import MessageBubble from './MessageBubble'
-import FileChangeCard from './FileChangeCard'
+import FileChangesPanel from './FileChangesPanel'
 import TerminalPanel from './TerminalPanel'
 import ModelSwitcher from './ModelSwitcher'
 import VpsSelector from './VpsSelector'
@@ -59,8 +59,6 @@ export default function ChatPanel(): JSX.Element {
   const loopStop = useStore((state) => state.loopStop)
   const dismissLoopStop = useStore((state) => state.dismissLoopStop)
   const fileChanges = useStore((state) => state.fileChanges)
-  const applyFileChange = useStore((state) => state.applyFileChange)
-  const rejectFileChange = useStore((state) => state.rejectFileChange)
   const chatTreeOpen = useStore((state) => state.chatTreeOpen)
   const toggleChatTree = useStore((state) => state.toggleChatTree)
   const terminalOpen = useStore((state) => state.terminalOpen)
@@ -376,21 +374,7 @@ export default function ChatPanel(): JSX.Element {
             </span>
           </div>
         ) : null}
-        {fileChanges.length > 0 ? (
-          <div className="mb-2 flex flex-col gap-2">
-            <p className="px-1 text-[10px] uppercase tracking-wide text-neutral-500">
-              {t('chat.changesTitle')}
-            </p>
-            {fileChanges.map((change) => (
-              <FileChangeCard
-                key={change.id}
-                change={change}
-                onApply={(id) => void applyFileChange(id)}
-                onReject={(id) => void rejectFileChange(id)}
-              />
-            ))}
-          </div>
-        ) : null}
+        <FileChangesPanel changes={fileChanges} />
 
         {attached.length > 0 ? (
           <div className="mb-2 flex flex-wrap gap-1">
