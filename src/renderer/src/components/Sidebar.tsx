@@ -364,7 +364,7 @@ export default function Sidebar(): JSX.Element {
                       <span className="block truncate text-xs">{project.name}</span>
                       {project.exists === false ? (
                         <span className="block truncate text-[10px] text-amber-400/90">
-                          {t('sidebar.missingPath')}
+                          {project.osMismatch ? t('sidebar.osMismatch') : t('sidebar.missingPath')}
                         </span>
                       ) : project.type === 'remote' ? (
                         <span className="block truncate text-[10px] text-sky-400/80">

@@ -11,6 +11,7 @@ import FileExplorer from './components/FileExplorer'
 import GitHubPanel from './components/GitHubPanel'
 import VpsPanel from './components/Vps/VpsPanel'
 import Onboarding from './components/Onboarding'
+import MigrationDialog from './components/MigrationDialog'
 import SettingsPanel from './components/SettingsPanel'
 import Sidebar from './components/Sidebar'
 import StatusBar from './components/StatusBar'
@@ -179,6 +180,8 @@ export default function App(): JSX.Element {
       <Onboarding />
 
       <SettingsPanel />
+
+      <MigrationDialog />
 
       <CommandPalette />
 

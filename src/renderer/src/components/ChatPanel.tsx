@@ -44,6 +44,8 @@ export default function ChatPanel(): JSX.Element {
   const abort = useStore((state) => state.abort)
   const newSession = useStore((state) => state.newSession)
   const projectMissing = useStore((state) => state.projectMissing)
+  const settings = useStore((state) => state.settings)
+  const addProject = useStore((state) => state.addProject)
   const showTokenCount = useStore((state) => state.showTokenCount)
   const openSettings = useStore((state) => state.openSettings)
   const setView = useStore((state) => state.setView)
@@ -173,6 +175,11 @@ export default function ChatPanel(): JSX.Element {
     }
   }
 
+  const pickWorkspace = async (): Promise<void> => {
+    const picked = await window.api.dialog.pickDirectory()
+    if (picked) await addProject(basename(picked), picked)
+  }
+
   const attach = async (): Promise<void> => {
     const picked = await window.api.dialog.pickFile()
     if (picked.length > 0) setAttached((current) => [...current, ...picked])
@@ -246,6 +253,18 @@ export default function ChatPanel(): JSX.Element {
             className="rounded border border-amber-500/40 px-2 py-0.5 text-amber-200 hover:bg-amber-500/15"
           >
             {t('sidebar.locate')}
+          </button>
+        </div>
+      ) : !settings?.activeProjectId ? (
+        <div className="mx-3 mt-2 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-300">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+          <span className="flex-1">{t('chat.noWorkspaceWarning')}</span>
+          <button
+            type="button"
+            onClick={() => void pickWorkspace()}
+            className="rounded border border-amber-500/40 px-2 py-0.5 text-amber-200 hover:bg-amber-500/15"
+          >
+            {t('titlebar.openFolder')}
           </button>
         </div>
       ) : null}

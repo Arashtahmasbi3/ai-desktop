@@ -20,6 +20,12 @@ export interface ProjectRecord {
    * path from another OS survives a round-trip.
    */
   exists?: boolean
+  /**
+   * Computed at read time: whether a local project path clearly belongs to a
+   * different OS than the one the app is running on (for example a Linux path
+   * while running on Windows).
+   */
+  osMismatch?: boolean
 }
 
 /** Provider settings safe to display in the renderer (no key material). */

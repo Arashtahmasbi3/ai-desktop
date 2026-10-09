@@ -54,7 +54,8 @@
     "remote": "Remote",
     "searchOnVps": "Search on VPS",
     "remoteMissing": "VPS not connected",
-    "noProject": "No project"
+    "noProject": "No project",
+    "osMismatch": "Path from another OS"
   },
   "chat": {
     "placeholder": "Ask anything or give a task…",
@@ -110,7 +111,8 @@
     "applyAll": "Apply all",
     "rejectAll": "Reject all",
     "emptyWelcomeProject": "Working in {project}",
-    "emptyTagline": "Ask me to write code, run commands, or explore your project."
+    "emptyTagline": "Ask me to write code, run commands, or explore your project.",
+    "noWorkspaceWarning": "No workspace folder is open. Open a project before running tools so the agent has a safe place to work."
   },
   "vpsSelector": {
     "label": "VPS",
@@ -192,7 +194,8 @@
     "notConnected": "Connect a VPS first.",
     "searching": "Searching on the VPS…",
     "noMatches": "No matching folder found on the VPS.",
-    "found": "Found {{count}} folder(s)."
+    "found": "Found {{count}} folder(s).",
+    "noServers": "No VPS configured"
   },
   "slash": {
     "new": "Start a new chat",
@@ -211,5 +214,16 @@
     "placeholder": "Search the codebase…",
     "hint": "Type to search across the active project.",
     "empty": "No matches found."
+  },
+  "migration": {
+    "title": "Some projects could not be found",
+    "body": "These project folders are missing on this computer. Locate them, connect them through a VPS, or remove them.",
+    "locate": "Locate on this PC",
+    "connectVps": "Connect to VPS",
+    "remove": "Remove",
+    "later": "Remind me later",
+    "osMismatch": "Wrong OS",
+    "located": "Project folder updated.",
+    "autoMapped": "Found on the VPS: {path}"
   }
 }

@@ -4,7 +4,7 @@ import {
   normalizeProjectPath,
   normalizeRemoteProjectPath
 } from '@core/agent/persistence'
-import { crossPlatformPathWarning, isPosixAbsolutePath } from '@shared/paths'
+import { crossPlatformPathWarning, classifyLocalProject, isPosixAbsolutePath } from '@shared/paths'
 import { XorCipher } from '../helpers/fake-cipher'
 
 let file: string
@@ -67,6 +67,22 @@ describe('crossPlatformPathWarning', () => {
   it('does not treat a UNC-ish //server/share as POSIX-absolute', () => {
     expect(isPosixAbsolutePath('//server/share')).toBe(false)
     expect(crossPlatformPathWarning('//server/share', 'win32')).toBeUndefined()
+  })
+})
+
+describe('classifyLocalProject', () => {
+  it('reports an existing folder as ok', () => {
+    expect(classifyLocalProject('C:\\projects\\app', 'win32', true)).toBe('ok')
+  })
+
+  it('flags a foreign-OS path as os-mismatch, not merely missing', () => {
+    expect(classifyLocalProject('/opt/sepehr-motor', 'win32', false)).toBe('os-mismatch')
+    expect(classifyLocalProject('C:\\projects\\app', 'linux', false)).toBe('os-mismatch')
+  })
+
+  it('reports a native path that is not on disk as missing', () => {
+    expect(classifyLocalProject('C:\\projects\\gone', 'win32', false)).toBe('missing')
+    expect(classifyLocalProject('/home/me/gone', 'darwin', false)).toBe('missing')
   })
 })
 

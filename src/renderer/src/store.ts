@@ -144,6 +144,8 @@ interface AppState {
   customProviders: CustomProviderView[]
   /** First-run wizard state; null until loaded. */
   onboarding: OnboardingStatus | null
+  /** Startup project-migration modal visibility. */
+  migrationOpen: boolean
 
   /** Interface language (drives dir + all t() text). */
   locale: Locale
@@ -205,6 +207,7 @@ interface AppState {
   init: () => Promise<void>
   openSettings: () => void
   closeSettings: () => void
+  closeMigration: () => void
   setView: (view: ViewId) => void
   setSelection: (patch: Partial<ModelSelection>) => void
   refreshCustomProviders: () => Promise<void>
@@ -284,6 +287,7 @@ export const useStore = create<AppState>((set, get) => ({
   selection: DEFAULT_SELECTION,
   customProviders: [],
   onboarding: null,
+  migrationOpen: false,
 
   locale: detectLocale(),
   sidebarCollapsed: false,
@@ -467,6 +471,14 @@ export const useStore = create<AppState>((set, get) => ({
       await get().refreshFiles()
       await get().refreshSessions()
 
+      // Offer to fix projects whose folder is missing (e.g. a path from another OS).
+      if (
+        (onboarding?.completed ?? false) &&
+        settings.projects.some((project) => project.exists === false && project.type !== 'remote')
+      ) {
+        set({ migrationOpen: true })
+      }
+
       // Resume where the user left off, then keep the open chat saved so a
       // crash mid-run does not lose the conversation.
       const lastChatId = readLastChatId()
@@ -481,6 +493,7 @@ export const useStore = create<AppState>((set, get) => ({
 
   openSettings: () => set({ settingsOpen: true }),
   closeSettings: () => set({ settingsOpen: false }),
+  closeMigration: () => set({ migrationOpen: false }),
   setView: (view) => set({ view }),
   setSelection: (patch) => set({ selection: { ...get().selection, ...patch } }),
 

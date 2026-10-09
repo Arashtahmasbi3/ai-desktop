@@ -4,6 +4,7 @@ import type { SandboxManager } from '@shared/sandbox'
 import type { AgentEvent, RemoteStatus, SettingsView, WorkerStatus } from '@shared/ui'
 import type { Persistence } from '@core/agent/persistence'
 import type { SessionStore } from '@core/agent/session-store'
+import { classifyLocalProject } from '@shared/paths'
 import { SandboxManagerImpl } from '@core/sandbox/manager'
 import { WorkerManager } from '@core/worker/worker-manager'
 import { RemoteServer } from '@core/remote/remote-server'
@@ -155,15 +156,21 @@ export class AppServices {
     const view: SettingsView = {
       platform: process.platform,
       providers: {},
-      projects: settings.projects.map((project) => ({
-        ...project,
+      projects: settings.projects.map((project) => {
         // Keep the record even when missing; the UI marks it instead of deleting.
         // Remote projects count as present while their VPS is connected.
-        exists:
+        const exists =
           project.type === 'remote'
             ? Boolean(project.vpsId && this.vps.isConnected(project.vpsId))
             : existsSync(project.path)
-      }))
+        return {
+          ...project,
+          exists,
+          osMismatch:
+            project.type !== 'remote' &&
+            classifyLocalProject(project.path, process.platform, exists) === 'os-mismatch'
+        }
+      })
     }
     if (settings.activeProvider) view.activeProvider = settings.activeProvider
     if (activeId) view.activeProjectId = activeId
