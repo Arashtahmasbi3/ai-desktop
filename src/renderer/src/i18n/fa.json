@@ -102,9 +102,16 @@
     "noProjects": "هنوز پروژه‌ای نداری.",
     "missingPath": "مسیر روی این سیستم یافت نشد",
     "addRemoteProject": "افزودن Workspace ریموت",
-    "remoteHint": "پوشه‌ای روی یک VPS متصل اضافه کن؛ دستیار می‌تواند از طریق SSH آن را بگردد.",
+    "remoteHint": "پوشه‌ای را که روی VPS قرار دارد اضافه کنید. پروژه‌های ریموت از طریق SSH باز و خوانده/نوشته می‌شوند.",
     "selectServer": "سرور VPS",
-    "noVps": "هنوز VPS‌ای تنظیم نشده."
+    "noVps": "هنوز VPS‌ای تنظیم نشده.",
+    "remoteProjectName": "نام پروژه ریموت",
+    "remoteProjectPath": "/مسیر/روی/سرور",
+    "remoteActiveServer": "سرور فعال",
+    "remotePickServer": "انتخاب سرور…",
+    "discover": "جست‌وجو",
+    "remoteNotFound": "پوشه‌ای با این نام روی سرور پیدا نشد",
+    "remoteBadge": "ریموت"
   },
   "toast": {
     "dismiss": "بستن",
@@ -140,5 +147,18 @@
     "searching": "در حال جستجو روی VPS…",
     "noMatches": "پوشه‌ای روی VPS پیدا نشد.",
     "found": "{{count}} پوشه پیدا شد."
+  },
+  "slash": {
+    "new": "شروع چت جدید",
+    "clear": "پاک کردن گفتگو",
+    "settings": "باز کردن تنظیمات",
+    "workspace": "رفتن به Workspace",
+    "vps": "رفتن به VPS",
+    "github": "رفتن به گیت‌هاب",
+    "plan": "نوشتن پلان مرحله‌به‌مرحله",
+    "explain": "توضیح کد",
+    "fix": "پیدا و رفع باگ",
+    "test": "نوشتن تست",
+    "help": "نمایش همه دستورها"
   }
 }

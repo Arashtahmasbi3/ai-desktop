@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AlertTriangle, ArrowDown, Bot, Loader2, Paperclip, Send, Square, Trash2, X } from 'lucide-react'
 import { basename, useStore } from '../store'
@@ -6,8 +6,17 @@ import MessageBubble from './MessageBubble'
 import ModelSwitcher from './ModelSwitcher'
 import VpsSelector from './VpsSelector'
 import ProviderWarning from './ProviderWarning'
+import { filterSlashCommands, resolveSlashCommand } from '../lib/slash'
 
 const SUGGESTION_KEYS = ['chat.suggestion1', 'chat.suggestion2', 'chat.suggestion3']
+
+/** A composer slash-command: either runs an action or seeds a prompt template. */
+interface SlashCommand {
+  id: string
+  descKey: string
+  run?: () => void
+  insert?: string
+}
 
 /** Rough token estimate (~4 chars/token) for the composer counter. */
 export function estimateTokens(text: string): number {
@@ -25,14 +34,39 @@ export default function ChatPanel(): JSX.Element {
   const projectMissing = useStore((state) => state.projectMissing)
   const showTokenCount = useStore((state) => state.showTokenCount)
   const openSettings = useStore((state) => state.openSettings)
+  const setView = useStore((state) => state.setView)
 
   const [input, setInput] = useState('')
   const [attached, setAttached] = useState<string[]>([])
   const [atBottom, setAtBottom] = useState(true)
+  const [commandIndex, setCommandIndex] = useState(0)
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const dir = i18n.language === 'fa' ? 'rtl' : 'ltr'
+
+  const commands = useMemo<SlashCommand[]>(
+    () => [
+      { id: 'new', descKey: 'slash.new', run: () => newSession() },
+      { id: 'clear', descKey: 'slash.clear', run: () => newSession() },
+      { id: 'settings', descKey: 'slash.settings', run: () => openSettings() },
+      { id: 'workspace', descKey: 'slash.workspace', run: () => setView('files') },
+      { id: 'vps', descKey: 'slash.vps', run: () => setView('vps') },
+      { id: 'github', descKey: 'slash.github', run: () => setView('github') },
+      {
+        id: 'plan',
+        descKey: 'slash.plan',
+        insert: 'Plan the following task step by step before writing any code:\n\n'
+      },
+      { id: 'explain', descKey: 'slash.explain', insert: 'Explain what this code does and why:\n\n' },
+      { id: 'fix', descKey: 'slash.fix', insert: 'Find and fix the bug in:\n\n' },
+      { id: 'test', descKey: 'slash.test', insert: 'Write tests for:\n\n' },
+      { id: 'help', descKey: 'slash.help', run: () => setInput('/') }
+    ],
+    [newSession, openSettings, setView]
+  )
+
+  const matches = useMemo(() => filterSlashCommands(commands, input), [commands, input])
 
   useEffect(() => {
     const node = scrollRef.current
@@ -58,8 +92,25 @@ export default function ChatPanel(): JSX.Element {
     setAtBottom(true)
   }
 
+  const applyCommand = (command: SlashCommand): void => {
+    setCommandIndex(0)
+    if (command.run) {
+      command.run()
+      setInput('')
+      return
+    }
+    setInput(command.insert ?? '')
+    requestAnimationFrame(() => textareaRef.current?.focus())
+  }
+
   const submit = (): void => {
-    const body = [input.trim(), ...attached.map((path) => `@${path}`)].filter(Boolean).join('\n')
+    const trimmed = input.trim()
+    const command = resolveSlashCommand(commands, trimmed)
+    if (command) {
+      applyCommand(command)
+      return
+    }
+    const body = [trimmed, ...attached.map((path) => `@${path}`)].filter(Boolean).join('\n')
     if (!body || running) return
     setInput('')
     setAttached([])
@@ -68,6 +119,28 @@ export default function ChatPanel(): JSX.Element {
   }
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>): void => {
+    if (matches.length > 0) {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault()
+        setCommandIndex((index) => (index + 1) % matches.length)
+        return
+      }
+      if (event.key === 'ArrowUp') {
+        event.preventDefault()
+        setCommandIndex((index) => (index - 1 + matches.length) % matches.length)
+        return
+      }
+      if ((event.key === 'Enter' || event.key === 'Tab') && matches[commandIndex]) {
+        event.preventDefault()
+        applyCommand(matches[commandIndex])
+        return
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setInput('')
+        return
+      }
+    }
     if (event.key === 'Enter' && !event.shiftKey && !event.ctrlKey && !event.metaKey) {
       event.preventDefault()
       submit()
@@ -199,7 +272,29 @@ export default function ChatPanel(): JSX.Element {
           </div>
         ) : null}
 
-        <div className="flex items-end gap-2 rounded-xl border border-border bg-bg-primary p-2">
+        {matches.length > 0 ? (
+            <div className="mb-2 overflow-hidden rounded-lg border border-border bg-bg-secondary">
+              {matches.map((command, index) => (
+                <button
+                  key={command.id}
+                  type="button"
+                  onMouseDown={(event) => {
+                    event.preventDefault()
+                    applyCommand(command)
+                  }}
+                  onMouseEnter={() => setCommandIndex(index)}
+                  className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition ${
+                    index === commandIndex ? 'bg-bg-tertiary text-neutral-100' : 'text-neutral-400'
+                  }`}
+                >
+                  <span className="font-mono text-accent">/{command.id}</span>
+                  <span className="truncate text-neutral-500">{t(command.descKey)}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="flex items-end gap-2 rounded-xl border border-border bg-bg-primary p-2">
           <button
             type="button"
             onClick={() => void attach()}

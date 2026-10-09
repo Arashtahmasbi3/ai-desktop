@@ -102,9 +102,16 @@
     "noProjects": "No projects yet.",
     "missingPath": "Path not found on this system",
     "addRemoteProject": "Add remote workspace",
-    "remoteHint": "Add a folder that lives on a connected VPS. The assistant can explore it over SSH.",
+    "remoteHint": "Add a folder that lives on a VPS. Remote projects open over SSH and are read/written through the remote shell.",
     "selectServer": "VPS server",
-    "noVps": "No VPS configured yet."
+    "noVps": "No VPS configured yet.",
+    "remoteProjectName": "Remote project name",
+    "remoteProjectPath": "/path/on/server",
+    "remoteActiveServer": "Active server",
+    "remotePickServer": "Select server…",
+    "discover": "Discover",
+    "remoteNotFound": "No matching folder found on the server",
+    "remoteBadge": "remote"
   },
   "toast": {
     "dismiss": "Dismiss",
@@ -140,5 +147,18 @@
     "searching": "Searching on the VPS…",
     "noMatches": "No matching folder found on the VPS.",
     "found": "Found {{count}} folder(s)."
+  },
+  "slash": {
+    "new": "Start a new chat",
+    "clear": "Clear the conversation",
+    "settings": "Open settings",
+    "workspace": "Go to workspace",
+    "vps": "Go to VPS",
+    "github": "Go to GitHub",
+    "plan": "Draft a step-by-step plan",
+    "explain": "Explain code",
+    "fix": "Find and fix a bug",
+    "test": "Write tests",
+    "help": "Show all commands"
   }
 }
