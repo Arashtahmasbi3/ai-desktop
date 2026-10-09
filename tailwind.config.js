@@ -16,7 +16,7 @@ module.exports = {
         }
       },
       fontFamily: {
-        sans: ['Vazirmatn', 'ui-sans-serif', 'system-ui', 'sans-serif']
+          sans: ['Inter', 'Vazirmatn', 'ui-sans-serif', 'system-ui', 'sans-serif']
       }
     }
   },

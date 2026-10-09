@@ -1,17 +1,37 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AlertTriangle, ArrowDown, Bot, Loader2, Paperclip, Send, Square, Trash2, X } from 'lucide-react'
+import {
+  AlertTriangle,
+  ArrowDown,
+  Bot,
+  Loader2,
+  PanelLeft,
+  Paperclip,
+  Send,
+  ShieldAlert,
+  Square,
+  Terminal,
+  Trash2,
+  X
+} from 'lucide-react'
 import { basename, useStore } from '../store'
 import MessageBubble from './MessageBubble'
+import FileChangeCard from './FileChangeCard'
+import TerminalPanel from './TerminalPanel'
 import ModelSwitcher from './ModelSwitcher'
 import VpsSelector from './VpsSelector'
 import ProviderWarning from './ProviderWarning'
+import { filterSlashCommands, resolveSlashCommand } from '../lib/slash'
+import { contextBudget, estimateTokens } from '@shared/memory'
 
 const SUGGESTION_KEYS = ['chat.suggestion1', 'chat.suggestion2', 'chat.suggestion3']
 
-/** Rough token estimate (~4 chars/token) for the composer counter. */
-export function estimateTokens(text: string): number {
-  return Math.ceil(text.trim().length / 4)
+/** A composer slash-command: either runs an action or seeds a prompt template. */
+interface SlashCommand {
+  id: string
+  descKey: string
+  run?: () => void
+  insert?: string
 }
 
 export default function ChatPanel(): JSX.Element {
@@ -25,14 +45,51 @@ export default function ChatPanel(): JSX.Element {
   const projectMissing = useStore((state) => state.projectMissing)
   const showTokenCount = useStore((state) => state.showTokenCount)
   const openSettings = useStore((state) => state.openSettings)
+  const setView = useStore((state) => state.setView)
+  const planMode = useStore((state) => state.planMode)
+  const setPlanMode = useStore((state) => state.setPlanMode)
+  const pendingApproval = useStore((state) => state.pendingApproval)
+  const respondApproval = useStore((state) => state.respondApproval)
+  const fileChanges = useStore((state) => state.fileChanges)
+  const applyFileChange = useStore((state) => state.applyFileChange)
+  const rejectFileChange = useStore((state) => state.rejectFileChange)
+  const chatTreeOpen = useStore((state) => state.chatTreeOpen)
+  const toggleChatTree = useStore((state) => state.toggleChatTree)
+  const terminalOpen = useStore((state) => state.terminalOpen)
+  const toggleTerminal = useStore((state) => state.toggleTerminal)
 
   const [input, setInput] = useState('')
   const [attached, setAttached] = useState<string[]>([])
   const [atBottom, setAtBottom] = useState(true)
+  const [commandIndex, setCommandIndex] = useState(0)
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const dir = i18n.language === 'fa' ? 'rtl' : 'ltr'
+
+  const commands = useMemo<SlashCommand[]>(
+    () => [
+      { id: 'new', descKey: 'slash.new', run: () => newSession() },
+      { id: 'clear', descKey: 'slash.clear', run: () => newSession() },
+      { id: 'settings', descKey: 'slash.settings', run: () => openSettings() },
+      { id: 'workspace', descKey: 'slash.workspace', run: () => setView('files') },
+      { id: 'vps', descKey: 'slash.vps', run: () => setView('vps') },
+      { id: 'github', descKey: 'slash.github', run: () => setView('github') },
+      {
+        id: 'plan',
+        descKey: 'slash.plan',
+        insert: 'Plan the following task step by step before writing any code:\n\n'
+      },
+      { id: 'explain', descKey: 'slash.explain', insert: 'Explain what this code does and why:\n\n' },
+      { id: 'fix', descKey: 'slash.fix', insert: 'Find and fix the bug in:\n\n' },
+      { id: 'test', descKey: 'slash.test', insert: 'Write tests for:\n\n' },
+      { id: 'help', descKey: 'slash.help', run: () => setInput('/') }
+    ],
+    [newSession, openSettings, setView]
+  )
+
+  const matches = useMemo(() => filterSlashCommands(commands, input), [commands, input])
+  const budget = useMemo(() => contextBudget(messages, input), [messages, input])
 
   useEffect(() => {
     const node = scrollRef.current
@@ -58,8 +115,25 @@ export default function ChatPanel(): JSX.Element {
     setAtBottom(true)
   }
 
+  const applyCommand = (command: SlashCommand): void => {
+    setCommandIndex(0)
+    if (command.run) {
+      command.run()
+      setInput('')
+      return
+    }
+    setInput(command.insert ?? '')
+    requestAnimationFrame(() => textareaRef.current?.focus())
+  }
+
   const submit = (): void => {
-    const body = [input.trim(), ...attached.map((path) => `@${path}`)].filter(Boolean).join('\n')
+    const trimmed = input.trim()
+    const command = resolveSlashCommand(commands, trimmed)
+    if (command) {
+      applyCommand(command)
+      return
+    }
+    const body = [trimmed, ...attached.map((path) => `@${path}`)].filter(Boolean).join('\n')
     if (!body || running) return
     setInput('')
     setAttached([])
@@ -68,6 +142,28 @@ export default function ChatPanel(): JSX.Element {
   }
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>): void => {
+    if (matches.length > 0) {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault()
+        setCommandIndex((index) => (index + 1) % matches.length)
+        return
+      }
+      if (event.key === 'ArrowUp') {
+        event.preventDefault()
+        setCommandIndex((index) => (index - 1 + matches.length) % matches.length)
+        return
+      }
+      if ((event.key === 'Enter' || event.key === 'Tab') && matches[commandIndex]) {
+        event.preventDefault()
+        applyCommand(matches[commandIndex])
+        return
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setInput('')
+        return
+      }
+    }
     if (event.key === 'Enter' && !event.shiftKey && !event.ctrlKey && !event.metaKey) {
       event.preventDefault()
       submit()
@@ -83,9 +179,49 @@ export default function ChatPanel(): JSX.Element {
     <section className="relative flex min-h-0 flex-1 flex-col bg-bg-primary">
       <div className="flex h-8 shrink-0 items-center justify-between gap-2 border-b border-border px-3 text-[11px] text-neutral-500">
         <div className="flex min-w-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={toggleChatTree}
+            title={t('chat.toggleTree')}
+            aria-label={t('chat.toggleTree')}
+            className={`flex h-5 w-5 items-center justify-center rounded transition ${
+              chatTreeOpen
+                ? 'bg-accent/20 text-accent'
+                : 'text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300'
+            }`}
+          >
+            <PanelLeft className="h-3.5 w-3.5" />
+          </button>
           <ModelSwitcher />
           <span className="text-neutral-700">·</span>
           <VpsSelector />
+          <span className="text-neutral-700">·</span>
+          <button
+            type="button"
+            onClick={() => setPlanMode(!planMode)}
+            title={t('chat.planModeHint')}
+            className={`flex items-center gap-1 rounded px-1.5 py-0.5 transition ${
+              planMode
+                ? 'bg-accent/20 text-accent'
+                : 'text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300'
+            }`}
+          >
+            <ShieldAlert className="h-3 w-3" />
+            {planMode ? t('chat.planMode') : t('chat.codeMode')}
+          </button>
+          <button
+            type="button"
+            onClick={toggleTerminal}
+            title={t('chat.terminalTitle')}
+            aria-label={t('chat.terminalTitle')}
+            className={`flex h-5 w-5 items-center justify-center rounded transition ${
+              terminalOpen
+                ? 'bg-accent/20 text-accent'
+                : 'text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300'
+            }`}
+          >
+            <Terminal className="h-3.5 w-3.5" />
+          </button>
         </div>
         <button
           type="button"
@@ -175,7 +311,25 @@ export default function ChatPanel(): JSX.Element {
         </div>
       ) : null}
 
+      {terminalOpen ? <TerminalPanel /> : null}
+
       <div className="shrink-0 border-t border-border bg-bg-secondary p-3">
+        {fileChanges.length > 0 ? (
+          <div className="mb-2 flex flex-col gap-2">
+            <p className="px-1 text-[10px] uppercase tracking-wide text-neutral-500">
+              {t('chat.changesTitle')}
+            </p>
+            {fileChanges.map((change) => (
+              <FileChangeCard
+                key={change.id}
+                change={change}
+                onApply={(id) => void applyFileChange(id)}
+                onReject={(id) => void rejectFileChange(id)}
+              />
+            ))}
+          </div>
+        ) : null}
+
         {attached.length > 0 ? (
           <div className="mb-2 flex flex-wrap gap-1">
             {attached.map((path) => (
@@ -199,7 +353,29 @@ export default function ChatPanel(): JSX.Element {
           </div>
         ) : null}
 
-        <div className="flex items-end gap-2 rounded-xl border border-border bg-bg-primary p-2">
+        {matches.length > 0 ? (
+            <div className="mb-2 overflow-hidden rounded-lg border border-border bg-bg-secondary">
+              {matches.map((command, index) => (
+                <button
+                  key={command.id}
+                  type="button"
+                  onMouseDown={(event) => {
+                    event.preventDefault()
+                    applyCommand(command)
+                  }}
+                  onMouseEnter={() => setCommandIndex(index)}
+                  className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition ${
+                    index === commandIndex ? 'bg-bg-tertiary text-neutral-100' : 'text-neutral-400'
+                  }`}
+                >
+                  <span className="font-mono text-accent">/{command.id}</span>
+                  <span className="truncate text-neutral-500">{t(command.descKey)}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="flex items-end gap-2 rounded-xl border border-border bg-bg-primary p-2">
           <button
             type="button"
             onClick={() => void attach()}
@@ -251,7 +427,48 @@ export default function ChatPanel(): JSX.Element {
             </span>
           ) : null}
         </div>
+        {budget.overBudget ? (
+          <p className="mt-1 px-1 text-[10px] text-amber-400">
+            {t('chat.overBudget', { count: budget.tokens })}
+          </p>
+        ) : null}
       </div>
+
+      {pendingApproval ? (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-xl border border-border bg-bg-secondary p-4 shadow-2xl">
+            <h2 className="flex items-center gap-2 text-sm font-semibold text-neutral-100">
+              <ShieldAlert className="h-4 w-4 text-amber-400" />
+              {t('chat.approvalTitle')}
+            </h2>
+            <p className="mt-2 text-xs text-neutral-400">{t('chat.approvalBody')}</p>
+            <pre
+              dir="ltr"
+              className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-bg-primary p-2 font-mono text-[11px] text-neutral-200"
+            >
+              {pendingApproval.tool}
+              {'\n'}
+              {pendingApproval.summary}
+            </pre>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => respondApproval(false)}
+                className="rounded-lg border border-border px-3 py-1.5 text-xs text-neutral-300 hover:bg-bg-tertiary"
+              >
+                {t('chat.deny')}
+              </button>
+              <button
+                type="button"
+                onClick={() => respondApproval(true)}
+                className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover"
+              >
+                {t('chat.approve')}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   )
 }

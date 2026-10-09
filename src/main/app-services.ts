@@ -8,6 +8,7 @@ import { SandboxManagerImpl } from '@core/sandbox/manager'
 import { WorkerManager } from '@core/worker/worker-manager'
 import { RemoteServer } from '@core/remote/remote-server'
 import { AgentService } from './agent-service'
+import { ApprovalBroker } from './approval-broker'
 import { FileService } from './file-service'
 import { ChatStore } from './chat-store'
 import {
@@ -65,6 +66,7 @@ export class AppServices {
   readonly chats: ChatStore
   readonly sandbox: SandboxManager
   readonly agent: AgentService
+  readonly approvals: ApprovalBroker
   readonly worker: WorkerManager
   readonly remote: RemoteServer
 
@@ -93,12 +95,18 @@ export class AppServices {
       options.sandbox ??
       new SandboxManagerImpl({ baseDir: sandboxDir(this.dir) })
 
+    this.approvals = new ApprovalBroker({
+      emit: (event: AgentEvent) => this.emit('agent:event', event)
+    })
     this.agent = new AgentService({
       sandbox: this.sandbox,
       persistence: this.persistence,
       sessionStore: this.sessions,
       customProviders: this.customProviders,
       vps: this.vps,
+      requestApproval: (runId, action) => this.approvals.request(runId, action),
+      cancelApprovals: () => this.approvals.cancelAll(),
+      files: this.files,
       emit: (event: AgentEvent) => this.emit('agent:event', event)
     })
 
@@ -145,15 +153,22 @@ export class AppServices {
     const settings = await this.persistence.load()
     const activeId = settings.activeProjectId
     const view: SettingsView = {
+      platform: process.platform,
       providers: {},
       projects: settings.projects.map((project) => ({
         ...project,
         // Keep the record even when missing; the UI marks it instead of deleting.
-        exists: existsSync(project.path)
+        // Remote projects count as present while their VPS is connected.
+        exists:
+          project.type === 'remote'
+            ? Boolean(project.vpsId && this.vps.isConnected(project.vpsId))
+            : existsSync(project.path)
       }))
     }
     if (settings.activeProvider) view.activeProvider = settings.activeProvider
     if (activeId) view.activeProjectId = activeId
+    if (settings.approvalMode) view.approvalMode = settings.approvalMode
+    if (settings.planModeDefault !== undefined) view.planModeDefault = settings.planModeDefault
     for (const [provider, value] of Object.entries(settings.providers)) {
       if (!value) continue
       view.providers[provider as keyof SettingsView['providers']] = {

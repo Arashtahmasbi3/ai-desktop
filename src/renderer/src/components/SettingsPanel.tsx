@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   AlertTriangle,
@@ -10,12 +10,14 @@ import {
   Languages,
   MapPin,
   Server,
+  Search,
   Settings2,
   Trash2,
   X
 } from 'lucide-react'
 import { PROVIDERS, PROVIDER_IDS } from '@shared/providers'
 import type { ProviderId } from '@shared/types'
+import type { VpsConnectionState, VpsServerView } from '@shared/vps'
 import { SUPPORTED_LOCALES } from '../i18n/locale'
 import { useStore } from '../store'
 import CustomProvidersSection from './CustomProvidersSection'
@@ -42,6 +44,8 @@ export default function SettingsPanel(): JSX.Element | null {
   const setModel = useStore((state) => state.setModel)
   const setActiveProvider = useStore((state) => state.setActiveProvider)
   const addProject = useStore((state) => state.addProject)
+  const addRemoteProject = useStore((state) => state.addRemoteProject)
+  const pushToast = useStore((state) => state.pushToast)
   const removeProject = useStore((state) => state.removeProject)
   const updateProjectPath = useStore((state) => state.updateProjectPath)
   const openProject = useStore((state) => state.openProject)
@@ -49,13 +53,27 @@ export default function SettingsPanel(): JSX.Element | null {
   const setLocale = useStore((state) => state.setLocale)
   const showTokenCount = useStore((state) => state.showTokenCount)
   const setShowTokenCount = useStore((state) => state.setShowTokenCount)
+  const setApprovalMode = useStore((state) => state.setApprovalMode)
+  const setPlanModeDefault = useStore((state) => state.setPlanModeDefault)
   const setView = useStore((state) => state.setView)
 
   const [tab, setTab] = useState<TabId>('general')
   const [keys, setKeys] = useState<Partial<Record<ProviderId, string>>>({})
   const [projectName, setProjectName] = useState('')
   const [projectPath, setProjectPath] = useState('')
+  const [remoteName, setRemoteName] = useState('')
+  const [remotePath, setRemotePath] = useState('')
+  const [remoteVpsId, setRemoteVpsId] = useState('')
+  const [servers, setServers] = useState<VpsServerView[]>([])
+  const [vpsStatus, setVpsStatus] = useState<VpsConnectionState>({ status: 'disconnected' })
+  const [discovering, setDiscovering] = useState(false)
   const [savingKey, setSavingKey] = useState<ProviderId | null>(null)
+
+  useEffect(() => {
+    void window.api.vps.list().then(setServers)
+    void window.api.vps.status().then(setVpsStatus)
+    return window.api.events.on('vps:status', setVpsStatus)
+  }, [])
 
   if (!open) return null
 
@@ -78,6 +96,33 @@ export default function SettingsPanel(): JSX.Element | null {
   const locate = async (id: string): Promise<void> => {
     const picked = await window.api.dialog.pickDirectory()
     if (picked) await updateProjectPath(id, picked)
+  }
+
+  const connectedId = vpsStatus.status === 'connected' ? vpsStatus.serverId : undefined
+  const targetVpsId = remoteVpsId || connectedId || ''
+
+  const discoverRemote = async (): Promise<void> => {
+    if (!targetVpsId) {
+      pushToast('warning', t('vps.notConnected'))
+      return
+    }
+    const query = remoteName.trim() || remotePath.trim()
+    if (!query) return
+    setDiscovering(true)
+    try {
+      const found = await window.api.vps.searchProject(targetVpsId, query)
+      if (found.length > 0) setRemotePath(found[0])
+      else pushToast('warning', t('settings.remoteNotFound'))
+    } finally {
+      setDiscovering(false)
+    }
+  }
+
+  const addRemote = async (): Promise<void> => {
+    if (!targetVpsId || !remotePath.trim()) return
+    await addRemoteProject(remoteName.trim(), remotePath.trim(), targetVpsId)
+    setRemoteName('')
+    setRemotePath('')
   }
 
   return (
@@ -313,6 +358,58 @@ export default function SettingsPanel(): JSX.Element | null {
                   </button>
                 </div>
 
+                <div className="mb-1 flex items-center gap-2">
+                  <input
+                    value={remoteName}
+                    onChange={(event) => setRemoteName(event.target.value)}
+                    placeholder={t('settings.remoteProjectName')}
+                    className="w-36 rounded border border-border bg-bg-primary px-2 py-1 text-xs text-neutral-200 outline-none focus:border-accent/50"
+                  />
+                  <input
+                    value={remotePath}
+                    onChange={(event) => setRemotePath(event.target.value)}
+                    placeholder={t('settings.remoteProjectPath')}
+                    dir="ltr"
+                    className="flex-1 rounded border border-border bg-bg-primary px-2 py-1 font-mono text-xs text-neutral-200 outline-none focus:border-accent/50"
+                  />
+                  <select
+                    value={remoteVpsId}
+                    onChange={(event) => setRemoteVpsId(event.target.value)}
+                    className="max-w-[9rem] rounded border border-border bg-bg-primary px-2 py-1 text-xs text-neutral-300"
+                  >
+                    <option value="">
+                      {connectedId ? t('settings.remoteActiveServer') : t('settings.remotePickServer')}
+                    </option>
+                    {servers.map((server) => (
+                      <option key={server.id} value={server.id}>
+                        {server.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => void discoverRemote()}
+                    disabled={discovering}
+                    title={t('settings.discover')}
+                    className="flex items-center gap-1 rounded border border-border px-2 py-1 text-xs text-neutral-300 hover:bg-bg-tertiary disabled:opacity-40"
+                  >
+                    <Search className="h-3 w-3" />
+                    {t('settings.discover')}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!remotePath.trim() || !targetVpsId}
+                    onClick={() => void addRemote()}
+                    className="flex items-center gap-1 rounded bg-accent px-3 py-1 text-xs text-white hover:bg-accent-hover disabled:opacity-40"
+                  >
+                    <Server className="h-3 w-3" />
+                    {t('common.add')}
+                  </button>
+                </div>
+                <p className="mb-3 text-[11px] leading-relaxed text-neutral-600">
+                  {t('settings.remoteHint')}
+                </p>
+
                 {projects.length === 0 ? (
                   <p className="text-xs text-neutral-600">{t('settings.noProjects')}</p>
                 ) : (
@@ -331,6 +428,12 @@ export default function SettingsPanel(): JSX.Element | null {
                           <span className="ml-2 font-mono text-[10px] text-neutral-500" dir="ltr">
                             {project.path}
                           </span>
+                          {project.type === 'remote' ? (
+                            <span className="ml-2 inline-flex items-center gap-0.5 rounded bg-sky-500/15 px-1 py-0.5 text-[9px] text-sky-300">
+                              <Server className="h-2.5 w-2.5" />
+                              {t('settings.remoteBadge')}
+                            </span>
+                          ) : null}
                         </button>
                         {project.exists === false ? (
                           <span className="mr-2 flex items-center gap-1 text-[10px] text-amber-400">
@@ -400,7 +503,50 @@ export default function SettingsPanel(): JSX.Element | null {
                   />
                   {t('settings.showTokenCount')}
                 </label>
-                <p className="text-[11px] text-neutral-600">AI Desktop v2.1.0</p>
+
+                <div className="flex flex-col gap-2 rounded-lg border border-border bg-bg-primary p-3">
+                  <div>
+                    <p className="text-xs font-medium text-neutral-200">
+                      {t('settings.approvalMode')}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-neutral-500">
+                      {t('settings.approvalHint')}
+                    </p>
+                  </div>
+                  {(
+                    [
+                      ['auto', 'settings.approvalAuto'],
+                      ['dangerous', 'settings.approvalDangerous'],
+                      ['writes', 'settings.approvalWrites']
+                    ] as const
+                  ).map(([value, labelKey]) => (
+                    <label
+                      key={value}
+                      className="flex cursor-pointer items-center gap-2 text-xs text-neutral-300"
+                    >
+                      <input
+                        type="radio"
+                        name="approval-mode"
+                        checked={(settings?.approvalMode ?? 'dangerous') === value}
+                        onChange={() => void setApprovalMode(value)}
+                        className="accent-accent"
+                      />
+                      {t(labelKey)}
+                    </label>
+                  ))}
+                </div>
+
+                <label className="flex cursor-pointer items-center gap-2 text-xs text-neutral-300">
+                  <input
+                    type="checkbox"
+                    checked={settings?.planModeDefault ?? false}
+                    onChange={(event) => void setPlanModeDefault(event.target.checked)}
+                    className="accent-accent"
+                  />
+                  {t('settings.planModeDefault')}
+                </label>
+
+                <p className="text-[11px] text-neutral-600">AI Desktop v2.2.0</p>
               </section>
             ) : null}
           </div>

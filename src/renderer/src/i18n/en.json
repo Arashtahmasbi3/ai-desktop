@@ -18,7 +18,8 @@
     "active": "Active",
     "setActive": "Set active",
     "none": "None",
-    "more": "More"
+    "more": "More",
+    "clear": "Clear"
   },
   "titlebar": {
     "newChat": "New chat",
@@ -49,7 +50,11 @@
     "navBrowser": "Browser",
     "navGitHub": "GitHub",
     "navVps": "VPS",
-    "user": "User"
+    "user": "User",
+    "remote": "Remote",
+    "searchOnVps": "Search on VPS",
+    "remoteMissing": "VPS not connected",
+    "noProject": "No project"
   },
   "chat": {
     "placeholder": "Ask anything or give a task…",
@@ -67,7 +72,21 @@
     "suggestion1": "Read the project folder and explain its structure.",
     "suggestion2": "Write and test a TypeScript email validator.",
     "suggestion3": "Open package.json and report outdated dependencies.",
-    "usedRemote": "Used remote shell"
+    "usedRemote": "Used remote shell",
+    "overBudget": "≈{{count}} tokens — this conversation is over the context budget. Start a new chat to keep replies accurate.",
+    "planMode": "Plan",
+    "codeMode": "Code",
+    "planModeHint": "Plan Mode: the agent describes the steps but does not run any tools.",
+    "approvalTitle": "Approve agent action?",
+    "approvalBody": "The agent wants to run:",
+    "approve": "Approve",
+    "deny": "Deny",
+    "applyChange": "Apply",
+    "rejectChange": "Reject",
+    "changesTitle": "Proposed file changes",
+    "toggleTree": "Toggle file tree",
+    "terminalTitle": "Terminal",
+    "terminalPlaceholder": "Type a command and press Enter"
   },
   "vpsSelector": {
     "label": "VPS",
@@ -97,7 +116,24 @@
     "projectName": "Name",
     "projectPath": "Path (e.g. C:\\Users\\me\\project)",
     "noProjects": "No projects yet.",
-    "missingPath": "Path not found on this system"
+    "missingPath": "Path not found on this system",
+    "addRemoteProject": "Add remote workspace",
+    "remoteHint": "Add a folder that lives on a VPS. Remote projects open over SSH and are read/written through the remote shell.",
+    "selectServer": "VPS server",
+    "noVps": "No VPS configured yet.",
+    "remoteProjectName": "Remote project name",
+    "remoteProjectPath": "/path/on/server",
+    "remoteActiveServer": "Active server",
+    "remotePickServer": "Select server…",
+    "discover": "Discover",
+    "remoteNotFound": "No matching folder found on the server",
+    "remoteBadge": "remote",
+    "approvalMode": "Approval mode",
+    "approvalAuto": "Auto — run everything",
+    "approvalDangerous": "Ask before shell commands",
+    "approvalWrites": "Ask before every write",
+    "approvalHint": "Controls when the agent pauses for your approval before running a tool.",
+    "planModeDefault": "Start new chats in Plan Mode"
   },
   "toast": {
     "dismiss": "Dismiss",
@@ -127,5 +163,29 @@
     "stepOf": "Step {{current}} of {{total}}",
     "vpsTitle": "VPS & Remote",
     "vpsBody": "Connect a server over SSH to run remote commands. Pick a connected VPS in the chat header and the assistant can use the remote_shell tool."
+  },
+  "vps": {
+    "notConnected": "Connect a VPS first.",
+    "searching": "Searching on the VPS…",
+    "noMatches": "No matching folder found on the VPS.",
+    "found": "Found {{count}} folder(s)."
+  },
+  "slash": {
+    "new": "Start a new chat",
+    "clear": "Clear the conversation",
+    "settings": "Open settings",
+    "workspace": "Go to workspace",
+    "vps": "Go to VPS",
+    "github": "Go to GitHub",
+    "plan": "Draft a step-by-step plan",
+    "explain": "Explain code",
+    "fix": "Find and fix a bug",
+    "test": "Write tests",
+    "help": "Show all commands"
+  },
+  "search": {
+    "placeholder": "Search the codebase…",
+    "hint": "Type to search across the active project.",
+    "empty": "No matches found."
   }
 }

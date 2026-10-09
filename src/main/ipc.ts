@@ -1,9 +1,12 @@
 import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import type { CustomProviderInput, ProviderId } from '@shared/types'
+import type { ApprovalMode } from '@shared/approval'
 import type { GitCommitInput } from '@shared/github'
 import type { AgentRunRequest, WorkerJobRequest } from '@shared/ui'
 import type { AppServices } from './app-services'
 import { registerVpsIpc } from './vps-ipc'
+import { runLocalCommand } from './local-shell'
+import { searchProject } from './project-search'
 
 /**
  * Registers every IPC channel the renderer is allowed to call. Handlers only
@@ -82,9 +85,31 @@ export function registerIpc(services: AppServices, getWindow: () => BrowserWindo
       }
     ],
     [
+      'settings:setApprovalMode',
+      async (mode: ApprovalMode) => {
+        await services.persistence.setApprovalMode(mode)
+        return changed()
+      }
+    ],
+    [
+      'settings:setPlanModeDefault',
+      async (enabled: boolean) => {
+        await services.persistence.setPlanModeDefault(enabled)
+        return changed()
+      }
+    ],
+    [
       'settings:addProject',
       async (name: string, path: string) => {
         await services.persistence.addProject(name, path)
+        await services.openActiveProject()
+        return changed()
+      }
+    ],
+    [
+      'settings:addRemoteProject',
+      async (name: string, path: string, vpsId: string) => {
+        await services.persistence.addProject(name, path, { type: 'remote', vpsId })
         await services.openActiveProject()
         return changed()
       }
@@ -148,6 +173,7 @@ export function registerIpc(services: AppServices, getWindow: () => BrowserWindo
 
     ['github:status', () => services.github.status()],
     ['github:setClientId', (clientId: string) => services.github.setClientId(clientId)],
+    ['github:setToken', (token: string) => services.github.setToken(token)],
     ['github:startAuth', () => services.github.startAuth()],
     ['github:pollAuth', (deviceCode: string) => services.github.pollAuth(deviceCode)],
     ['github:logout', () => services.github.logout()],
@@ -205,6 +231,15 @@ export function registerIpc(services: AppServices, getWindow: () => BrowserWindo
 
     ['agent:run', (request: AgentRunRequest) => services.agent.run(request)],
     ['agent:abort', () => services.agent.abort()],
+    ['agent:respondApproval', (id: string, approved: boolean) => services.approvals.resolve(id, approved)],
+    ['agent:applyChange', (id: string) => services.agent.applyChange(id)],
+    ['shell:exec', (command: string) => runLocalCommand(command, { cwd: services.files.getRoot() })],
+    ['search:code', (query: string) => {
+      const root = services.files.getRoot()
+      if (!root) throw new Error('No active project. Add or select a project first.')
+      return searchProject(root, query)
+    }],
+    ['agent:rejectChange', (id: string) => services.agent.rejectChange(id)],
     ['agent:sessions', () => services.agent.listSessions()],
     ['agent:loadSession', (id: string) => services.agent.loadSession(id)],
 

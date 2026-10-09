@@ -4,6 +4,7 @@ import { Bot, AlertTriangle, UploadCloud, X } from 'lucide-react'
 import BrowserPanel from './components/BrowserPanel'
 import ChatPanel from './components/ChatPanel'
 import CodeViewer from './components/CodeViewer'
+import CodeSearchModal from './components/CodeSearchModal'
 import CommandPalette from './components/CommandPalette'
 import ErrorBoundary from './components/ErrorBoundary'
 import FileExplorer from './components/FileExplorer'
@@ -27,6 +28,7 @@ export default function App(): JSX.Element {
   const error = useStore((state) => state.error)
   const clearError = useStore((state) => state.clearError)
   const addProject = useStore((state) => state.addProject)
+  const chatTreeOpen = useStore((state) => state.chatTreeOpen)
   const [dragging, setDragging] = useState(false)
 
   useEffect(() => {
@@ -42,6 +44,33 @@ export default function App(): JSX.Element {
 
       if (event.ctrlKey && event.key === 'Enter' && !typing) {
         event.preventDefault()
+        return
+      }
+      if (event.ctrlKey && event.shiftKey && (event.key === 'f' || event.key === 'F')) {
+        event.preventDefault()
+        state.setSearchOpen(true)
+        return
+      }
+      if (event.ctrlKey && event.shiftKey && (event.key === 'e' || event.key === 'E')) {
+        event.preventDefault()
+        state.toggleChatTree()
+        return
+      }
+      if (event.ctrlKey && event.shiftKey && (event.key === 't' || event.key === 'T')) {
+        event.preventDefault()
+        state.toggleTerminal()
+        return
+      }
+      if (event.ctrlKey && (event.key === 's' || event.key === 'S')) {
+        if (state.selectedFile) {
+          event.preventDefault()
+          void state.saveFile()
+        }
+        return
+      }
+      if (event.ctrlKey && event.key === '`' && !typing) {
+        event.preventDefault()
+        state.toggleTerminal()
         return
       }
       if (event.ctrlKey && (event.key === 'k' || event.key === 'K' || event.key === 'p' || event.key === 'P')) {
@@ -64,7 +93,8 @@ export default function App(): JSX.Element {
           ]
         )
       } else if (event.key === 'Escape') {
-        if (state.paletteOpen) state.setPaletteOpen(false)
+        if (state.searchOpen) state.setSearchOpen(false)
+        else if (state.paletteOpen) state.setPaletteOpen(false)
         else if (state.settingsOpen) state.closeSettings()
         else clearError()
       }
@@ -106,7 +136,16 @@ export default function App(): JSX.Element {
             </div>
           ) : (
             <ErrorBoundary label="Workspace" key={view}>
-              {view === 'chat' ? <ChatPanel /> : null}
+              {view === 'chat' ? (
+                <div className="flex min-h-0 min-w-0 flex-1">
+                  {chatTreeOpen ? (
+                    <aside className="hidden w-64 shrink-0 border-r border-border md:flex">
+                      <FileExplorer />
+                    </aside>
+                  ) : null}
+                  <ChatPanel />
+                </div>
+              ) : null}
               {view === 'tasks' ? <TaskPanel /> : null}
               {view === 'files' ? <FileExplorer /> : null}
               {view === 'browser' ? <BrowserPanel /> : null}
@@ -142,6 +181,8 @@ export default function App(): JSX.Element {
       <SettingsPanel />
 
       <CommandPalette />
+
+      <CodeSearchModal />
 
       <ToastHost />
 

@@ -8,6 +8,7 @@ import type {
   ProviderId
 } from '@shared/types'
 import { DEFAULT_SELECTION, resolveSelection } from '@shared/selection'
+import type { ApprovalMode } from '@shared/approval'
 import type { OnboardingStatus } from '@shared/onboarding'
 import type { ChatSummary, StoredMessage } from '@shared/chat'
 import type { Locale } from './i18n/locale'
@@ -15,6 +16,9 @@ import { detectLocale } from './i18n/locale'
 import i18n from './i18n'
 import type {
   AgentEvent,
+  ApprovalRequest,
+  CodeMatch,
+  FileChangeView,
   FileEntry,
   ModelSelection,
   RemoteStatus,
@@ -34,6 +38,14 @@ export interface Toast {
   message: string
 }
 
+export type TerminalLineKind = 'command' | 'stdout' | 'stderr' | 'info'
+
+export interface TerminalLine {
+  id: string
+  kind: TerminalLineKind
+  text: string
+}
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant' | 'tool' | 'system'
@@ -46,7 +58,11 @@ export interface ChatMessage {
 }
 
 const MAX_LOGS = 500
+const MAX_TERMINAL_LINES = 500
 const TOKEN_SETTINGS_KEY = 'ai-desktop:show-token-count'
+const CHAT_TREE_KEY = 'ai-desktop:chat-tree-open'
+const LAST_CHAT_KEY = 'ai-desktop:last-chat'
+const AUTOSAVE_INTERVAL_MS = 30_000
 
 function newId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `id-${Math.random().toString(36).slice(2)}`
@@ -57,6 +73,30 @@ function readShowTokenCount(): boolean {
     return globalThis.localStorage?.getItem(TOKEN_SETTINGS_KEY) !== '0'
   } catch {
     return true
+  }
+}
+
+function readChatTreeOpen(): boolean {
+  try {
+    return globalThis.localStorage?.getItem(CHAT_TREE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function readLastChatId(): string | null {
+  try {
+    return globalThis.localStorage?.getItem(LAST_CHAT_KEY)
+  } catch {
+    return null
+  }
+}
+
+function rememberChatId(id: string): void {
+  try {
+    globalThis.localStorage?.setItem(LAST_CHAT_KEY, id)
+  } catch {
+    // Best-effort: forgetting the last chat only skips restore.
   }
 }
 
@@ -115,8 +155,24 @@ interface AppState {
   activeChatId: string | null
   /** Connected VPS selected for remote_shell in this chat. */
   vpsServerId: string | undefined
+  /** Plan Mode: the agent drafts a plan without running tools. */
+  planMode: boolean
+  /** Tool call awaiting the user's approval, if any. */
+  pendingApproval: ApprovalRequest | null
+  /** Agent file edits awaiting the user's apply/reject decision. */
+  fileChanges: FileChangeView[]
   /** Transient toast notifications. */
   toasts: Toast[]
+  /** Whether the file tree is shown next to the chat. */
+  chatTreeOpen: boolean
+  /** Whether the local terminal panel is open under the chat. */
+  terminalOpen: boolean
+  /** Whether the codebase search modal is open. */
+  searchOpen: boolean
+  /** Results of the last codebase search. */
+  searchResults: CodeMatch[]
+  /** Output lines of the local terminal panel. */
+  terminalLines: TerminalLine[]
   /** Command palette visibility. */
   paletteOpen: boolean
 
@@ -129,9 +185,20 @@ interface AppState {
   renameChat: (id: string, title: string) => Promise<void>
   deleteChat: (id: string) => Promise<void>
   setVpsServerId: (id: string | undefined) => void
+  setPlanMode: (value: boolean) => void
+  setApprovalMode: (mode: ApprovalMode) => Promise<void>
+  setPlanModeDefault: (value: boolean) => Promise<void>
+  respondApproval: (approved: boolean) => void
+  applyFileChange: (id: string) => Promise<void>
+  rejectFileChange: (id: string) => Promise<void>
   pushToast: (kind: ToastKind, message: string) => void
   dismissToast: (id: string) => void
   setPaletteOpen: (open: boolean) => void
+  toggleChatTree: () => void
+  toggleTerminal: () => void
+  runTerminalCommand: (command: string) => Promise<void>
+  setSearchOpen: (open: boolean) => void
+  runCodeSearch: (query: string) => Promise<void>
 
   init: () => Promise<void>
   openSettings: () => void
@@ -162,15 +229,27 @@ interface AppState {
   toggleRemote: () => Promise<void>
 
   addProject: (name: string, path: string) => Promise<void>
+  addRemoteProject: (name: string, path: string, vpsId: string) => Promise<void>
   removeProject: (id: string) => Promise<void>
   openProject: (id: string) => Promise<void>
   updateProjectPath: (id: string, path: string) => Promise<void>
+  searchVpsProject: (name: string) => Promise<string[]>
   setApiKey: (provider: ProviderId, apiKey: string) => Promise<void>
   removeApiKey: (provider: ProviderId) => Promise<void>
   setModel: (provider: ProviderId, model: string) => Promise<void>
   setActiveProvider: (provider: ProviderId) => Promise<void>
 
   clearError: () => void
+}
+
+let autosaveTimer: ReturnType<typeof setInterval> | null = null
+
+function startAutosave(get: () => AppState): void {
+  if (autosaveTimer || typeof setInterval !== 'function') return
+  autosaveTimer = setInterval(() => {
+    const state = get()
+    if (state.messages.length > 0) void state.persistChat()
+  }, AUTOSAVE_INTERVAL_MS)
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -208,7 +287,15 @@ export const useStore = create<AppState>((set, get) => ({
   chats: [],
   activeChatId: null,
   vpsServerId: undefined,
+  planMode: false,
+  pendingApproval: null,
+  fileChanges: [],
   toasts: [],
+  chatTreeOpen: readChatTreeOpen(),
+  terminalOpen: false,
+  terminalLines: [],
+  searchOpen: false,
+  searchResults: [],
   paletteOpen: false,
 
   setLocale(locale) {
@@ -225,6 +312,71 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
   setVpsServerId: (id) => set({ vpsServerId: id }),
+  toggleTerminal: () => set({ terminalOpen: !get().terminalOpen }),
+  setSearchOpen: (open) => set({ searchOpen: open, ...(open ? {} : { searchResults: [] }) }),
+  async runCodeSearch(query) {
+    const trimmed = query.trim()
+    if (!trimmed) {
+      set({ searchResults: [] })
+      return
+    }
+    try {
+      set({ searchResults: await window.api.search.code(trimmed) })
+    } catch {
+      set({ searchResults: [] })
+    }
+  },
+  async runTerminalCommand(command) {
+    const trimmed = command.trim()
+    if (!trimmed) return
+    const push = (kind: TerminalLineKind, text: string): void => {
+      const lines = [...get().terminalLines, { id: newId(), kind, text }]
+      if (lines.length > MAX_TERMINAL_LINES) lines.splice(0, lines.length - MAX_TERMINAL_LINES)
+      set({ terminalLines: lines })
+    }
+    push('command', `$ ${trimmed}`)
+    try {
+      const result = await window.api.shell.exec(trimmed)
+      if (result.stdout) push('stdout', result.stdout.replace(/\n$/, ''))
+      if (result.stderr) push('stderr', result.stderr.replace(/\n$/, ''))
+      if (result.exitCode !== 0) push('info', `exit ${result.exitCode}`)
+    } catch (error) {
+      push('stderr', error instanceof Error ? error.message : String(error))
+    }
+  },
+  toggleChatTree() {
+    const value = !get().chatTreeOpen
+    set({ chatTreeOpen: value })
+    try {
+      globalThis.localStorage?.setItem(CHAT_TREE_KEY, value ? '1' : '0')
+    } catch {
+      // Persisting the preference is best-effort.
+    }
+  },
+  setPlanMode: (value) => set({ planMode: value }),
+  async setApprovalMode(mode) {
+    set({ settings: await window.api.settings.setApprovalMode(mode) })
+  },
+  async setPlanModeDefault(value) {
+    set({ settings: await window.api.settings.setPlanModeDefault(value) })
+  },
+  respondApproval(approved) {
+    const pending = get().pendingApproval
+    if (!pending) return
+    set({ pendingApproval: null })
+    void window.api.agent.respondApproval(pending.id, approved)
+  },
+  async applyFileChange(id) {
+    const ok = await window.api.agent.applyChange(id)
+    if (ok) {
+      set({ fileChanges: get().fileChanges.filter((change) => change.id !== id) })
+      void get().refreshFiles()
+    }
+  },
+  async rejectFileChange(id) {
+    const ok = await window.api.agent.rejectChange(id)
+    if (ok) set({ fileChanges: get().fileChanges.filter((change) => change.id !== id) })
+  },
   pushToast(kind, message) {
     const id = newId()
     set({ toasts: [...get().toasts, { id, kind, message }] })
@@ -258,13 +410,16 @@ export const useStore = create<AppState>((set, get) => ({
       }))
     if (stored.length === 0) return
     try {
+      const workspaceId = get().settings?.activeProjectId
       const chat = await window.api.chats.save({
         ...(activeChatId ? { id: activeChatId } : {}),
         messages: stored,
         model: selection,
-        ...(vpsServerId ? { vpsServerId } : {})
+        ...(vpsServerId ? { vpsServerId } : {}),
+        ...(workspaceId ? { workspaceId } : {})
       })
       set({ activeChatId: chat.id })
+      rememberChatId(chat.id)
       await get().refreshChats()
     } catch (error) {
       set({ error: error instanceof Error ? error.message : String(error) })
@@ -302,10 +457,19 @@ export const useStore = create<AppState>((set, get) => ({
         onboarding,
         chats,
         ready: true,
+        planMode: settings.planModeDefault ?? false,
         selection: resolveSelection(settings)
       })
       await get().refreshFiles()
       await get().refreshSessions()
+
+      // Resume where the user left off, then keep the open chat saved so a
+      // crash mid-run does not lose the conversation.
+      const lastChatId = readLastChatId()
+      if (lastChatId && chats.some((chat) => chat.id === lastChatId) && get().messages.length === 0) {
+        await get().loadSession(lastChatId)
+      }
+      startAutosave(get)
     } catch (error) {
       set({ error: error instanceof Error ? error.message : String(error), ready: true })
     }
@@ -337,7 +501,16 @@ export const useStore = create<AppState>((set, get) => ({
   applyEvent(event) {
     switch (event.type) {
       case 'run:start':
-        set({ running: true, currentRunId: event.runId, error: null, logs: [] })
+        set({ running: true, currentRunId: event.runId, error: null, logs: [], pendingApproval: null })
+        break
+      case 'approval:request':
+        set({ pendingApproval: event.request })
+        break
+      case 'file:change':
+        set({ fileChanges: [...get().fileChanges, event.change] })
+        break
+      case 'file:change:resolved':
+        set({ fileChanges: get().fileChanges.filter((change) => change.id !== event.id) })
         break
       case 'log': {
         const logs = [...get().logs, event.entry]
@@ -381,6 +554,7 @@ export const useStore = create<AppState>((set, get) => ({
           running: false,
           currentRunId: null,
           warnings: event.warnings,
+          pendingApproval: null,
           messages
         })
         void get().persistChat()
@@ -391,6 +565,7 @@ export const useStore = create<AppState>((set, get) => ({
         set({
           running: false,
           currentRunId: null,
+          pendingApproval: null,
           error: event.message,
           messages: [
             ...get().messages,
@@ -419,7 +594,8 @@ export const useStore = create<AppState>((set, get) => ({
         provider: selection.provider,
         model: selection.model,
         ...(selection.customProviderId ? { customProviderId: selection.customProviderId } : {}),
-        ...(get().vpsServerId ? { vpsServerId: get().vpsServerId } : {})
+        ...(get().vpsServerId ? { vpsServerId: get().vpsServerId } : {}),
+        planMode: get().planMode
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -442,6 +618,8 @@ export const useStore = create<AppState>((set, get) => ({
       running: false,
       currentRunId: null,
       error: null,
+      pendingApproval: null,
+      fileChanges: [],
       view: 'chat'
     })
   },
@@ -449,6 +627,7 @@ export const useStore = create<AppState>((set, get) => ({
   async loadSession(id) {
     const record = await window.api.chats.load(id)
     if (!record) return
+    rememberChatId(id)
     set({
       sessionId: id,
       activeChatId: id,
@@ -543,6 +722,19 @@ export const useStore = create<AppState>((set, get) => ({
   async addProject(name, path) {
     set({ settings: await window.api.settings.addProject(name || basename(path), path) })
     await get().refreshFiles('.')
+  },
+
+  async addRemoteProject(name, path, vpsId) {
+    set({ settings: await window.api.settings.addRemoteProject(name || basename(path), path, vpsId) })
+  },
+
+  async searchVpsProject(name) {
+    const status = await window.api.vps.status()
+    if (status.status !== 'connected' || !status.serverId) {
+      get().pushToast('warning', i18n.t('vps.notConnected'))
+      return []
+    }
+    return window.api.vps.searchProject(status.serverId, name)
   },
 
   async removeProject(id) {

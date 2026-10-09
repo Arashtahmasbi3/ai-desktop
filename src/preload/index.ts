@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { CustomProviderInput, CustomProviderTestResult, CustomProviderView, ProviderId } from '@shared/types'
 import type { OnboardingStatus } from '@shared/onboarding'
+import type { ApprovalMode } from '@shared/approval'
 import type { ChatSaveInput, ChatSummary, StoredChat } from '@shared/chat'
 import type {
   AuditEntryView,
@@ -26,6 +27,8 @@ import type {
   AppEventMap,
   RemoteStatus,
   SessionInfo,
+  CodeMatch,
+  LocalShellResult,
   SessionRecordView,
   SettingsView,
   WorkerJobRequest,
@@ -58,8 +61,14 @@ export const api = {
       invoke('settings:setModel', provider, model),
     setActiveProvider: (provider: ProviderId): Promise<SettingsView> =>
       invoke('settings:setActiveProvider', provider),
+    setApprovalMode: (mode: ApprovalMode): Promise<SettingsView> =>
+      invoke('settings:setApprovalMode', mode),
+    setPlanModeDefault: (enabled: boolean): Promise<SettingsView> =>
+      invoke('settings:setPlanModeDefault', enabled),
     addProject: (name: string, path: string): Promise<SettingsView> =>
       invoke('settings:addProject', name, path),
+    addRemoteProject: (name: string, path: string, vpsId: string): Promise<SettingsView> =>
+      invoke('settings:addRemoteProject', name, path, vpsId),
     removeProject: (id: string): Promise<SettingsView> => invoke('settings:removeProject', id),
     updateProjectPath: (id: string, path: string): Promise<SettingsView> =>
       invoke('settings:updateProjectPath', id, path)
@@ -101,6 +110,7 @@ export const api = {
     status: (): Promise<GitHubAuthStatus> => invoke('github:status'),
     setClientId: (clientId: string): Promise<GitHubAuthStatus> =>
       invoke('github:setClientId', clientId),
+    setToken: (token: string): Promise<GitHubAuthStatus> => invoke('github:setToken', token),
     startAuth: (): Promise<GitHubDeviceCode> => invoke('github:startAuth'),
     pollAuth: (deviceCode: string): Promise<GitHubAuthPollResult> =>
       invoke('github:pollAuth', deviceCode),
@@ -132,6 +142,10 @@ export const api = {
       invoke('vps:approveFingerprint', id),
     exec: (id: string, command: string): Promise<VpsExecResult> => invoke('vps:exec', id, command),
     audit: (): Promise<AuditEntryView[]> => invoke('vps:audit'),
+    searchProject: (id: string, name: string): Promise<string[]> =>
+      invoke('vps:searchProject', id, name),
+    listDirs: (id: string, path: string): Promise<string[]> => invoke('vps:listDirs', id, path),
+    gitStatus: (id: string, path: string): Promise<string> => invoke('vps:gitStatus', id, path),
     terminalOpen: (id: string, cols?: number, rows?: number): Promise<string> =>
       invoke('vps:terminalOpen', id, cols, rows),
     terminalWrite: (id: string, data: string): Promise<void> => invoke('vps:terminalWrite', id, data),
@@ -159,8 +173,20 @@ export const api = {
   agent: {
     run: (request: AgentRunRequest): Promise<unknown> => invoke('agent:run', request),
     abort: (): Promise<void> => invoke('agent:abort'),
+    respondApproval: (id: string, approved: boolean): Promise<boolean> =>
+      invoke('agent:respondApproval', id, approved),
+    applyChange: (id: string): Promise<boolean> => invoke('agent:applyChange', id),
+    rejectChange: (id: string): Promise<boolean> => invoke('agent:rejectChange', id),
     sessions: (): Promise<SessionInfo[]> => invoke('agent:sessions'),
     loadSession: (id: string): Promise<SessionRecordView | null> => invoke('agent:loadSession', id)
+  },
+
+  shell: {
+    exec: (command: string): Promise<LocalShellResult> => invoke('shell:exec', command)
+  },
+
+  search: {
+    code: (query: string): Promise<CodeMatch[]> => invoke('search:code', query)
   },
 
   worker: {

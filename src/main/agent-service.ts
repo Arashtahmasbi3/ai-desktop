@@ -1,18 +1,31 @@
-import type { AgentLogEntry, AgentLogger } from '@shared/agent'
+import type { AgentAction, AgentLogEntry, AgentLogger } from '@shared/agent'
 import type { AgentRunResult } from '@shared/agent'
 import type { ProviderId, ToolDefinition } from '@shared/types'
-import type { VpsExecResult } from '@shared/vps'
-import type { AgentEvent, AgentRunRequest, SessionInfo, SessionRecordView } from '@shared/ui'
+import type { RemoteFileEntry, VpsExecResult } from '@shared/vps'
+import type {
+  AgentEvent,
+  AgentRunRequest,
+  FileChangeView,
+  SessionInfo,
+  SessionRecordView
+} from '@shared/ui'
 import { AgentOrchestrator } from '@core/agent-orchestrator'
+import type { FileChange } from '@core/agent-orchestrator'
 import type { ProviderEntry } from '@core/agent-orchestrator'
 import type { ToolExecutor } from '@core/agent/tools'
 import { PROVIDERS, createAdapterForConfig } from '@core/llm-adapters/registry'
+import type { AuditEntry } from '@core/agent/audit-log'
 import { REMOTE_SHELL_TOOL } from '@core/tools/remote-shell-tool'
 import { RemoteShellToolExecutor } from '@core/tools/remote-shell-executor'
+import { REMOTE_FS_TOOLS, type RemoteFsDeps } from '@core/tools/remote-fs-tools'
+import { RemoteFsToolExecutor } from '@core/tools/remote-fs-executor'
+import { CompositeToolExecutor, type ToolRoute } from '@core/tools/composite-executor'
+import { DEFAULT_APPROVAL_MODE, requiresApproval } from '@core/agent/approval'
 import type { Persistence } from '@core/agent/persistence'
 import type { SessionStore } from '@core/agent/session-store'
 import type { SandboxManager } from '@shared/sandbox'
 import type { CustomProviderStore } from './custom-providers'
+import { loadProjectMemory } from './project-memory'
 
 /**
  * The slice of the SSH manager the agent needs to run remote commands. Kept as
@@ -21,6 +34,21 @@ import type { CustomProviderStore } from './custom-providers'
 export interface RemoteShellHost {
   connectedServers(): string[]
   exec(serverId: string, command: string): Promise<VpsExecResult>
+}
+
+/** SFTP surface the remote-fs tools use. Optional so older hosts still work. */
+export interface RemoteFsHost {
+  readFile(serverId: string, path: string): Promise<string>
+  writeFile(serverId: string, path: string, content: string): Promise<void>
+  listFiles(serverId: string, path: string): Promise<RemoteFileEntry[]>
+  recordAudit?(entry: Omit<AuditEntry, 'at'>): Promise<unknown>
+}
+
+export type RemoteHost = RemoteShellHost & Partial<RemoteFsHost>
+/** Project-bound file access used to review and apply agent edits. */
+export interface ProjectFiles {
+  read(relativePath: string): Promise<string>
+  write(relativePath: string, content: string): Promise<void>
 }
 
 /** Keywords that make the agent reach for `remote_shell` on a default chat. */
@@ -40,7 +68,7 @@ interface RemoteRuntime {
 export function planRemoteRuntime(
   task: string,
   vpsServerId: string | undefined,
-  vps: RemoteShellHost | undefined
+  vps: RemoteHost | undefined
 ): RemoteRuntime {
   if (!vps) return {}
   const connected = vps.connectedServers()
@@ -59,25 +87,57 @@ export function planRemoteRuntime(
   }
 
   const target = pinned ?? connected[0]
-  const tool: ToolDefinition = {
+  const shellTool: ToolDefinition = {
     ...REMOTE_SHELL_TOOL,
     description: `${REMOTE_SHELL_TOOL.description} Use server_id="${target}".`
   }
-  const executor = new RemoteShellToolExecutor(
+  const shellExecutor = new RemoteShellToolExecutor(
     {
       exec: (serverId, command) => vps.exec(serverId, command),
       connectedServers: () => vps.connectedServers()
     },
     target
   )
-  return {
-    extraTools: [tool],
-    extraExecutor: executor,
-    systemHint:
-      `You have access to the "remote_shell" tool on the connected VPS "${target}". ` +
-      'Use it for tasks about that server; call it with server_id ' +
-      `"${target}" and the shell command to run.`
+
+  const extraTools: ToolDefinition[] = [shellTool]
+  const routes: ToolRoute[] = [
+    { names: new Set([REMOTE_SHELL_TOOL.name]), executor: shellExecutor }
+  ]
+  let hint =
+    `You have access to the "remote_shell" tool on the connected VPS "${target}". ` +
+    'Use it for tasks about that server; call it with server_id ' +
+    `"${target}" and the shell command to run.`
+
+  // Remote file tools are only offered when the host exposes SFTP.
+  if (typeof vps.readFile === 'function') {
+    const fsDeps: RemoteFsDeps = {
+      connectedServers: () => vps.connectedServers(),
+      readFile: (serverId, path) => vps.readFile!(serverId, path),
+      writeFile: (serverId, path, content) => vps.writeFile!(serverId, path, content),
+      listFiles: (serverId, path) => vps.listFiles!(serverId, path),
+      exec: (serverId, command) => vps.exec(serverId, command)
+    }
+    if (typeof vps.recordAudit === 'function') {
+      fsDeps.audit = (entry) => vps.recordAudit!(entry).then(() => undefined)
+    }
+    const fsTools = REMOTE_FS_TOOLS.map((tool) => ({
+      ...tool,
+      description: `${tool.description} Target server: "${target}".`
+    }))
+    extraTools.push(...fsTools)
+    routes.push({
+      names: new Set(fsTools.map((tool) => tool.name)),
+      executor: new RemoteFsToolExecutor(fsDeps, target)
+    })
+    hint +=
+      ` You also have the remote file tools ${fsTools.map((tool) => tool.name).join(', ')} ` +
+      'for reading, writing, listing, grepping and checking git status on that server.'
   }
+
+  const executor: ToolExecutor =
+    routes.length === 1 ? shellExecutor : new CompositeToolExecutor(routes)
+
+  return { extraTools, extraExecutor: executor, systemHint: hint }
 }
 
 /** Forwards orchestrator log entries to a sink (the renderer, in the app). */
@@ -97,8 +157,14 @@ export interface AgentServiceOptions {
   now?: () => number
   /** Optional: enables user-defined OpenAI-compatible providers. */
   customProviders?: CustomProviderStore
-  /** Optional: enables the `remote_shell` tool against connected VPS servers. */
-  vps?: RemoteShellHost
+  /** Optional: enables the `remote_shell` / remote-fs tools against connected VPS servers. */
+  vps?: RemoteHost
+  /** Ask the user to approve a tool call (Approval Modes). Defaults to allow. */
+  requestApproval?: (runId: string, action: AgentAction) => Promise<boolean>
+  /** Deny any outstanding approval requests (e.g. the user aborted). */
+  cancelApprovals?: () => void
+  /** Optional: enables chat review of agent edits (apply/reject). */
+  files?: ProjectFiles
 }
 
 /** Which provider/model to put first for an agent run. */
@@ -131,9 +197,14 @@ export class AgentService {
   private readonly emit: (event: AgentEvent) => void
   private readonly now: () => number
   private readonly customProviders?: CustomProviderStore
-  private readonly vps?: RemoteShellHost
+  private readonly vps?: RemoteHost
+  private readonly requestApproval?: (runId: string, action: AgentAction) => Promise<boolean>
+  private readonly cancelApprovals?: () => void
+  private readonly files?: ProjectFiles
   private readonly controllers = new Set<AbortController>()
+  private readonly changes = new Map<string, FileChangeView>()
   private runCounter = 0
+  private changeCounter = 0
 
   constructor(options: AgentServiceOptions) {
     this.sandbox = options.sandbox
@@ -143,6 +214,9 @@ export class AgentService {
     this.now = options.now ?? (() => Date.now())
     if (options.customProviders) this.customProviders = options.customProviders
     if (options.vps) this.vps = options.vps
+    this.requestApproval = options.requestApproval
+    this.cancelApprovals = options.cancelApprovals
+    if (options.files) this.files = options.files
   }
 
   isRunning(): boolean {
@@ -155,6 +229,23 @@ export class AgentService {
    */
   private buildRemoteRuntime(task: string, vpsServerId?: string): RemoteRuntime {
     return planRemoteRuntime(task, vpsServerId, this.vps)
+  }
+
+  /**
+   * System hint built from the active project's AI_CONTEXT.md / AGENTS.md.
+   * Remote projects are skipped (their files are not on this machine).
+   */
+  private async projectMemoryHint(): Promise<string | undefined> {
+    try {
+      const settings = await this.persistence.load()
+      const active = settings.projects.find(
+        (project) => project.id === settings.activeProjectId
+      )
+      if (!active || active.type === 'remote') return undefined
+      return await loadProjectMemory(active.path)
+    } catch {
+      return undefined
+    }
   }
 
   /** Build provider entries (with keys) ordered by preference. */
@@ -236,13 +327,35 @@ export class AgentService {
       ...(request.model ? { model: request.model } : {}),
       ...(request.customProviderId ? { customProviderId: request.customProviderId } : {})
     })
+    const remote = this.buildRemoteRuntime(request.task, request.vpsServerId)
+    const memory = await this.projectMemoryHint()
+    const systemHint = [remote.systemHint, memory].filter(Boolean).join('\n\n')
+
+    const runId = `run-${++this.runCounter}`
+    const settings = await this.persistence.load()
+    const approvalMode = settings.approvalMode ?? DEFAULT_APPROVAL_MODE
+    const planMode = request.planMode ?? settings.planModeDefault ?? false
+    const requestApproval = this.requestApproval
+    const approvalGate = requestApproval
+      ? async (action: AgentAction): Promise<boolean> => {
+          if (!requiresApproval(approvalMode, action)) return true
+          return requestApproval(runId, action)
+        }
+      : undefined
+
     const orchestrator = new AgentOrchestrator({
       sandbox: this.sandbox,
       providers,
       logger: new EmittingLogger(this.emit),
       sessionStore: this.sessionStore,
       ...(request.sessionId ? { sessionId: request.sessionId } : {}),
-      ...this.buildRemoteRuntime(request.task, request.vpsServerId)
+      ...remote,
+      ...(systemHint ? { systemHint } : {}),
+      ...(planMode ? { planMode: true } : {}),
+      ...(approvalGate ? { approvalGate } : {}),
+      ...(this.files
+        ? { onFileWritten: (change: FileChange) => this.captureChange(runId, request.sessionId, change) }
+        : {})
     })
 
     const controller = new AbortController()
@@ -250,7 +363,6 @@ export class AgentService {
     const onExternalAbort = (): void => controller.abort()
     externalSignal?.addEventListener('abort', onExternalAbort, { once: true })
 
-    const runId = `run-${++this.runCounter}`
     this.emit({ type: 'run:start', runId, task: request.task, at: this.now() })
 
     try {
@@ -282,6 +394,51 @@ export class AgentService {
 
   abort(): void {
     for (const controller of this.controllers) controller.abort()
+    this.cancelApprovals?.()
+  }
+  /** Records an agent edit and surfaces it in the chat for review. */
+  private captureChange(runId: string, sessionId: string | undefined, change: FileChange): void {
+    const id = `change-${++this.changeCounter}`
+    void (async () => {
+      let before = change.before
+      if (this.files) {
+        before = await this.files.read(change.path).catch(() => change.before)
+      }
+      const view: FileChangeView = {
+        id,
+        runId,
+        path: change.path,
+        before,
+        after: change.after,
+        ...(sessionId ? { sessionId } : {})
+      }
+      this.changes.set(id, view)
+      this.emit({ type: 'file:change', change: view, at: this.now() })
+    })()
+  }
+  /** Writes the agent's edit into the active project. */
+  async applyChange(id: string): Promise<boolean> {
+    const change = this.changes.get(id)
+    if (!change || !this.files) return false
+    try {
+      await this.files.write(change.path, change.after)
+    } catch {
+      return false
+    }
+    this.changes.delete(id)
+    this.emit({ type: 'file:change:resolved', id, status: 'accepted', at: this.now() })
+    return true
+  }
+  /** Discards an agent edit without touching the project. */
+  rejectChange(id: string): boolean {
+    if (!this.changes.has(id)) return false
+    this.changes.delete(id)
+    this.emit({ type: 'file:change:resolved', id, status: 'rejected', at: this.now() })
+    return true
+  }
+  /** Pending edits, used by tests and diagnostics. */
+  pendingChanges(): FileChangeView[] {
+    return [...this.changes.values()]
   }
 
   async loadSession(id: string): Promise<SessionRecordView | null> {

@@ -5,6 +5,7 @@ import type {
   CustomProviderView
 } from '@shared/types'
 import type { OnboardingStatus } from '@shared/onboarding'
+import type { ApprovalMode } from '@shared/approval'
 import type { ChatSaveInput, ChatSummary, StoredChat } from '@shared/chat'
 import type {
   AuditEntryView,
@@ -28,7 +29,9 @@ import type {
 import type {
   AgentRunRequest,
   AppEventMap,
+  CodeMatch,
   FileEntry,
+  LocalShellResult,
   RemoteStatus,
   SessionInfo,
   SessionRecordView,
@@ -55,7 +58,10 @@ export interface Api {
     removeApiKey(provider: ProviderId): Promise<SettingsView>
     setModel(provider: ProviderId, model: string): Promise<SettingsView>
     setActiveProvider(provider: ProviderId): Promise<SettingsView>
+    setApprovalMode(mode: ApprovalMode): Promise<SettingsView>
+    setPlanModeDefault(enabled: boolean): Promise<SettingsView>
     addProject(name: string, path: string): Promise<SettingsView>
+    addRemoteProject(name: string, path: string, vpsId: string): Promise<SettingsView>
     removeProject(id: string): Promise<SettingsView>
     updateProjectPath(id: string, path: string): Promise<SettingsView>
   }
@@ -86,6 +92,7 @@ export interface Api {
   github: {
     status(): Promise<GitHubAuthStatus>
     setClientId(clientId: string): Promise<GitHubAuthStatus>
+    setToken(token: string): Promise<GitHubAuthStatus>
     startAuth(): Promise<GitHubDeviceCode>
     pollAuth(deviceCode: string): Promise<GitHubAuthPollResult>
     logout(): Promise<GitHubAuthStatus>
@@ -109,6 +116,9 @@ export interface Api {
     approveFingerprint(id: string): Promise<VpsConnectionState>
     exec(id: string, command: string): Promise<VpsExecResult>
     audit(): Promise<AuditEntryView[]>
+    searchProject(id: string, name: string): Promise<string[]>
+    listDirs(id: string, path: string): Promise<string[]>
+    gitStatus(id: string, path: string): Promise<string>
     terminalOpen(id: string, cols?: number, rows?: number): Promise<string>
     terminalWrite(id: string, data: string): Promise<void>
     terminalResize(id: string, cols: number, rows: number): Promise<void>
@@ -129,8 +139,17 @@ export interface Api {
   agent: {
     run(request: AgentRunRequest): Promise<unknown>
     abort(): Promise<void>
+    respondApproval(id: string, approved: boolean): Promise<boolean>
+    applyChange(id: string): Promise<boolean>
+    rejectChange(id: string): Promise<boolean>
     sessions(): Promise<SessionInfo[]>
     loadSession(id: string): Promise<SessionRecordView | null>
+  }
+  shell: {
+    exec(command: string): Promise<LocalShellResult>
+  }
+  search: {
+    code(query: string): Promise<CodeMatch[]>
   }
   worker: {
     submit(request: WorkerJobRequest): Promise<WorkerJobView>

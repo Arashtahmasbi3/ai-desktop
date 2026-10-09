@@ -5,7 +5,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@shared': resolve(process.cwd(), 'src/shared'),
-      '@core': resolve(process.cwd(), 'src/core')
+      '@core': resolve(process.cwd(), 'src/core'),
+      '@main': resolve(process.cwd(), 'src/main')
     }
   },
   test: {

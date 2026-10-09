@@ -429,3 +429,71 @@ Decisions taken conservatively without blocking on questions (per the sprint's g
 - `[AUTO-DECISION]` **Shortcuts:** `Ctrl+K`/`Ctrl+P` palette, `Ctrl+B` sidebar, `Ctrl+N` new chat, `Ctrl+,` settings,
   `Ctrl+1..6` views, `Esc` closes palette → settings → error.
 - Tests: 58 files / 411 passed, 1 skipped. `typecheck` (node + web) and `build` green.
+
+## v2.2 — Codex-like features & deep fixes (branch `feature/v2.2-codex-features`)
+
+Autonomous decisions logged per the sprint's golden rule (`[AUTO-DECISION]`, no blocking questions).
+
+- `[AUTO-DECISION]` **Automatic path discovery / missing-project recovery (Task 1).** Projects are never
+  deleted when their path is missing; `exists` is computed at read time (`settingsView()`), the Sidebar shows
+  a missing-path warning with **Locate** (pick a new folder) and remote projects can be searched on a connected
+  VPS (`vps:searchProject` -> `settings:addRemoteProject`). Cross-OS paths survive a round-trip.
+- `[AUTO-DECISION]` **Model catalog (Task 7).** Tags extended to `cheap|powerful|fast|free|coding|reasoning|vision`;
+  catalog refreshed with current OpenAI/Anthropic/DeepSeek/Google Gemini ids. Model picker badges reuse these tags.
+- `[AUTO-DECISION]` **RTL & typography (Task 5).** Font stack is `Inter, Vazirmatn, ...` (menus English / chat RTL via
+  `<html dir>`), markdown code blocks force LTR, and dark themed scrollbars replace the OS default. Inter is added as
+  the primary Latin face but is not bundled -- it falls back to Vazirmatn/system when unavailable (no new dependency).
+- `[AUTO-DECISION]` **GitHub auth (Task 4).** Kept the OAuth **device flow** and added a zero-config
+  **Personal Access Token** path (`GitHubService.setToken` -> validated with `GET /user` *before* persisting, so a
+  bad token never leaves a half-connected state). UI has a Device-flow / Access-token toggle with guide links.
+  IPC: `github:setToken`. The device flow still needs a client id (env `AI_DESKTOP_GITHUB_CLIENT_ID` or the in-app
+  field) because GitHub has no public client id to embed; the PAT path is the no-setup fallback.
+- `[AUTO-DECISION]` **Chats organised by project (Task 3).** New chats inherit `settings.activeProjectId` as
+  `workspaceId`; the Sidebar groups history under the project name. Chats with no project (or a deleted one) fall
+  into a trailing **No project** bucket -- the migration path for pre-v2.2 history (no file rewrite needed).
+- `[AUTO-DECISION]` **Memory (Task 6).** `AI_CONTEXT.md` and `AGENTS.md` from the active *local* project are read at
+  run time and appended to the agent system prompt, truncated to a 12 000-char budget so they cannot crowd out the
+  task (`src/shared/memory.ts` + `src/main/project-memory.ts`). Remote projects are skipped (files are not local).
+  The composer shows an amber over-budget notice once the conversation estimate crosses ~32k tokens.
+- `[AUTO-DECISION]` **Slash commands (Task 8, partial).** `/new /clear /settings /workspace /vps /github` run actions;
+  `/plan /explain /fix /test` seed prompt templates; `/help` lists everything. Menu supports arrows/Tab/Enter/Esc.
+  Tool **approval modes** and a Plan/Code system-prompt switch are **deferred** -- they require orchestrator-level
+  tool gating that is too risky to land without a larger refactor and dedicated tests.
+- `[AUTO-DECISION]` **Remote workspace (Task 2, partial).** Remote projects, VPS discovery IPC and the Settings
+  add-remote UI ship. A dedicated `read_file/write_file/list_dir` **remote** fs tool for the agent is **deferred**
+  (today the agent reaches a VPS through `remote_shell`); doing it properly needs an SFTP-backed tool executor.
+- Tests: 64 files / 439 passed, 1 skipped. `typecheck` (node + web) and `build` green.
+
+### Sprint v2.2 continued — Codex-like features
+- `[AUTO-DECISION]` **Remote FS tools (Task A).** Added SFTP-backed `remote_read_file` / `remote_write_file` /
+  `remote_list_dir` / `remote_exists` / `remote_grep` / `remote_git_status` (`src/core/tools/remote-fs-tools.ts` +
+  `remote-fs-executor.ts`). They are injected only when a VPS is connected and the SSH host exposes SFTP
+  (`RemoteFsHost`), routed through `CompositeToolExecutor`; writes/deletes honour the shared deny-list and audit log.
+- `[AUTO-DECISION]` **Approval modes + Plan/Code switch (Task B).** Supersedes the earlier "deferred" note. Three
+  modes (`auto` / `dangerous` / `writes`, default `dangerous`) gate every tool call through `core/agent/approval.ts`
+  (`classifyAction` -> read/write/shell + deny-list escalation). The renderer answers via `main/approval-broker.ts`
+  (`ApprovalBroker`), which **fails closed** on timeout (2 min), on abort (`cancelAll`), or on an unknown id.
+  **Plan Mode** exposes no tools (`tools: []`, `toolChoice: 'none'`) and appends `PLAN_MODE_HINT`; a composer
+  Plan/Code toggle and Settings > Advanced controls drive it. Persisted as settings schema v2 (`approvalMode`,
+  `planModeDefault`).
+- `[AUTO-DECISION]` **Inline diff review (Task C).** The agent still edits in an ephemeral sandbox; after a
+  successful `write_file` the orchestrator emits `FileChange {path, before, after}` via `onFileWritten`.
+  `AgentService` re-reads the *project* file for a true `before`, emits a `file:change` event, and exposes
+  `applyChange` (writes onto the active project through `FileService`) / `rejectChange` (drops it). The chat renders
+  each pending edit as a collapsible split diff (`FileChangeCard` + `DiffViewer`) with **Apply** / **Reject**.
+  Rationale: applying to the project is an explicit, user-initiated action, so agent writes can never touch real
+  files without consent — safer than pointing the sandbox at the project.
+- `[AUTO-DECISION]` **Chat file tree + terminal (Tasks D/E).** The chat header gains two toggles: a file tree
+  (`FileExplorer` rendered in an aside, preference persisted in `localStorage`) and a local terminal panel.
+  The terminal is **one-shot, not a PTY**: `shell:exec` runs a command via `child_process.exec` with a 30s timeout,
+  a 4MB cap and `cwd` = the active project root (`src/main/local-shell.ts`), keeping history/clear/close in the UI.
+  Chose one-shot exec over a PTY because it reuses the existing IPC/typed boundary and avoids vending a raw shell.
+- `[AUTO-DECISION]` **Codebase search (Task F).** `Ctrl+Shift+F` opens a modal backed by `search:code` →
+  `src/main/project-search.ts`, a literal case-insensitive walker that skips `node_modules`/`.git`/build dirs,
+  caps files (5k), file size (512KB) and results (200). Clicking a hit opens it in the code viewer.
+- `[AUTO-DECISION]` **Session restore (Task G).** The active chat id is remembered in `localStorage`; `init()`
+  restores the most recent chat after a restart, and a 30s interval autosaves the open conversation
+  (`persistChat`) so a crash mid-run does not lose messages.
+- `[AUTO-DECISION]` **Keyboard shortcuts (Task H).** Existing: `Ctrl+K/P` palette, `Ctrl+B` sidebar, `Ctrl+N` new
+  chat, `Ctrl+,` settings, `Ctrl+1..6` views. Added: `Ctrl+Shift+F` search, `Ctrl+Shift+E` file tree,
+  `Ctrl+Shift+T`/`` Ctrl+` `` terminal, `Ctrl+S` save the open file, and `Esc` now also closes the search modal.

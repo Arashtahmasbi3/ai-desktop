@@ -17,8 +17,9 @@ import {
   Trash2,
   User
 } from 'lucide-react'
-import { CHAT_GROUPS, groupChats, type ChatGroupId, type ChatSummary } from '@shared/chat'
+import { groupChatsByProject, type ChatSummary } from '@shared/chat'
 import { basename, useStore, type ViewId } from '../store'
+import type { ProjectRecord } from '@shared/ui'
 
 const NAV: Array<{ id: ViewId; labelKey: string; icon: typeof MessageSquare }> = [
   { id: 'chat', labelKey: 'sidebar.navChat', icon: MessageSquare },
@@ -28,13 +29,6 @@ const NAV: Array<{ id: ViewId; labelKey: string; icon: typeof MessageSquare }> =
   { id: 'github', labelKey: 'sidebar.navGitHub', icon: GitFork },
   { id: 'vps', labelKey: 'sidebar.navVps', icon: Server }
 ]
-
-const GROUP_LABEL: Record<ChatGroupId, string> = {
-  today: 'sidebar.today',
-  yesterday: 'sidebar.yesterday',
-  thisWeek: 'sidebar.thisWeek',
-  older: 'sidebar.older'
-}
 
 /** Short relative time such as "3m", "2h", "5d" for the chat rows. */
 export function relativeTime(at: number, now = Date.now()): string {
@@ -79,17 +73,29 @@ export default function Sidebar(): JSX.Element {
   const openProject = useStore((state) => state.openProject)
   const removeProject = useStore((state) => state.removeProject)
   const updateProjectPath = useStore((state) => state.updateProjectPath)
+  const addRemoteProject = useStore((state) => state.addRemoteProject)
+  const pushToast = useStore((state) => state.pushToast)
 
   const [query, setQuery] = useState('')
   const [menuFor, setMenuFor] = useState<string | null>(null)
+  const [searchingId, setSearchingId] = useState<string | null>(null)
+  const [vpsSearch, setVpsSearch] = useState<{
+    id: string
+    serverId: string
+    paths: string[]
+  } | null>(null)
 
   const filtered = useMemo(
     () => chats.filter((chat) => chat.title.toLowerCase().includes(query.trim().toLowerCase())),
     [chats, query]
   )
-  const grouped = useMemo(() => groupChats(filtered, Date.now()), [filtered])
-
   const projects = settings?.projects ?? []
+  const groups = useMemo(
+    () => groupChatsByProject(filtered, projects.map((project) => project.id)),
+    [filtered, projects]
+  )
+  const projectName = (id?: string): string =>
+    projects.find((project) => project.id === id)?.name ?? t('sidebar.noProject')
 
   const onRename = (chat: ChatSummary): void => {
     setMenuFor(null)
@@ -105,6 +111,37 @@ export default function Sidebar(): JSX.Element {
   const locate = async (id: string): Promise<void> => {
     const picked = await window.api.dialog.pickDirectory()
     if (picked) await updateProjectPath(id, picked)
+  }
+
+  /** Ask the connected VPS to find folders matching a missing project's name. */
+  const searchOnVps = async (project: ProjectRecord): Promise<void> => {
+    const status = await window.api.vps.status()
+    if (status.status !== 'connected' || !status.serverId) {
+      pushToast('warning', t('vps.notConnected'))
+      return
+    }
+    setSearchingId(project.id)
+    setVpsSearch(null)
+    try {
+      const paths = await window.api.vps.searchProject(status.serverId, project.name)
+      if (paths.length === 0) {
+        pushToast('warning', t('vps.noMatches'))
+        return
+      }
+      setVpsSearch({ id: project.id, serverId: status.serverId, paths })
+    } catch (error) {
+      pushToast('error', error instanceof Error ? error.message : String(error))
+    } finally {
+      setSearchingId(null)
+    }
+  }
+
+  const addFoundRemote = async (name: string, remotePath: string): Promise<void> => {
+    const serverId = vpsSearch?.serverId
+    setVpsSearch(null)
+    if (!serverId) return
+    await addRemoteProject(name, remotePath, serverId)
+    pushToast('success', t('toast.saved'))
   }
 
   if (collapsed) {
@@ -208,13 +245,12 @@ export default function Sidebar(): JSX.Element {
         ) : filtered.length === 0 ? (
           <p className="px-2 py-3 text-[11px] text-neutral-600">{t('palette.noResults')}</p>
         ) : (
-          CHAT_GROUPS.map((group) =>
-            grouped[group].length === 0 ? null : (
-              <section key={group} className="mb-2">
+          groups.map((group) => (
+              <section key={group.projectId ?? '__none__'} className="mb-2">
                 <h3 className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
-                  {t(GROUP_LABEL[group])}
+                  {projectName(group.projectId)}
                 </h3>
-                {grouped[group].map((chat) => (
+                {group.chats.map((chat) => (
                   <div key={chat.id} className="relative">
                     <button
                       type="button"
@@ -296,9 +332,7 @@ export default function Sidebar(): JSX.Element {
                   </div>
                 ))}
               </section>
-            )
-          )
-        )}
+          )))}
 
         <section className="mb-2 border-t border-border pt-2">
           <h3 className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
@@ -308,54 +342,92 @@ export default function Sidebar(): JSX.Element {
             <p className="px-2 py-1 text-[11px] text-neutral-600">{t('settings.noProjects')}</p>
           ) : (
             projects.map((project) => (
-              <div key={project.id} className="group flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => void openProject(project.id)}
-                  className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left transition ${
-                    project.id === settings?.activeProjectId
-                      ? 'bg-accent/15 text-neutral-100'
-                      : 'text-neutral-300 hover:bg-bg-tertiary'
-                  }`}
-                >
-                  {project.exists === false ? (
-                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-400" />
-                  ) : (
-                    <FolderTree className="h-3.5 w-3.5 shrink-0 text-neutral-500" />
-                  )}
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-xs">{project.name}</span>
-                    {project.exists === false ? (
-                      <span className="block truncate text-[10px] text-amber-400/90">
-                        {t('sidebar.missingPath')}
-                      </span>
-                    ) : (
-                      <span className="block truncate text-[10px] text-neutral-600" dir="ltr">
-                        {basename(project.path)}
-                      </span>
-                    )}
-                  </span>
-                </button>
-                {project.exists === false ? (
+              <div key={project.id} className="group mb-0.5">
+                <div className="flex items-center gap-1">
                   <button
                     type="button"
-                    onClick={() => void locate(project.id)}
-                    title={t('sidebar.locate')}
-                    aria-label={t('sidebar.locate')}
-                    className="shrink-0 rounded p-1 text-neutral-500 hover:bg-bg-tertiary hover:text-accent"
+                    onClick={() => void openProject(project.id)}
+                    className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left transition ${
+                      project.id === settings?.activeProjectId
+                        ? 'bg-accent/15 text-neutral-100'
+                        : 'text-neutral-300 hover:bg-bg-tertiary'
+                    }`}
                   >
-                    <MapPin className="h-3.5 w-3.5" />
+                    {project.exists === false ? (
+                      <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-400" />
+                    ) : project.type === 'remote' ? (
+                      <Server className="h-3.5 w-3.5 shrink-0 text-sky-400" />
+                    ) : (
+                      <FolderTree className="h-3.5 w-3.5 shrink-0 text-neutral-500" />
+                    )}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-xs">{project.name}</span>
+                      {project.exists === false ? (
+                        <span className="block truncate text-[10px] text-amber-400/90">
+                          {t('sidebar.missingPath')}
+                        </span>
+                      ) : project.type === 'remote' ? (
+                        <span className="block truncate text-[10px] text-sky-400/80">
+                          {t('sidebar.remote')}
+                        </span>
+                      ) : (
+                        <span className="block truncate text-[10px] text-neutral-600" dir="ltr">
+                          {basename(project.path)}
+                        </span>
+                      )}
+                    </span>
                   </button>
+                  {project.exists === false ? (
+                    <button
+                      type="button"
+                      onClick={() => void searchOnVps(project)}
+                      disabled={searchingId === project.id}
+                      title={t('sidebar.searchOnVps')}
+                      aria-label={t('sidebar.searchOnVps')}
+                      className="shrink-0 rounded p-1 text-neutral-500 hover:bg-bg-tertiary hover:text-sky-400 disabled:opacity-40"
+                    >
+                      <Server className={`h-3.5 w-3.5 ${searchingId === project.id ? 'animate-pulse' : ''}`} />
+                    </button>
+                  ) : null}
+                  {project.exists === false ? (
+                    <button
+                      type="button"
+                      onClick={() => void locate(project.id)}
+                      title={t('sidebar.locate')}
+                      aria-label={t('sidebar.locate')}
+                      className="shrink-0 rounded p-1 text-neutral-500 hover:bg-bg-tertiary hover:text-accent"
+                    >
+                      <MapPin className="h-3.5 w-3.5" />
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => void removeProject(project.id)}
+                    title={t('common.remove')}
+                    aria-label={t('common.remove')}
+                    className="hidden shrink-0 rounded p-1 text-neutral-500 hover:bg-bg-tertiary hover:text-red-400 group-hover:block"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                {vpsSearch?.id === project.id ? (
+                  <div className="ml-2 mt-0.5 rounded-lg border border-border bg-bg-primary p-1">
+                    <p className="px-1 py-0.5 text-[10px] text-neutral-500">
+                      {t('vps.found', { count: vpsSearch.paths.length })}
+                    </p>
+                    {vpsSearch.paths.map((remotePath) => (
+                      <button
+                        key={remotePath}
+                        type="button"
+                        dir="ltr"
+                        onClick={() => void addFoundRemote(project.name, remotePath)}
+                        className="block w-full truncate rounded px-1.5 py-1 text-left text-[11px] text-neutral-300 hover:bg-bg-tertiary"
+                      >
+                        {remotePath}
+                      </button>
+                    ))}
+                  </div>
                 ) : null}
-                <button
-                  type="button"
-                  onClick={() => void removeProject(project.id)}
-                  title={t('common.remove')}
-                  aria-label={t('common.remove')}
-                  className="hidden shrink-0 rounded p-1 text-neutral-500 hover:bg-bg-tertiary hover:text-red-400 group-hover:block"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
               </div>
             ))
           )}

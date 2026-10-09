@@ -18,7 +18,8 @@
     "active": "فعال",
     "setActive": "فعال کن",
     "none": "هیچ",
-    "more": "بیشتر"
+    "more": "بیشتر",
+    "clear": "پاک‌کردن"
   },
   "titlebar": {
     "newChat": "چت جدید",
@@ -49,7 +50,11 @@
     "navBrowser": "مرورگر",
     "navGitHub": "گیت‌هاب",
     "navVps": "VPS",
-    "user": "کاربر"
+    "user": "کاربر",
+    "remote": "ریموت",
+    "searchOnVps": "جستجو روی VPS",
+    "remoteMissing": "VPS متصل نیست",
+    "noProject": "بدون پروژه"
   },
   "chat": {
     "placeholder": "بپرس یا وظیفه بده…",
@@ -67,7 +72,21 @@
     "suggestion1": "لیست فایل‌های پوشه پروژه را بخوان و ساختار آن را توضیح بده.",
     "suggestion2": "یک تابع TypeScript برای اعتبارسنجی ایمیل بنویس و تستش کن.",
     "suggestion3": "package.json را باز کن و وابستگی‌های قدیمی را گزارش کن.",
-    "usedRemote": "از remote shell استفاده شد"
+    "usedRemote": "از remote shell استفاده شد",
+    "overBudget": "≈{{count}} توکن — این گفتگو از بودجه‌ی context گذشته است. برای دقت پاسخ‌ها چت جدیدی شروع کنید.",
+    "planMode": "برنامه",
+    "codeMode": "کد",
+    "planModeHint": "حالت برنامه‌ریزی: عامل مراحل را توضیح می‌دهد اما هیچ ابزاری اجرا نمی‌کند.",
+    "approvalTitle": "تأیید اقدام عامل؟",
+    "approvalBody": "عامل می‌خواهد اجرا کند:",
+    "approve": "تأیید",
+    "deny": "رد",
+    "applyChange": "اعمال",
+    "rejectChange": "رد",
+    "changesTitle": "تغییرات پیشنهادی فایل‌ها",
+    "toggleTree": "نمایش/پنهان‌کردن درخت فایل",
+    "terminalTitle": "ترمینال",
+    "terminalPlaceholder": "یک دستور بنویسید و Enter بزنید"
   },
   "vpsSelector": {
     "label": "VPS",
@@ -97,7 +116,24 @@
     "projectName": "نام",
     "projectPath": "مسیر (مثلاً C:\\Users\\me\\project)",
     "noProjects": "هنوز پروژه‌ای نداری.",
-    "missingPath": "مسیر روی این سیستم یافت نشد"
+    "missingPath": "مسیر روی این سیستم یافت نشد",
+    "addRemoteProject": "افزودن Workspace ریموت",
+    "remoteHint": "پوشه‌ای را که روی VPS قرار دارد اضافه کنید. پروژه‌های ریموت از طریق SSH باز و خوانده/نوشته می‌شوند.",
+    "selectServer": "سرور VPS",
+    "noVps": "هنوز VPS‌ای تنظیم نشده.",
+    "remoteProjectName": "نام پروژه ریموت",
+    "remoteProjectPath": "/مسیر/روی/سرور",
+    "remoteActiveServer": "سرور فعال",
+    "remotePickServer": "انتخاب سرور…",
+    "discover": "جست‌وجو",
+    "remoteNotFound": "پوشه‌ای با این نام روی سرور پیدا نشد",
+    "remoteBadge": "ریموت",
+    "approvalMode": "حالت تأیید",
+    "approvalAuto": "خودکار — همه چیز اجرا شود",
+    "approvalDangerous": "قبل از دستورات شل بپرس",
+    "approvalWrites": "قبل از هر نوشتن بپرس",
+    "approvalHint": "تعیین می‌کند عامل چه زمانی قبل از اجرای ابزار برای تأیید متوقف شود.",
+    "planModeDefault": "شروع گفتگوهای جدید در حالت برنامه‌ریزی"
   },
   "toast": {
     "dismiss": "بستن",
@@ -127,5 +163,29 @@
     "stepOf": "گام {{current}} از {{total}}",
     "vpsTitle": "VPS و ریموت",
     "vpsBody": "با SSH به یک سرور وصل شو تا دستورهای ریموت اجرا شود. در هدر چت یک VPS متصل انتخاب کن تا دستیار از ابزار remote_shell استفاده کند."
+  },
+  "vps": {
+    "notConnected": "ابتدا به یک VPS وصل شو.",
+    "searching": "در حال جستجو روی VPS…",
+    "noMatches": "پوشه‌ای روی VPS پیدا نشد.",
+    "found": "{{count}} پوشه پیدا شد."
+  },
+  "slash": {
+    "new": "شروع چت جدید",
+    "clear": "پاک کردن گفتگو",
+    "settings": "باز کردن تنظیمات",
+    "workspace": "رفتن به Workspace",
+    "vps": "رفتن به VPS",
+    "github": "رفتن به گیت‌هاب",
+    "plan": "نوشتن پلان مرحله‌به‌مرحله",
+    "explain": "توضیح کد",
+    "fix": "پیدا و رفع باگ",
+    "test": "نوشتن تست",
+    "help": "نمایش همه دستورها"
+  },
+  "search": {
+    "placeholder": "جست‌وجو در کدبیس…",
+    "hint": "برای جست‌وجو در پروژه فعال تایپ کنید.",
+    "empty": "موردی یافت نشد."
   }
 }

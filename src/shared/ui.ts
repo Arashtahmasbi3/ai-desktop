@@ -1,6 +1,7 @@
 import type { AgentLogEntry, AgentStatus, LoopWarning } from './agent'
 import type { ChatMessage, ProviderId } from './types'
 import type { VpsConnectionState } from './vps'
+import type { ApprovalMode } from './approval'
 
 /** A project (folder) the user has added to the app. */
 export interface ProjectRecord {
@@ -8,10 +9,15 @@ export interface ProjectRecord {
   name: string
   path: string
   createdAt: number
+  /** 'local' (default) or 'remote' (a folder on a connected VPS). */
+  type?: 'local' | 'remote'
+  /** VPS the remote project lives on. */
+  vpsId?: string
   /**
    * Computed at read time (never persisted): whether `path` exists on this
-   * machine/OS. Missing projects are shown with a warning instead of being
-   * deleted, so a project path from another OS survives a round-trip.
+   * machine/OS (for remote projects: whether the VPS is connected). Missing
+   * projects are shown with a warning instead of being deleted, so a project
+   * path from another OS survives a round-trip.
    */
   exists?: boolean
 }
@@ -29,6 +35,12 @@ export interface SettingsView {
   activeProjectId?: string
   providers: Partial<Record<ProviderId, ProviderSettingsView>>
   projects: ProjectRecord[]
+  /** Host platform (`process.platform`) so the UI can warn on foreign paths. */
+  platform?: string
+  /** When the agent must ask before acting. */
+  approvalMode?: ApprovalMode
+  /** Whether new chats start in Plan Mode. */
+  planModeDefault?: boolean
 }
 
 /** A single entry in the workspace file explorer. */
@@ -53,6 +65,18 @@ export interface AgentRunRequest {
   resumeSessionId?: string
   /** Connected VPS to run `remote_shell` on (chosen in the chat header). */
   vpsServerId?: string
+  /** Plan Mode: no tools are exposed; the model only drafts a plan. */
+  planMode?: boolean
+}
+
+/** A tool call awaiting the user's approval (Approval Modes). */
+export interface ApprovalRequest {
+  id: string
+  runId: string
+  tool: string
+  /** One-line, human-readable description of what the tool will do. */
+  summary: string
+  arguments: Record<string, unknown>
 }
 
 /** The model the user has selected for the next/next messages. */
@@ -80,6 +104,29 @@ export interface SessionRecordView {
 }
 
 /** Events streamed main -> renderer while an agent run is in progress. */
+/** A file the agent wrote, captured for review in the chat. */
+export interface CodeMatch {
+  path: string
+  line: number
+  text: string
+}
+export interface LocalShellResult {
+  stdout: string
+  stderr: string
+  exitCode: number
+}
+export interface FileChangeView {
+  id: string
+  runId: string
+  sessionId?: string
+  /** Project-relative path. */
+  path: string
+  before: string
+  after: string
+}
+
+export type FileChangeStatus = 'accepted' | 'rejected'
+
 export type AgentEvent =
   | { type: 'run:start'; runId: string; task: string; at: number }
   | {
@@ -95,6 +142,9 @@ export type AgentEvent =
       at: number
     }
   | { type: 'log'; entry: AgentLogEntry }
+  | { type: 'approval:request'; request: ApprovalRequest }
+  | { type: 'file:change'; change: FileChangeView; at: number }
+  | { type: 'file:change:resolved'; id: string; status: FileChangeStatus; at: number }
   | { type: 'error'; runId: string; message: string }
 
 export type WorkerState = 'stopped' | 'idle' | 'running'

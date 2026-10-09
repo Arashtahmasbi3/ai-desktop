@@ -80,6 +80,11 @@ export class SshManager {
     return this.audit.entries()
   }
 
+  /** Record an audit entry (e.g. an SFTP file operation) outside `exec`. */
+  async recordAudit(entry: Omit<AuditEntry, 'at'>): Promise<AuditEntry> {
+    return this.audit.record(entry)
+  }
+
   private setState(next: VpsConnectionState): VpsConnectionState {
     this.state = next
     this.onStatus?.(this.getState())
