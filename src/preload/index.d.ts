@@ -5,6 +5,7 @@ import type {
   CustomProviderView
 } from '@shared/types'
 import type { OnboardingStatus } from '@shared/onboarding'
+import type { ChatSaveInput, ChatSummary, StoredChat } from '@shared/chat'
 import type {
   AuditEntryView,
   RemoteFileEntry,
@@ -42,6 +43,12 @@ export interface Api {
   app: {
     ping(): Promise<string>
   }
+  window: {
+    minimize(): Promise<void>
+    toggleMaximize(): Promise<boolean>
+    close(): Promise<void>
+    isMaximized(): Promise<boolean>
+  }
   settings: {
     get(): Promise<SettingsView>
     setApiKey(provider: ProviderId, apiKey: string): Promise<SettingsView>
@@ -50,12 +57,21 @@ export interface Api {
     setActiveProvider(provider: ProviderId): Promise<SettingsView>
     addProject(name: string, path: string): Promise<SettingsView>
     removeProject(id: string): Promise<SettingsView>
+    updateProjectPath(id: string, path: string): Promise<SettingsView>
   }
   dialog: {
     pickDirectory(): Promise<string | null>
+    pickFile(): Promise<string[]>
   }
   projects: {
     open(id: string): Promise<SettingsView>
+  }
+  chats: {
+    list(): Promise<ChatSummary[]>
+    load(id: string): Promise<StoredChat | null>
+    save(input: ChatSaveInput): Promise<StoredChat>
+    rename(id: string, title: string): Promise<ChatSummary | null>
+    remove(id: string): Promise<boolean>
   }
   customProviders: {
     list(): Promise<CustomProviderView[]>

@@ -9,6 +9,10 @@ import type {
 } from '@shared/types'
 import { DEFAULT_SELECTION, resolveSelection } from '@shared/selection'
 import type { OnboardingStatus } from '@shared/onboarding'
+import type { ChatSummary, StoredMessage } from '@shared/chat'
+import type { Locale } from './i18n/locale'
+import { detectLocale } from './i18n/locale'
+import i18n from './i18n'
 import type {
   AgentEvent,
   FileEntry,
@@ -22,6 +26,14 @@ import type {
 
 export type ViewId = 'chat' | 'tasks' | 'files' | 'browser' | 'github' | 'vps'
 
+export type ToastKind = 'success' | 'error' | 'warning'
+
+export interface Toast {
+  id: string
+  kind: ToastKind
+  message: string
+}
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant' | 'tool' | 'system'
@@ -29,12 +41,28 @@ export interface ChatMessage {
   at: number
   /** Provider/model that produced an assistant message (display only). */
   model?: string
+  /** True when this assistant turn used the remote_shell tool. */
+  usedRemote?: boolean
 }
 
 const MAX_LOGS = 500
+const TOKEN_SETTINGS_KEY = 'ai-desktop:show-token-count'
 
 function newId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `id-${Math.random().toString(36).slice(2)}`
+}
+
+function readShowTokenCount(): boolean {
+  try {
+    return globalThis.localStorage?.getItem(TOKEN_SETTINGS_KEY) !== '0'
+  } catch {
+    return true
+  }
+}
+
+/** Switch the active language (kept here so the store is the single entry point). */
+async function i18nChangeLanguage(locale: Locale): Promise<void> {
+  await i18n.changeLanguage(locale)
 }
 
 function basename(path: string): string {
@@ -65,6 +93,8 @@ interface AppState {
   worker: WorkerStatus | null
   remote: RemoteStatus | null
   error: string | null
+  /** True when the active project folder cannot be found on this OS. */
+  projectMissing: boolean
 
   /** Model chosen in the chat header for the next message. */
   selection: ModelSelection
@@ -72,6 +102,36 @@ interface AppState {
   customProviders: CustomProviderView[]
   /** First-run wizard state; null until loaded. */
   onboarding: OnboardingStatus | null
+
+  /** Interface language (drives dir + all t() text). */
+  locale: Locale
+  /** Collapsed state of the left sidebar. */
+  sidebarCollapsed: boolean
+  /** Whether the token estimate is shown under the chat input. */
+  showTokenCount: boolean
+  /** Saved chats for the sidebar list. */
+  chats: ChatSummary[]
+  /** Currently open chat id (created lazily on first message). */
+  activeChatId: string | null
+  /** Connected VPS selected for remote_shell in this chat. */
+  vpsServerId: string | undefined
+  /** Transient toast notifications. */
+  toasts: Toast[]
+  /** Command palette visibility. */
+  paletteOpen: boolean
+
+  setLocale: (locale: Locale) => void
+  toggleSidebar: () => void
+  setShowTokenCount: (value: boolean) => void
+  refreshChats: () => Promise<void>
+  /** Save the current messages/model/vps as the active chat. */
+  persistChat: () => Promise<void>
+  renameChat: (id: string, title: string) => Promise<void>
+  deleteChat: (id: string) => Promise<void>
+  setVpsServerId: (id: string | undefined) => void
+  pushToast: (kind: ToastKind, message: string) => void
+  dismissToast: (id: string) => void
+  setPaletteOpen: (open: boolean) => void
 
   init: () => Promise<void>
   openSettings: () => void
@@ -104,6 +164,7 @@ interface AppState {
   addProject: (name: string, path: string) => Promise<void>
   removeProject: (id: string) => Promise<void>
   openProject: (id: string) => Promise<void>
+  updateProjectPath: (id: string, path: string) => Promise<void>
   setApiKey: (provider: ProviderId, apiKey: string) => Promise<void>
   removeApiKey: (provider: ProviderId) => Promise<void>
   setModel: (provider: ProviderId, model: string) => Promise<void>
@@ -136,18 +197,102 @@ export const useStore = create<AppState>((set, get) => ({
   worker: null,
   remote: null,
   error: null,
+  projectMissing: false,
   selection: DEFAULT_SELECTION,
   customProviders: [],
   onboarding: null,
 
+  locale: detectLocale(),
+  sidebarCollapsed: false,
+  showTokenCount: readShowTokenCount(),
+  chats: [],
+  activeChatId: null,
+  vpsServerId: undefined,
+  toasts: [],
+  paletteOpen: false,
+
+  setLocale(locale) {
+    set({ locale })
+    void i18nChangeLanguage(locale)
+  },
+  toggleSidebar: () => set({ sidebarCollapsed: !get().sidebarCollapsed }),
+  setShowTokenCount(value) {
+    set({ showTokenCount: value })
+    try {
+      globalThis.localStorage?.setItem(TOKEN_SETTINGS_KEY, value ? '1' : '0')
+    } catch {
+      // Persisting the preference is best-effort.
+    }
+  },
+  setVpsServerId: (id) => set({ vpsServerId: id }),
+  pushToast(kind, message) {
+    const id = newId()
+    set({ toasts: [...get().toasts, { id, kind, message }] })
+    const ttl = kind === 'error' ? 5000 : 3000
+    setTimeout(() => get().dismissToast(id), ttl)
+  },
+  dismissToast(id) {
+    set({ toasts: get().toasts.filter((toast) => toast.id !== id) })
+  },
+  setPaletteOpen: (open) => set({ paletteOpen: open }),
+
+  async refreshChats() {
+    try {
+      set({ chats: await window.api.chats.list() })
+    } catch {
+      // Chat history is best-effort.
+    }
+  },
+
+  async persistChat() {
+    const { messages, activeChatId, vpsServerId, selection } = get()
+    const stored: StoredMessage[] = messages
+      .filter((message) => message.role !== 'tool')
+      .map((message) => ({
+        id: message.id,
+        role: message.role as StoredMessage['role'],
+        content: message.content,
+        at: message.at,
+        ...(message.model ? { model: message.model } : {}),
+        ...(message.usedRemote ? { usedRemote: true } : {})
+      }))
+    if (stored.length === 0) return
+    try {
+      const chat = await window.api.chats.save({
+        ...(activeChatId ? { id: activeChatId } : {}),
+        messages: stored,
+        model: selection,
+        ...(vpsServerId ? { vpsServerId } : {})
+      })
+      set({ activeChatId: chat.id })
+      await get().refreshChats()
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : String(error) })
+    }
+  },
+
+  async renameChat(id, title) {
+    await window.api.chats.rename(id, title)
+    await get().refreshChats()
+  },
+
+  async deleteChat(id) {
+    await window.api.chats.remove(id)
+    if (get().activeChatId === id) {
+      set({ activeChatId: null, messages: [], logs: [], warnings: [] })
+    }
+    await get().refreshChats()
+  },
+
   async init() {
     try {
-      const [settings, worker, remote, customProviders, onboarding] = await Promise.all([
+      const [settings, worker, remote, customProviders, onboarding, chats] = await Promise.all([
         window.api.settings.get(),
         window.api.worker.status(),
         window.api.remote.status(),
         window.api.customProviders.list(),
-        window.api.onboarding.get()
+        window.api.onboarding.get(),
+        window.api.chats.list()
       ])
       set({
         settings,
@@ -155,6 +300,7 @@ export const useStore = create<AppState>((set, get) => ({
         remote,
         customProviders,
         onboarding,
+        chats,
         ready: true,
         selection: resolveSelection(settings)
       })
@@ -191,7 +337,7 @@ export const useStore = create<AppState>((set, get) => ({
   applyEvent(event) {
     switch (event.type) {
       case 'run:start':
-        set({ running: true, currentRunId: event.runId, error: null })
+        set({ running: true, currentRunId: event.runId, error: null, logs: [] })
         break
       case 'log': {
         const logs = [...get().logs, event.entry]
@@ -218,13 +364,17 @@ export const useStore = create<AppState>((set, get) => ({
       case 'run:end': {
         const text = event.finalAnswer ?? event.message ?? ''
         const messages = [...get().messages]
+        const usedRemote = get().logs.some(
+          (entry) => entry.event === 'action.ok' && entry.tool === 'remote_shell'
+        )
         if (text) {
           messages.push({
             id: newId(),
             role: 'assistant',
             content: text,
             at: event.at,
-            ...(event.model ? { model: event.model } : {})
+            ...(event.model ? { model: event.model } : {}),
+            ...(usedRemote ? { usedRemote: true } : {})
           })
         }
         set({
@@ -233,6 +383,7 @@ export const useStore = create<AppState>((set, get) => ({
           warnings: event.warnings,
           messages
         })
+        void get().persistChat()
         void get().refreshSessions()
         break
       }
@@ -246,6 +397,7 @@ export const useStore = create<AppState>((set, get) => ({
             { id: newId(), role: 'system', content: `Error: ${event.message}`, at: Date.now() }
           ]
         })
+        get().pushToast('error', event.message)
         break
     }
   },
@@ -259,17 +411,20 @@ export const useStore = create<AppState>((set, get) => ({
       running: true,
       error: null
     })
+    void get().persistChat()
     try {
       await window.api.agent.run({
         task: trimmed,
-        sessionId: get().sessionId,
+        sessionId: get().activeChatId ?? get().sessionId,
         provider: selection.provider,
         model: selection.model,
-        ...(selection.customProviderId ? { customProviderId: selection.customProviderId } : {})
+        ...(selection.customProviderId ? { customProviderId: selection.customProviderId } : {}),
+        ...(get().vpsServerId ? { vpsServerId: get().vpsServerId } : {})
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       set({ running: false, error: message })
+      get().pushToast('error', message)
     }
   },
 
@@ -280,27 +435,33 @@ export const useStore = create<AppState>((set, get) => ({
   newSession() {
     set({
       sessionId: newId(),
+      activeChatId: null,
       messages: [],
       logs: [],
       warnings: [],
       running: false,
       currentRunId: null,
-      error: null
+      error: null,
+      view: 'chat'
     })
   },
 
   async loadSession(id) {
-    const record = await window.api.agent.loadSession(id)
+    const record = await window.api.chats.load(id)
     if (!record) return
     set({
-      sessionId: record.id,
+      sessionId: id,
+      activeChatId: id,
+      vpsServerId: record.vpsServerId,
       messages: record.messages
-        .filter((message) => message.role === 'user' || message.role === 'assistant')
+        .filter((message) => message.role !== 'system')
         .map((message) => ({
-          id: newId(),
-          role: message.role as 'user' | 'assistant',
-          content: typeof message.content === 'string' ? message.content : '',
-          at: Date.now()
+          id: message.id || newId(),
+          role: message.role,
+          content: message.content,
+          at: message.at,
+          ...(message.model ? { model: message.model } : {}),
+          ...(message.usedRemote ? { usedRemote: true } : {})
         })),
       logs: [],
       warnings: [],
@@ -320,11 +481,18 @@ export const useStore = create<AppState>((set, get) => ({
     const target = path ?? get().cwd
     try {
       const entries = await window.api.fs.list(target)
-      set({ entries, cwd: target })
+      set({ entries, cwd: target, projectMissing: false })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       // No project selected yet is a normal first-run state, not an error.
-      set(/No active project/i.test(message) ? { entries: [] } : { entries: [], error: message })
+      if (/No active project/i.test(message)) {
+        set({ entries: [], projectMissing: false })
+      } else if (/PATH_NOT_FOUND|Path not found/i.test(message)) {
+        // A project path that only existed on another OS: mark, never crash.
+        set({ entries: [], projectMissing: true })
+      } else {
+        set({ entries: [], error: message })
+      }
     }
   },
 
@@ -384,6 +552,11 @@ export const useStore = create<AppState>((set, get) => ({
 
   async openProject(id) {
     set({ settings: await window.api.projects.open(id) })
+    await get().refreshFiles('.')
+  },
+
+  async updateProjectPath(id, path) {
+    set({ settings: await window.api.settings.updateProjectPath(id, path) })
     await get().refreshFiles('.')
   },
 

@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] — 2026-10-05
+
+UX overhaul, bilingual UI and critical bug fixes.
+
+### Added
+
+- **Internationalization** — English/Persian locales with an instant RTL/LTR switch, persisted
+  preference and a Settings language dropdown (i18next + react-i18next).
+- **Chat history** — file-per-chat storage with a grouped sidebar (Today / Yesterday /
+  This Week / Older), search, and per-chat rename, export (JSON) and delete.
+- **Command palette** (`Ctrl+K` / `Ctrl+P`) and a collapsible sidebar (`Ctrl+B`).
+- **Workspace switcher** in the title bar, plus custom frameless window controls.
+- **VPS selector** in the chat header so a run can target an explicit connected server, with a
+  "used remote shell" badge on the answer.
+- **Chat composer upgrades** — file attachments (`@path`), live token/character estimate,
+  auto-growing textarea and a scroll-to-bottom button.
+- **Two-column Settings** — General / Providers / Projects / GitHub / VPS / Advanced.
+- **Toast notifications** and an onboarding VPS step.
+
+### Fixed
+
+- Missing project folders are now flagged (`PATH_NOT_FOUND` + `exists`) and can be re-located
+  from the sidebar or Settings instead of failing silently.
+- `remote_shell` is injected into the main chat runtime when a VPS is connected.
+- Project paths now accept Windows drive letters when validated on POSIX hosts.
+- Window maximize/restore state is reported to the renderer.
+
 ## [2.0.0] — 2026-10-05
 
 VPS / remote — SSH servers from the desktop app, with a hard security boundary.

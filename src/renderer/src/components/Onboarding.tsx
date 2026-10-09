@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { ArrowRight, Bot, Check, FolderPlus, KeyRound, Settings } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { ArrowRight, Bot, Check, FolderPlus, KeyRound, Server, Settings } from 'lucide-react'
 import { ONBOARDING_STEPS, USE_CASES, recommendModel } from '@shared/onboarding'
 import type { UseCase } from '@shared/onboarding'
 import { useStore } from '../store'
@@ -15,12 +16,14 @@ const USE_CASE_LABELS: Record<UseCase, string> = {
  * then a summary. Rendered before SettingsPanel so Settings can appear on top.
  */
 export default function Onboarding(): JSX.Element | null {
+  const { t } = useTranslation()
   const ready = useStore((state) => state.ready)
   const onboarding = useStore((state) => state.onboarding)
   const settings = useStore((state) => state.settings)
   const openSettings = useStore((state) => state.openSettings)
   const completeOnboarding = useStore((state) => state.completeOnboarding)
   const setSelection = useStore((state) => state.setSelection)
+  const setView = useStore((state) => state.setView)
 
   const [step, setStep] = useState(0)
   const [useCase, setUseCase] = useState<UseCase>('quick')
@@ -58,8 +61,13 @@ export default function Onboarding(): JSX.Element | null {
                 ? 'Connect a provider'
                 : current === 'project'
                   ? 'Add your first project'
-                  : 'You are all set'}
+                  : current === 'vps'
+                    ? t('onboarding.vpsTitle')
+                    : 'You are all set'}
           </h2>
+          <span className="ml-auto text-[10px] text-neutral-500">
+            {t('onboarding.stepOf', { current: step + 1, total: ONBOARDING_STEPS.length })}
+          </span>
         </div>
 
         <div className="px-5 py-5 text-sm text-neutral-300">
@@ -131,6 +139,24 @@ export default function Onboarding(): JSX.Element | null {
             </div>
           ) : null}
 
+          {current === 'vps' ? (
+            <div className="flex flex-col gap-3">
+              <StatusRow ok label={t('onboarding.vpsTitle')} />
+              <p className="text-xs text-neutral-500">{t('onboarding.vpsBody')}</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setView('vps')
+                  void completeOnboarding()
+                }}
+                className="flex w-fit items-center gap-2 rounded border border-border px-3 py-1.5 text-xs text-neutral-200 hover:bg-bg-tertiary"
+              >
+                <Server className="h-3.5 w-3.5" />
+                {t('sidebar.navVps')}
+              </button>
+            </div>
+          ) : null}
+
           {current === 'done' ? (
             <div className="flex flex-col gap-3">
               <StatusRow ok label="Setup complete" />
@@ -149,7 +175,7 @@ export default function Onboarding(): JSX.Element | null {
             disabled={step === 0}
             className="rounded px-2 py-1 text-xs text-neutral-500 hover:text-neutral-300 disabled:opacity-30"
           >
-            Back
+            {t('onboarding.back')}
           </button>
           <div className="flex items-center gap-2">
             <button
@@ -157,14 +183,14 @@ export default function Onboarding(): JSX.Element | null {
               onClick={() => void completeOnboarding()}
               className="rounded px-2 py-1 text-xs text-neutral-500 hover:text-neutral-300"
             >
-              Skip
+              {t('onboarding.skip')}
             </button>
             <button
               type="button"
               onClick={() => void finish()}
               className="flex items-center gap-1 rounded bg-accent px-3 py-1.5 text-xs text-white hover:bg-accent-hover"
             >
-              {last ? 'Start chatting' : 'Continue'}
+              {last ? t('onboarding.getStarted') : t('onboarding.next')}
               {last ? <Check className="h-3.5 w-3.5" /> : <ArrowRight className="h-3.5 w-3.5" />}
             </button>
           </div>
@@ -177,6 +203,7 @@ export default function Onboarding(): JSX.Element | null {
 function Sparkle({ current }: { current: string }): JSX.Element {
   if (current === 'connect') return <KeyRound className="h-4 w-4 text-accent" />
   if (current === 'project') return <FolderPlus className="h-4 w-4 text-accent" />
+  if (current === 'vps') return <Server className="h-4 w-4 text-accent" />
   if (current === 'done') return <Check className="h-4 w-4 text-emerald-400" />
   return <Bot className="h-4 w-4 text-accent" />
 }

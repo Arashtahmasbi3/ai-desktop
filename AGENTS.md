@@ -407,3 +407,25 @@ from the plan are tagged `[AUTO-DECISION]` or `[BETTER-ALTERNATIVE]`.
 - **TODO v2.1:** گزینه «اعمال Deny-list روی ترمینال دستی» در Settings (پیش‌فرض: خاموش).
   (Manual VPS terminal input is intentionally unrestricted today because the user owns the
   server; v2.1 will add an opt-in Settings toggle to apply the deny list to typed input too.)
+
+## v2.1 — UX overhaul & bug fixes (branch `feature/v2.1-ux-overhaul`)
+
+Decisions taken conservatively without blocking on questions (per the sprint's golden rule):
+
+- `[AUTO-DECISION]` **Version bump `2.0.0` → `2.1.0`** to match the sprint line (package.json + StatusBar/Advanced label).
+- `[AUTO-DECISION]` **Chat history is file-per-chat** (`ChatStore` → `<userData>/chats/<id>.json`) exposed as
+  `window.api.chats.*`. This is the sidebar source of truth; the older `agent.sessions` store is kept for the
+  Tasks/worker panel. `normalizeProjectPath` also accepts **Windows drive paths** even on POSIX so CI (Linux) and
+  the Windows app agree.
+- `[AUTO-DECISION]` **i18n = i18next + react-i18next** with `en`/`fa` resources under `src/renderer/src/i18n/`.
+  Locale is persisted in `localStorage` (`ai-desktop:locale`); `<html dir>` switches instantly (`fa` → `rtl`).
+  A parity test fails the build if a key is missing from `fa.json`.
+- `[AUTO-DECISION]` **Menu chrome stays English; chat content follows locale direction.** Sidebar/Settings labels are
+  translated, but long marketing/help copy in Onboarding is still English to avoid churn.
+- `[AUTO-DECISION]` **Chat export = JSON download** (Blob + `<a download>`) rather than a native save dialog; rename
+  uses `window.prompt`. Chosen to stay dependency-free and avoid new IPC surface.
+- `[AUTO-DECISION]` **New IPC added:** `dialog:pickFile` (multi-select) for the composer attachment button. Attached
+  paths are appended to the prompt as `@<path>` lines.
+- `[AUTO-DECISION]` **Shortcuts:** `Ctrl+K`/`Ctrl+P` palette, `Ctrl+B` sidebar, `Ctrl+N` new chat, `Ctrl+,` settings,
+  `Ctrl+1..6` views, `Esc` closes palette → settings → error.
+- Tests: 58 files / 411 passed, 1 skipped. `typecheck` (node + web) and `build` green.

@@ -8,6 +8,12 @@ export interface ProjectRecord {
   name: string
   path: string
   createdAt: number
+  /**
+   * Computed at read time (never persisted): whether `path` exists on this
+   * machine/OS. Missing projects are shown with a warning instead of being
+   * deleted, so a project path from another OS survives a round-trip.
+   */
+  exists?: boolean
 }
 
 /** Provider settings safe to display in the renderer (no key material). */
@@ -45,6 +51,8 @@ export interface AgentRunRequest {
   sessionId?: string
   /** Load this stored session before running. */
   resumeSessionId?: string
+  /** Connected VPS to run `remote_shell` on (chosen in the chat header). */
+  vpsServerId?: string
 }
 
 /** The model the user has selected for the next/next messages. */
@@ -144,6 +152,7 @@ export interface AppEventMap {
   'remote:status': RemoteStatus
   'settings:changed': SettingsView
   'files:changed': { root: string }
+  'window:maximized': boolean
   'vps:status': VpsConnectionState
   'vps:data': { sessionId: string; chunk: string }
 }

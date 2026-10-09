@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { SandboxManager } from '@shared/sandbox'
 import type { AgentEvent, RemoteStatus, SettingsView, WorkerStatus } from '@shared/ui'
@@ -8,6 +9,7 @@ import { WorkerManager } from '@core/worker/worker-manager'
 import { RemoteServer } from '@core/remote/remote-server'
 import { AgentService } from './agent-service'
 import { FileService } from './file-service'
+import { ChatStore } from './chat-store'
 import {
   appDataDir,
   createAuditLog,
@@ -60,6 +62,7 @@ export class AppServices {
   readonly vpsServers: VpsServerStore
   readonly vps: SshManager
   readonly files = new FileService()
+  readonly chats: ChatStore
   readonly sandbox: SandboxManager
   readonly agent: AgentService
   readonly worker: WorkerManager
@@ -73,6 +76,7 @@ export class AppServices {
     this.persistence = createSettingsStore(this.dir)
     this.sessions = createSessionStore(this.dir)
     this.customProviders = options.customProviders ?? createCustomProviderStore(this.dir)
+    this.chats = new ChatStore(this.dir)
     this.onboarding = options.onboarding ?? createOnboardingStore(this.dir)
     this.github = options.github ?? createGitHubService(this.dir)
     this.vpsServers = options.vpsServers ?? createVpsServerStore(this.dir)
@@ -94,6 +98,7 @@ export class AppServices {
       persistence: this.persistence,
       sessionStore: this.sessions,
       customProviders: this.customProviders,
+      vps: this.vps,
       emit: (event: AgentEvent) => this.emit('agent:event', event)
     })
 
@@ -138,12 +143,17 @@ export class AppServices {
 
   async settingsView(): Promise<SettingsView> {
     const settings = await this.persistence.load()
+    const activeId = settings.activeProjectId
     const view: SettingsView = {
       providers: {},
-      projects: settings.projects
+      projects: settings.projects.map((project) => ({
+        ...project,
+        // Keep the record even when missing; the UI marks it instead of deleting.
+        exists: existsSync(project.path)
+      }))
     }
     if (settings.activeProvider) view.activeProvider = settings.activeProvider
-    if (settings.activeProjectId) view.activeProjectId = settings.activeProjectId
+    if (activeId) view.activeProjectId = activeId
     for (const [provider, value] of Object.entries(settings.providers)) {
       if (!value) continue
       view.providers[provider as keyof SettingsView['providers']] = {

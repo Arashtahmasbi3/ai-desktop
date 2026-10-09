@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Bot, AlertTriangle, UploadCloud, X } from 'lucide-react'
 import BrowserPanel from './components/BrowserPanel'
 import ChatPanel from './components/ChatPanel'
 import CodeViewer from './components/CodeViewer'
+import CommandPalette from './components/CommandPalette'
 import ErrorBoundary from './components/ErrorBoundary'
 import FileExplorer from './components/FileExplorer'
 import GitHubPanel from './components/GitHubPanel'
@@ -13,9 +15,11 @@ import Sidebar from './components/Sidebar'
 import StatusBar from './components/StatusBar'
 import TaskPanel from './components/TaskPanel'
 import Titlebar from './components/Titlebar'
+import ToastHost from './components/ToastHost'
 import { basename, subscribeToEvents, useStore } from './store'
 
 export default function App(): JSX.Element {
+  const { t } = useTranslation()
   const init = useStore((state) => state.init)
   const ready = useStore((state) => state.ready)
   const view = useStore((state) => state.view)
@@ -40,7 +44,13 @@ export default function App(): JSX.Element {
         event.preventDefault()
         return
       }
-      if (event.ctrlKey && (event.key === 'n' || event.key === 'N')) {
+      if (event.ctrlKey && (event.key === 'k' || event.key === 'K' || event.key === 'p' || event.key === 'P')) {
+        event.preventDefault()
+        state.setPaletteOpen(!state.paletteOpen)
+      } else if (event.ctrlKey && (event.key === 'b' || event.key === 'B')) {
+        event.preventDefault()
+        state.toggleSidebar()
+      } else if (event.ctrlKey && (event.key === 'n' || event.key === 'N')) {
         event.preventDefault()
         state.newSession()
       } else if (event.ctrlKey && event.key === ',') {
@@ -54,7 +64,8 @@ export default function App(): JSX.Element {
           ]
         )
       } else if (event.key === 'Escape') {
-        if (state.settingsOpen) state.closeSettings()
+        if (state.paletteOpen) state.setPaletteOpen(false)
+        else if (state.settingsOpen) state.closeSettings()
         else clearError()
       }
     }
@@ -91,7 +102,7 @@ export default function App(): JSX.Element {
           {!ready ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-3">
               <Bot className="h-10 w-10 animate-pulse text-accent" />
-              <p className="text-sm text-neutral-500">Starting AI Desktop…</p>
+              <p className="text-sm text-neutral-500">{t('common.loading')}</p>
             </div>
           ) : (
             <ErrorBoundary label="Workspace" key={view}>
@@ -130,11 +141,15 @@ export default function App(): JSX.Element {
 
       <SettingsPanel />
 
+      <CommandPalette />
+
+      <ToastHost />
+
       {dragging ? (
         <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center bg-accent/10 backdrop-blur-sm">
           <div className="flex items-center gap-2 rounded-xl border border-accent/50 bg-bg-secondary px-4 py-3 text-sm text-neutral-200">
             <UploadCloud className="h-4 w-4 text-accent" />
-            رها کنید تا به‌عنوان پروژه اضافه شود…
+            {t('titlebar.openFolder')}
           </div>
         </div>
       ) : null}
