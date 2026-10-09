@@ -79,7 +79,10 @@
     "approvalTitle": "Approve agent action?",
     "approvalBody": "The agent wants to run:",
     "approve": "Approve",
-    "deny": "Deny"
+    "deny": "Deny",
+    "applyChange": "Apply",
+    "rejectChange": "Reject",
+    "changesTitle": "Proposed file changes"
   },
   "vpsSelector": {
     "label": "VPS",

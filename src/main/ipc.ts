@@ -230,6 +230,8 @@ export function registerIpc(services: AppServices, getWindow: () => BrowserWindo
     ['agent:run', (request: AgentRunRequest) => services.agent.run(request)],
     ['agent:abort', () => services.agent.abort()],
     ['agent:respondApproval', (id: string, approved: boolean) => services.approvals.resolve(id, approved)],
+    ['agent:applyChange', (id: string) => services.agent.applyChange(id)],
+    ['agent:rejectChange', (id: string) => services.agent.rejectChange(id)],
     ['agent:sessions', () => services.agent.listSessions()],
     ['agent:loadSession', (id: string) => services.agent.loadSession(id)],
 

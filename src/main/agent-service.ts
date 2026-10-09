@@ -2,8 +2,15 @@ import type { AgentAction, AgentLogEntry, AgentLogger } from '@shared/agent'
 import type { AgentRunResult } from '@shared/agent'
 import type { ProviderId, ToolDefinition } from '@shared/types'
 import type { RemoteFileEntry, VpsExecResult } from '@shared/vps'
-import type { AgentEvent, AgentRunRequest, SessionInfo, SessionRecordView } from '@shared/ui'
+import type {
+  AgentEvent,
+  AgentRunRequest,
+  FileChangeView,
+  SessionInfo,
+  SessionRecordView
+} from '@shared/ui'
 import { AgentOrchestrator } from '@core/agent-orchestrator'
+import type { FileChange } from '@core/agent-orchestrator'
 import type { ProviderEntry } from '@core/agent-orchestrator'
 import type { ToolExecutor } from '@core/agent/tools'
 import { PROVIDERS, createAdapterForConfig } from '@core/llm-adapters/registry'
@@ -38,6 +45,11 @@ export interface RemoteFsHost {
 }
 
 export type RemoteHost = RemoteShellHost & Partial<RemoteFsHost>
+/** Project-bound file access used to review and apply agent edits. */
+export interface ProjectFiles {
+  read(relativePath: string): Promise<string>
+  write(relativePath: string, content: string): Promise<void>
+}
 
 /** Keywords that make the agent reach for `remote_shell` on a default chat. */
 const VPS_KEYWORDS = /\b(vps|ssh|server|remote|سرور|ریموت)\b/i
@@ -151,6 +163,8 @@ export interface AgentServiceOptions {
   requestApproval?: (runId: string, action: AgentAction) => Promise<boolean>
   /** Deny any outstanding approval requests (e.g. the user aborted). */
   cancelApprovals?: () => void
+  /** Optional: enables chat review of agent edits (apply/reject). */
+  files?: ProjectFiles
 }
 
 /** Which provider/model to put first for an agent run. */
@@ -186,8 +200,11 @@ export class AgentService {
   private readonly vps?: RemoteHost
   private readonly requestApproval?: (runId: string, action: AgentAction) => Promise<boolean>
   private readonly cancelApprovals?: () => void
+  private readonly files?: ProjectFiles
   private readonly controllers = new Set<AbortController>()
+  private readonly changes = new Map<string, FileChangeView>()
   private runCounter = 0
+  private changeCounter = 0
 
   constructor(options: AgentServiceOptions) {
     this.sandbox = options.sandbox
@@ -199,6 +216,7 @@ export class AgentService {
     if (options.vps) this.vps = options.vps
     this.requestApproval = options.requestApproval
     this.cancelApprovals = options.cancelApprovals
+    if (options.files) this.files = options.files
   }
 
   isRunning(): boolean {
@@ -334,7 +352,10 @@ export class AgentService {
       ...remote,
       ...(systemHint ? { systemHint } : {}),
       ...(planMode ? { planMode: true } : {}),
-      ...(approvalGate ? { approvalGate } : {})
+      ...(approvalGate ? { approvalGate } : {}),
+      ...(this.files
+        ? { onFileWritten: (change: FileChange) => this.captureChange(runId, request.sessionId, change) }
+        : {})
     })
 
     const controller = new AbortController()
@@ -374,6 +395,50 @@ export class AgentService {
   abort(): void {
     for (const controller of this.controllers) controller.abort()
     this.cancelApprovals?.()
+  }
+  /** Records an agent edit and surfaces it in the chat for review. */
+  private captureChange(runId: string, sessionId: string | undefined, change: FileChange): void {
+    const id = `change-${++this.changeCounter}`
+    void (async () => {
+      let before = change.before
+      if (this.files) {
+        before = await this.files.read(change.path).catch(() => change.before)
+      }
+      const view: FileChangeView = {
+        id,
+        runId,
+        path: change.path,
+        before,
+        after: change.after,
+        ...(sessionId ? { sessionId } : {})
+      }
+      this.changes.set(id, view)
+      this.emit({ type: 'file:change', change: view, at: this.now() })
+    })()
+  }
+  /** Writes the agent's edit into the active project. */
+  async applyChange(id: string): Promise<boolean> {
+    const change = this.changes.get(id)
+    if (!change || !this.files) return false
+    try {
+      await this.files.write(change.path, change.after)
+    } catch {
+      return false
+    }
+    this.changes.delete(id)
+    this.emit({ type: 'file:change:resolved', id, status: 'accepted', at: this.now() })
+    return true
+  }
+  /** Discards an agent edit without touching the project. */
+  rejectChange(id: string): boolean {
+    if (!this.changes.has(id)) return false
+    this.changes.delete(id)
+    this.emit({ type: 'file:change:resolved', id, status: 'rejected', at: this.now() })
+    return true
+  }
+  /** Pending edits, used by tests and diagnostics. */
+  pendingChanges(): FileChangeView[] {
+    return [...this.changes.values()]
   }
 
   async loadSession(id: string): Promise<SessionRecordView | null> {

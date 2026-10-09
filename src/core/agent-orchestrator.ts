@@ -42,6 +42,13 @@ import { SANDBOX_TOOLS, SandboxToolExecutor, actionFromToolCall } from './agent/
 import { PLAN_MODE_HINT } from './agent/approval'
 import type { ToolExecutor, ToolExecOptions } from './agent/tools'
 
+/** A file that an agent `write_file` action changed during a run. */
+export interface FileChange {
+  path: string
+  before: string
+  after: string
+}
+
 export interface AgentOrchestratorOptions {
   sandbox: SandboxManager
   providers: ProviderEntry[]
@@ -84,6 +91,11 @@ export interface AgentOrchestratorOptions {
    * (recorded as a `blocked` observation) without running it.
    */
   approvalGate?: (action: AgentAction) => Promise<boolean>
+  /**
+   * Called after a successful `write_file`, with the file's previous and new
+   * contents, so callers can surface a reviewable diff.
+   */
+  onFileWritten?: (change: FileChange) => void
   now?: () => number
   runIdFactory?: () => string
 }
@@ -243,6 +255,7 @@ export class AgentOrchestrator {
   private readonly sessionId?: string
   private readonly planMode: boolean
   private readonly approvalGate?: (action: AgentAction) => Promise<boolean>
+  private readonly onFileWritten?: (change: FileChange) => void
   private readonly now: () => number
   private readonly runIdFactory: () => string
   private runCounter = 0
@@ -274,6 +287,7 @@ export class AgentOrchestrator {
     this.sessionId = options.sessionId
     this.planMode = options.planMode ?? false
     this.approvalGate = options.approvalGate
+    this.onFileWritten = options.onFileWritten
     this.now = options.now ?? (() => Date.now())
     this.runCounter = 0
     this.runIdFactory = options.runIdFactory ?? (() => `run-${++this.runCounter}`)
@@ -441,7 +455,15 @@ export class AgentOrchestrator {
         const observations: AgentToolResult[] = []
         for (const action of actions) {
           if (options.signal?.aborted) break
+          const before = await this.snapshotBefore(action, sandboxId)
           const result = await this.guardedExecute(executor, action, runId, index, options)
+          if (result.ok && before !== null) {
+            this.onFileWritten?.({
+              path: String(action.arguments.path ?? ''),
+              before,
+              after: String(action.arguments.content ?? '')
+            })
+          }
           observations.push(result)
           context.appendToolResult({
             toolCallId: action.id,
@@ -758,6 +780,21 @@ export class AgentOrchestrator {
   }
 
   /** Execute one action, retrying transient sandbox failures. */
+  /** Reads the pre-write contents of a `write_file` target ('' when new). */
+  private async snapshotBefore(
+    action: AgentAction,
+    sandboxId: string | null
+  ): Promise<string | null> {
+    if (!sandboxId || action.name !== 'write_file' || !action.valid) return null
+    const path = action.arguments.path
+    if (typeof path !== 'string') return null
+    try {
+      return await this.sandbox.readFile(sandboxId, path)
+    } catch {
+      return ''
+    }
+  }
+
   private async executeAction(
     executor: ToolExecutor,
     action: AgentAction,

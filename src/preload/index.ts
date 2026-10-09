@@ -173,6 +173,8 @@ export const api = {
     abort: (): Promise<void> => invoke('agent:abort'),
     respondApproval: (id: string, approved: boolean): Promise<boolean> =>
       invoke('agent:respondApproval', id, approved),
+    applyChange: (id: string): Promise<boolean> => invoke('agent:applyChange', id),
+    rejectChange: (id: string): Promise<boolean> => invoke('agent:rejectChange', id),
     sessions: (): Promise<SessionInfo[]> => invoke('agent:sessions'),
     loadSession: (id: string): Promise<SessionRecordView | null> => invoke('agent:loadSession', id)
   },

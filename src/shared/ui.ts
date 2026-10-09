@@ -104,6 +104,19 @@ export interface SessionRecordView {
 }
 
 /** Events streamed main -> renderer while an agent run is in progress. */
+/** A file the agent wrote, captured for review in the chat. */
+export interface FileChangeView {
+  id: string
+  runId: string
+  sessionId?: string
+  /** Project-relative path. */
+  path: string
+  before: string
+  after: string
+}
+
+export type FileChangeStatus = 'accepted' | 'rejected'
+
 export type AgentEvent =
   | { type: 'run:start'; runId: string; task: string; at: number }
   | {
@@ -120,6 +133,8 @@ export type AgentEvent =
     }
   | { type: 'log'; entry: AgentLogEntry }
   | { type: 'approval:request'; request: ApprovalRequest }
+  | { type: 'file:change'; change: FileChangeView; at: number }
+  | { type: 'file:change:resolved'; id: string; status: FileChangeStatus; at: number }
   | { type: 'error'; runId: string; message: string }
 
 export type WorkerState = 'stopped' | 'idle' | 'running'

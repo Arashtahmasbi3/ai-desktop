@@ -138,6 +138,8 @@ export interface Api {
     run(request: AgentRunRequest): Promise<unknown>
     abort(): Promise<void>
     respondApproval(id: string, approved: boolean): Promise<boolean>
+    applyChange(id: string): Promise<boolean>
+    rejectChange(id: string): Promise<boolean>
     sessions(): Promise<SessionInfo[]>
     loadSession(id: string): Promise<SessionRecordView | null>
   }

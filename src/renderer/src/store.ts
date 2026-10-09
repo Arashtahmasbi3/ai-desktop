@@ -17,6 +17,7 @@ import i18n from './i18n'
 import type {
   AgentEvent,
   ApprovalRequest,
+  FileChangeView,
   FileEntry,
   ModelSelection,
   RemoteStatus,
@@ -121,6 +122,8 @@ interface AppState {
   planMode: boolean
   /** Tool call awaiting the user's approval, if any. */
   pendingApproval: ApprovalRequest | null
+  /** Agent file edits awaiting the user's apply/reject decision. */
+  fileChanges: FileChangeView[]
   /** Transient toast notifications. */
   toasts: Toast[]
   /** Command palette visibility. */
@@ -139,6 +142,8 @@ interface AppState {
   setApprovalMode: (mode: ApprovalMode) => Promise<void>
   setPlanModeDefault: (value: boolean) => Promise<void>
   respondApproval: (approved: boolean) => void
+  applyFileChange: (id: string) => Promise<void>
+  rejectFileChange: (id: string) => Promise<void>
   pushToast: (kind: ToastKind, message: string) => void
   dismissToast: (id: string) => void
   setPaletteOpen: (open: boolean) => void
@@ -222,6 +227,7 @@ export const useStore = create<AppState>((set, get) => ({
   vpsServerId: undefined,
   planMode: false,
   pendingApproval: null,
+  fileChanges: [],
   toasts: [],
   paletteOpen: false,
 
@@ -251,6 +257,17 @@ export const useStore = create<AppState>((set, get) => ({
     if (!pending) return
     set({ pendingApproval: null })
     void window.api.agent.respondApproval(pending.id, approved)
+  },
+  async applyFileChange(id) {
+    const ok = await window.api.agent.applyChange(id)
+    if (ok) {
+      set({ fileChanges: get().fileChanges.filter((change) => change.id !== id) })
+      void get().refreshFiles()
+    }
+  },
+  async rejectFileChange(id) {
+    const ok = await window.api.agent.rejectChange(id)
+    if (ok) set({ fileChanges: get().fileChanges.filter((change) => change.id !== id) })
   },
   pushToast(kind, message) {
     const id = newId()
@@ -372,6 +389,12 @@ export const useStore = create<AppState>((set, get) => ({
       case 'approval:request':
         set({ pendingApproval: event.request })
         break
+      case 'file:change':
+        set({ fileChanges: [...get().fileChanges, event.change] })
+        break
+      case 'file:change:resolved':
+        set({ fileChanges: get().fileChanges.filter((change) => change.id !== event.id) })
+        break
       case 'log': {
         const logs = [...get().logs, event.entry]
         if (logs.length > MAX_LOGS) logs.splice(0, logs.length - MAX_LOGS)
@@ -478,6 +501,8 @@ export const useStore = create<AppState>((set, get) => ({
       running: false,
       currentRunId: null,
       error: null,
+      pendingApproval: null,
+      fileChanges: [],
       view: 'chat'
     })
   },

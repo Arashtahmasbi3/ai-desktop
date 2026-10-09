@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { AlertTriangle, ArrowDown, Bot, Loader2, Paperclip, Send, ShieldAlert, Square, Trash2, X } from 'lucide-react'
 import { basename, useStore } from '../store'
 import MessageBubble from './MessageBubble'
+import FileChangeCard from './FileChangeCard'
 import ModelSwitcher from './ModelSwitcher'
 import VpsSelector from './VpsSelector'
 import ProviderWarning from './ProviderWarning'
@@ -35,6 +36,9 @@ export default function ChatPanel(): JSX.Element {
   const setPlanMode = useStore((state) => state.setPlanMode)
   const pendingApproval = useStore((state) => state.pendingApproval)
   const respondApproval = useStore((state) => state.respondApproval)
+  const fileChanges = useStore((state) => state.fileChanges)
+  const applyFileChange = useStore((state) => state.applyFileChange)
+  const rejectFileChange = useStore((state) => state.rejectFileChange)
 
   const [input, setInput] = useState('')
   const [attached, setAttached] = useState<string[]>([])
@@ -264,6 +268,22 @@ export default function ChatPanel(): JSX.Element {
       ) : null}
 
       <div className="shrink-0 border-t border-border bg-bg-secondary p-3">
+        {fileChanges.length > 0 ? (
+          <div className="mb-2 flex flex-col gap-2">
+            <p className="px-1 text-[10px] uppercase tracking-wide text-neutral-500">
+              {t('chat.changesTitle')}
+            </p>
+            {fileChanges.map((change) => (
+              <FileChangeCard
+                key={change.id}
+                change={change}
+                onApply={(id) => void applyFileChange(id)}
+                onReject={(id) => void rejectFileChange(id)}
+              />
+            ))}
+          </div>
+        ) : null}
+
         {attached.length > 0 ? (
           <div className="mb-2 flex flex-wrap gap-1">
             {attached.map((path) => (

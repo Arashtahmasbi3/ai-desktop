@@ -188,4 +188,30 @@ describe('AgentOrchestrator plan mode + approval gate', () => {
     expect(result.steps[0].observations[0]).toMatchObject({ ok: true, name: 'write_file' })
     await manager.dispose()
   })
+
+  it('reports written files with their previous contents', async () => {
+    const dir = await sandboxDir()
+    await fs.writeFile(join(dir, 'existing.txt'), 'old', 'utf8')
+    const manager = createLocalManager(dir)
+    const adapter = new ScriptedAdapter('deepseek', [
+      { toolCalls: [toolCall('write_file', { path: 'existing.txt', content: 'new' })] },
+      { toolCalls: [toolCall('write_file', { path: 'fresh.txt', content: 'hi' })] },
+      { content: 'done' }
+    ])
+    const changes: Array<{ path: string; before: string; after: string }> = []
+    const orchestrator = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(adapter)],
+      sandboxOptions: { workspaceRoot: dir },
+      onFileWritten: (change) => changes.push(change)
+    })
+
+    await orchestrator.run('edit and create files')
+
+    expect(changes).toEqual([
+      { path: 'existing.txt', before: 'old', after: 'new' },
+      { path: 'fresh.txt', before: '', after: 'hi' }
+    ])
+    await manager.dispose()
+  })
 })

@@ -79,7 +79,10 @@
     "approvalTitle": "تأیید اقدام عامل؟",
     "approvalBody": "عامل می‌خواهد اجرا کند:",
     "approve": "تأیید",
-    "deny": "رد"
+    "deny": "رد",
+    "applyChange": "اعمال",
+    "rejectChange": "رد",
+    "changesTitle": "تغییرات پیشنهادی فایل‌ها"
   },
   "vpsSelector": {
     "label": "VPS",

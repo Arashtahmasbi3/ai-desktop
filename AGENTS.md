@@ -463,3 +463,23 @@ Autonomous decisions logged per the sprint's golden rule (`[AUTO-DECISION]`, no 
   add-remote UI ship. A dedicated `read_file/write_file/list_dir` **remote** fs tool for the agent is **deferred**
   (today the agent reaches a VPS through `remote_shell`); doing it properly needs an SFTP-backed tool executor.
 - Tests: 64 files / 439 passed, 1 skipped. `typecheck` (node + web) and `build` green.
+
+### Sprint v2.2 continued — Codex-like features
+- `[AUTO-DECISION]` **Remote FS tools (Task A).** Added SFTP-backed `remote_read_file` / `remote_write_file` /
+  `remote_list_dir` / `remote_exists` / `remote_grep` / `remote_git_status` (`src/core/tools/remote-fs-tools.ts` +
+  `remote-fs-executor.ts`). They are injected only when a VPS is connected and the SSH host exposes SFTP
+  (`RemoteFsHost`), routed through `CompositeToolExecutor`; writes/deletes honour the shared deny-list and audit log.
+- `[AUTO-DECISION]` **Approval modes + Plan/Code switch (Task B).** Supersedes the earlier "deferred" note. Three
+  modes (`auto` / `dangerous` / `writes`, default `dangerous`) gate every tool call through `core/agent/approval.ts`
+  (`classifyAction` -> read/write/shell + deny-list escalation). The renderer answers via `main/approval-broker.ts`
+  (`ApprovalBroker`), which **fails closed** on timeout (2 min), on abort (`cancelAll`), or on an unknown id.
+  **Plan Mode** exposes no tools (`tools: []`, `toolChoice: 'none'`) and appends `PLAN_MODE_HINT`; a composer
+  Plan/Code toggle and Settings > Advanced controls drive it. Persisted as settings schema v2 (`approvalMode`,
+  `planModeDefault`).
+- `[AUTO-DECISION]` **Inline diff review (Task C).** The agent still edits in an ephemeral sandbox; after a
+  successful `write_file` the orchestrator emits `FileChange {path, before, after}` via `onFileWritten`.
+  `AgentService` re-reads the *project* file for a true `before`, emits a `file:change` event, and exposes
+  `applyChange` (writes onto the active project through `FileService`) / `rejectChange` (drops it). The chat renders
+  each pending edit as a collapsible split diff (`FileChangeCard` + `DiffViewer`) with **Apply** / **Reject**.
+  Rationale: applying to the project is an explicit, user-initiated action, so agent writes can never touch real
+  files without consent — safer than pointing the sandbox at the project.

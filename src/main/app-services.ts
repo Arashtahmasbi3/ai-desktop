@@ -106,6 +106,7 @@ export class AppServices {
       vps: this.vps,
       requestApproval: (runId, action) => this.approvals.request(runId, action),
       cancelApprovals: () => this.approvals.cancelAll(),
+      files: this.files,
       emit: (event: AgentEvent) => this.emit('agent:event', event)
     })
 
