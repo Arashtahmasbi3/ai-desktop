@@ -5,6 +5,7 @@ import type { GitCommitInput } from '@shared/github'
 import type { AgentRunRequest, WorkerJobRequest } from '@shared/ui'
 import type { AppServices } from './app-services'
 import { registerVpsIpc } from './vps-ipc'
+import { runLocalCommand } from './local-shell'
 
 /**
  * Registers every IPC channel the renderer is allowed to call. Handlers only
@@ -231,6 +232,7 @@ export function registerIpc(services: AppServices, getWindow: () => BrowserWindo
     ['agent:abort', () => services.agent.abort()],
     ['agent:respondApproval', (id: string, approved: boolean) => services.approvals.resolve(id, approved)],
     ['agent:applyChange', (id: string) => services.agent.applyChange(id)],
+    ['shell:exec', (command: string) => runLocalCommand(command, { cwd: services.files.getRoot() })],
     ['agent:rejectChange', (id: string) => services.agent.rejectChange(id)],
     ['agent:sessions', () => services.agent.listSessions()],
     ['agent:loadSession', (id: string) => services.agent.loadSession(id)],

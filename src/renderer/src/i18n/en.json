@@ -18,7 +18,8 @@
     "active": "Active",
     "setActive": "Set active",
     "none": "None",
-    "more": "More"
+    "more": "More",
+    "clear": "Clear"
   },
   "titlebar": {
     "newChat": "New chat",
@@ -82,7 +83,10 @@
     "deny": "Deny",
     "applyChange": "Apply",
     "rejectChange": "Reject",
-    "changesTitle": "Proposed file changes"
+    "changesTitle": "Proposed file changes",
+    "toggleTree": "Toggle file tree",
+    "terminalTitle": "Terminal",
+    "terminalPlaceholder": "Type a command and press Enter"
   },
   "vpsSelector": {
     "label": "VPS",

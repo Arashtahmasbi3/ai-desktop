@@ -18,7 +18,8 @@
     "active": "فعال",
     "setActive": "فعال کن",
     "none": "هیچ",
-    "more": "بیشتر"
+    "more": "بیشتر",
+    "clear": "پاک‌کردن"
   },
   "titlebar": {
     "newChat": "چت جدید",
@@ -82,7 +83,10 @@
     "deny": "رد",
     "applyChange": "اعمال",
     "rejectChange": "رد",
-    "changesTitle": "تغییرات پیشنهادی فایل‌ها"
+    "changesTitle": "تغییرات پیشنهادی فایل‌ها",
+    "toggleTree": "نمایش/پنهان‌کردن درخت فایل",
+    "terminalTitle": "ترمینال",
+    "terminalPlaceholder": "یک دستور بنویسید و Enter بزنید"
   },
   "vpsSelector": {
     "label": "VPS",

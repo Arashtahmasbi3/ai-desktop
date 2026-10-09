@@ -37,6 +37,14 @@ export interface Toast {
   message: string
 }
 
+export type TerminalLineKind = 'command' | 'stdout' | 'stderr' | 'info'
+
+export interface TerminalLine {
+  id: string
+  kind: TerminalLineKind
+  text: string
+}
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant' | 'tool' | 'system'
@@ -49,7 +57,9 @@ export interface ChatMessage {
 }
 
 const MAX_LOGS = 500
+const MAX_TERMINAL_LINES = 500
 const TOKEN_SETTINGS_KEY = 'ai-desktop:show-token-count'
+const CHAT_TREE_KEY = 'ai-desktop:chat-tree-open'
 
 function newId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `id-${Math.random().toString(36).slice(2)}`
@@ -60,6 +70,14 @@ function readShowTokenCount(): boolean {
     return globalThis.localStorage?.getItem(TOKEN_SETTINGS_KEY) !== '0'
   } catch {
     return true
+  }
+}
+
+function readChatTreeOpen(): boolean {
+  try {
+    return globalThis.localStorage?.getItem(CHAT_TREE_KEY) === '1'
+  } catch {
+    return false
   }
 }
 
@@ -126,6 +144,12 @@ interface AppState {
   fileChanges: FileChangeView[]
   /** Transient toast notifications. */
   toasts: Toast[]
+  /** Whether the file tree is shown next to the chat. */
+  chatTreeOpen: boolean
+  /** Whether the local terminal panel is open under the chat. */
+  terminalOpen: boolean
+  /** Output lines of the local terminal panel. */
+  terminalLines: TerminalLine[]
   /** Command palette visibility. */
   paletteOpen: boolean
 
@@ -147,6 +171,9 @@ interface AppState {
   pushToast: (kind: ToastKind, message: string) => void
   dismissToast: (id: string) => void
   setPaletteOpen: (open: boolean) => void
+  toggleChatTree: () => void
+  toggleTerminal: () => void
+  runTerminalCommand: (command: string) => Promise<void>
 
   init: () => Promise<void>
   openSettings: () => void
@@ -229,6 +256,9 @@ export const useStore = create<AppState>((set, get) => ({
   pendingApproval: null,
   fileChanges: [],
   toasts: [],
+  chatTreeOpen: readChatTreeOpen(),
+  terminalOpen: false,
+  terminalLines: [],
   paletteOpen: false,
 
   setLocale(locale) {
@@ -245,6 +275,34 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
   setVpsServerId: (id) => set({ vpsServerId: id }),
+  toggleTerminal: () => set({ terminalOpen: !get().terminalOpen }),
+  async runTerminalCommand(command) {
+    const trimmed = command.trim()
+    if (!trimmed) return
+    const push = (kind: TerminalLineKind, text: string): void => {
+      const lines = [...get().terminalLines, { id: newId(), kind, text }]
+      if (lines.length > MAX_TERMINAL_LINES) lines.splice(0, lines.length - MAX_TERMINAL_LINES)
+      set({ terminalLines: lines })
+    }
+    push('command', `$ ${trimmed}`)
+    try {
+      const result = await window.api.shell.exec(trimmed)
+      if (result.stdout) push('stdout', result.stdout.replace(/\n$/, ''))
+      if (result.stderr) push('stderr', result.stderr.replace(/\n$/, ''))
+      if (result.exitCode !== 0) push('info', `exit ${result.exitCode}`)
+    } catch (error) {
+      push('stderr', error instanceof Error ? error.message : String(error))
+    }
+  },
+  toggleChatTree() {
+    const value = !get().chatTreeOpen
+    set({ chatTreeOpen: value })
+    try {
+      globalThis.localStorage?.setItem(CHAT_TREE_KEY, value ? '1' : '0')
+    } catch {
+      // Persisting the preference is best-effort.
+    }
+  },
   setPlanMode: (value) => set({ planMode: value }),
   async setApprovalMode(mode) {
     set({ settings: await window.api.settings.setApprovalMode(mode) })

@@ -27,6 +27,7 @@ export default function App(): JSX.Element {
   const error = useStore((state) => state.error)
   const clearError = useStore((state) => state.clearError)
   const addProject = useStore((state) => state.addProject)
+  const chatTreeOpen = useStore((state) => state.chatTreeOpen)
   const [dragging, setDragging] = useState(false)
 
   useEffect(() => {
@@ -106,7 +107,16 @@ export default function App(): JSX.Element {
             </div>
           ) : (
             <ErrorBoundary label="Workspace" key={view}>
-              {view === 'chat' ? <ChatPanel /> : null}
+              {view === 'chat' ? (
+                <div className="flex min-h-0 min-w-0 flex-1">
+                  {chatTreeOpen ? (
+                    <aside className="hidden w-64 shrink-0 border-r border-border md:flex">
+                      <FileExplorer />
+                    </aside>
+                  ) : null}
+                  <ChatPanel />
+                </div>
+              ) : null}
               {view === 'tasks' ? <TaskPanel /> : null}
               {view === 'files' ? <FileExplorer /> : null}
               {view === 'browser' ? <BrowserPanel /> : null}

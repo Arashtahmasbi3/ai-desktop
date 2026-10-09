@@ -105,6 +105,11 @@ export interface SessionRecordView {
 
 /** Events streamed main -> renderer while an agent run is in progress. */
 /** A file the agent wrote, captured for review in the chat. */
+export interface LocalShellResult {
+  stdout: string
+  stderr: string
+  exitCode: number
+}
 export interface FileChangeView {
   id: string
   runId: string

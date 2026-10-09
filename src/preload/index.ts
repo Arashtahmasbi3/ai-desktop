@@ -27,6 +27,7 @@ import type {
   AppEventMap,
   RemoteStatus,
   SessionInfo,
+  LocalShellResult,
   SessionRecordView,
   SettingsView,
   WorkerJobRequest,
@@ -177,6 +178,10 @@ export const api = {
     rejectChange: (id: string): Promise<boolean> => invoke('agent:rejectChange', id),
     sessions: (): Promise<SessionInfo[]> => invoke('agent:sessions'),
     loadSession: (id: string): Promise<SessionRecordView | null> => invoke('agent:loadSession', id)
+  },
+
+  shell: {
+    exec: (command: string): Promise<LocalShellResult> => invoke('shell:exec', command)
   },
 
   worker: {

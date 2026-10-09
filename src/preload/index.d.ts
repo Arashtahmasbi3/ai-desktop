@@ -30,6 +30,7 @@ import type {
   AgentRunRequest,
   AppEventMap,
   FileEntry,
+  LocalShellResult,
   RemoteStatus,
   SessionInfo,
   SessionRecordView,
@@ -142,6 +143,9 @@ export interface Api {
     rejectChange(id: string): Promise<boolean>
     sessions(): Promise<SessionInfo[]>
     loadSession(id: string): Promise<SessionRecordView | null>
+  }
+  shell: {
+    exec(command: string): Promise<LocalShellResult>
   }
   worker: {
     submit(request: WorkerJobRequest): Promise<WorkerJobView>

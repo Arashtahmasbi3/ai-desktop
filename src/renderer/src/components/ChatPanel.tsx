@@ -1,9 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AlertTriangle, ArrowDown, Bot, Loader2, Paperclip, Send, ShieldAlert, Square, Trash2, X } from 'lucide-react'
+import {
+  AlertTriangle,
+  ArrowDown,
+  Bot,
+  Loader2,
+  PanelLeft,
+  Paperclip,
+  Send,
+  ShieldAlert,
+  Square,
+  Terminal,
+  Trash2,
+  X
+} from 'lucide-react'
 import { basename, useStore } from '../store'
 import MessageBubble from './MessageBubble'
 import FileChangeCard from './FileChangeCard'
+import TerminalPanel from './TerminalPanel'
 import ModelSwitcher from './ModelSwitcher'
 import VpsSelector from './VpsSelector'
 import ProviderWarning from './ProviderWarning'
@@ -39,6 +53,10 @@ export default function ChatPanel(): JSX.Element {
   const fileChanges = useStore((state) => state.fileChanges)
   const applyFileChange = useStore((state) => state.applyFileChange)
   const rejectFileChange = useStore((state) => state.rejectFileChange)
+  const chatTreeOpen = useStore((state) => state.chatTreeOpen)
+  const toggleChatTree = useStore((state) => state.toggleChatTree)
+  const terminalOpen = useStore((state) => state.terminalOpen)
+  const toggleTerminal = useStore((state) => state.toggleTerminal)
 
   const [input, setInput] = useState('')
   const [attached, setAttached] = useState<string[]>([])
@@ -161,6 +179,19 @@ export default function ChatPanel(): JSX.Element {
     <section className="relative flex min-h-0 flex-1 flex-col bg-bg-primary">
       <div className="flex h-8 shrink-0 items-center justify-between gap-2 border-b border-border px-3 text-[11px] text-neutral-500">
         <div className="flex min-w-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={toggleChatTree}
+            title={t('chat.toggleTree')}
+            aria-label={t('chat.toggleTree')}
+            className={`flex h-5 w-5 items-center justify-center rounded transition ${
+              chatTreeOpen
+                ? 'bg-accent/20 text-accent'
+                : 'text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300'
+            }`}
+          >
+            <PanelLeft className="h-3.5 w-3.5" />
+          </button>
           <ModelSwitcher />
           <span className="text-neutral-700">·</span>
           <VpsSelector />
@@ -177,6 +208,19 @@ export default function ChatPanel(): JSX.Element {
           >
             <ShieldAlert className="h-3 w-3" />
             {planMode ? t('chat.planMode') : t('chat.codeMode')}
+          </button>
+          <button
+            type="button"
+            onClick={toggleTerminal}
+            title={t('chat.terminalTitle')}
+            aria-label={t('chat.terminalTitle')}
+            className={`flex h-5 w-5 items-center justify-center rounded transition ${
+              terminalOpen
+                ? 'bg-accent/20 text-accent'
+                : 'text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300'
+            }`}
+          >
+            <Terminal className="h-3.5 w-3.5" />
           </button>
         </div>
         <button
@@ -266,6 +310,8 @@ export default function ChatPanel(): JSX.Element {
           </div>
         </div>
       ) : null}
+
+      {terminalOpen ? <TerminalPanel /> : null}
 
       <div className="shrink-0 border-t border-border bg-bg-secondary p-3">
         {fileChanges.length > 0 ? (
