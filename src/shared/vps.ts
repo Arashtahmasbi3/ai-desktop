@@ -16,6 +16,13 @@ export interface HostPolicy {
   denyCommands: string[]
   requireApproval: HostApprovalRequirement
   allowedPaths: string[]
+  /**
+   * Commands that are always allowed without approval, on every mode
+   * (v2.3.2, A.3). Empty/absent ⇒ fall back to the legacy read heuristic.
+   */
+  readOnlyCommands?: string[]
+  /** Commands that require approval on staging / are blocked on production. */
+  writeCommands?: string[]
 }
 
 export interface VpsServer {

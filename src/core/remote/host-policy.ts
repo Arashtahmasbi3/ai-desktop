@@ -58,6 +58,100 @@ const READ = [
   /\bkubectl\s+(get|describe|logs|version)\b/i
 ]
 
+/** Whether a shell command is a read that should never need approval. */
+export function isReadOnlyCommand(command: string): boolean {
+  return commandIntent(command) === 'read'
+}
+
+/** Commands that are safe to run without approval on every host mode (A.3). */
+export const DEFAULT_READ_ONLY_COMMANDS: string[] = [
+  'ls',
+  'cat',
+  'head',
+  'tail',
+  'grep',
+  'find',
+  'pwd',
+  'git status',
+  'git log',
+  'git diff',
+  'git branch',
+  'docker ps',
+  'docker images',
+  'docker logs',
+  'systemctl status',
+  'systemctl is-active',
+  'ps',
+  'top',
+  'htop',
+  'free',
+  'df',
+  'du',
+  'whoami',
+  'id',
+  'uname',
+  'date',
+  'node --version',
+  'npm --version',
+  'python --version',
+  'echo',
+  'which',
+  'file',
+  'wc'
+]
+
+/** Commands that mutate the host and therefore need approval on staging. */
+export const DEFAULT_WRITE_COMMANDS: string[] = [
+  'git pull',
+  'git fetch',
+  'git checkout',
+  'git merge',
+  'npm install',
+  'npm run build',
+  'npm test',
+  'docker compose up',
+  'docker compose down',
+  'docker compose restart',
+  'pm2 restart',
+  'pm2 reload',
+  'systemctl restart',
+  'systemctl reload'
+]
+
+/** Commands that are always refused, regardless of mode. */
+export const DEFAULT_DENY_COMMANDS: string[] = [
+  'rm -rf /',
+  'mkfs',
+  'dd if=',
+  'shutdown',
+  'reboot',
+  'halt',
+  'sudo',
+  'su',
+  'chmod -R 777',
+  'chown -R',
+  'git push --force',
+  'git reset --hard',
+  'docker rm -f',
+  'docker system prune -a',
+  'kill -9',
+  '> /dev/sda',
+  '> /dev/sdb'
+]
+
+/** Extra commands refused on production hosts (service-affecting mutations). */
+const PRODUCTION_EXTRA_DENY: string[] = [
+  'git push',
+  'docker run',
+  'docker compose up',
+  'docker compose down',
+  'docker compose restart',
+  'pm2 restart',
+  'pm2 reload',
+  'systemctl restart',
+  'systemctl reload'
+]
+
 /** Classify what a shell command is likely to do. Unknown ⇒ `write` (fail-closed). */
 export function commandIntent(command: string): CommandIntent {
   const normalized = command.trim()
@@ -85,85 +179,163 @@ export interface PolicyDecision {
   requiresApproval: boolean
   intent: CommandIntent
   reason?: string
+  /** Which rule produced this decision (v2.3.2, A.3). */
+  category?: 'deny' | 'path' | 'read-only' | 'write' | 'unknown' | 'allow' | 'mode'
+}
+
+/** `entry` matches `command` at a word boundary (avoids `ls` matching `lsblk`). */
+function matchesPrefixList(list: string[] | undefined, command: string): boolean {
+  if (!list || list.length === 0) return false
+  const normalized = command.trim().toLowerCase()
+  return list.some((entry) => {
+    if (!entry) return false
+    const needle = entry.toLowerCase()
+    return normalized === needle || normalized.startsWith(`${needle} `)
+  })
+}
+
+/** Whether the policy carries the v2.3.2 A.3 read/write command lists. */
+function hasContextLists(policy: HostPolicy): boolean {
+  return (policy.readOnlyCommands?.length ?? 0) > 0 || (policy.writeCommands?.length ?? 0) > 0
 }
 
 /**
  * Evaluate a command against a host policy. Precedence:
- *   denyCommands → read-only mode → allowedPaths → explicit allowlist → approval.
+ *   denyCommands → allowedPaths → read-only allow → read-only/production mode
+ *   gate → explicit allowlist → write/unknown.
+ *
+ * A policy carrying `readOnlyCommands` / `writeCommands` (A.3) is
+ * context-aware: read-only commands never need approval, writes need approval
+ * on staging and are refused on production, and anything unrecognised
+ * fail-closes. A legacy policy (no such lists) keeps the pre-A.3 behaviour.
  */
 export function evaluateHostPolicy(policy: HostPolicy, command: string): PolicyDecision {
   const intent = commandIntent(command)
   const base = { requiresApproval: false, intent }
 
   if (matchesList(policy.denyCommands, command)) {
-    return { ...base, allowed: false, reason: 'Blocked by this host policy (deny rule).' }
-  }
-
-  const readOnly = policy.mode === 'read-only' || policy.mode === 'production'
-  if (readOnly && intent !== 'read') {
     return {
       ...base,
       allowed: false,
-      reason: `${policy.mode} hosts are read-only: ${intent} commands are blocked.`
+      category: 'deny',
+      reason: 'Blocked by this host policy (deny rule).'
     }
   }
 
   if (policy.allowedPaths && policy.allowedPaths.length > 0) {
     for (const path of referencedPaths(command)) {
       if (!policy.allowedPaths.some((allowed) => path === allowed || path.startsWith(`${allowed}/`))) {
-        return { ...base, allowed: false, reason: `Path ${path} is outside the allowed paths.` }
+        return {
+          ...base,
+          allowed: false,
+          category: 'path',
+          reason: `Path ${path} is outside the allowed paths.`
+        }
       }
     }
   }
 
-  const explicitlyAllowed = matchesList(policy.allowCommands, command)
-  if (explicitlyAllowed) return { ...base, allowed: true, requiresApproval: false }
+  const contextAware = hasContextLists(policy)
+  const readAllowed =
+    matchesPrefixList(policy.readOnlyCommands, command) ||
+    (!contextAware && intent === 'read')
 
-  if (policy.requireApproval === 'always') {
-    return { ...base, allowed: true, requiresApproval: true, reason: 'This host requires approval for every command.' }
-  }
-  if (policy.requireApproval === 'destructive' && intent !== 'read') {
+  if (readAllowed) {
+    const needsApproval = policy.requireApproval === 'always'
     return {
       ...base,
       allowed: true,
-      requiresApproval: true,
-      reason: 'This host requires approval for writes and destructive commands.'
+      category: 'read-only',
+      requiresApproval: needsApproval,
+      ...(needsApproval
+        ? { reason: 'This host requires approval for every command.' }
+        : {})
     }
   }
 
-  return { ...base, allowed: true }
+  if (policy.mode === 'read-only') {
+    return {
+      ...base,
+      allowed: false,
+      category: 'mode',
+      reason: 'read-only hosts are read-only: mutations are blocked.'
+    }
+  }
+
+  // Legacy explicit allowlist bypasses approval (but never a deny/path block).
+  if (matchesList(policy.allowCommands, command)) {
+    return { ...base, allowed: true, category: 'allow', requiresApproval: false }
+  }
+
+  const isWrite = matchesPrefixList(policy.writeCommands, command)
+  const category: PolicyDecision['category'] = isWrite ? 'write' : 'unknown'
+
+  if (policy.mode === 'production') {
+    if (isWrite) {
+      return {
+        ...base,
+        allowed: true,
+        category,
+        requiresApproval: true,
+        reason: 'Production hosts require approval for write commands.'
+      }
+    }
+    return {
+      ...base,
+      allowed: false,
+      category,
+      reason: 'production hosts are read-only: mutations are blocked.'
+    }
+  }
+
+  const requiresApproval = policy.requireApproval !== 'never'
+  return {
+    ...base,
+    allowed: true,
+    category,
+    requiresApproval,
+    ...(requiresApproval
+      ? {
+          reason: isWrite
+            ? 'This host requires approval for write commands.'
+            : 'Unrecognised command; approval required.'
+        }
+      : {})
+  }
 }
 
-/** Sensible starting policy per host mode (aligned with the sprint defaults). */
+/** Sensible starting policy per host mode (aligned with the v2.3.2 defaults). */
 export function defaultHostPolicy(vpsId: string, mode: HostPolicyMode): HostPolicy {
+  const base = {
+    vpsId,
+    allowCommands: [] as string[],
+    allowedPaths: [] as string[],
+    readOnlyCommands: [...DEFAULT_READ_ONLY_COMMANDS],
+    writeCommands: [...DEFAULT_WRITE_COMMANDS]
+  }
   switch (mode) {
     case 'production':
       return {
-        vpsId,
+        ...base,
         mode,
         requireApproval: 'never',
-        allowCommands: [],
-        denyCommands: [],
-        allowedPaths: []
+        denyCommands: [...DEFAULT_DENY_COMMANDS, ...PRODUCTION_EXTRA_DENY]
       }
     case 'staging':
       return {
-        vpsId,
+        ...base,
         mode,
         requireApproval: 'destructive',
         allowCommands: ['deploy'],
-        denyCommands: ['rm -rf', 'mkfs', 'dd if=', 'shutdown', 'reboot'],
-        allowedPaths: []
+        denyCommands: [...DEFAULT_DENY_COMMANDS]
       }
     case 'read-only':
     default:
       return {
-        vpsId,
+        ...base,
         mode,
         requireApproval: 'never',
-        allowCommands: [],
-        denyCommands: [],
-        allowedPaths: []
+        denyCommands: [...DEFAULT_DENY_COMMANDS]
       }
   }
 }
@@ -190,6 +362,8 @@ export function coerceHostPolicy(value: unknown, vpsId: string): HostPolicy | un
     requireApproval,
     allowCommands: stringList(raw.allowCommands),
     denyCommands: stringList(raw.denyCommands),
-    allowedPaths: stringList(raw.allowedPaths)
+    allowedPaths: stringList(raw.allowedPaths),
+    readOnlyCommands: stringList(raw.readOnlyCommands),
+    writeCommands: stringList(raw.writeCommands)
   }
 }

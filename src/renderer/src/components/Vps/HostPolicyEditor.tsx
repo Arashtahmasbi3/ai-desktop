@@ -7,7 +7,7 @@ import type {
   HostPolicyMode,
   VpsServerView
 } from '@shared/vps'
-import { defaultHostPolicy } from '@core/remote/host-policy'
+import { defaultHostPolicy, DEFAULT_READ_ONLY_COMMANDS, DEFAULT_WRITE_COMMANDS } from '@core/remote/host-policy'
 import { useStore } from '../../store'
 
 const MODES: HostPolicyMode[] = ['read-only', 'staging', 'production']
@@ -45,6 +45,10 @@ export default function HostPolicyEditor({ server }: { server: VpsServerView }):
   const [allow, setAllow] = useState(current.allowCommands.join(', '))
   const [deny, setDeny] = useState(current.denyCommands.join(', '))
   const [paths, setPaths] = useState(current.allowedPaths.join(', '))
+  const [readOnly, setReadOnlyCommands] = useState(
+    current.readOnlyCommands ?? DEFAULT_READ_ONLY_COMMANDS
+  )
+  const [writeCmds, setWriteCommands] = useState(current.writeCommands ?? DEFAULT_WRITE_COMMANDS)
   const [busy, setBusy] = useState(false)
 
   const changeMode = (next: HostPolicyMode): void => {
@@ -53,6 +57,8 @@ export default function HostPolicyEditor({ server }: { server: VpsServerView }):
     setApproval(defaults.requireApproval)
     setAllow(defaults.allowCommands.join(', '))
     setDeny(defaults.denyCommands.join(', '))
+    setReadOnlyCommands(defaults.readOnlyCommands ?? DEFAULT_READ_ONLY_COMMANDS)
+    setWriteCommands(defaults.writeCommands ?? DEFAULT_WRITE_COMMANDS)
   }
 
   const save = async (): Promise<void> => {
@@ -64,7 +70,9 @@ export default function HostPolicyEditor({ server }: { server: VpsServerView }):
         requireApproval: approval,
         allowCommands: list(allow),
         denyCommands: list(deny),
-        allowedPaths: list(paths)
+        allowedPaths: list(paths),
+        readOnlyCommands: readOnly,
+        writeCommands: writeCmds
       }
       await window.api.vps.save({
         id: server.id,
