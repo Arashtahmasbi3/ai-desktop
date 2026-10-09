@@ -1,4 +1,5 @@
 import type { AgentLogEntry, AgentLogLevel, AgentLogger } from '@shared/agent'
+import { redact, redactValue } from './redact'
 
 const LEVEL_ORDER: Record<AgentLogLevel, number> = {
   debug: 10,
@@ -21,7 +22,8 @@ export class JsonLogger implements AgentLogger {
 
   log(entry: AgentLogEntry): void {
     if (LEVEL_ORDER[entry.level] < LEVEL_ORDER[this.minLevel]) return
-    this.sink(JSON.stringify(entry), entry)
+    const safe = redactValue(entry)
+    this.sink(redact(JSON.stringify(safe)), safe)
   }
 }
 
@@ -30,7 +32,7 @@ export class MemoryLogger implements AgentLogger {
   readonly entries: AgentLogEntry[] = []
 
   log(entry: AgentLogEntry): void {
-    this.entries.push(entry)
+    this.entries.push(redactValue(entry))
   }
 
   /** All events with the given name. */

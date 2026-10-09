@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Laptop, Server, Smartphone, Terminal } from 'lucide-react'
 import { readPrefs, writePrefs } from '../lib/prefs'
 import { useStore } from '../store'
+import HostPolicyEditor from './Vps/HostPolicyEditor'
 
 type ConnectionTab = 'pc' | 'devices' | 'ssh'
 
@@ -15,6 +16,7 @@ export default function SettingsConnections(): JSX.Element {
   const toggleTerminal = useStore((state) => state.toggleTerminal)
   const closeSettings = useStore((state) => state.closeSettings)
   const projects = useStore((state) => state.settings?.projects ?? [])
+  const vpsServers = useStore((state) => state.vpsServers)
   const sshCount = projects.filter((project) => project.vpsId).length
 
   const tabs: Array<{ id: ConnectionTab; labelKey: string; icon: typeof Laptop }> = [
@@ -117,6 +119,13 @@ export default function SettingsConnections(): JSX.Element {
           <p className="text-[11px] text-neutral-500">
             {t('settings.sshProjects')}: {sshCount}
           </p>
+          <div className="flex flex-col gap-2">
+            {vpsServers.length === 0 ? (
+              <p className="text-[11px] text-neutral-600">{t('settings.hostPolicyNone')}</p>
+            ) : (
+              vpsServers.map((server) => <HostPolicyEditor key={server.id} server={server} />)
+            )}
+          </div>
           <button
             type="button"
             onClick={() => {

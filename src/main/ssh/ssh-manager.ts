@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs'
 import { AuditLog, type AuditEntry } from '@core/agent/audit-log'
 import { checkDenyList } from '@core/agent/deny-list'
 import { RateLimiter } from '@core/agent/rate-limiter'
+import { evaluateHostPolicy } from '@core/remote/host-policy'
 import type { RemoteFileEntry, VpsConnectionState, VpsExecResult } from '@shared/vps'
 import { evaluateHostKey, fingerprintFromKey } from './host-key-verify'
 import type { SftpEntry, SshBackend, SshConnection } from './backend'
@@ -240,6 +241,44 @@ export class SshManager {
         exitCode: 126,
         blocked: true,
         reason: denied.reason
+      }
+    }
+    const policy = await this.store.policyFor(serverId)
+    if (policy) {
+      const decision = evaluateHostPolicy(policy, command)
+      if (!decision.allowed) {
+        await this.audit.record({
+          type: 'blocked',
+          ok: false,
+          serverId,
+          command: denied.command,
+          detail: `policy: ${decision.reason}`
+        })
+        return {
+          ok: false,
+          stdout: '',
+          stderr: '',
+          exitCode: 126,
+          blocked: true,
+          reason: decision.reason
+        }
+      }
+      if (decision.requiresApproval) {
+        await this.audit.record({
+          type: 'blocked',
+          ok: false,
+          serverId,
+          command: denied.command,
+          detail: `policy: approval required — ${decision.reason}`
+        })
+        return {
+          ok: false,
+          stdout: '',
+          stderr: '',
+          exitCode: 126,
+          requiresApproval: true,
+          reason: decision.reason
+        }
       }
     }
     const limit = this.rateLimiter.tryAcquire()

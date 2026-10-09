@@ -17,6 +17,17 @@ export interface CatalogModel {
   id: string
   label: string
   tags: ModelTag[]
+  /** Short, human-readable description shown in the picker. */
+  description?: string
+  /** Maximum context window in tokens, when known. */
+  contextWindow?: number
+  /**
+   * True for models the provider has retired. The UI warns and offers the
+   * {@link CatalogModel.migrationTarget} instead.
+   */
+  deprecated?: boolean
+  /** Preferred replacement for a deprecated model. */
+  migrationTarget?: string
 }
 
 export interface CatalogGroup {
@@ -67,13 +78,35 @@ export const MODEL_CATALOG: CatalogGroup[] = [
     provider: 'deepseek',
     label: 'DeepSeek',
     defaultBaseUrl: 'https://api.deepseek.com/v1',
-    defaultModel: 'deepseek-chat',
+    defaultModel: 'deepseek-v4-flash',
     models: [
-      { id: 'deepseek-chat', label: 'DeepSeek Chat (V3.2)', tags: ['cheap', 'fast', 'coding'] },
+      {
+        id: 'deepseek-v4-flash',
+        label: 'DeepSeek V4 Flash',
+        tags: ['fast', 'cheap', 'coding'],
+        description: 'سریع، ارزان، بهینه برای کدنویسی',
+        contextWindow: 128_000
+      },
+      {
+        id: 'deepseek-v4-pro',
+        label: 'DeepSeek V4 Pro',
+        tags: ['powerful', 'reasoning', 'coding'],
+        description: 'قدرتمندترین مدل DeepSeek برای استدلال پیچیده',
+        contextWindow: 128_000
+      },
+      {
+        id: 'deepseek-chat',
+        label: 'DeepSeek Chat (V3) — Legacy',
+        tags: ['cheap', 'fast', 'coding'],
+        deprecated: true,
+        migrationTarget: 'deepseek-v4-flash'
+      },
       {
         id: 'deepseek-reasoner',
-        label: 'DeepSeek Reasoner (R1)',
-        tags: ['powerful', 'reasoning', 'coding']
+        label: 'DeepSeek Reasoner (R1) — Legacy',
+        tags: ['powerful', 'reasoning', 'coding'],
+        deprecated: true,
+        migrationTarget: 'deepseek-v4-pro'
       }
     ]
   },
@@ -110,3 +143,23 @@ export const MODEL_TAGS: ModelTag[] = [
   'reasoning',
   'vision'
 ]
+
+/** Look up a catalog model by provider and id. */
+export function findCatalogModel(provider: ProviderId, id: string): CatalogModel | undefined {
+  return MODEL_CATALOG.find((group) => group.provider === provider)?.models.find(
+    (model) => model.id === id
+  )
+}
+
+/** True when the provider has retired this model. */
+export function isDeprecatedModel(provider: ProviderId, id: string): boolean {
+  return findCatalogModel(provider, id)?.deprecated === true
+}
+
+/**
+ * The model a deprecated selection should migrate to, or `undefined` when the
+ * model is current/unknown.
+ */
+export function migrationTargetFor(provider: ProviderId, id: string): string | undefined {
+  return findCatalogModel(provider, id)?.migrationTarget
+}

@@ -19,6 +19,10 @@ import TaskPanel from './components/TaskPanel'
 import Titlebar from './components/Titlebar'
 import ToastHost from './components/ToastHost'
 import { basename, subscribeToEvents, useStore } from './store'
+import { readLastVpsId, resolveReconnectId } from './lib/vps-state'
+
+/** Retry interval for a selected-but-dropped VPS connection. */
+const VPS_KEEPALIVE_MS = 30_000
 
 export default function App(): JSX.Element {
   const { t } = useTranslation()
@@ -36,6 +40,40 @@ export default function App(): JSX.Element {
     subscribeToEvents()
     void init()
   }, [init])
+
+  // Keep the shared VPS state fresh: load on startup, auto-reconnect the last
+  // active server, and retry if it ever drops while still selected.
+  useEffect(() => {
+    if (!ready) return
+    let cancelled = false
+    let timer: ReturnType<typeof setInterval> | null = null
+
+    const boot = async (): Promise<void> => {
+      await useStore.getState().refreshVps()
+      const { vpsServers, vpsStatus, connectVps, setVpsServerId } = useStore.getState()
+      const target = resolveReconnectId(vpsServers, readLastVpsId())
+      if (!target || cancelled) return
+      setVpsServerId(target)
+      if (vpsStatus.status !== 'connected' || vpsStatus.serverId !== target) {
+        await connectVps(target)
+      }
+    }
+
+    const keepalive = async (): Promise<void> => {
+      const { vpsServerId, vpsStatus, connectVps } = useStore.getState()
+      if (!vpsServerId) return
+      const connected = vpsStatus.status === 'connected' && vpsStatus.serverId === vpsServerId
+      if (!connected && vpsStatus.status !== 'connecting') await connectVps(vpsServerId)
+    }
+
+    void boot().then(() => {
+      if (!cancelled) timer = setInterval(() => void keepalive(), VPS_KEEPALIVE_MS)
+    })
+    return () => {
+      cancelled = true
+      if (timer) clearInterval(timer)
+    }
+  }, [ready])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {

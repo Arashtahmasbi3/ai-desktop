@@ -35,6 +35,17 @@ export function coerceApprovalMode(value: unknown): ApprovalMode | undefined {
   return undefined
 }
 
+/** True when the agent runs without asking (full access). */
+export function isFullAccess(mode: ApprovalMode): boolean {
+  return mode === 'full'
+}
+
+/** Cycle ask -> auto-write -> full -> ask, used by the composer/status toggles. */
+export function nextApprovalMode(mode: ApprovalMode): ApprovalMode {
+  const index = APPROVAL_MODES.indexOf(mode)
+  return APPROVAL_MODES[(index + 1) % APPROVAL_MODES.length]
+}
+
 /** What may be remembered from an approval, widest last. */
 export type ApprovalRememberScope = 'action' | 'tool' | 'session'
 

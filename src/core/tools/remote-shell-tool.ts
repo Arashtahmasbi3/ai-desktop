@@ -58,6 +58,13 @@ export async function executeRemoteShell(
   if (result.blocked) {
     return { ok: false, blocked: true, content: `Blocked by policy: ${result.reason}` }
   }
+  if (result.requiresApproval) {
+    return {
+      ok: false,
+      blocked: true,
+      content: `Approval required by host policy: ${result.reason}`
+    }
+  }
   if (result.rateLimited) {
     return { ok: false, content: `Rate limited: ${result.reason}` }
   }

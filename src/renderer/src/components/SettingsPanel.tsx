@@ -20,7 +20,6 @@ import {
   Wrench,
   X
 } from 'lucide-react'
-import type { VpsConnectionState, VpsServerView } from '@shared/vps'
 import { SUPPORTED_LOCALES } from '../i18n/locale'
 import { useStore } from '../store'
 import ProvidersSection from './ProvidersSection'
@@ -108,15 +107,14 @@ export default function SettingsPanel(): JSX.Element | null {
   const [remoteName, setRemoteName] = useState('')
   const [remotePath, setRemotePath] = useState('')
   const [remoteVpsId, setRemoteVpsId] = useState('')
-  const [servers, setServers] = useState<VpsServerView[]>([])
-  const [vpsStatus, setVpsStatus] = useState<VpsConnectionState>({ status: 'disconnected' })
+  const servers = useStore((state) => state.vpsServers)
+  const vpsStatus = useStore((state) => state.vpsStatus)
+  const refreshVps = useStore((state) => state.refreshVps)
   const [discovering, setDiscovering] = useState(false)
 
   useEffect(() => {
-    void window.api.vps.list().then(setServers)
-    void window.api.vps.status().then(setVpsStatus)
-    return window.api.events.on('vps:status', setVpsStatus)
-  }, [])
+    if (open) void refreshVps()
+  }, [open, refreshVps])
 
   if (!open) return null
 

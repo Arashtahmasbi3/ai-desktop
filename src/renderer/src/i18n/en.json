@@ -257,7 +257,22 @@
     "usageErrors": "Errors",
     "developer": "Developer",
     "version": "Version",
-    "resetLocal": "Reset local preferences"
+    "resetLocal": "Reset local preferences",
+    "hostPolicy": "Host policy",
+    "hostPolicyMode": "Mode",
+    "hostPolicyReadOnly": "Read-only",
+    "hostPolicyStaging": "Staging",
+    "hostPolicyProduction": "Production",
+    "hostPolicyApproval": "Approval",
+    "hostPolicyApprovalNever": "Never ask",
+    "hostPolicyApprovalDestructive": "Ask for writes",
+    "hostPolicyApprovalAlways": "Always ask",
+    "hostPolicyAllow": "Allowed commands (comma separated)",
+    "hostPolicyDeny": "Denied commands (comma separated)",
+    "hostPolicyPaths": "Allowed paths (comma separated)",
+    "hostPolicySave": "Save policy",
+    "hostPolicySaved": "Host policy saved",
+    "hostPolicyNone": "No VPS servers configured yet."
   },
   "toast": {
     "dismiss": "Dismiss",

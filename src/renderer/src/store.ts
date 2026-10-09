@@ -10,9 +10,12 @@ import type {
 import { DEFAULT_SELECTION, resolveSelection } from '@shared/selection'
 import type { ApprovalMode, ApprovalOutcome } from '@shared/approval'
 import type { OnboardingStatus } from '@shared/onboarding'
+import type { VpsConnectionState, VpsServerView } from '@shared/vps'
 import type { ChatSummary, StoredMessage } from '@shared/chat'
 import type { Locale } from './i18n/locale'
 import { detectLocale } from './i18n/locale'
+import { VPS_RECONNECT_KEY } from './lib/vps-state'
+import { redact } from '@core/agent/redact'
 import i18n from './i18n'
 import type {
   AgentEvent,
@@ -162,6 +165,10 @@ interface AppState {
   activeChatId: string | null
   /** Connected VPS selected for remote_shell in this chat. */
   vpsServerId: string | undefined
+  /** Saved VPS servers, shared by every component (single source of truth). */
+  vpsServers: VpsServerView[]
+  /** Live VPS connection state from the main process. */
+  vpsStatus: VpsConnectionState
   /** Plan Mode: the agent drafts a plan without running tools. */
   planMode: boolean
   /** Tool call awaiting the user's approval, if any. */
@@ -199,6 +206,14 @@ interface AppState {
   /** Fork a chat from a message (inclusive); returns the new chat id. */
   forkChat: (id: string, messageId: string) => Promise<string | null>
   setVpsServerId: (id: string | undefined) => void
+  /** Load the saved VPS list and current connection state into the store. */
+  refreshVps: () => Promise<void>
+  /** Connect to a VPS (updates the shared status on every UI surface). */
+  connectVps: (serverId: string) => Promise<void>
+  /** Disconnect a VPS and clear the shared status. */
+  disconnectVps: (serverId: string) => Promise<void>
+  /** Apply a status pushed from the main process. */
+  setVpsStatus: (status: VpsConnectionState) => void
   setPlanMode: (value: boolean) => void
   setApprovalMode: (mode: ApprovalMode) => Promise<void>
   setPlanModeDefault: (value: boolean) => Promise<void>
@@ -308,6 +323,8 @@ export const useStore = create<AppState>((set, get) => ({
   chats: [],
   activeChatId: null,
   vpsServerId: undefined,
+  vpsServers: [],
+  vpsStatus: { status: 'disconnected' },
   planMode: false,
   pendingApproval: null,
   approvalSuggestion: null,
@@ -334,7 +351,46 @@ export const useStore = create<AppState>((set, get) => ({
       // Persisting the preference is best-effort.
     }
   },
-  setVpsServerId: (id) => set({ vpsServerId: id }),
+  setVpsServerId: (id) => {
+    set({ vpsServerId: id })
+    try {
+      if (id) globalThis.localStorage?.setItem(VPS_RECONNECT_KEY, id)
+      else globalThis.localStorage?.removeItem(VPS_RECONNECT_KEY)
+    } catch {
+      // Persisting the last VPS is best-effort.
+    }
+  },
+  async refreshVps() {
+    try {
+      const [servers, status] = await Promise.all([
+        window.api.vps.list(),
+        window.api.vps.status()
+      ])
+      set({ vpsServers: servers, vpsStatus: status })
+    } catch {
+      set({ vpsServers: [], vpsStatus: { status: 'disconnected' } })
+    }
+  },
+  async connectVps(serverId) {
+    set({ vpsStatus: { status: 'connecting', serverId } })
+    try {
+      const status = await window.api.vps.connect(serverId)
+      set({ vpsStatus: status, ...(status.status === 'connected' ? { vpsServerId: serverId } : {}) })
+    } catch (error) {
+      set({
+        vpsStatus: {
+          status: 'error',
+          serverId,
+          error: error instanceof Error ? error.message : String(error)
+        }
+      })
+    }
+  },
+  async disconnectVps(serverId) {
+    const status = await window.api.vps.disconnect(serverId)
+    set({ vpsStatus: status })
+  },
+  setVpsStatus: (status) => set({ vpsStatus: status }),
   toggleTerminal: () => set({ terminalOpen: !get().terminalOpen }),
   setSearchOpen: (open) => set({ searchOpen: open, ...(open ? {} : { searchResults: [] }) }),
   async runCodeSearch(query) {
@@ -433,7 +489,7 @@ export const useStore = create<AppState>((set, get) => ({
   },
   pushToast(kind, message) {
     const id = newId()
-    set({ toasts: [...get().toasts, { id, kind, message }] })
+    set({ toasts: [...get().toasts, { id, kind, message: redact(message) }] })
     const ttl = kind === 'error' ? 5000 : 3000
     setTimeout(() => get().dismissToast(id), ttl)
   },
@@ -682,11 +738,11 @@ export const useStore = create<AppState>((set, get) => ({
           running: false,
           currentRunId: null,
           pendingApproval: null,
-          error: event.message,
+          error: redact(event.message),
           loopStop: null,
           messages: [
             ...get().messages,
-            { id: newId(), role: 'system', content: `Error: ${event.message}`, at: Date.now() }
+            { id: newId(), role: 'system', content: `Error: ${redact(event.message)}`, at: Date.now() }
           ]
         })
         get().pushToast('error', event.message)
@@ -912,12 +968,16 @@ export function subscribeToEvents(): void {
   const offFiles = window.api.events.on('files:changed', () => {
     void useStore.getState().refreshFiles()
   })
+  const offVps = window.api.events.on('vps:status', (status) =>
+    useStore.getState().setVpsStatus(status)
+  )
   unsubscribe = () => {
     offAgent()
     offWorker()
     offRemote()
     offSettings()
     offFiles()
+    offVps()
     unsubscribe = null
   }
 }
