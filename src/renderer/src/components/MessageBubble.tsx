@@ -1,8 +1,23 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import ReactMarkdown from 'react-markdown'
-import { AlertTriangle, Bot, Check, Copy, Server, User } from 'lucide-react'
-import type { ChatMessage } from '../store'
+import ReactMarkdown, { type Components } from 'react-markdown'
+import CodeBlock from './CodeBlock'
+import { readCode } from '../lib/markdown-code'
+import { AlertTriangle, Bot, Check, Copy, GitFork, Server, User } from 'lucide-react'
+import { useStore, type ChatMessage } from '../store'
+
+const MARKDOWN_COMPONENTS: Components = {
+  pre: ({ node }) => {
+    const { code, language } = readCode(node)
+    if (!code) return null
+    return <CodeBlock code={code} language={language} />
+  },
+  code: ({ children }) => (
+    <code className="rounded bg-bg-primary px-1 py-0.5 font-mono text-[0.85em] text-accent">
+      {children}
+    </code>
+  )
+}
 
 const ROLE_LABEL: Record<ChatMessage['role'], string> = {
   user: 'chat.roleUser',
@@ -31,6 +46,8 @@ function Avatar({ role }: { role: ChatMessage['role'] }): JSX.Element {
 /** A single chat message: avatar + role + Markdown body (+ model / copy / badges). */
 export default function MessageBubble({ message }: { message: ChatMessage }): JSX.Element {
   const { t } = useTranslation()
+  const activeChatId = useStore((state) => state.activeChatId)
+  const forkChat = useStore((state) => state.forkChat)
   const [copied, setCopied] = useState(false)
   const isUser = message.role === 'user'
 
@@ -67,7 +84,7 @@ export default function MessageBubble({ message }: { message: ChatMessage }): JS
             isUser ? 'bg-accent/20 text-neutral-100' : 'bg-bg-tertiary text-neutral-200'
           } ${message.role === 'system' ? 'border border-amber-500/30' : ''}`}
         >
-          <ReactMarkdown>{message.content}</ReactMarkdown>
+          <ReactMarkdown components={MARKDOWN_COMPONENTS}>{message.content}</ReactMarkdown>
         </div>
         <div className="mt-0.5 flex items-center gap-2 px-1">
           {message.role === 'assistant' && message.model ? (
@@ -93,6 +110,17 @@ export default function MessageBubble({ message }: { message: ChatMessage }): JS
             {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
             {copied ? t('toast.copied') : null}
           </button>
+          {message.role !== 'system' && activeChatId ? (
+            <button
+              type="button"
+              onClick={() => void forkChat(activeChatId, message.id)}
+              title={t('chat.forkFrom')}
+              aria-label={t('chat.forkFrom')}
+              className="flex items-center gap-0.5 text-[10px] text-neutral-600 opacity-0 transition hover:text-neutral-300 group-hover:opacity-100"
+            >
+              <GitFork className="h-3 w-3" />
+            </button>
+          ) : null}
         </div>
       </div>
     </div>

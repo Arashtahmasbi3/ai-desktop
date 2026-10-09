@@ -144,7 +144,16 @@
     "templateRefactor": "Refactor X",
     "templateFixBug": "Fix this bug",
     "templateOptimize": "Optimize performance",
-    "templatePlaceholder": "Describe what to do with this file..."
+    "templatePlaceholder": "Describe what to do with this file...",
+    "copy": "Copy",
+    "copied": "Copied",
+    "runCode": "Run",
+    "runningCode": "Running...",
+    "runHint": "Run locally (Ctrl+Enter)",
+    "runCodeConfirm": "Run this code on your machine?",
+    "output": "Output",
+    "noOutput": "(no output)",
+    "forkFrom": "Fork from here"
   },
   "vpsSelector": {
     "label": "VPS",

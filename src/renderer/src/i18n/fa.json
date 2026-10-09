@@ -144,7 +144,16 @@
     "templateRefactor": "X را بازنویسی کن",
     "templateFixBug": "این باگ را درست کن",
     "templateOptimize": "کارایی را بهینه کن",
-    "templatePlaceholder": "توضیح بده با این فایل چه کار کنم..."
+    "templatePlaceholder": "توضیح بده با این فایل چه کار کنم...",
+    "copy": "کپی",
+    "copied": "کپی شد",
+    "runCode": "اجرا",
+    "runningCode": "در حال اجرا...",
+    "runHint": "اجرای محلی (Ctrl+Enter)",
+    "runCodeConfirm": "این کد روی سیستم شما اجرا شود؟",
+    "output": "خروجی",
+    "noOutput": "(بدون خروجی)",
+    "forkFrom": "انشعاب از اینجا"
   },
   "vpsSelector": {
     "label": "VPS",
