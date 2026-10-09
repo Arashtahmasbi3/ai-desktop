@@ -155,7 +155,15 @@
     "noOutput": "(بدون خروجی)",
     "forkFrom": "انشعاب از اینجا",
     "voiceInput": "ورودی صوتی",
-    "listening": "در حال شنیدن..."
+    "listening": "در حال شنیدن...",
+    "localPathMissing": "مسیر محلی یافت نشد",
+    "remoteConnected": "ریموت: {{path}} (متصل)",
+    "remoteDisconnected": "VPS متصل نیست",
+    "remoteNoVps": "برای این پروژه یک VPS انتخاب کنید",
+    "remoteNoPath": "مسیر ریموت این پروژه را تنظیم کنید",
+    "reconnect": "اتصال مجدد",
+    "selectVps": "انتخاب VPS",
+    "setPath": "تنظیم مسیر"
   },
   "vpsSelector": {
     "label": "VPS",

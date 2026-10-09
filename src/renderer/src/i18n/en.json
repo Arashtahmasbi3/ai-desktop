@@ -155,7 +155,15 @@
     "noOutput": "(no output)",
     "forkFrom": "Fork from here",
     "voiceInput": "Voice input",
-    "listening": "Listening..."
+    "listening": "Listening...",
+    "localPathMissing": "Local path not found",
+    "remoteConnected": "Remote: {{path}} (connected)",
+    "remoteDisconnected": "VPS not connected",
+    "remoteNoVps": "Select a VPS for this project",
+    "remoteNoPath": "Set the remote path for this project",
+    "reconnect": "Reconnect",
+    "selectVps": "Select VPS",
+    "setPath": "Set path"
   },
   "vpsSelector": {
     "label": "VPS",

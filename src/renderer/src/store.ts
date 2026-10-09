@@ -840,6 +840,14 @@ export const useStore = create<AppState>((set, get) => ({
 
   async refreshFiles(path) {
     const target = path ?? get().cwd
+    const settings = get().settings
+    const active = settings?.projects.find((project) => project.id === settings.activeProjectId)
+    if (active?.type === 'remote') {
+      // A remote project lives on a VPS: never probe the local filesystem, or
+      // the UI would wrongly report "Path not found" (v2.3.2, A.2).
+      set({ entries: [], cwd: target, projectMissing: false })
+      return
+    }
     try {
       const entries = await window.api.fs.list(target)
       set({ entries, cwd: target, projectMissing: false })

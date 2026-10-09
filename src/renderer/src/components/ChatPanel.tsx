@@ -29,6 +29,7 @@ import ProgressTimeline from './ProgressTimeline'
 import MicButton from './MicButton'
 import { FullAccessBanner, FullAccessToggle } from './FullAccessToggle'
 import { filterSlashCommands, resolveSlashCommand } from '../lib/slash'
+import { workspaceStatus, shouldShowWorkspaceBanner } from '../lib/project-status'
 import { contextBudget, estimateTokens } from '@shared/memory'
 
 const SUGGESTION_KEYS = [
@@ -56,6 +57,8 @@ export default function ChatPanel(): JSX.Element {
   const newSession = useStore((state) => state.newSession)
   const projectMissing = useStore((state) => state.projectMissing)
   const settings = useStore((state) => state.settings)
+  const vpsStatus = useStore((state) => state.vpsStatus)
+  const connectVps = useStore((state) => state.connectVps)
   const addProject = useStore((state) => state.addProject)
   const showTokenCount = useStore((state) => state.showTokenCount)
   const openSettings = useStore((state) => state.openSettings)
@@ -85,6 +88,42 @@ export default function ChatPanel(): JSX.Element {
   const activeProject = settings?.projects.find(
     (project) => project.id === settings.activeProjectId
   )
+  const vpsConnected = Boolean(
+    activeProject?.type === 'remote' &&
+      activeProject.vpsId &&
+      vpsStatus.status === 'connected' &&
+      vpsStatus.serverId === activeProject.vpsId
+  )
+  const wsStatus = workspaceStatus({
+    project: activeProject
+      ? {
+          ...activeProject,
+          exists:
+            activeProject.type !== 'remote' && projectMissing ? false : activeProject.exists
+        }
+      : undefined,
+    vpsConnected
+  })
+  const wsBanner = shouldShowWorkspaceBanner(wsStatus)
+  const runStatusAction = (): void => {
+    if (wsStatus.action === 'picker') void pickWorkspace()
+    else if (wsStatus.action === 'settings') openSettings()
+    else if (wsStatus.action === 'reconnect' && activeProject?.vpsId) {
+      void connectVps(activeProject.vpsId)
+    }
+  }
+  const statusTone =
+    wsStatus.tone === 'error'
+      ? 'border-red-500/30 bg-red-500/10 text-red-300'
+      : wsStatus.tone === 'warning'
+        ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+        : 'border-border bg-bg-tertiary text-neutral-300'
+  const statusActionTone =
+    wsStatus.tone === 'error'
+      ? 'border-red-500/40 text-red-200 hover:bg-red-500/15'
+      : wsStatus.tone === 'warning'
+        ? 'border-amber-500/40 text-amber-200 hover:bg-amber-500/15'
+        : 'border-border text-neutral-300 hover:bg-bg-secondary'
 
   const commands = useMemo<SlashCommand[]>(
     () => [
@@ -268,29 +307,21 @@ export default function ChatPanel(): JSX.Element {
         </button>
       </div>
 
-      {projectMissing ? (
-        <div className="mx-3 mt-2 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-300">
+      {wsBanner ? (
+        <div
+          className={`mx-3 mt-2 flex items-center gap-2 rounded-lg border px-3 py-2 text-[11px] ${statusTone}`}
+        >
           <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-          <span className="flex-1">{t('sidebar.missingPath')}</span>
-          <button
-            type="button"
-            onClick={openSettings}
-            className="rounded border border-amber-500/40 px-2 py-0.5 text-amber-200 hover:bg-amber-500/15"
-          >
-            {t('sidebar.locate')}
-          </button>
-        </div>
-      ) : !settings?.activeProjectId ? (
-        <div className="mx-3 mt-2 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-300">
-          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-          <span className="flex-1">{t('chat.noWorkspaceWarning')}</span>
-          <button
-            type="button"
-            onClick={() => void pickWorkspace()}
-            className="rounded border border-amber-500/40 px-2 py-0.5 text-amber-200 hover:bg-amber-500/15"
-          >
-            {t('titlebar.openFolder')}
-          </button>
+          <span className="flex-1">{t(wsStatus.messageKey as string, { path: wsStatus.path })}</span>
+          {wsStatus.actionKey ? (
+            <button
+              type="button"
+              onClick={runStatusAction}
+              className={`rounded border px-2 py-0.5 ${statusActionTone}`}
+            >
+              {t(wsStatus.actionKey)}
+            </button>
+          ) : null}
         </div>
       ) : null}
 
