@@ -36,7 +36,7 @@ import {
 } from './agent/context-manager'
 import { compressMessage, type CompressOptions } from './agent/context-compressor'
 import { ErrorRecovery, guidanceForToolError } from './agent/error-recovery'
-import { LoopDetector } from './agent/loop-detector'
+import { LoopDetector, type LoopCallDecision } from './agent/loop-detector'
 import { silentLogger } from './agent/logger'
 import { SESSION_SCHEMA_VERSION, type AgentSession, type SessionStore } from './agent/session-store'
 import { SANDBOX_TOOLS, SandboxToolExecutor, actionFromToolCall } from './agent/tools'
@@ -479,10 +479,41 @@ export class AgentOrchestrator {
         })
 
         const observations: AgentToolResult[] = []
+        const progressTools = new Set([
+          'write_file',
+          'read_file',
+          'remote_write_file',
+          'remote_read_file'
+        ])
+        let guardStop: LoopCallDecision | null = null
         for (const action of actions) {
           if (options.signal?.aborted) break
+
+          // Fuzzy loop guard: catch the same tool name repeated even when its
+          // arguments change every call (e.g. remote_shell with new commands).
+          const guard = loopDetector.beforeToolCall(action.name, action.arguments)
+          if (guard.action === 'warn') {
+            this.log('warn', 'loop.guard_warn', runId, {
+              step: index,
+              tool: action.name,
+              count: guard.count
+            })
+          }
+          if (!guard.allow) {
+            guardStop = guard
+            this.log('warn', 'loop.stop', runId, {
+              step: index,
+              reason: guard.reason ?? 'repeated_action',
+              tool: action.name,
+              count: guard.count
+            })
+            break
+          }
+
           const before = await this.snapshotBefore(action, sandboxId)
           const result = await this.guardedExecute(executor, action, runId, index, options)
+          loopDetector.afterToolCall(action.name, { ok: result.ok })
+          if (result.ok && progressTools.has(action.name)) loopDetector.markProgress()
           if (result.ok && before !== null) {
             this.onFileWritten?.({
               path: String(action.arguments.path ?? ''),
@@ -496,6 +527,22 @@ export class AgentOrchestrator {
             name: action.name,
             content: formatObservation(result)
           })
+        }
+
+        if (guardStop) {
+          const guardReason = (guardStop.reason ?? 'repeated_action') as LoopStopInfo['reason']
+          stopInfo = this.buildStopInfo(guardReason, steps)
+          if (guardStop.message) stopInfo.message = guardStop.message
+          const history = loopDetector.toolCallHistory.slice(-5)
+          if (history.length > 0) {
+            stopInfo.recentActions = history.map(
+              (call) => `${call.toolName} (${call.ok ? 'ok' : 'failed'}) @ ${new Date(call.at).toISOString()}`
+            )
+          }
+          status = 'needs_input'
+          message = guardStop.message ?? stopInfo.message
+          finalAnswer = null
+          break
         }
 
         // ---- Observation + Reflection ----

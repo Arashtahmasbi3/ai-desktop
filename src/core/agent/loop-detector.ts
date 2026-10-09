@@ -31,6 +31,59 @@ export interface LoopCheckResult {
   stopReason?: LoopStopReason
 }
 
+/** One executed tool call, kept so a STOP can show a short recent history. */
+export interface RecentToolCall {
+  toolName: string
+  ok: boolean
+  at: number
+}
+
+/**
+ * The verdict of {@link LoopDetector.beforeToolCall}: whether the next tool call
+ * may run, and — when it may not — why.
+ */
+export interface LoopCallDecision {
+  allow: boolean
+  reason?: string
+  action?: 'warn' | 'stop'
+  toolName?: string
+  /** How many times this tool name appears in the current window. */
+  count?: number
+  /** Farsi, user-facing explanation when a stop fires. */
+  message?: string
+}
+
+export interface LoopDetectorOptions {
+  /** Injectable clock so timeout behaviour is testable. */
+  now?: () => number
+}
+
+/**
+ * Sliding-window budget for the fuzzy (per-tool-name) guard. These are the exact
+ * thresholds from Sprint v2.3.1: warn on the 3rd repeat, stop on the 5th, stop
+ * after 3 consecutive failures, and stop after 2 minutes without progress.
+ */
+const WARN_THRESHOLD = 3
+const STOP_THRESHOLD = 5
+const FAIL_THRESHOLD = 3
+const GUARD_WINDOW_SIZE = 15
+const PROGRESS_TIMEOUT_MS = 120_000
+
+function hashCall(toolName: string, args: unknown): string {
+  let serialized: string
+  try {
+    serialized = JSON.stringify(args) ?? 'undefined'
+  } catch {
+    serialized = String(args)
+  }
+  return `${toolName}:${serialized}`
+}
+
+/** The Farsi stop message shown in the chat when a loop is detected. */
+export function loopStopMessage(toolName: string, count: number): string {
+  return `⚠️ تشخیص حلقه. ${count} بار تلاش تکراری برای ${toolName}. متوقف کردم.`
+}
+
 function buildHint(warnings: LoopWarning[]): string {
   return warnings
     .map((warning) => {
@@ -64,17 +117,22 @@ function buildHint(warnings: LoopWarning[]): string {
 }
 
 /**
- * Detects unproductive cycles:
- *  - the same action repeated across a sliding window of recent steps,
- *  - several consecutive steps whose actions all failed,
- *  - the model repeating the same reasoning without a new action, and
- *  - a run that exceeds its wall-clock budget.
+ * Detects unproductive cycles. Two layers share one instance:
  *
- * Severity is layered: a repeated action first produces a WARN (so the model can
- * self-correct), then a STOP once it crosses the hard threshold. Any STOP reason
- * sets {@link LoopCheckResult.stop} so the orchestrator can hand control back.
+ *  1. A **per-tool-call** sliding window (Sprint v2.3.1) keyed on the tool
+ *     *name* — so repeated `remote_shell` calls are caught even when the
+ *     arguments change every time (`beforeToolCall` / `afterToolCall` /
+ *     `markProgress`).
+ *  2. A **per-step** analyzer (`observe`) that also spots failure streaks,
+ *     repeated reasoning, and steps that make no progress.
+ *
+ * Severity is layered: a repeat first produces a WARN (so the model can
+ * self-correct), then a STOP once a hard threshold is crossed. Any STOP reason
+ * surfaces via {@link LoopCheckResult.stop} / {@link LoopCallDecision.allow}
+ * so the orchestrator can hand control back to the user.
  */
 export class LoopDetector {
+  // --- Step-level state (observe) -------------------------------------------
   private readonly counts = new Map<string, number>()
   private readonly warnedSignatures = new Set<string>()
   private readonly window: string[] = []
@@ -86,8 +144,21 @@ export class LoopDetector {
   private stopped = false
   private readonly policy: LoopDetectionPolicy
 
-  constructor(policy: Partial<LoopDetectionPolicy> = {}) {
+  // --- Per-tool-call state (beforeToolCall / afterToolCall) -----------------
+  private readonly now: () => number
+  private readonly recentToolNames: string[] = []
+  private readonly recentToolHashes: string[] = []
+  private readonly warnedToolNames = new Set<string>()
+  private readonly recentCalls: RecentToolCall[] = []
+  private toolFailureStreak = 0
+  private lastProgressAt: number
+  private guardStopReason: LoopStopReason | undefined
+  private guardStopped = false
+
+  constructor(policy: Partial<LoopDetectionPolicy> = {}, options: LoopDetectorOptions = {}) {
     this.policy = { ...DEFAULT_LOOP_POLICY, ...policy }
+    this.now = options.now ?? (() => Date.now())
+    this.lastProgressAt = this.now()
   }
 
   get noProgressSteps(): number {
@@ -100,7 +171,17 @@ export class LoopDetector {
 
   /** True once a hard stop condition has fired for this run. */
   get isStopped(): boolean {
-    return this.stopped
+    return this.stopped || this.guardStopped
+  }
+
+  /** Why the run stopped (either layer), when it did. */
+  get stoppedReason(): LoopStopReason | undefined {
+    return this.guardStopReason ?? this.stopReason
+  }
+
+  /** The most recent executed tool calls (newest last), for the STOP summary. */
+  get toolCallHistory(): RecentToolCall[] {
+    return [...this.recentCalls]
   }
 
   signatureCount(signature: string): number {
@@ -108,6 +189,7 @@ export class LoopDetector {
   }
 
   reset(): void {
+    // Step-level
     this.counts.clear()
     this.warnedSignatures.clear()
     this.window.length = 0
@@ -117,7 +199,131 @@ export class LoopDetector {
     this.lastReasoning = null
     this.stopReason = undefined
     this.stopped = false
+    // Per-tool-call
+    this.recentToolNames.length = 0
+    this.recentToolHashes.length = 0
+    this.warnedToolNames.clear()
+    this.recentCalls.length = 0
+    this.toolFailureStreak = 0
+    this.lastProgressAt = this.now()
+    this.guardStopReason = undefined
+    this.guardStopped = false
   }
+
+  // ---------------------------------------------------------------------------
+  // Per-tool-call guard (Sprint v2.3.1)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Decide whether the next tool call may run. Pushes the call onto the sliding
+   * window first, then evaluates: no-progress timeout, tool-name repeat
+   * (warn at 3 / stop at 5), and consecutive-failure stop.
+   */
+  beforeToolCall(toolName: string, args: unknown): LoopCallDecision {
+    this.recentToolNames.push(toolName)
+    this.recentToolHashes.push(hashCall(toolName, args))
+    if (this.recentToolNames.length > GUARD_WINDOW_SIZE) this.recentToolNames.shift()
+    if (this.recentToolHashes.length > GUARD_WINDOW_SIZE) this.recentToolHashes.shift()
+
+    const count = this.recentToolNames.filter((name) => name === toolName).length
+
+    if (this.guardStopped) {
+      const reason = this.guardStopReason ?? 'repeated_action'
+      return {
+        allow: false,
+        action: 'stop',
+        reason,
+        toolName,
+        count,
+        ...(reason === 'repeated_action' ? { message: loopStopMessage(toolName, count) } : {})
+      }
+    }
+
+    if (this.now() - this.lastProgressAt > PROGRESS_TIMEOUT_MS) {
+      this.guardStopped = true
+      this.guardStopReason = 'turn_timeout'
+      return {
+        allow: false,
+        action: 'stop',
+        reason: 'turn_timeout',
+        toolName,
+        count,
+        message: '⚠️ تشخیص حلقه. ۲ دقیقه بدون پیشرفت. متوقف کردم.'
+      }
+    }
+
+    if (this.toolFailureStreak >= FAIL_THRESHOLD) {
+      this.guardStopped = true
+      this.guardStopReason = 'failure_streak'
+      return {
+        allow: false,
+        action: 'stop',
+        reason: 'failure_streak',
+        toolName,
+        count,
+        message: `⚠️ تشخیص حلقه. ${this.toolFailureStreak} خطای متوالی در ${toolName}. متوقف کردم.`
+      }
+    }
+
+    if (count >= STOP_THRESHOLD) {
+      this.guardStopped = true
+      this.guardStopReason = 'repeated_action'
+      return {
+        allow: false,
+        action: 'stop',
+        reason: 'repeated_action',
+        toolName,
+        count,
+        message: loopStopMessage(toolName, count)
+      }
+    }
+
+    const decision: LoopCallDecision = { allow: true, toolName, count }
+    if (count >= WARN_THRESHOLD && !this.warnedToolNames.has(toolName)) {
+      this.warnedToolNames.add(toolName)
+      decision.action = 'warn'
+      decision.reason =
+        `Tool "${toolName}" called ${count} times in the last ${GUARD_WINDOW_SIZE} calls ` +
+        'with different arguments. Repeating it is unlikely to help.'
+      decision.message = `⚠️ هشدار حلقه: ${toolName} ${count} بار تکرار شد.`
+    }
+    return decision
+  }
+
+  /** Record the outcome of the tool call just executed. */
+  afterToolCall(toolName: string, result: { ok: boolean }): void {
+    this.recentCalls.push({ toolName, ok: result.ok, at: this.now() })
+    if (this.recentCalls.length > GUARD_WINDOW_SIZE) this.recentCalls.shift()
+
+    if (result.ok) {
+      this.toolFailureStreak = 0
+    } else {
+      this.toolFailureStreak += 1
+      if (this.toolFailureStreak >= FAIL_THRESHOLD) {
+        this.guardStopped = true
+        this.guardStopReason = 'failure_streak'
+      }
+    }
+  }
+
+  /**
+   * Real progress happened (a file was written, tests passed, ...). Clears the
+   * fuzzy window, the failure streak and the no-progress timer so the model
+   * gets a fresh budget.
+   */
+  markProgress(): void {
+    this.lastProgressAt = this.now()
+    this.toolFailureStreak = 0
+    this.recentToolNames.length = 0
+    this.recentToolHashes.length = 0
+    this.warnedToolNames.clear()
+    this.guardStopped = false
+    this.guardStopReason = undefined
+  }
+
+  // ---------------------------------------------------------------------------
+  // Per-step analyzer (shared with the orchestrator)
+  // ---------------------------------------------------------------------------
 
   observe(observation: LoopObservation): LoopCheckResult {
     const warnings: LoopWarning[] = []
