@@ -1,5 +1,12 @@
 # SPRINT v2.4.1 — Wire the Tools into Agent + UI
 
+## 📌 Status (updated)
+- ✅ A.1–A.4 agent wiring — commit `b03e658`
+- ✅ B.1–B.2 Settings toggle + Chat tool card — commit `1a8582b`
+- ✅ C.1–C.2 e2e + mocked smoke — commit `8cfa165`
+- ⏸️ D merge/tag/push — **pending explicit confirmation** (tag name `v2.4.0` in the
+  plan conflicts with the new `v2.4.1` scope; also pushes to `master`).
+
 
 ## 🎯 هدف
 اتصال ۵ ماژول ساخته‌شده در v2.4 به Agent و UI، به‌طوری که AI بتواند در Chat واقعی از آن‌ها استفاده کند.
