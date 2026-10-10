@@ -25,6 +25,7 @@ import type { HostPolicy } from '@shared/vps'
 import type { ProjectRecord } from '@shared/ui'
 import { basename, useStore, type ViewId } from '../store'
 import ProjectBadges from './ProjectBadges'
+import GitStatusPill from './GitStatusPill'
 import { hasPolicyMismatch } from '../lib/project-badge'
 
 const NAV: Array<{ id: ViewId; labelKey: string; icon: typeof MessageSquare }> = [
@@ -251,6 +252,7 @@ export default function Sidebar(): JSX.Element {
             <span className="min-w-0 flex-1 truncate text-xs font-medium text-neutral-200">
               {activeProject?.name ?? 'AI Desktop'}
             </span>
+            <GitStatusPill />
             <ChevronDown className="h-3.5 w-3.5 shrink-0 text-neutral-500" />
           </button>
           {workspaceOpen ? (

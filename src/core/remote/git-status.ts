@@ -7,15 +7,9 @@
  */
 
 import { quotePath } from './workspace-detect'
+import type { RemoteGitStatus } from '@shared/workspace-info'
 
-export interface RemoteGitStatus {
-  branch: string
-  /** Number of changed/untracked entries. */
-  changes: number
-  ahead: number
-  behind: number
-  clean: boolean
-}
+export type { RemoteGitStatus } from '@shared/workspace-info'
 
 export function remoteGitStatusCommand(path: string): string {
   return `cd ${quotePath(path)} && git status --porcelain=v1 --branch 2>/dev/null`

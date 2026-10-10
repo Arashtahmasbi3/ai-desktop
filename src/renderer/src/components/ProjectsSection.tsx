@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { FolderPlus, Search, Server } from 'lucide-react'
 import { useStore } from '../store'
 import ProjectCard from './ProjectCard'
+import GitSetupDialog from './GitSetupDialog'
 
 /** Settings → Projects: add local/remote projects and edit each one's metadata. */
 export default function ProjectsSection(): JSX.Element {
@@ -20,6 +21,8 @@ export default function ProjectsSection(): JSX.Element {
   const [remotePath, setRemotePath] = useState('')
   const [remoteVpsId, setRemoteVpsId] = useState('')
   const [discovering, setDiscovering] = useState(false)
+  // v2.3.3 (B.1): offer git setup for a freshly added non-repo remote project.
+  const [gitSetupFor, setGitSetupFor] = useState<{ serverId: string; path: string } | null>(null)
 
   const connectedId = vpsStatus.status === 'connected' ? vpsStatus.serverId : undefined
   const targetVpsId = remoteVpsId || connectedId || ''
@@ -48,9 +51,18 @@ export default function ProjectsSection(): JSX.Element {
 
   const addRemote = async (): Promise<void> => {
     if (!targetVpsId || !remotePath.trim()) return
-    await addRemoteProject(remoteName.trim(), remotePath.trim(), targetVpsId)
+    const path = remotePath.trim()
+    const serverId = targetVpsId
+    await addRemoteProject(remoteName.trim(), path, serverId)
     setRemoteName('')
     setRemotePath('')
+    // Ask about git only when the folder is not already a repo.
+    try {
+      const info = await window.api.vps.workspaceInfo(serverId, path)
+      if (!info.isGitRepo) setGitSetupFor({ serverId, path })
+    } catch {
+      // Host may be unreachable; skip the prompt rather than block the add.
+    }
   }
 
   return (
@@ -156,6 +168,14 @@ export default function ProjectsSection(): JSX.Element {
           ))}
         </div>
       )}
+
+      {gitSetupFor ? (
+        <GitSetupDialog
+          serverId={gitSetupFor.serverId}
+          path={gitSetupFor.path}
+          onClose={() => setGitSetupFor(null)}
+        />
+      ) : null}
     </section>
   )
 }

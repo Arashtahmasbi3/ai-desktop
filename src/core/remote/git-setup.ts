@@ -7,8 +7,9 @@
  */
 
 import { quotePath } from './workspace-detect'
+import type { GitProjectType, GitSetupOptions } from '@shared/workspace-info'
 
-export type GitProjectType = 'node' | 'python' | 'generic'
+export type { GitProjectType, GitSetupOptions } from '@shared/workspace-info'
 
 export const GITIGNORE_TEMPLATES: Readonly<Record<GitProjectType, string>> = {
   node: ['node_modules/', 'dist/', '.env', '*.log', '.DS_Store'].join('\n'),
@@ -19,19 +20,6 @@ export const GITIGNORE_TEMPLATES: Readonly<Record<GitProjectType, string>> = {
 export function getGitignoreTemplate(type: GitProjectType | string | undefined): string {
   const key = (type ?? 'generic') as GitProjectType
   return GITIGNORE_TEMPLATES[key] ?? GITIGNORE_TEMPLATES.generic
-}
-
-export interface GitSetupOptions {
-  /** `git init`. */
-  init?: boolean
-  /** Write a `.gitignore` from the template. */
-  gitignore?: boolean
-  projectType?: GitProjectType | string
-  /** Stage everything and create the initial commit. */
-  commit?: boolean
-  /** Add `origin` and push the initial branch. */
-  push?: boolean
-  remoteUrl?: string
 }
 
 /** Build a heredoc that writes the .gitignore without a temp file. */

@@ -30,3 +30,31 @@ export function formatWorkspaceTooltip(info: RemoteWorkspaceInfo | undefined): s
   const remote = info.gitRemote?.trim()
   return remote ? remote : 'Local only'
 }
+
+/** Git project kinds with a bundled `.gitignore` template (v2.3.3, B.1). */
+export type GitProjectType = 'node' | 'python' | 'generic'
+
+/** Options chosen in the "Setup Git?" dialog (v2.3.3, B.1). */
+export interface GitSetupOptions {
+  init?: boolean
+  gitignore?: boolean
+  projectType?: GitProjectType | string
+  commit?: boolean
+  push?: boolean
+  remoteUrl?: string
+}
+
+/** Structured remote git status for the sidebar (v2.3.3, B.2). */
+export interface RemoteGitStatus {
+  branch: string
+  changes: number
+  ahead: number
+  behind: number
+  clean: boolean
+}
+
+/** Result of an approved git-setup / install run (v2.3.3). */
+export interface RemoteCommandRun {
+  ran: string[]
+  output: string
+}
