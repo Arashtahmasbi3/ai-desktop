@@ -5,12 +5,12 @@ import { fakeV24Host, action } from './v24-host'
 
 describe('A.3 scaffold_project wiring', () => {
   it('exposes scaffold_project to the agent', () => {
-    const runtime = planRemoteRuntime('start a new project on my vps', undefined, fakeV24Host())
+    const runtime = planRemoteRuntime('start a new project on my vps', 'srv-1', fakeV24Host())
     expect(runtime.extraTools?.map((tool) => tool.name)).toContain(scaffoldTool.name)
   })
 
   it('hints at the available templates', () => {
-    const runtime = planRemoteRuntime('scaffold on my vps', undefined, fakeV24Host())
+    const runtime = planRemoteRuntime('scaffold on my vps', 'srv-1', fakeV24Host())
     expect(runtime.systemHint).toContain('scaffold_project')
     expect(runtime.systemHint).toContain('node-ts')
   })

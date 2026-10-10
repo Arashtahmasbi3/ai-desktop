@@ -23,7 +23,7 @@ import { RemoteFsToolExecutor } from '@core/tools/remote-fs-executor'
 import { MIGRATE_PROJECT_TOOL, type MigrateProjectDeps } from '@core/tools/migrate-project-tool'
 import { MigrateProjectToolExecutor } from '@core/tools/migrate-project-executor'
 import { CompositeToolExecutor, type ToolRoute } from '@core/tools/composite-executor'
-import { planV24Tools } from './v24-tools-wiring'
+import { planV24Tools, enabledV24ToolNames } from './v24-tools-wiring'
 import { routeToolCall, remoteWorkspaceHint } from '@core/agent/remote-routing'
 import type { RoutingDecision } from '@core/agent/remote-routing'
 import { detectWorkspace } from '@core/remote/workspace-detect'
@@ -31,6 +31,7 @@ import { preflight, preflightActionFor, type PreflightResult } from '@core/agent
 import { buildWorkspaceSystemHint } from '@core/agent/workspace-prompt'
 import type { RemoteWorkspaceInfo } from '@shared/workspace-info'
 import { DEFAULT_APPROVAL_MODE } from '@core/agent/approval'
+import { resolveVpsForRun, requiresVps } from '@core/agent/vps-resolver'
 import type { Plan, PlanDecision, PlanWarning } from '@shared/plan'
 import { createApprovalGate } from './approval-gate'
 import type { ApprovalOutcome } from '@shared/approval'
@@ -128,21 +129,40 @@ export function planRemoteRuntime(
 ): RemoteRuntime {
   if (!vps) return {}
   const connected = vps.connectedServers()
-  const wants = VPS_KEYWORDS.test(task)
+  // A VPS is "wanted" when the task talks about one, or when a VPS-only tool
+  // group was explicitly enabled. Either way we never guess a server (P0-4).
+  // `enabledTools === undefined` means "all enabled", which is not a request for
+  // a VPS, so only an explicit list counts here.
+  const enabledRequiresVps = enabledTools
+    ? [...enabledV24ToolNames(enabledTools), ...enabledTools].some((tool) => requiresVps(tool))
+    : false
+  const wants = VPS_KEYWORDS.test(task) || enabledRequiresVps
 
-  const pinned = vpsServerId && connected.includes(vpsServerId) ? vpsServerId : undefined
-  if (!pinned && !(wants && connected.length > 0)) {
-    if (wants && connected.length === 0) {
+  const resolution = resolveVpsForRun({
+    ...(vpsServerId ? { explicitVpsId: vpsServerId } : {}),
+    requiresVps: wants
+  })
+  if (!resolution.ok) {
+    return {
+      systemHint:
+        `${resolution.error} Do not assume or auto-select a server. Ask the user to pick one ` +
+        'in the chat header (or select a remote project), then retry.'
+    }
+  }
+
+  const target = resolution.vpsId
+  if (!target) return {}
+
+  if (!connected.includes(target)) {
+    if (wants) {
       return {
         systemHint:
-          'The user asked about a VPS / remote server, but none is connected. ' +
-          'Explain that they must add a VPS in Settings and connect it first, then retry.'
+          `The selected VPS "${target}" is not connected. Tell the user to add or connect it ` +
+          'in Settings -> Connections, then retry.'
       }
     }
     return {}
   }
-
-  const target = pinned ?? connected[0]
   const shellTool: ToolDefinition = {
     ...REMOTE_SHELL_TOOL,
     description: `${REMOTE_SHELL_TOOL.description} Use server_id="${target}".`
@@ -379,7 +399,14 @@ export class AgentService {
     const hint = activeRemoteProjectHint(active, connectedServers)
     if (hint) return { systemHint: hint, ...routing }
 
-    const pinned = vpsServerId ?? (isRemote ? serverId : undefined)
+    // Resolve the target explicitly: the user's chat-header choice wins, then the
+    // active remote project's own VPS. Never inferred from the task text (P0-4).
+    const resolved = resolveVpsForRun({
+      ...(vpsServerId ? { explicitVpsId: vpsServerId } : {}),
+      ...(active ? { project: active } : {}),
+      requiresVps: false
+    })
+    const pinned = resolved.ok ? resolved.vpsId : undefined
     const runtime = planRemoteRuntime(
       task,
       pinned,

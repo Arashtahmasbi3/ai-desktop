@@ -12,12 +12,12 @@ function deps(): ConstructorParameters<typeof DbMigrateToolExecutor>[0] {
 
 describe('A.1 migrate_database wiring', () => {
   it('exposes migrate_database to the agent when a VPS is connected', () => {
-    const runtime = planRemoteRuntime('move this on my vps', undefined, fakeV24Host({ servers: SERVERS }))
+    const runtime = planRemoteRuntime('move this on my vps', 'srv-1', fakeV24Host({ servers: SERVERS }))
     expect(runtime.extraTools?.map((tool) => tool.name)).toContain(dbMigrateTool.name)
   })
 
   it('tells the model to dry-run first', () => {
-    const runtime = planRemoteRuntime('migrate a db on my vps', undefined, fakeV24Host({ servers: SERVERS }))
+    const runtime = planRemoteRuntime('migrate a db on my vps', 'srv-1', fakeV24Host({ servers: SERVERS }))
     expect(runtime.systemHint).toContain('migrate_database')
     expect(runtime.systemHint).toContain('dry-run')
   })
