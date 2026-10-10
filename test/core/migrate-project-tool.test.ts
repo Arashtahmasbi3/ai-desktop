@@ -5,6 +5,7 @@ import {
   MIGRATE_PROJECT_TOOL,
   buildRsyncCommand,
   executeMigrateProject,
+  parseRsyncStats,
   type MigrateProjectDeps,
   type ServerConnection
 } from '../../src/core/tools/migrate-project-tool'
@@ -91,20 +92,99 @@ describe('buildRsyncCommand', () => {
     expect(command).toContain("'/src/project/'")
     expect(command).toContain("'deploy@10.0.0.9:/dst/project/'")
   })
+
+  it('never adds --delete, with or without dry-run', () => {
+    expect(buildRsyncCommand('/src', TARGET, '/dst')).not.toContain('--delete')
+    expect(buildRsyncCommand('/src', TARGET, '/dst', { dryRun: true })).not.toContain('--delete')
+  })
+
+  it('adds --dry-run only when asked', () => {
+    expect(buildRsyncCommand('/src', TARGET, '/dst')).not.toContain('--dry-run')
+    expect(buildRsyncCommand('/src', TARGET, '/dst', { dryRun: true })).toContain('--dry-run')
+  })
+})
+
+describe('parseRsyncStats', () => {
+  it('reads transfer counts, size and deletions from rsync stats', () => {
+    const stdout = [
+      'Number of files: 1,234 (reg: 1,200)',
+      'Number of deleted files: 0',
+      'Number of regular files transferred: 245',
+      'Total transferred file size: 13,000,000 bytes',
+      'sent 13,000,000 bytes  received 1,200 bytes'
+    ].join('\n')
+    expect(parseRsyncStats(stdout)).toMatchObject({
+      files: 245,
+      bytes: 13000000,
+      deletes: 0
+    })
+  })
+
+  it('defaults to zero when stats are absent', () => {
+    expect(parseRsyncStats('sent 1.2K bytes')).toEqual({
+      files: 0,
+      bytes: 0,
+      deletes: 0,
+      list: []
+    })
+  })
 })
 
 describe('executeMigrateProject', () => {
-  it('runs rsync on the source server for the resolved target', async () => {
+  it('dry-runs first, then runs the real rsync on the source server', async () => {
     const deps = fakeSsh()
     const result = await executeMigrateProject(deps, ARGS)
 
     expect(result.ok).toBe(true)
-    expect(deps.execCalls).toHaveLength(1)
-    const call = deps.execCalls[0]!
-    expect(call.serverId).toBe('srv-1')
-    expect(call.command).toContain('rsync -az')
-    expect(call.command).toContain("'deploy@10.0.0.9:/srv/app/'")
+    expect(deps.execCalls).toHaveLength(2)
+    expect(deps.execCalls[0]!.serverId).toBe('srv-1')
+    expect(deps.execCalls[0]!.command).toContain('--dry-run')
+    expect(deps.execCalls[0]!.command).not.toContain('--delete')
+    const real = deps.execCalls[1]!
+    expect(real.command).toContain('rsync -az --info=stats2')
+    expect(real.command).toContain("'deploy@10.0.0.9:/srv/app/'")
+    expect(real.command).not.toContain('--delete')
     expect(result.content).toContain('sent 1.2K bytes')
+  })
+
+  it('reports the dry-run plan and copies nothing when dry_run is set', async () => {
+    const deps = fakeSsh({
+      result: {
+        stdout: [
+          'Number of regular files transferred: 245',
+          'Total transferred file size: 13000000 bytes'
+        ].join('\n')
+      }
+    })
+    const result = await executeMigrateProject(deps, { ...ARGS, dry_run: true })
+
+    expect(result.ok).toBe(true)
+    expect(deps.execCalls).toHaveLength(1)
+    expect(deps.execCalls[0]!.command).toContain('--dry-run')
+    expect(result.plan).toMatchObject({ files: 245, bytes: 13000000, deletes: 0 })
+    expect(result.content).toContain('Files to transfer: 245')
+    expect(result.content).toContain('Files to delete: 0 (--delete off)')
+  })
+
+  it('includes the dry-run summary in the real migration output', async () => {
+    const deps = fakeSsh({
+      result: { stdout: 'Number of regular files transferred: 7\nsent 1.2K bytes' }
+    })
+    const result = await executeMigrateProject(deps, ARGS)
+    expect(result.ok).toBe(true)
+    expect(result.content).toContain('Files to transfer: 7')
+    expect(result.content).toContain('sent 1.2K bytes')
+    expect(deps.audits[0]?.detail).toBe('exit 0; 7 file(s), 0 delete(s)')
+  })
+
+  it('aborts before the real transfer when the dry-run fails', async () => {
+    const deps = fakeSsh({
+      result: { ok: false, stdout: '', stderr: 'rsync: connection refused', exitCode: 255 }
+    })
+    const result = await executeMigrateProject(deps, ARGS)
+    expect(result.ok).toBe(false)
+    expect(result.content).toContain('Dry-run failed')
+    expect(deps.execCalls).toHaveLength(1)
   })
 
   it('audits the migration', async () => {
