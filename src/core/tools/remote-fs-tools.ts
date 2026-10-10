@@ -3,6 +3,7 @@ import type { RemoteFileEntry, VpsExecResult } from '@shared/vps'
 import { checkDenyList } from '@core/agent/deny-list'
 import type { AuditEntry } from '@core/agent/audit-log'
 import { backupPathFor } from '@core/remote/backup'
+import { enforceProjectPath } from '@core/remote/path-guard'
 
 /** POSIX single-quote a value so it can be safely embedded in a shell command. */
 export function shellQuote(value: string): string {
@@ -93,6 +94,11 @@ export interface RemoteFsDeps {
   audit?(entry: Omit<AuditEntry, 'at'>): Promise<void>
   /** Clock override for deterministic backup names in tests. */
   now?: () => number
+  /**
+   * Absolute root of the remote project. When set, every path is proven to stay
+   * inside it before touching the VPS (v2.5, P0-2).
+   */
+  projectRoot?: string
 }
 
 export interface RemoteFsResult {
@@ -111,6 +117,18 @@ function cleanPath(value: unknown): string | undefined {
   const path = value.trim()
   if (!path || /[\u0000\n\r]/.test(path)) return undefined
   return path
+}
+
+/**
+ * Refuse a path that leaves the remote project root. A missing `projectRoot`
+ * (callers that do not know the active project) skips the check so the tools stay
+ * usable on their own; AgentService always supplies it for remote projects.
+ */
+function containPath(deps: RemoteFsDeps, path: string): RemoteFsResult | undefined {
+  if (!deps.projectRoot) return undefined
+  const guard = enforceProjectPath(path, deps.projectRoot)
+  if (!guard.ok) return fail(`Blocked: ${guard.error}`, true)
+  return undefined
 }
 
 /** Guard a shell command we build internally with the same deny list as exec. */
@@ -185,6 +203,8 @@ async function readFile(
 ): Promise<RemoteFsResult> {
   const path = cleanPath(args.path)
   if (!path) return fail('remote_read_file requires a non-empty "path"')
+  const blocked = containPath(deps, path)
+  if (blocked) return blocked
   try {
     const content = await deps.readFile(serverId, path)
     await deps.audit?.({ type: 'exec', ok: true, serverId, command: `fs:read ${path}` })
@@ -205,6 +225,8 @@ async function writeFile(
   if (!path || content === undefined) {
     return fail('remote_write_file requires "path" and "content"')
   }
+  const blocked = containPath(deps, path)
+  if (blocked) return blocked
 
   // Back up an existing file before overwriting it so the change can be undone.
   const existing = await readExisting(deps, serverId, path)
@@ -243,6 +265,8 @@ async function listDir(
   args: Record<string, unknown>
 ): Promise<RemoteFsResult> {
   const path = cleanPath(args.path) ?? '.'
+  const blocked = containPath(deps, path)
+  if (blocked) return blocked
   const entries = await deps.listFiles(serverId, path)
   await deps.audit?.({ type: 'exec', ok: true, serverId, command: `fs:list ${path}` })
   if (entries.length === 0) return { ok: true, content: '(empty directory)' }
@@ -263,6 +287,8 @@ async function exists(
 ): Promise<RemoteFsResult> {
   const path = cleanPath(args.path)
   if (!path) return fail('remote_exists requires a non-empty "path"')
+  const contained = containPath(deps, path)
+  if (contained) return contained
   const command = `test -e ${shellQuote(path)} && echo yes || echo no`
   const blocked = guardCommand(command)
   if (blocked) return blocked
@@ -282,6 +308,8 @@ async function grep(
     return fail('remote_grep requires a single-line "pattern"')
   }
   const path = cleanPath(args.path) ?? '.'
+  const contained = containPath(deps, path)
+  if (contained) return contained
   const command = `grep -rnE -- ${shellQuote(pattern)} ${shellQuote(path)} 2>/dev/null | head -n 200`
   const blocked = guardCommand(command)
   if (blocked) return blocked
@@ -299,6 +327,8 @@ async function gitStatus(
 ): Promise<RemoteFsResult> {
   const path = cleanPath(args.path)
   if (!path) return fail('remote_git_status requires a non-empty "path"')
+  const contained = containPath(deps, path)
+  if (contained) return contained
   const command = `cd ${shellQuote(path)} && git status --porcelain=v1 -b 2>&1 | head -n 200`
   const blocked = guardCommand(command)
   if (blocked) return blocked

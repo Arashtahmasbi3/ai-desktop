@@ -9,14 +9,14 @@ const fail = { ok: false, stdout: '', stderr: '', exitCode: 1 }
 
 describe('A.4 project_user + worktree wiring', () => {
   it('exposes the project_user tools', () => {
-    const runtime = planRemoteRuntime('manage users on my vps', undefined, fakeV24Host())
+    const runtime = planRemoteRuntime('manage users on my vps', 'srv-1', fakeV24Host())
     const names = runtime.extraTools?.map((tool) => tool.name) ?? []
     expect(names).toContain('project_user_create')
     expect(names).toContain('project_user_remove')
   })
 
   it('exposes the worktree tools', () => {
-    const runtime = planRemoteRuntime('parallel branches on my vps', undefined, fakeV24Host())
+    const runtime = planRemoteRuntime('parallel branches on my vps', 'srv-1', fakeV24Host())
     const names = runtime.extraTools?.map((tool) => tool.name) ?? []
     expect(names).toContain('worktree_create')
     expect(names).toContain('worktree_list')

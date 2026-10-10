@@ -1,6 +1,7 @@
 import type { ToolDefinition } from '@shared/types'
 import type { VpsExecResult } from '@shared/vps'
 import { checkDenyList } from '@core/agent/deny-list'
+import { enforceCommandPaths } from '@core/remote/path-guard'
 
 /** Tool the agent can call to run a command on a connected VPS. */
 export const REMOTE_SHELL_TOOL: ToolDefinition = {
@@ -33,6 +34,11 @@ export interface RemoteShellDeps {
   connectedServers(): string[]
   /** When set, long commands are detached and tracked as jobs. */
   jobs?: RemoteJobRunner
+  /**
+   * Absolute root of the remote project. When set, an absolute path referenced by
+   * the command that leaves the project is refused (v2.5, P0-2).
+   */
+  projectRoot?: string
 }
 
 /**
@@ -93,6 +99,14 @@ export async function executeRemoteShell(
   }
   if (!connected.includes(serverId)) {
     return { ok: false, content: `Server ${serverId} is not connected.` }
+  }
+  // Containment first: refuse any absolute path in the command that leaves the
+  // project root, then apply the deny list (v2.5, P0-2).
+  if (deps.projectRoot) {
+    const guard = enforceCommandPaths(command, deps.projectRoot)
+    if (!guard.ok) {
+      return { ok: false, blocked: true, content: `Blocked: ${guard.error}` }
+    }
   }
   const denial = checkDenyList(command)
   if (denial.blocked) {

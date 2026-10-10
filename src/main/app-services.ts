@@ -6,6 +6,7 @@ import type { ProjectRecord } from '@shared/ui'
 import type { Persistence } from '@core/agent/persistence'
 import type { SessionStore } from '@core/agent/session-store'
 import { ApprovedCommands } from '@core/agent/approved-commands'
+import { RunStore } from '@core/agent/run-store'
 import { classifyLocalProject } from '@shared/paths'
 import { SandboxManagerImpl } from '@core/sandbox/manager'
 import { WorkerManager } from '@core/worker/worker-manager'
@@ -78,6 +79,8 @@ export class AppServices {
   readonly approvals: ApprovalBroker
   readonly plans: PlanBroker
   readonly approvedCommands: ApprovedCommands
+  /** Run -> project binding for patch isolation (v2.5, P0-1). */
+  readonly runs = new RunStore()
   readonly worker: WorkerManager
   readonly remote: RemoteServer
 
@@ -140,6 +143,7 @@ export class AppServices {
       cancelPlans: () => this.plans.cancelAll(),
       approvedCommands: this.approvedCommands,
       files: this.files,
+      runStore: this.runs,
       emit: (event: AgentEvent) => this.emit('agent:event', event)
     })
 

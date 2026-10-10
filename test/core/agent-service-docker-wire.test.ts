@@ -7,12 +7,12 @@ const SERVERS = { 'srv-1': { host: 'a.example', port: 22, username: 'root' }, 's
 
 describe('A.2 migrate_docker wiring', () => {
   it('exposes migrate_docker to the agent', () => {
-    const runtime = planRemoteRuntime('transfer a docker image on my vps', undefined, fakeV24Host({ servers: SERVERS }))
+    const runtime = planRemoteRuntime('transfer a docker image on my vps', 'srv-1', fakeV24Host({ servers: SERVERS }))
     expect(runtime.extraTools?.map((tool) => tool.name)).toContain(dockerMigrateTool.name)
   })
 
   it('hints at both registry and save/load strategies', () => {
-    const runtime = planRemoteRuntime('docker on my vps', undefined, fakeV24Host({ servers: SERVERS }))
+    const runtime = planRemoteRuntime('docker on my vps', 'srv-1', fakeV24Host({ servers: SERVERS }))
     expect(runtime.systemHint).toContain('migrate_docker')
     expect(runtime.systemHint).toContain('save/load')
   })

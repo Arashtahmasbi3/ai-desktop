@@ -9,6 +9,7 @@ import type { AppServices } from './app-services'
 import { registerVpsIpc } from './vps-ipc'
 import { runLocalCommand } from './local-shell'
 import { searchProject } from './project-search'
+import { canRememberTool, createRememberedApproval } from '@core/agent/remember-policy'
 
 /**
  * Registers every IPC channel the renderer is allowed to call. Handlers only
@@ -247,7 +248,21 @@ export function registerIpc(
     ['agent:approvalHistory', () => services.approvals.history()],
     ['agent:approvedCommands', () => services.approvedCommands.list()],
     ['agent:revokeApprovedCommand', (id: string) => services.approvedCommands.revoke(id)],
-    ['agent:rememberApprovalTool', (tool: string) => services.approvedCommands.rememberTool(tool)],
+    [
+      'agent:rememberApprovalTool',
+      async (tool: string) => {
+        // Sensitive tools can never be "always allowed" (P0-3).
+        if (!canRememberTool(tool)) return
+        const project = services.persistence.getActiveProject()
+        if (project) {
+          await services.approvedCommands.rememberScoped(
+            createRememberedApproval(tool, project.vpsId ?? '', project.id)
+          )
+          return
+        }
+        await services.approvedCommands.rememberTool(tool)
+      }
+    ],
     ['agent:applyChange', (id: string) => services.agent.applyChange(id)],
     ['shell:exec', (command: string) => runLocalCommand(command, { cwd: services.files.getRoot() })],
     ['search:code', (query: string) => {

@@ -56,9 +56,20 @@ describe('ApprovedCommands', () => {
 
   it('scopes session approvals to that session', async () => {
     const commands = new ApprovedCommands({ file: await newFile() })
-    await commands.rememberSession('session-1', 'write_file')
-    expect(commands.isApproved('write_file', {}, 'session-1')).toBe(true)
-    expect(commands.isApproved('write_file', {}, 'session-2')).toBe(false)
+    await commands.rememberSession('session-1', 'remote_read_file')
+    expect(commands.isApproved('remote_read_file', {}, 'session-1')).toBe(true)
+    expect(commands.isApproved('remote_read_file', {}, 'session-2')).toBe(false)
+  })
+
+  it('refuses to remember a write or shell tool', async () => {
+    const commands = new ApprovedCommands({ file: await newFile() })
+    await commands.rememberTool('remote_shell')
+    await commands.rememberSession('s1', 'write_file')
+    await commands.rememberAction('run_command', { command: 'ls' })
+    expect(commands.isApproved('remote_shell', {})).toBe(false)
+    expect(commands.isApproved('write_file', {}, 's1')).toBe(false)
+    expect(commands.isApproved('run_command', { command: 'ls' })).toBe(false)
+    expect(commands.list()).toHaveLength(0)
   })
 
   it('persists remember choices across instances', async () => {
@@ -74,7 +85,7 @@ describe('ApprovedCommands', () => {
     const commands = new ApprovedCommands({ file: await newFile() })
     await commands.rememberAction('read_file', { path: 'a.txt' })
     await commands.rememberTool('list_dir')
-    await commands.rememberSession('s1', 'write_file')
+    await commands.rememberSession('s1', 'remote_read_file')
 
     const views = commands.list()
     expect(views).toHaveLength(3)
@@ -84,6 +95,6 @@ describe('ApprovedCommands', () => {
     expect(commands.list()).toHaveLength(0)
     expect(commands.isApproved('read_file', { path: 'a.txt' })).toBe(false)
     expect(commands.isApproved('list_dir', {})).toBe(false)
-    expect(commands.isApproved('write_file', {}, 's1')).toBe(false)
+    expect(commands.isApproved('remote_read_file', {}, 's1')).toBe(false)
   })
 })

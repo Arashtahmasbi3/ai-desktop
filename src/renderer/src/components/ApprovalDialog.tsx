@@ -13,6 +13,7 @@ import {
 import { useStore } from '../store'
 import { evaluateProjectCommandWarning } from '../lib/policy-warning'
 import PolicyWarningBanner from './PolicyWarningBanner'
+import { canRememberTool } from '@core/agent/remember-policy'
 import type {
   ApprovalHistoryEntry,
   ApprovalOutcome,
@@ -101,6 +102,7 @@ export default function ApprovalDialog(): JSX.Element | null {
 
   if (!request) return null
 
+  const rememberable = canRememberTool(request.tool)
   const activeProject = settings?.projects.find((p) => p.id === settings.activeProjectId)
   const projectPolicy =
     activeProject?.policy ?? servers.find((server) => server.id === activeProject?.vpsId)?.policy
@@ -206,44 +208,52 @@ export default function ApprovalDialog(): JSX.Element | null {
           </pre>
         ) : null}
 
-        <div className="mt-3 flex flex-col gap-1.5 text-xs text-neutral-300">
-          <label className="flex cursor-pointer items-center gap-2">
-            <input
-              type="checkbox"
-              checked={rememberCommand}
-              onChange={(event) => {
-                if (event.target.checked) pick('action')
-                else setRememberCommand(false)
-              }}
-              className="accent-accent"
-            />
-            {t('chat.approvalRememberCommand')}
-          </label>
-          <label className="flex cursor-pointer items-center gap-2">
-            <input
-              type="checkbox"
-              checked={rememberTool}
-              onChange={(event) => {
-                if (event.target.checked) pick('tool')
-                else setRememberTool(false)
-              }}
-              className="accent-accent"
-            />
-            {t('chat.approvalRememberTool')}
-          </label>
-          <label className="flex cursor-pointer items-center gap-2">
-            <input
-              type="checkbox"
-              checked={rememberSession}
-              onChange={(event) => {
-                if (event.target.checked) pick('session')
-                else setRememberSession(false)
-              }}
-              className="accent-accent"
-            />
-            {t('chat.approvalSession')}
-          </label>
-        </div>
+        {rememberable ? (
+          <div className="mt-3 flex flex-col gap-1.5 text-xs text-neutral-300">
+            <label className="flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                checked={rememberCommand}
+                onChange={(event) => {
+                  if (event.target.checked) pick('action')
+                  else setRememberCommand(false)
+                }}
+                className="accent-accent"
+              />
+              {t('chat.approvalRememberCommand')}
+            </label>
+            <label className="flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                checked={rememberTool}
+                onChange={(event) => {
+                  if (event.target.checked) pick('tool')
+                  else setRememberTool(false)
+                }}
+                className="accent-accent"
+              />
+              {t('chat.approvalRememberTool')}
+            </label>
+            <label className="flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                checked={rememberSession}
+                onChange={(event) => {
+                  if (event.target.checked) pick('session')
+                  else setRememberSession(false)
+                }}
+                className="accent-accent"
+              />
+              {t('chat.approvalSession')}
+            </label>
+            <p className="text-[10px] text-neutral-600">{t('chat.approvalRememberScope')}</p>
+          </div>
+        ) : (
+          <p className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-[11px] text-amber-300">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            {t('chat.approvalCannotRemember')}
+          </p>
+        )}
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -285,13 +295,15 @@ export default function ApprovalDialog(): JSX.Element | null {
             >
               {t('chat.approve')}
             </button>
-            <button
-              type="button"
-              onClick={() => respondApproval({ approved: true, remember: 'session' })}
-              className="rounded-lg border border-accent/50 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/10"
-            >
-              {t('chat.approvalApproveAll')}
-            </button>
+            {rememberable ? (
+              <button
+                type="button"
+                onClick={() => respondApproval({ approved: true, remember: 'session' })}
+                className="rounded-lg border border-accent/50 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/10"
+              >
+                {t('chat.approvalApproveAll')}
+              </button>
+            ) : null}
           </div>
         </div>
 

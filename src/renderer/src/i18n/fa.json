@@ -142,6 +142,8 @@
     "approvalRememberCommand": "این دستور را به خاطر بسپار",
     "approvalRememberTool": "همه دستورهای این ابزار را به خاطر بسپار",
     "approvalApproveAll": "تأیید همه (این نشست)",
+    "approvalRememberScope": "تأییدهای به‌خاطرسپرده فقط برای همین VPS و پروژه اعمال می‌شوند و پس از ۳۰ دقیقه منقضی می‌شوند.",
+    "approvalCannotRemember": "این ابزار قابل به‌خاطرسپاری نیست. هر فراخوانی نیاز به تأیید شما دارد.",
     "showMoreFiles": "نمایش {{count}} فایل بیشتر",
     "reviewIndividually": "بررسی تک‌تک",
     "applyChangesConfirm": "{{count}} تغییر فایل در پروژه اعمال شود؟",

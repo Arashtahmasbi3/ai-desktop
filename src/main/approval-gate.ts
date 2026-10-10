@@ -2,6 +2,7 @@ import type { ApprovalMode, ApprovalOutcome, ApprovalRememberScope } from '@shar
 import type { AgentAction } from '@shared/agent'
 import { isDenyListedAction, requiresApproval } from '@core/agent/approval'
 import type { ApprovedCommands } from '@core/agent/approved-commands'
+import { canRememberTool, createRememberedApproval } from '@core/agent/remember-policy'
 
 export interface ApprovalGateOptions {
   mode: ApprovalMode
@@ -9,6 +10,13 @@ export interface ApprovalGateOptions {
   approvedCommands?: ApprovedCommands
   /** Session id used for session-scoped learned approvals. */
   sessionId?: string
+  /**
+   * Scope remembered approvals to this VPS + project (v2.5, P0-3). When both are
+   * set, a remember choice stores a scoped approval with a 30-minute TTL instead
+   * of a permanent global one; a match on VPS *and* project is then required.
+   */
+  vpsId?: string
+  projectId?: string
   /** Ask the user to approve a tool call. */
   requestApproval: (action: AgentAction) => Promise<ApprovalOutcome>
   /** Persist a remember choice. Defaults to writing to `approvedCommands`. */
@@ -25,7 +33,9 @@ const DEFAULT_SUGGESTION_AT = 3
  * Builds the per-run approval gate: returns true when an action may run, asking
  * the user only when the mode (or a deny-listed command) requires it. Learned
  * approvals short-circuit the prompt, except for deny-listed commands which are
- * always re-confirmed and never persisted.
+ * always re-confirmed and never persisted. Only read-only tools may be
+ * remembered, and (when a scope is supplied) only for the same VPS + project
+ * within the TTL (v2.5, P0-3).
  */
 export function createApprovalGate(
   options: ApprovalGateOptions
@@ -34,18 +44,30 @@ export function createApprovalGate(
   const sessionId = options.sessionId
   const suggestionAt = options.suggestionAt ?? DEFAULT_SUGGESTION_AT
   const counts = new Map<string, number>()
+  const scope =
+    options.vpsId !== undefined && options.projectId !== undefined
+      ? { vpsId: options.vpsId, projectId: options.projectId }
+      : undefined
 
   const remember = async (
     action: AgentAction,
-    scope: ApprovalRememberScope
+    rememberScope: ApprovalRememberScope
   ): Promise<void> => {
+    // Sensitive tools (shell, writes, migrations, ...) can never be remembered.
+    if (!canRememberTool(action.name)) return
     if (options.recordRemember) {
-      await options.recordRemember(action, scope)
+      await options.recordRemember(action, rememberScope)
       return
     }
-    if (scope === 'action') await approvedCommands?.rememberAction(action.name, action.arguments)
-    else if (scope === 'tool') await approvedCommands?.rememberTool(action.name)
-    else if (scope === 'session' && sessionId) {
+    if (scope) {
+      await approvedCommands?.rememberScoped(
+        createRememberedApproval(action.name, scope.vpsId, scope.projectId)
+      )
+      return
+    }
+    if (rememberScope === 'action') await approvedCommands?.rememberAction(action.name, action.arguments)
+    else if (rememberScope === 'tool') await approvedCommands?.rememberTool(action.name)
+    else if (rememberScope === 'session' && sessionId) {
       await approvedCommands?.rememberSession(sessionId, action.name)
     }
   }
@@ -53,7 +75,9 @@ export function createApprovalGate(
   return async (action: AgentAction): Promise<boolean> => {
     const denyListed = isDenyListedAction(action)
     if (!denyListed) {
-      if (approvedCommands?.isApproved(action.name, action.arguments, sessionId)) return true
+      if (approvedCommands?.isApproved(action.name, action.arguments, sessionId, scope)) {
+        return true
+      }
       if (!requiresApproval(options.mode, action)) return true
     }
 
@@ -66,7 +90,8 @@ export function createApprovalGate(
     counts.set(action.name, count)
     if (
       count === suggestionAt &&
-      !approvedCommands?.isApproved(action.name, action.arguments, sessionId)
+      canRememberTool(action.name) &&
+      !approvedCommands?.isApproved(action.name, action.arguments, sessionId, scope)
     ) {
       options.onSuggestion?.(action.name, count)
     }

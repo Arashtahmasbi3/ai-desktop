@@ -42,11 +42,12 @@ describe('remote_shell tool injection', () => {
     expect(runtime.extraTools).toBeUndefined()
   })
 
-  it('injects remote_shell when the task mentions a VPS and one is connected', () => {
+  it('does NOT auto-select the first connected VPS when the task only mentions one (P0-4)', () => {
     const runtime = planRemoteRuntime('restart nginx on my vps', undefined, fakeHost(['srv-1']))
-    expect(runtime.extraTools?.map((tool) => tool.name)).toContain(REMOTE_SHELL_TOOL.name)
-    expect(runtime.extraExecutor).toBeDefined()
-    expect(runtime.systemHint).toContain('srv-1')
+    // A keyword in the prompt must never bind a side-effecting run to a host.
+    expect(runtime.extraTools).toBeUndefined()
+    expect(runtime.extraExecutor).toBeUndefined()
+    expect(runtime.systemHint).toMatch(/choose a VPS/i)
   })
 
   it('injects remote_shell when the user explicitly selects a connected VPS', () => {
@@ -60,10 +61,29 @@ describe('remote_shell tool injection', () => {
     expect(runtime.extraTools).toBeUndefined()
   })
 
-  it('adds a helpful hint (no tool) when a VPS is requested but none is connected', () => {
+  it('adds a helpful hint (no tool) when a VPS is requested but none is selected', () => {
     const runtime = planRemoteRuntime('check my vps uptime', undefined, fakeHost([]))
     expect(runtime.extraTools).toBeUndefined()
-    expect(runtime.systemHint).toMatch(/Settings/i)
+    expect(runtime.systemHint).toMatch(/choose a VPS/i)
+  })
+
+  it('does not auto-select even with several connected VPS hosts', () => {
+    const runtime = planRemoteRuntime(
+      'deploy to the server',
+      undefined,
+      fakeHost(['srv-1', 'srv-2', 'srv-3'])
+    )
+    expect(runtime.extraTools).toBeUndefined()
+    expect(runtime.extraExecutor).toBeUndefined()
+  })
+
+  it('hints (no auto-select) when a VPS-only tool group is enabled but nothing is selected', () => {
+    const runtime = planRemoteRuntime('do the thing', undefined, fakeHost(['srv-1']), undefined, [
+      'worktree_create',
+      'migrate_database'
+    ])
+    expect(runtime.extraTools).toBeUndefined()
+    expect(runtime.systemHint).toMatch(/choose a VPS/i)
   })
 
   it('adds the remote-fs tools when the host exposes SFTP', () => {

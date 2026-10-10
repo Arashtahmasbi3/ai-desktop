@@ -142,6 +142,8 @@
     "approvalRememberCommand": "Remember this command",
     "approvalRememberTool": "Remember all commands from this tool",
     "approvalApproveAll": "Approve all (this session)",
+    "approvalRememberScope": "Remembered approvals apply only to this VPS + project and expire after 30 minutes.",
+    "approvalCannotRemember": "This tool cannot be remembered. Every call requires your approval.",
     "showMoreFiles": "Show {{count}} more files",
     "reviewIndividually": "Review individually",
     "applyChangesConfirm": "Apply {{count}} file change(s) to your project?",

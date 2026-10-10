@@ -9,6 +9,7 @@
  *
  * The logic is a pure function so it can be unit-tested without SSH or an LLM.
  */
+import { enforceCommandPaths, enforceProjectPath } from '@core/remote/path-guard'
 
 /** Local tool name → remote tool name. */
 export const LOCAL_TO_REMOTE_TOOL: Readonly<Record<string, string>> = {
@@ -84,31 +85,55 @@ export function routeToolCall(
 
   const root = context.remotePath ?? '.'
   const server: Record<string, unknown> = { server_id: context.serverId }
+
+  // Every path the model hands us is rebased onto the remote root and then
+  // proven to stay inside it (P0-2). An absolute path that escapes the project
+  // is refused instead of being forwarded to the executor.
+  const guarded = (input: unknown): RoutingDecision | string => {
+    const resolved = resolveRemotePath(root, input)
+    // Without a known remote root there is nothing to contain the path to.
+    if (context.remotePath === undefined) return resolved
+    const guard = enforceProjectPath(resolved, root)
+    return guard.ok ? guard.resolvedPath! : { kind: 'error', message: guard.error! }
+  }
+
+  const guardedCommand = (command: unknown): RoutingDecision | undefined => {
+    if (context.remotePath === undefined) return undefined
+    const guard = enforceCommandPaths(typeof command === 'string' ? command : '', context.remotePath)
+    return guard.ok
+      ? undefined
+      : { kind: 'error', message: `Command references a path outside the project: ${guard.error}` }
+  }
+
   let remoteArgs: Record<string, unknown>
 
   switch (toolName) {
     case 'read_file':
     case 'list_dir':
-    case 'exists':
-      remoteArgs = { ...server, path: resolveRemotePath(root, args.path) }
+    case 'exists': {
+      const path = guarded(args.path)
+      if (typeof path !== 'string') return path
+      remoteArgs = { ...server, path }
       break
-    case 'write_file':
-      remoteArgs = {
-        ...server,
-        path: resolveRemotePath(root, args.path),
-        content: args.content
-      }
+    }
+    case 'write_file': {
+      const path = guarded(args.path)
+      if (typeof path !== 'string') return path
+      remoteArgs = { ...server, path, content: args.content }
       break
-    case 'grep':
-      remoteArgs = {
-        ...server,
-        pattern: args.pattern,
-        path: resolveRemotePath(root, args.path)
-      }
+    }
+    case 'grep': {
+      const path = guarded(args.path)
+      if (typeof path !== 'string') return path
+      remoteArgs = { ...server, pattern: args.pattern, path }
       break
-    case 'run_command':
+    }
+    case 'run_command': {
+      const denied = guardedCommand(args.command)
+      if (denied) return denied
       remoteArgs = { ...server, command: args.command }
       break
+    }
     default:
       return { kind: 'passthrough' }
   }

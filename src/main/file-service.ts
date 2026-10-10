@@ -43,15 +43,32 @@ export class FileService {
     return this.root
   }
 
-  /** Resolve a project-relative path, rejecting anything outside the root. */
-  resolveSafe(relativePath: string): string {
-    const root = this.requireRoot()
+  /** Resolve a project-relative path against an explicit root, rejecting escapes. */
+  resolveSafeAt(root: string, relativePath: string): string {
+    const base = resolve(root)
     const cleaned = relativePath.replace(/\\/g, '/').replace(/^\/+/, '')
-    const target = resolve(root, cleaned)
-    if (target !== root && !target.startsWith(root + sep)) {
+    const target = resolve(base, cleaned)
+    if (target !== base && !target.startsWith(base + sep)) {
       throw new Error(`Path escapes the project root: ${relativePath}`)
     }
     return target
+  }
+
+  /** Resolve a project-relative path, rejecting anything outside the root. */
+  resolveSafe(relativePath: string): string {
+    return this.resolveSafeAt(this.requireRoot(), relativePath)
+  }
+
+  /** Read a path under an explicit root (used to verify a run's own project). */
+  async readAt(root: string, relativePath: string): Promise<string> {
+    return fs.readFile(this.resolveSafeAt(root, relativePath), 'utf8')
+  }
+
+  /** Write a path under an explicit root (used to apply a run's own project). */
+  async writeAt(root: string, relativePath: string, content: string): Promise<void> {
+    const target = this.resolveSafeAt(root, relativePath)
+    await fs.mkdir(dirname(target), { recursive: true })
+    await fs.writeFile(target, content, 'utf8')
   }
 
   private toRelative(absolute: string): string {
