@@ -79,3 +79,20 @@ export function buildInstallCommands(recipe: InstallRecipe): string[] {
 export function requiresElevatedApproval(recipe: InstallRecipe): boolean {
   return recipe.requiresSudo
 }
+
+/**
+ * The security gate for installs (v2.3.3, D.2). Throws unless the user approved
+ * and, for a sudo recipe, also confirmed elevation. Kept pure so the guard is
+ * testable without an SSH session — `runInstallRecipe` calls it before any exec.
+ */
+export function assertInstallAllowed(
+  recipe: InstallRecipe | undefined,
+  approved: boolean,
+  elevated: boolean
+): asserts recipe is InstallRecipe {
+  if (!recipe) throw new Error('No installation recipe selected')
+  if (!approved) throw new Error('Installation requires explicit approval')
+  if (recipe.requiresSudo && !elevated) {
+    throw new Error('This installation requires root (sudo) confirmation')
+  }
+}

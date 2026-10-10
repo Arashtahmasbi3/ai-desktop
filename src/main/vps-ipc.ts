@@ -10,7 +10,8 @@ import { detectWorkspace } from '@core/remote/workspace-detect'
 import { parseRemoteGitStatus, type RemoteGitStatus } from '@core/remote/git-status'
 import { getSystemHealth } from '@core/remote/system-health'
 import { buildGitSetupCommands, type GitSetupOptions } from '@core/remote/git-setup'
-import { buildInstallCommands, getInstallRecipe } from '@core/agent/install-recipes'
+import { assertInstallAllowed, buildInstallCommands, getInstallRecipe } from '@core/agent/install-recipes'
+import { runRemoteCommands } from '@core/remote/run-commands'
 import type { AppServices } from './app-services'
 
 /** POSIX single-quote a value so it can be safely embedded in a shell command. */
@@ -108,17 +109,7 @@ async function applyRemoteGitSetup(
   options: GitSetupOptions
 ): Promise<{ ran: string[]; output: string }> {
   const commands = buildGitSetupCommands(path, options)
-  const ran: string[] = []
-  const output: string[] = []
-  for (const command of commands) {
-    const result = await services.vps.exec(serverId, command)
-    if (result.blocked) throw new Error(result.reason ?? 'Blocked by policy')
-    ran.push(command)
-    const text = `${result.stdout}${result.stderr}`.trim()
-    if (text) output.push(text)
-    if (!result.ok) throw new Error(`Command failed: ${command}\n${text}`)
-  }
-  return { ran, output: output.join('\n') }
+  return runRemoteCommands((command) => services.vps.exec(serverId, command), commands)
 }
 
 /**
@@ -133,25 +124,14 @@ async function runInstallRecipe(
   elevated: boolean
 ): Promise<{ ran: string[]; output: string }> {
   const recipe = getInstallRecipe(tool)
-  if (!recipe) throw new Error(`No installation recipe for "${tool}"`)
-  if (!approved) throw new Error('Installation requires explicit approval')
-  if (recipe.requiresSudo && !elevated) {
-    throw new Error('This installation requires root (sudo) confirmation')
-  }
-  const commands = buildInstallCommands(recipe)
-  const ran: string[] = []
-  const output: string[] = []
-  for (const command of commands) {
-    const result = await services.vps.exec(serverId, command)
-    if (result.blocked) throw new Error(result.reason ?? 'Blocked by policy')
-    ran.push(command)
-    const text = `${result.stdout}${result.stderr}`.trim()
-    if (text) output.push(text)
-    if (!result.ok) throw new Error(`Command failed: ${command}\n${text}`)
-  }
+  assertInstallAllowed(recipe, approved, elevated)
+  const outcome = await runRemoteCommands(
+    (command) => services.vps.exec(serverId, command),
+    buildInstallCommands(recipe)
+  )
   const verify = await services.vps.exec(serverId, recipe.verify)
-  output.push(`${verify.stdout}${verify.stderr}`.trim())
-  return { ran, output: output.filter(Boolean).join('\n') }
+  const verifyText = `${verify.stdout}${verify.stderr}`.trim()
+  return { ...outcome, output: [outcome.output, verifyText].filter(Boolean).join('\n') }
 }
 
 /**
