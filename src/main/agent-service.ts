@@ -37,6 +37,8 @@ import type { ApprovalOutcome } from '@shared/approval'
 import type { ApprovedCommands } from '@core/agent/approved-commands'
 import type { Persistence } from '@core/agent/persistence'
 import type { SessionStore } from '@core/agent/session-store'
+import { RunStore } from '@core/agent/run-store'
+import type { RunFileIO } from '@core/agent/run-store'
 import type { SandboxManager } from '@shared/sandbox'
 import type { CustomProviderStore } from './custom-providers'
 import { loadProjectMemory } from './project-memory'
@@ -67,7 +69,7 @@ export interface RemoteServerResolver {
 
 export type RemoteHost = RemoteShellHost & Partial<RemoteFsHost> & Partial<RemoteServerResolver>
 /** Project-bound file access used to review and apply agent edits. */
-export interface ProjectFiles {
+export interface ProjectFiles extends RunFileIO {
   read(relativePath: string): Promise<string>
   write(relativePath: string, content: string): Promise<void>
 }
@@ -264,6 +266,8 @@ export interface AgentServiceOptions {
   approvedCommands?: ApprovedCommands
   /** Optional: enables chat review of agent edits (apply/reject). */
   files?: ProjectFiles
+  /** Tracks run -> project binding so stale patches cannot leak across projects. */
+  runStore?: RunStore
 }
 
 /** Which provider/model to put first for an agent run. */
@@ -308,6 +312,7 @@ export class AgentService {
   private readonly cancelPlans?: () => void
   private readonly approvedCommands?: ApprovedCommands
   private readonly files?: ProjectFiles
+  private readonly runStore: RunStore
   private readonly controllers = new Set<AbortController>()
   private readonly changes = new Map<string, FileChangeView>()
   private runCounter = 0
@@ -330,6 +335,7 @@ export class AgentService {
     this.cancelPlans = options.cancelPlans
     if (options.approvedCommands) this.approvedCommands = options.approvedCommands
     if (options.files) this.files = options.files
+    this.runStore = options.runStore ?? new RunStore()
   }
 
   isRunning(): boolean {
@@ -525,6 +531,16 @@ export class AgentService {
 
     const runId = `run-${++this.runCounter}`
     const settings = await this.persistence.load()
+    // Snapshot the project this run belongs to. Patches captured during the run
+    // are bound to it and can never be applied to another project (P0-1).
+    const activeProject = this.persistence.getActiveProject()
+    if (activeProject) {
+      this.runStore.createRun({
+        id: runId,
+        projectId: activeProject.id,
+        projectRoot: activeProject.path
+      })
+    }
     const approvalMode = settings.approvalMode ?? DEFAULT_APPROVAL_MODE
     const planMode = request.planMode ?? settings.planModeDefault ?? false
     const requestApproval = this.requestApproval
@@ -588,8 +604,10 @@ export class AgentService {
         model: providers[0].config.model,
         at: this.now()
       })
+      this.runStore.markCompleted(runId)
       return result
     } catch (error) {
+      this.runStore.markAborted(runId)
       const message = error instanceof Error ? error.message : String(error)
       this.emit({ type: 'error', runId, message })
       throw error
@@ -604,13 +622,32 @@ export class AgentService {
     this.cancelApprovals?.()
     this.cancelPlans?.()
   }
+  /** Root-scoped file IO for the run store, or undefined when files are disabled. */
+  private fileIO(): RunFileIO | undefined {
+    const files = this.files
+    if (!files) return undefined
+    return {
+      readAt: (root, path) => files.readAt(root, path),
+      writeAt: (root, path, content) => files.writeAt(root, path, content)
+    }
+  }
   /** Records an agent edit and surfaces it in the chat for review. */
   private captureChange(runId: string, sessionId: string | undefined, change: FileChange): void {
     const id = `change-${++this.changeCounter}`
+    const io = this.fileIO()
     void (async () => {
       let before = change.before
-      if (this.files) {
-        before = await this.files.read(change.path).catch(() => change.before)
+      if (io) {
+        // Read the file from the run's own root and remember its hash so apply
+        // can detect external edits (P0-1). A read failure means a new file.
+        before = (
+          await this.runStore.capturePatch({
+            runId,
+            path: change.path,
+            fallbackBefore: change.before,
+            io
+          })
+        ).before
       }
       const view: FileChangeView = {
         id,
@@ -624,15 +661,20 @@ export class AgentService {
       this.emit({ type: 'file:change', change: view, at: this.now() })
     })()
   }
-  /** Writes the agent's edit into the active project. */
+  /** Writes the agent's edit into the project the run belongs to. */
   async applyChange(id: string): Promise<boolean> {
     const change = this.changes.get(id)
     if (!change || !this.files) return false
-    try {
-      await this.files.write(change.path, change.after)
-    } catch {
-      return false
-    }
+    const io = this.fileIO()
+    if (!io) return false
+    const result = await this.runStore.applyPatch({
+      runId: change.runId,
+      activeProjectId: this.persistence.getActiveProject()?.id,
+      path: change.path,
+      content: change.after,
+      io
+    })
+    if (!result.ok) return false
     this.changes.delete(id)
     this.emit({ type: 'file:change:resolved', id, status: 'accepted', at: this.now() })
     return true
