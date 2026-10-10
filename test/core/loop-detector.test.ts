@@ -107,16 +107,80 @@ describe('LoopDetector — per-tool-call guard', () => {
     expect(detector.isStopped).toBe(false)
   })
 
-  it('8. different arguments, same tool name — still warns (fuzzy match)', () => {
+  it('8. different arguments, same tool name — NOT a loop (call identity)', () => {
     const detector = new LoopDetector()
-    call(detector, 'remote_shell', { command: 'ls -la' })
-    call(detector, 'remote_shell', { command: 'pwd' })
+    const first = call(detector, 'remote_shell', { command: 'ls -la' })
+    const second = call(detector, 'remote_shell', { command: 'pwd' })
     const third = call(detector, 'remote_shell', { command: 'whoami' })
+
+    expect(first.action).toBeUndefined()
+    expect(second.action).toBeUndefined()
+    expect(third.action).toBeUndefined()
+    expect(third.allow).toBe(true)
+    expect(third.count).toBe(1)
+    expect(detector.isStopped).toBe(false)
+    // And the exact-hash layer kept all three distinct.
+    expect(detector.toolCallHistory).toHaveLength(0) // nothing executed yet
+  })
+
+  it('9. a long script of distinct shell commands never stops', () => {
+    const detector = new LoopDetector()
+    const commands = ['pwd', 'ls', 'cat package.json', 'git status', 'npm test', 'whoami']
+    for (const command of commands) {
+      const decision = call(detector, 'remote_shell', { command })
+      expect(decision.allow).toBe(true)
+      expect(decision.action).toBeUndefined()
+      detector.afterToolCall('remote_shell', { ok: true })
+    }
+    expect(detector.isStopped).toBe(false)
+  })
+
+  it('10. the same command still warns and stops (genuine loop)', () => {
+    const detector = new LoopDetector()
+    const decisions = [1, 2, 3, 4, 5].map(() =>
+      call(detector, 'remote_shell', { command: 'git status' })
+    )
+    expect(decisions[2].action).toBe('warn')
+    expect(decisions[4].action).toBe('stop')
+    expect(decisions[4].count).toBe(5)
+  })
+
+  it('11. normalises insignificant whitespace in commands', () => {
+    const detector = new LoopDetector()
+    call(detector, 'run_command', { command: 'git status' })
+    call(detector, 'run_command', { command: 'git   status  ' })
+    const third = call(detector, 'run_command', { command: ' git  status' })
 
     expect(third.action).toBe('warn')
     expect(third.count).toBe(3)
-    // And the exact-hash layer kept all three distinct.
-    expect(detector.toolCallHistory).toHaveLength(0) // nothing executed yet
+  })
+
+  it('12. keys filesystem tools by normalised path', () => {
+    const detector = new LoopDetector()
+    call(detector, 'read_file', { path: 'src/app.ts' })
+    call(detector, 'read_file', { path: './src/app.ts/' })
+    const third = call(detector, 'read_file', { path: 'src/app.ts' })
+
+    expect(third.action).toBe('warn')
+    expect(third.count).toBe(3)
+
+    // A different path is a different call identity.
+    const other = call(detector, 'read_file', { path: 'src/other.ts' })
+    expect(other.action).toBeUndefined()
+    expect(other.count).toBe(1)
+  })
+
+  it('13. falls back to the full arguments for unclassified tools', () => {
+    const detector = new LoopDetector()
+    call(detector, 'custom_tool', { a: 1 })
+    call(detector, 'custom_tool', { a: 2 })
+    const same = call(detector, 'custom_tool', { a: 1 })
+    expect(same.count).toBe(2)
+    expect(same.action).toBeUndefined()
+
+    const third = call(detector, 'custom_tool', { a: 1 })
+    expect(third.count).toBe(3)
+    expect(third.action).toBe('warn')
   })
 
   it('records recent tool calls with timestamps for the STOP summary', () => {
