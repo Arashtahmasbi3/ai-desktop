@@ -48,6 +48,7 @@ import type {
   RemoteWorkspaceInfo
 } from '@shared/workspace-info'
 import type { SystemHealth } from '@shared/system-health'
+import type { Job } from '@shared/jobs'
 
 const invoke = <T>(channel: string, ...args: unknown[]): Promise<T> =>
   ipcRenderer.invoke(channel, ...args) as Promise<T>
@@ -234,6 +235,13 @@ export const api = {
 
   shell: {
     exec: (command: string): Promise<LocalShellResult> => invoke('shell:exec', command)
+  },
+
+  jobs: {
+    list: (): Promise<Job[]> => invoke('jobs:list'),
+    refresh: (): Promise<Job[]> => invoke('jobs:refresh'),
+    status: (id: string): Promise<Job | undefined> => invoke('jobs:status', id),
+    kill: (id: string): Promise<boolean> => invoke('jobs:kill', id)
   },
 
   search: {

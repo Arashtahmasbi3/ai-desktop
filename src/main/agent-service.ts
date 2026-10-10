@@ -16,7 +16,7 @@ import type { ProviderEntry } from '@core/agent-orchestrator'
 import type { ToolExecutor } from '@core/agent/tools'
 import { PROVIDERS, createAdapterForConfig } from '@core/llm-adapters/registry'
 import type { AuditEntry } from '@core/agent/audit-log'
-import { REMOTE_SHELL_TOOL } from '@core/tools/remote-shell-tool'
+import { REMOTE_SHELL_TOOL, type RemoteJobRunner } from '@core/tools/remote-shell-tool'
 import { RemoteShellToolExecutor } from '@core/tools/remote-shell-executor'
 import { REMOTE_FS_TOOLS, type RemoteFsDeps } from '@core/tools/remote-fs-tools'
 import { RemoteFsToolExecutor } from '@core/tools/remote-fs-executor'
@@ -116,7 +116,8 @@ export function activeRemoteProjectHint(
 export function planRemoteRuntime(
   task: string,
   vpsServerId: string | undefined,
-  vps: RemoteHost | undefined
+  vps: RemoteHost | undefined,
+  jobs?: RemoteJobRunner
 ): RemoteRuntime {
   if (!vps) return {}
   const connected = vps.connectedServers()
@@ -142,7 +143,8 @@ export function planRemoteRuntime(
   const shellExecutor = new RemoteShellToolExecutor(
     {
       exec: (serverId, command) => vps.exec(serverId, command),
-      connectedServers: () => vps.connectedServers()
+      connectedServers: () => vps.connectedServers(),
+      ...(jobs ? { jobs } : {})
     },
     target
   )
@@ -227,6 +229,8 @@ export interface AgentServiceOptions {
   customProviders?: CustomProviderStore
   /** Optional: enables the `remote_shell` / remote-fs tools against connected VPS servers. */
   vps?: RemoteHost
+  /** Optional: detaches long remote commands as tracked jobs (v2.4, A.1). */
+  jobs?: RemoteJobRunner
   /** Ask the user to approve a tool call (Approval Modes). Defaults to allow. */
   requestApproval?: (runId: string, action: AgentAction) => Promise<ApprovalOutcome>
   /** Deny any outstanding approval requests (e.g. the user aborted). */
@@ -272,6 +276,7 @@ export class AgentService {
   private readonly now: () => number
   private readonly customProviders?: CustomProviderStore
   private readonly vps?: RemoteHost
+  private readonly jobs?: RemoteJobRunner
   private readonly requestApproval?: (runId: string, action: AgentAction) => Promise<ApprovalOutcome>
   private readonly cancelApprovals?: () => void
   private readonly requestPlan?: (
@@ -297,6 +302,7 @@ export class AgentService {
     this.now = options.now ?? (() => Date.now())
     if (options.customProviders) this.customProviders = options.customProviders
     if (options.vps) this.vps = options.vps
+    if (options.jobs) this.jobs = options.jobs
     this.requestApproval = options.requestApproval
     this.cancelApprovals = options.cancelApprovals
     this.requestPlan = options.requestPlan
@@ -342,7 +348,7 @@ export class AgentService {
     if (hint) return { systemHint: hint, ...routing }
 
     const pinned = vpsServerId ?? (isRemote ? serverId : undefined)
-    const runtime = planRemoteRuntime(task, pinned, this.vps)
+    const runtime = planRemoteRuntime(task, pinned, this.vps, this.jobs)
     if (isRemote && connected && serverId && active?.path) {
       const remoteHint = remoteWorkspaceHint(serverId, active.path)
       runtime.systemHint = [runtime.systemHint, remoteHint].filter(Boolean).join(' ')

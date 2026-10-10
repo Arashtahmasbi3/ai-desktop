@@ -51,7 +51,7 @@ fails, a tool is missing, or the budget ran out — ask rather than guess).
 
 ## Status
 
-**v2.4 Sprint — Checklist reviewed. Rules acknowledged. Branch: feature/v2.4-full-compliance.** (2026-10-05)
+**v2.4 Sprint — in progress. A.1 (Job ID + long-running tasks) done: core JobManager (tmux/systemd-run/nohup), `shell:exec`-independent jobs IPC + `~/.ai-desktop/jobs.json` persistence, JobCard/JobsPanel UI. Branch: feature/v2.4-full-compliance.** (2026-10-05)
 
 - Reviewed [`DEVELOPMENT_CHECKLIST.md`](./DEVELOPMENT_CHECKLIST.md) sections 1–3 (pre-sprint:
   precise definition, ordered backlog, ready environment) plus the ten golden rules; rules
@@ -666,3 +666,5 @@ Autonomous decisions logged per the sprint's golden rule (`[AUTO-DECISION]`, no 
 - `[AUTO-DECISION]` **v2.3.3 B.1/B.2 — git setup & status.** `buildGitSetupCommands` is a pure planner (preview shown before anything runs); `.gitignore` is written via a heredoc (`cat > file << 'EOF'`), not a temp file, and the path is POSIX-quoted. `parseRemoteGitStatus` parses `--porcelain=v1 --branch` for the sidebar pill. Both keep `core` free of `node:child_process` so the renderer can reuse the formatters.
 - `[AUTO-DECISION]` **v2.3.3 C.1/C.2/C.3 — self-diagnosis + install assistant.** Health probes run in parallel over the injected `exec` and are parsed into a shared `SystemHealth`. Missing tools map to a declarative `InstallRecipe`; `assertInstallAllowed(recipe, approved, elevated)` is the single security gate (approval always required, sudo needs a second confirmation) and `runRemoteCommands` aborts at the first failure. The renderer only chooses options — every command runs in main through the guarded remote shell.
 - `[PATTERN]` **Pure core, injected boundaries.** Anything that both main and renderer need, or that must be tested without SSH/LLM, lives in `src/core/*` as a pure function over injected callbacks (`WorkspaceExec`, `exec`). `src/main/*` wires these to real `AppServices`; the renderer imports only the pure formatters/types. This kept v2.3.3's detection, parsing, health, recipes and command runners unit-testable end to end.
+
+- `[AUTO-DECISION]` **v2.4 A.1 — Job ID + long-running tasks.** `JobManager` (`src/core/agent/job-manager.ts`) classifies a command via `estimateDurationMs` (`@shared/jobs`) and, when it exceeds 60s, detaches it on the host under the strongest available supervisor (tmux -> systemd-run -> nohup), writing output/exit to `/tmp/<id>.log|.exit`. All SSH goes through an injected `exec`, and persistence through an injected `persist`, so `core` keeps no node imports and the renderer can typecheck it. `executeRemoteShell` gained an optional `jobs` runner; `AppServices` wires a real `JobManager` backed by `JobStore` (`~/.ai-desktop/jobs.json`), reloaded on boot. IPC: `jobs:list|refresh|status|kill`. UI: `JobCard` + self-polling `JobsPanel` mounted in `ChatPanel`.

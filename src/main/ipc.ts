@@ -259,6 +259,17 @@ export function registerIpc(
     ['agent:sessions', () => services.agent.listSessions()],
     ['agent:loadSession', (id: string) => services.agent.loadSession(id)],
 
+    ['jobs:list', () => services.jobs.listJobs()],
+    ['jobs:refresh', () => services.jobs.refreshAll()],
+    ['jobs:status', (id: string) => {
+      const job = services.jobs.getJob(id)
+      return job ? services.jobs.getJobStatus(job.vpsId, id) : undefined
+    }],
+    ['jobs:kill', (id: string) => {
+      const job = services.jobs.getJob(id)
+      return job ? services.jobs.killJob(job.vpsId, id) : false
+    }],
+
     ['worker:submit', (request: WorkerJobRequest) => services.worker.enqueue(request)],
     ['worker:cancel', (id: string) => services.worker.cancel(id)],
     ['worker:status', () => services.worker.getStatus()],

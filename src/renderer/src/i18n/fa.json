@@ -423,5 +423,15 @@
     "warningTooLong": "این طرح طولانی است ({{count}} مرحله). بهتر است تقسیم شود.",
     "warningLoop": "این طرح همان طرح قبلی است.",
     "warningEmpty": "این طرح هیچ مرحله‌ای ندارد."
+  },
+  "jobs": {
+    "panelTitle": "کارهای پسزمینه ({{count}})",
+    "cardTitle": "کار #{{id}} ({{status}})",
+    "startedAgo": "شروع {{time}} پیش",
+    "viewLog": "مشاهده لاگ",
+    "hideLog": "بستن لاگ",
+    "kill": "کشتن",
+    "noOutput": "(هنوز خروجیای نیست)",
+    "finishedToast": "کار #{{id}} {{status}}"
   }
 }

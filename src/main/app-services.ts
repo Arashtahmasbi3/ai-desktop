@@ -32,6 +32,8 @@ import type { GitHubService } from './github/service'
 import { SshManager } from './ssh/ssh-manager'
 import { Ssh2Backend } from './ssh/ssh2-backend'
 import type { VpsServerStore } from './ssh/server-store'
+import { JobManager } from '@core/agent/job-manager'
+import { createJobStore } from './job-store'
 
 export type EventSender = (channel: string, payload: unknown) => void
 
@@ -51,6 +53,8 @@ export interface AppServicesOptions {
   vps?: SshManager
   /** Optional injected VPS store (tests). */
   vpsServers?: VpsServerStore
+  /** Optional injected job manager (tests). */
+  jobs?: JobManager
 }
 
 /**
@@ -66,6 +70,7 @@ export class AppServices {
   readonly github: GitHubService
   readonly vpsServers: VpsServerStore
   readonly vps: SshManager
+  readonly jobs: JobManager
   readonly files = new FileService()
   readonly chats: ChatStore
   readonly sandbox: SandboxManager
@@ -77,6 +82,7 @@ export class AppServices {
   readonly remote: RemoteServer
 
   private sender?: EventSender
+  private readonly jobStore: ReturnType<typeof createJobStore>
 
   constructor(options: AppServicesOptions = {}) {
     this.sender = options.sender
@@ -101,6 +107,16 @@ export class AppServices {
       options.sandbox ??
       new SandboxManagerImpl({ baseDir: sandboxDir(this.dir) })
 
+    this.jobStore = createJobStore(this.dir)
+    this.jobs =
+      options.jobs ??
+      new JobManager({
+        exec: (serverId, command) => this.vps.exec(serverId, command),
+        persist: (jobs) => {
+          void this.jobStore.save(jobs).catch(() => undefined)
+        }
+      })
+
     this.approvals = new ApprovalBroker({
       emit: (event: AgentEvent) => this.emit('agent:event', event)
     })
@@ -116,6 +132,7 @@ export class AppServices {
       sessionStore: this.sessions,
       customProviders: this.customProviders,
       vps: this.vps,
+      jobs: this.jobs,
       requestApproval: async (runId, action) =>
         this.approvals.request(runId, action, await this.approvalContext()),
       cancelApprovals: () => this.approvals.cancelAll(),
@@ -168,6 +185,7 @@ export class AppServices {
     await this.onboarding.load()
     await this.github.load()
     await this.approvedCommands.load()
+    this.jobs.load(await this.jobStore.load())
     const project = this.persistence.getActiveProject()
     this.files.setRoot(project?.path)
     this.worker.start()

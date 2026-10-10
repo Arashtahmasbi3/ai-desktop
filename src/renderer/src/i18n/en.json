@@ -423,5 +423,15 @@
     "warningTooLong": "This plan is long ({{count}} steps). Consider splitting it.",
     "warningLoop": "This plan repeats the previous one.",
     "warningEmpty": "This plan has no steps."
+  },
+  "jobs": {
+    "panelTitle": "Background jobs ({{count}})",
+    "cardTitle": "Job #{{id}} ({{status}})",
+    "startedAgo": "started {{time}} ago",
+    "viewLog": "View log",
+    "hideLog": "Hide log",
+    "kill": "Kill",
+    "noOutput": "(no output yet)",
+    "finishedToast": "Job #{{id}} {{status}}"
   }
 }
