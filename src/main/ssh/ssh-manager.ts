@@ -3,6 +3,8 @@ import { AuditLog, type AuditEntry } from '@core/agent/audit-log'
 import { checkDenyList } from '@core/agent/deny-list'
 import { RateLimiter } from '@core/agent/rate-limiter'
 import { evaluateHostPolicy } from '@core/remote/host-policy'
+import { parseBackupPath, restoreCommandFor } from '@core/remote/backup'
+import { shellQuote } from '@core/tools/remote-fs-tools'
 import { getCommandTimeout } from '@core/tools/remote-shell-tool'
 import type { RemoteFileEntry, VpsConnectionState, VpsExecResult } from '@shared/vps'
 import { evaluateHostKey, fingerprintFromKey } from './host-key-verify'
@@ -374,6 +376,28 @@ export class SshManager {
     this.touch(serverId)
     await entry.connection.sftpWrite(path, content)
     await this.audit.record({ type: 'exec', ok: true, serverId, command: `sftp:write ${path}` })
+  }
+
+  /**
+   * Restore a `<path>.backup-<ts>` copy over its original file (v2.3.2, B.1).
+   * Only paths we recognise as backups are accepted.
+   */
+  async restoreBackup(serverId: string, backupPath: string): Promise<void> {
+    const parsed = parseBackupPath(backupPath)
+    if (!parsed) {
+      throw new Error('Not a recognised backup path')
+    }
+    const result = await this.exec(serverId, restoreCommandFor(backupPath, shellQuote)!)
+    if (!result.ok) {
+      throw new Error(result.stderr || result.reason || 'Restore failed')
+    }
+    await this.audit.record({
+      type: 'backup_restored',
+      ok: true,
+      serverId,
+      command: `fs:restore ${parsed.original}`,
+      detail: backupPath
+    })
   }
 
   /** Exposed for tests / a manual sweep; also driven by the watchdog timer. */

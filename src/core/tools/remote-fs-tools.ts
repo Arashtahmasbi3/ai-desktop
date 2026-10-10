@@ -2,6 +2,7 @@ import type { ToolDefinition } from '@shared/types'
 import type { RemoteFileEntry, VpsExecResult } from '@shared/vps'
 import { checkDenyList } from '@core/agent/deny-list'
 import type { AuditEntry } from '@core/agent/audit-log'
+import { backupPathFor } from '@core/remote/backup'
 
 /** POSIX single-quote a value so it can be safely embedded in a shell command. */
 export function shellQuote(value: string): string {
@@ -90,6 +91,8 @@ export interface RemoteFsDeps {
   exec(serverId: string, command: string): Promise<VpsExecResult>
   /** Records an fs operation in the SSH audit log (best-effort). */
   audit?(entry: Omit<AuditEntry, 'at'>): Promise<void>
+  /** Clock override for deterministic backup names in tests. */
+  now?: () => number
 }
 
 export interface RemoteFsResult {
@@ -121,6 +124,19 @@ function execOutput(result: VpsExecResult): string {
   if (result.blocked) return `Blocked by policy: ${result.reason ?? 'denied'}`
   if (result.rateLimited) return `Rate limited: ${result.reason ?? ''}`.trim()
   return [result.stdout, result.stderr].filter((part) => part.trim().length > 0).join('\n').trim()
+}
+
+/** Read a file if it exists, returning undefined when it does not. */
+async function readExisting(
+  deps: RemoteFsDeps,
+  serverId: string,
+  path: string
+): Promise<string | undefined> {
+  try {
+    return await deps.readFile(serverId, path)
+  } catch {
+    return undefined
+  }
 }
 
 /**
@@ -189,6 +205,27 @@ async function writeFile(
   if (!path || content === undefined) {
     return fail('remote_write_file requires "path" and "content"')
   }
+
+  // Back up an existing file before overwriting it so the change can be undone.
+  const existing = await readExisting(deps, serverId, path)
+  if (existing !== undefined) {
+    const backup = backupPathFor(path, deps.now?.() ?? Date.now())
+    const copy = await deps.exec(
+      serverId,
+      `cp -p -- ${shellQuote(path)} ${shellQuote(backup)}`
+    )
+    if (!copy.ok) {
+      return fail(`Could not back up ${path} before writing: ${execOutput(copy)}`)
+    }
+    await deps.audit?.({
+      type: 'backup_created',
+      ok: true,
+      serverId,
+      command: `fs:backup ${path}`,
+      detail: backup
+    })
+  }
+
   await deps.writeFile(serverId, path, content)
   await deps.audit?.({
     type: 'exec',

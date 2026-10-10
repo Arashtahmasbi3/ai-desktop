@@ -160,7 +160,9 @@ export const api = {
         invoke('vps:files:list', id, path),
       read: (id: string, path: string): Promise<string> => invoke('vps:files:read', id, path),
       write: (id: string, path: string, content: string): Promise<void> =>
-        invoke('vps:files:write', id, path, content)
+        invoke('vps:files:write', id, path, content),
+      restoreBackup: (id: string, backupPath: string): Promise<void> =>
+        invoke('vps:files:restoreBackup', id, backupPath)
     }
   },
 

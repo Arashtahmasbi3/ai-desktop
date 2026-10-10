@@ -94,6 +94,10 @@ export function registerVpsIpc(services: AppServices): () => void {
     [
       'vps:files:write',
       (id: string, path: string, content: string) => services.vps.writeFile(id, path, content)
+    ],
+    [
+      'vps:files:restoreBackup',
+      (id: string, backupPath: string) => services.vps.restoreBackup(id, backupPath)
     ]
   ]
 

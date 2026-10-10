@@ -129,6 +129,7 @@ export interface Api {
       list(id: string, path: string): Promise<RemoteFileEntry[]>
       read(id: string, path: string): Promise<string>
       write(id: string, path: string, content: string): Promise<void>
+      restoreBackup(id: string, backupPath: string): Promise<void>
     }
   }
   fs: {

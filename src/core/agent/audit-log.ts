@@ -9,6 +9,8 @@ export type AuditEventType =
   | 'blocked'
   | 'rate_limited'
   | 'host_key'
+  | 'backup_created'
+  | 'backup_restored'
 
 export interface AuditEntry {
   at: string
