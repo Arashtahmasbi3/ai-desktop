@@ -122,7 +122,9 @@ export function planRemoteRuntime(
   vpsServerId: string | undefined,
   vps: RemoteHost | undefined,
   jobs?: RemoteJobRunner,
-  enabledTools?: string[]
+  enabledTools?: string[],
+  /** Absolute root of the active remote project; enables path containment (P0-2). */
+  projectRoot?: string
 ): RemoteRuntime {
   if (!vps) return {}
   const connected = vps.connectedServers()
@@ -149,7 +151,8 @@ export function planRemoteRuntime(
     {
       exec: (serverId, command) => vps.exec(serverId, command),
       connectedServers: () => vps.connectedServers(),
-      ...(jobs ? { jobs } : {})
+      ...(jobs ? { jobs } : {}),
+      ...(projectRoot ? { projectRoot } : {})
     },
     target
   )
@@ -170,7 +173,8 @@ export function planRemoteRuntime(
       readFile: (serverId, path) => vps.readFile!(serverId, path),
       writeFile: (serverId, path, content) => vps.writeFile!(serverId, path, content),
       listFiles: (serverId, path) => vps.listFiles!(serverId, path),
-      exec: (serverId, command) => vps.exec(serverId, command)
+      exec: (serverId, command) => vps.exec(serverId, command),
+      ...(projectRoot ? { projectRoot } : {})
     }
     if (typeof vps.recordAudit === 'function') {
       fsDeps.audit = (entry) => vps.recordAudit!(entry).then(() => undefined)
@@ -376,7 +380,14 @@ export class AgentService {
     if (hint) return { systemHint: hint, ...routing }
 
     const pinned = vpsServerId ?? (isRemote ? serverId : undefined)
-    const runtime = planRemoteRuntime(task, pinned, this.vps, this.jobs, enabledTools)
+    const runtime = planRemoteRuntime(
+      task,
+      pinned,
+      this.vps,
+      this.jobs,
+      enabledTools,
+      isRemote ? active?.path : undefined
+    )
     if (isRemote && connected && serverId && active?.path) {
       const remoteHint = remoteWorkspaceHint(serverId, active.path)
       runtime.systemHint = [runtime.systemHint, remoteHint].filter(Boolean).join(' ')
