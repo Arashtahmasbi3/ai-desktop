@@ -1,4 +1,11 @@
-import type { AgentLogEntry, AgentStatus, LoopStopInfo, LoopWarning } from './agent'
+import type {
+  AgentLogEntry,
+  AgentStatus,
+  LoopStopInfo,
+  LoopWarning,
+  ToolErrorCode,
+  ToolRecoveryInfo
+} from './agent'
 import type { ChatMessage, ProviderId } from './types'
 import type { VpsConnectionState } from './vps'
 import type { ApprovalMode } from './approval'
@@ -159,8 +166,33 @@ export interface PlanRequest {
   warnings: PlanWarning[]
 }
 
+/**
+ * Structured detail of one executed tool call (v2.5.2). Built from
+ * {@link AgentToolResult}, redacted and length-capped before it leaves the main
+ * process, then streamed to the renderer as a `tool:result` event.
+ */
+export interface ToolResultView {
+  actionId: string
+  name: string
+  ok: boolean
+  code?: ToolErrorCode
+  /** Short technical cause when the call failed. */
+  error?: string
+  durationMs: number
+  attempts: number
+  command?: string
+  serverId?: string
+  cwd?: string
+  path?: string
+  stdout?: string
+  stderr?: string
+  exitCode?: number
+  recovery?: ToolRecoveryInfo
+}
+
 export type AgentEvent =
   | { type: 'run:start'; runId: string; task: string; at: number }
+  | { type: 'tool:result'; runId: string; result: ToolResultView; at: number }
   | {
       type: 'run:end'
       runId: string

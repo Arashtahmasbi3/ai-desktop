@@ -25,9 +25,12 @@ import type {
   LoopDetectionPolicy,
   LoopStopInfo,
   LoopWarning,
-  ProviderEntry
+  ProviderEntry,
+  ToolRecoveryInfo
 } from '@shared/agent'
 export type { ProviderEntry }
+import type { ToolResultView } from '@shared/ui'
+import { buildToolDetail, toolDetailLogFields } from './agent/tool-detail'
 import { sleep } from '@core/llm-adapters'
 import {
   ContextManager,
@@ -130,6 +133,12 @@ export interface AgentOrchestratorOptions {
    * contents, so callers can surface a reviewable diff.
    */
   onFileWritten?: (change: FileChange) => void
+  /**
+   * Called after every executed action with its redacted, length-capped detail
+   * (v2.5.2). Lets the caller stream a `tool:result` event to the renderer
+   * independently of the structured log.
+   */
+  onToolResult?: (result: ToolResultView) => void
   /**
    * Reliability preflight (v2.4, A.2). Consulted before each action runs; a result
    * with `ok: false` blocks the action and any warn/fail checks are logged.
@@ -309,6 +318,7 @@ export class AgentOrchestrator {
     args: Record<string, unknown>
   ) => RoutingDecision
   private readonly onFileWritten?: (change: FileChange) => void
+  private readonly onToolResult?: (result: ToolResultView) => void
   private readonly preflightGate?: (action: AgentAction) => Promise<PreflightResult | undefined>
   private readonly enforceSuccessVerification: boolean
   private readonly now: () => number
@@ -347,6 +357,7 @@ export class AgentOrchestrator {
     this.planApproval = options.planApproval
     this.toolRouting = options.toolRouting
     this.onFileWritten = options.onFileWritten
+    this.onToolResult = options.onToolResult
     this.preflightGate = options.preflightGate
     this.enforceSuccessVerification = options.enforceSuccessVerification ?? false
     this.now = options.now ?? (() => Date.now())
@@ -1083,7 +1094,8 @@ export class AgentOrchestrator {
               provider: entry.provider,
               attempt,
               delayMs: plan.delayMs,
-              detail: plan.guidance
+              detail: plan.guidance,
+              decision: 'retry'
             })
             await sleep(plan.delayMs, options.signal)
             continue
@@ -1096,7 +1108,8 @@ export class AgentOrchestrator {
         this.log('warn', 'recovery.provider_switch', runId, {
           step,
           from: entry.provider,
-          to: next.provider
+          to: next.provider,
+          decision: 'switch'
         })
       }
     }
@@ -1206,6 +1219,7 @@ export class AgentOrchestrator {
     options: AgentRunOptions
   ): Promise<AgentToolResult> {
     let attempt = 1
+    let retried = false
     let result = await executor.execute(action, {
       ...(options.signal ? { signal: options.signal } : {})
     })
@@ -1213,29 +1227,51 @@ export class AgentOrchestrator {
     while (!result.ok && !options.signal?.aborted) {
       const plan = this.recovery.planToolRetry(result.code, attempt)
       if (!plan.retry) break
+      retried = true
       this.log('warn', 'recovery.action_retry', runId, {
         step,
         tool: action.name,
         attempt,
         delayMs: plan.delayMs,
-        code: result.code
+        code: result.code,
+        decision: 'retry',
+        ...(plan.guidance ? { message: plan.guidance } : {})
       })
       await sleep(plan.delayMs, options.signal)
       attempt += 1
-      const retried = await executor.execute(action, {
+      const retriedResult = await executor.execute(action, {
         ...(options.signal ? { signal: options.signal } : {})
       })
-      retried.attempts = attempt
-      result = retried
+      retriedResult.attempts = attempt
+      result = retriedResult
     }
 
+    // v2.5.2: record what the run chose to do after a failure so the chat can
+    // explain it. Omitted for a clean first-try success.
+    const recovery: ToolRecoveryInfo | undefined = !result.ok
+      ? {
+          decision: retried ? 'retry' : 'stop',
+          attempts: attempt,
+          recovered: false,
+          ...(result.code ? { code: result.code } : {})
+        }
+      : attempt > 1
+        ? { decision: 'retry', attempts: attempt, recovered: true }
+        : undefined
+    if (recovery) result = { ...result, recovery }
+
+    const detail = buildToolDetail(result)
     this.log(result.ok ? 'info' : 'error', result.ok ? 'action.ok' : 'action.error', runId, {
       step,
       tool: action.name,
       code: result.code,
       attempts: result.attempts,
-      durationMs: result.durationMs
+      durationMs: result.durationMs,
+      // Short technical cause, so the existing `message`-based card keeps working.
+      ...(detail.error !== undefined ? { message: detail.error } : {}),
+      ...toolDetailLogFields(detail)
     })
+    this.onToolResult?.(detail)
     return result
   }
 
