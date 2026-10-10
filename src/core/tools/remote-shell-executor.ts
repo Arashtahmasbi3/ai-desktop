@@ -54,6 +54,12 @@ export class RemoteShellToolExecutor implements ToolExecutor {
                   ? ('blocked' as const)
                   : ('remote_error' as const)
             }),
+        // Structured detail for the UI (raw; redacted/capped before emit).
+        ...(result.command !== undefined ? { command: result.command } : {}),
+        ...(result.serverId !== undefined ? { serverId: result.serverId } : {}),
+        ...(result.stdout !== undefined ? { stdout: result.stdout } : {}),
+        ...(result.stderr !== undefined ? { stderr: result.stderr } : {}),
+        ...(result.exitCode !== undefined ? { exitCode: result.exitCode } : {}),
         durationMs: Date.now() - startedAt
       }
     } catch (error) {

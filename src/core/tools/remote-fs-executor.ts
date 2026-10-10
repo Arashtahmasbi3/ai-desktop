@@ -42,6 +42,9 @@ export class RemoteFsToolExecutor implements ToolExecutor {
 
     const args = { ...action.arguments }
     if (this.pinnedServerId) args.server_id = this.pinnedServerId
+    const serverId =
+      typeof args.server_id === 'string' && args.server_id ? args.server_id : undefined
+    const path = typeof args.path === 'string' && args.path ? args.path : undefined
 
     const result = await executeRemoteFs(this.deps, action.name, args)
     return {
@@ -51,6 +54,9 @@ export class RemoteFsToolExecutor implements ToolExecutor {
       ...(result.ok
         ? {}
         : { error: result.content, code: result.blocked ? ('blocked' as const) : ('remote_error' as const) }),
+      // Structured detail for the UI (target host + path).
+      ...(serverId ? { serverId } : {}),
+      ...(path ? { path } : {}),
       durationMs: Date.now() - startedAt
     }
   }

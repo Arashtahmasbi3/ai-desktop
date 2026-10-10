@@ -22,7 +22,25 @@ export interface AgentAction {
   signature: string
 }
 
-/** The outcome of executing a single action. */
+/** What the run chose to do after an action failed (v2.5.2). */
+export interface ToolRecoveryInfo {
+  /** `retry` — a transient failure was retried; `stop` — no retry was attempted. */
+  decision: 'retry' | 'stop'
+  /** Total attempts used (1 = the first try, so `stop`). */
+  attempts: number
+  /** True when a retry turned the failure into a success. */
+  recovered: boolean
+  /** Final machine code when the action was still failing. */
+  code?: ToolErrorCode
+}
+
+/**
+ * The outcome of executing a single action.
+ *
+ * v2.5.2: the structured fields below are optional so every existing executor
+ * and stored run stays valid (they simply omit them). They carry the raw detail
+ * of what ran so the chat can show it; `output` remains the model-facing text.
+ */
 export interface AgentToolResult {
   actionId: string
   name: string
@@ -34,6 +52,22 @@ export interface AgentToolResult {
   /** How many attempts were needed (1 = succeeded first try). */
   attempts: number
   durationMs: number
+  /** Shell command that ran (local sandbox or remote host). */
+  command?: string
+  /** Id of the connected VPS a remote action targeted. */
+  serverId?: string
+  /** Working directory / project root the action ran in. */
+  cwd?: string
+  /** File or directory the action touched. */
+  path?: string
+  /** Captured standard output (raw; redacted + capped before it reaches the UI). */
+  stdout?: string
+  /** Captured standard error (raw; redacted + capped before it reaches the UI). */
+  stderr?: string
+  /** Process exit code when the action ran a command. */
+  exitCode?: number
+  /** What the run did after a failure (retry / stop). */
+  recovery?: ToolRecoveryInfo
 }
 
 export type ToolErrorCode =
