@@ -23,6 +23,7 @@ import { RemoteFsToolExecutor } from '@core/tools/remote-fs-executor'
 import { MIGRATE_PROJECT_TOOL, type MigrateProjectDeps } from '@core/tools/migrate-project-tool'
 import { MigrateProjectToolExecutor } from '@core/tools/migrate-project-executor'
 import { CompositeToolExecutor, type ToolRoute } from '@core/tools/composite-executor'
+import { planV24Tools } from './v24-tools-wiring'
 import { routeToolCall, remoteWorkspaceHint } from '@core/agent/remote-routing'
 import type { RoutingDecision } from '@core/agent/remote-routing'
 import { detectWorkspace } from '@core/remote/workspace-detect'
@@ -118,7 +119,8 @@ export function planRemoteRuntime(
   task: string,
   vpsServerId: string | undefined,
   vps: RemoteHost | undefined,
-  jobs?: RemoteJobRunner
+  jobs?: RemoteJobRunner,
+  enabledTools?: string[]
 ): RemoteRuntime {
   if (!vps) return {}
   const connected = vps.connectedServers()
@@ -204,6 +206,24 @@ export function planRemoteRuntime(
       ` You can also call "migrate_project" to copy a project directory from a connected ` +
       'source VPS to another saved VPS with rsync over SSH.'
   }
+
+  // v2.4.1: database/docker migration, project scaffold, per-project user and worktrees.
+  const v24 = planV24Tools(
+    {
+      connectedServers: () => vps.connectedServers(),
+      exec: (serverId, command) => vps.exec(serverId, command),
+      ...(typeof vps.resolveServer === 'function'
+        ? { resolveServer: (id: string) => vps.resolveServer!(id) }
+        : {}),
+      ...(typeof vps.recordAudit === 'function'
+        ? { recordAudit: (entry: Omit<AuditEntry, 'at'>) => vps.recordAudit!(entry) }
+        : {})
+    },
+    enabledTools
+  )
+  extraTools.push(...v24.extraTools)
+  routes.push(...v24.routes)
+  if (v24.hint) hint += ` ${v24.hint}`
 
   const executor: ToolExecutor =
     routes.length === 1 ? shellExecutor : new CompositeToolExecutor(routes)
@@ -322,7 +342,8 @@ export class AgentService {
    */
   private async buildRemoteRuntime(
     task: string,
-    vpsServerId?: string
+    vpsServerId?: string,
+    enabledTools?: string[]
   ): Promise<RemoteRuntime> {
     const settings = await this.persistence.load()
     const active = settings.projects.find((project) => project.id === settings.activeProjectId)
@@ -349,7 +370,7 @@ export class AgentService {
     if (hint) return { systemHint: hint, ...routing }
 
     const pinned = vpsServerId ?? (isRemote ? serverId : undefined)
-    const runtime = planRemoteRuntime(task, pinned, this.vps, this.jobs)
+    const runtime = planRemoteRuntime(task, pinned, this.vps, this.jobs, enabledTools)
     if (isRemote && connected && serverId && active?.path) {
       const remoteHint = remoteWorkspaceHint(serverId, active.path)
       runtime.systemHint = [runtime.systemHint, remoteHint].filter(Boolean).join(' ')
@@ -498,7 +519,7 @@ export class AgentService {
       ...(request.model ? { model: request.model } : {}),
       ...(request.customProviderId ? { customProviderId: request.customProviderId } : {})
     })
-    const remote = await this.buildRemoteRuntime(request.task, request.vpsServerId)
+    const remote = await this.buildRemoteRuntime(request.task, request.vpsServerId, request.enabledTools)
     const memory = await this.projectMemoryHint()
     const systemHint = [remote.systemHint, memory].filter(Boolean).join('\n\n')
 

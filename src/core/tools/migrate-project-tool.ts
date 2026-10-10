@@ -145,6 +145,25 @@ function toInt(raw: string | undefined): number {
   return Number.isFinite(value) ? value : 0
 }
 
+/**
+ * rsync a single file from the source host (where this runs) to a saved target.
+ * Used by the v2.4.1 database/docker pipelines to move one dump/archive file.
+ */
+export function buildFileTransferCommand(
+  fromPath: string,
+  target: ServerConnection,
+  toPath: string
+): string {
+  const directory = toPath.replace(/[^/]+$/, '')
+  const ssh = `ssh -p ${target.port} -o BatchMode=yes -o StrictHostKeyChecking=accept-new`
+  const to = `${target.username}@${target.host}:${toPath}`
+  // Create the destination directory first so rsync does not fail on a missing dir.
+  return (
+    `mkdir -p ${shellQuote(directory)} && ` +
+    `rsync -az -e ${shellQuote(ssh)} ${shellQuote(fromPath)} ${shellQuote(to)}`
+  )
+}
+
 /** Parse the `--info=stats2` summary rsync prints (works for dry-run too). */
 export function parseRsyncStats(stdout: string): RsyncPlan {
   const match = (re: RegExp): string | undefined => re.exec(stdout)?.[1]

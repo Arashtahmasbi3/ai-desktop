@@ -12,6 +12,9 @@
  */
 
 import type { VpsExecResult } from '@shared/vps'
+import type { ToolDefinition } from '@shared/types'
+import type { AgentAction, AgentToolResult } from '@shared/agent'
+import type { ToolExecutor, ToolExecOptions } from '@core/agent/tools'
 import { shellQuote } from './remote-fs-tools'
 
 export type DbType = 'postgres' | 'mysql' | 'mongodb' | 'sqlite'
@@ -276,4 +279,121 @@ export async function migrateDatabase(
 
   await deps.audit?.({ ok: true, detail: `migrated ${plan.source} -> ${plan.target} (${type})` })
   return { ok: true, logs, plan }
+}
+
+// --- v2.4.1: agent-facing tool + executor --------------------------------
+
+export const dbMigrateTool: ToolDefinition = {
+  name: 'migrate_database',
+  description:
+    'Migrate a database from one VPS to another. Supports postgres, mysql, ' +
+    'mongodb and sqlite. Always dry-run first, then run again without dry_run ' +
+    'to execute (the target is backed up before the restore).',
+  parameters: {
+    type: 'object',
+    properties: {
+      source_vps_id: { type: 'string' },
+      source_db: {
+        type: 'object',
+        properties: {
+          type: { type: 'string', description: 'postgres | mysql | mongodb | sqlite' },
+          name: { type: 'string' },
+          user: { type: 'string' },
+          host: { type: 'string' },
+          port: { type: 'number' },
+          path: { type: 'string', description: 'SQLite file path' }
+        },
+        required: ['type', 'name']
+      },
+      target_vps_id: { type: 'string' },
+      target_db: {
+        type: 'object',
+        properties: {
+          type: { type: 'string' },
+          name: { type: 'string' },
+          user: { type: 'string' },
+          host: { type: 'string' },
+          port: { type: 'number' },
+          path: { type: 'string' }
+        },
+        required: ['type', 'name']
+      },
+      dry_run: { type: 'boolean' },
+      backup_target: { type: 'boolean' }
+    },
+    required: ['source_vps_id', 'source_db', 'target_vps_id', 'target_db'],
+    additionalProperties: false
+  }
+}
+
+function parseEndpoint(raw: unknown): DbEndpoint | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined
+  const obj = raw as Record<string, unknown>
+  const type = typeof obj.type === 'string' ? obj.type : undefined
+  const name = typeof obj.name === 'string' ? obj.name : undefined
+  if (!type || !name) return undefined
+  const endpoint: DbEndpoint = { type, name }
+  if (typeof obj.user === 'string') endpoint.user = obj.user
+  if (typeof obj.host === 'string') endpoint.host = obj.host
+  if (typeof obj.port === 'number') endpoint.port = obj.port
+  if (typeof obj.path === 'string') endpoint.path = obj.path
+  return endpoint
+}
+
+export function parseDbMigrateArgs(args: Record<string, unknown>): DbMigrateParams | string {
+  const sourceVpsId = typeof args.source_vps_id === 'string' ? args.source_vps_id.trim() : ''
+  const targetVpsId = typeof args.target_vps_id === 'string' ? args.target_vps_id.trim() : ''
+  const sourceDb = parseEndpoint(args.source_db)
+  const targetDb = parseEndpoint(args.target_db)
+  if (!sourceVpsId) return 'source_vps_id is required'
+  if (!targetVpsId) return 'target_vps_id is required'
+  if (!sourceDb) return 'source_db must have a type and name'
+  if (!targetDb) return 'target_db must have a type and name'
+  return {
+    sourceVpsId,
+    sourceDb,
+    targetVpsId,
+    targetDb,
+    ...(args.dry_run === true ? { dryRun: true } : {}),
+    ...(args.backup_target === false ? { backupTarget: false } : {})
+  }
+}
+
+/** Bridges the agent's `migrate_database` action to the migration pipeline. */
+export class DbMigrateToolExecutor implements ToolExecutor {
+  constructor(private readonly deps: DbMigrateDeps) {}
+
+  async execute(action: AgentAction, _options: ToolExecOptions = {}): Promise<AgentToolResult> {
+    const startedAt = Date.now()
+    const base = {
+      actionId: action.id,
+      name: action.name,
+      attempts: 1,
+      durationMs: Date.now() - startedAt
+    }
+    if (action.name !== dbMigrateTool.name) {
+      return { ...base, ok: false, output: '', error: `Unknown tool "${action.name}"`, code: 'unknown_tool' }
+    }
+    if (!action.valid) {
+      return {
+        ...base,
+        ok: false,
+        output: '',
+        error: 'migrate_database received malformed arguments',
+        code: 'invalid_arguments'
+      }
+    }
+    const parsed = parseDbMigrateArgs(action.arguments)
+    if (typeof parsed === 'string') {
+      return { ...base, ok: false, output: '', error: parsed, code: 'invalid_arguments' }
+    }
+    const result = await migrateDatabase(this.deps, parsed)
+    return {
+      ...base,
+      ok: result.ok,
+      output: result.logs.join('\n'),
+      ...(result.ok ? {} : { error: result.logs.join('\n'), code: 'remote_error' as const }),
+      durationMs: Date.now() - startedAt
+    }
+  }
 }

@@ -90,3 +90,28 @@ export async function createProjectUser(
 function first(result: VpsExecResult): string {
   return [result.stdout, result.stderr].filter((part) => part.trim().length > 0).join('\n').trim()
 }
+
+/** Remove a project's Linux user (and its home), with the same sudo gate. */
+export async function removeProjectUser(
+  deps: ProjectUserDeps,
+  serverId: string,
+  projectId: string
+): Promise<ProjectUserResult> {
+  const logs: string[] = []
+  const username = projectUsername(projectId)
+  if (!usernameIsSafe(username)) {
+    return { username, created: false, logs: [`Unsafe username: ${username}`], blocked: true }
+  }
+  if (deps.approveSudo) {
+    const approved = await deps.approveSudo(serverId, `userdel -r ${username}`)
+    if (!approved) return { username, created: false, logs: ['Sudo approval denied.'], blocked: true }
+  }
+  const result = await deps.exec(serverId, `sudo userdel -r ${shellQuote(username)}`)
+  if (!result.ok) {
+    return { username, created: false, logs: [`userdel failed: ${first(result)}`] }
+  }
+  logs.push(`Removed user ${username}`)
+  await deps.audit?.({ ok: true, detail: `removed project user ${username}` })
+  return { username, created: false, logs }
+}
+
