@@ -6,10 +6,14 @@ import type {
 } from '@shared/types'
 import type { OnboardingStatus } from '@shared/onboarding'
 import type { ApprovalMode, ApprovalHistoryEntry, ApprovalOutcome, ApprovedCommandView } from '@shared/approval'
+import type { PlanDecision } from '@shared/plan'
 import type { ChatSaveInput, ChatSummary, StoredChat } from '@shared/chat'
 import type {
   AuditEntryView,
+  HealthCheckConfig,
+  HealthCheckOutcome,
   RemoteFileEntry,
+  SshConfigHost,
   VpsConnectionState,
   VpsExecResult,
   VpsServerInput,
@@ -34,12 +38,14 @@ import type {
   LocalShellResult,
   RemoteStatus,
   SessionInfo,
+  ProjectRecord,
   SessionRecordView,
   SettingsView,
   WorkerJobRequest,
   WorkerJobView,
   WorkerStatus
 } from '@shared/ui'
+import type { ProjectMetadataPatch } from '@shared/project-metadata'
 
 /** Shape of the object exposed on `window.api` by the preload script. */
 export interface Api {
@@ -73,6 +79,8 @@ export interface Api {
   }
   projects: {
     open(id: string): Promise<SettingsView>
+    getMetadata(id: string): Promise<ProjectRecord | null>
+    updateMetadata(id: string, patch: ProjectMetadataPatch): Promise<SettingsView>
   }
   chats: {
     list(): Promise<ChatSummary[]>
@@ -118,6 +126,8 @@ export interface Api {
     approveFingerprint(id: string): Promise<VpsConnectionState>
     exec(id: string, command: string): Promise<VpsExecResult>
     audit(): Promise<AuditEntryView[]>
+    importSshConfig(): Promise<SshConfigHost[]>
+    healthCheck(id: string, config: HealthCheckConfig): Promise<HealthCheckOutcome>
     searchProject(id: string, name: string): Promise<string[]>
     listDirs(id: string, path: string): Promise<string[]>
     gitStatus(id: string, path: string): Promise<string>
@@ -128,6 +138,7 @@ export interface Api {
       list(id: string, path: string): Promise<RemoteFileEntry[]>
       read(id: string, path: string): Promise<string>
       write(id: string, path: string, content: string): Promise<void>
+      restoreBackup(id: string, backupPath: string): Promise<void>
     }
   }
   fs: {
@@ -142,6 +153,7 @@ export interface Api {
     run(request: AgentRunRequest): Promise<unknown>
     abort(): Promise<void>
     respondApproval(id: string, answer: boolean | ApprovalOutcome): Promise<boolean>
+    respondPlan(id: string, decision: PlanDecision): Promise<boolean>
     approvalHistory(): Promise<ApprovalHistoryEntry[]>
     approvedCommands(): Promise<ApprovedCommandView[]>
     revokeApprovedCommand(id: string): Promise<boolean>

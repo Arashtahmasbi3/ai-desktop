@@ -17,7 +17,11 @@ export const MIGRATE_PROJECT_TOOL: ToolDefinition = {
       source_vps_id: { type: 'string', description: 'Id of the source VPS (from the saved server list)' },
       source_path: { type: 'string', description: 'Absolute project path on the source VPS' },
       target_vps_id: { type: 'string', description: 'Id of the target VPS (from the saved server list)' },
-      target_path: { type: 'string', description: 'Absolute destination path on the target VPS' }
+      target_path: { type: 'string', description: 'Absolute destination path on the target VPS' },
+      dry_run: {
+        type: 'boolean',
+        description: 'Only report what would transfer; do not copy anything.'
+      }
     },
     required: ['source_vps_id', 'source_path', 'target_vps_id', 'target_path'],
     additionalProperties: false
@@ -44,6 +48,17 @@ export interface MigrateProjectResult {
   ok: boolean
   content: string
   blocked?: boolean
+  /** Present on `dry_run` when the preview was produced (v2.3.2, B.3). */
+  plan?: RsyncPlan
+}
+
+/** Dry-run summary shown to the user before a real rsync. */
+export interface RsyncPlan {
+  files: number
+  bytes: number
+  deletes: number
+  /** Itemised lines, when rsync emitted any. */
+  list: string[]
 }
 
 function fail(content: string, blocked = false): MigrateProjectResult {
@@ -106,14 +121,73 @@ const USERNAME_RE = /^[A-Za-z0-9._-]+$/
 export function buildRsyncCommand(
   sourcePath: string,
   target: ServerConnection,
-  targetPath: string
+  targetPath: string,
+  options: { dryRun?: boolean } = {}
 ): string {
   const from = `${sourcePath.replace(/\/+$/, '')}/`
   const to = `${target.username}@${target.host}:${targetPath.replace(/\/+$/, '')}/`
   // BatchMode=yes fails fast instead of hanging on a password prompt; the
   // source host is expected to authenticate to the target with a key/agent.
   const ssh = `ssh -p ${target.port} -o BatchMode=yes -o StrictHostKeyChecking=accept-new`
-  return `rsync -az --info=stats2 -e ${shellQuote(ssh)} ${shellQuote(from)} ${shellQuote(to)}`
+  // Never add `--delete`: migrations only add or update destination files.
+  const dryRun = options.dryRun ? '--dry-run ' : ''
+  return `rsync -az ${dryRun}--info=stats2 -e ${shellQuote(ssh)} ${shellQuote(from)} ${shellQuote(to)}`
+}
+
+function toInt(raw: string | undefined): number {
+  if (!raw) return 0
+  const value = Number(raw.replace(/[^0-9]/g, ''))
+  return Number.isFinite(value) ? value : 0
+}
+
+/** Parse the `--info=stats2` summary rsync prints (works for dry-run too). */
+export function parseRsyncStats(stdout: string): RsyncPlan {
+  const match = (re: RegExp): string | undefined => re.exec(stdout)?.[1]
+  const list = stdout
+    .split('\n')
+    .filter((line) => /^[<>ch.*][fdLDS]/.test(line.trim()))
+    .map((line) => line.trim())
+  return {
+    files: toInt(
+      match(/Number of regular files transferred:\s*([\d,]+)/) ??
+        match(/Number of files transferred:\s*([\d,]+)/)
+    ),
+    bytes: toInt(match(/Total transferred file size:\s*([\d,]+)/)),
+    deletes: toInt(match(/Number of deleted files:\s*([\d,]+)/)),
+    list
+  }
+}
+
+/** Human-readable byte size, e.g. `12.4 MB`. */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  const units = ['KB', 'MB', 'GB', 'TB']
+  let value = bytes / 1024
+  let unit = 0
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024
+    unit += 1
+  }
+  return `${value.toFixed(1)} ${units[unit]}`
+}
+
+/** The preview block surfaced to the user before a real migration. */
+export function formatMigrationPlan(
+  plan: RsyncPlan,
+  sourcePath: string,
+  target: ServerConnection,
+  targetPath: string
+): string {
+  const from = sourcePath.replace(/\/+$/, '')
+  const to = `${target.username}@${target.host}:${targetPath.replace(/\/+$/, '')}`
+  return [
+    'Migration dry-run:',
+    `Files to transfer: ${plan.files}`,
+    `Total size: ${formatBytes(plan.bytes)}`,
+    `Files to delete: ${plan.deletes} (--delete off)`,
+    `Source: ${from}/`,
+    `Target: ${to}/`
+  ].join('\n')
 }
 
 /**
@@ -158,6 +232,27 @@ export async function executeMigrateProject(
   }
 
   try {
+    // Step 1: dry-run so the user sees what would change before anything is copied.
+    const dryCommand = buildRsyncCommand(sourcePath, target, targetPath, { dryRun: true })
+    const dryRun = await deps.exec(sourceId, dryCommand)
+    if (dryRun.blocked) return fail(`Blocked by policy: ${dryRun.reason ?? 'denied'}`, true)
+    if (dryRun.rateLimited) return fail(`Rate limited: ${dryRun.reason ?? ''}`.trim())
+    if (!dryRun.ok) {
+      const dryOutput = [dryRun.stdout, dryRun.stderr]
+        .filter((part) => part.trim().length > 0)
+        .join('\n')
+        .trim()
+      return fail(`Dry-run failed: ${dryOutput || `rsync exited with code ${dryRun.exitCode}`}`)
+    }
+
+    const plan = parseRsyncStats(dryRun.stdout)
+    const preview = formatMigrationPlan(plan, sourcePath, target, targetPath)
+
+    if (args.dry_run === true) {
+      return { ok: true, content: preview, plan }
+    }
+
+    // Step 2: the real transfer (never `--delete`).
     const result = await deps.exec(sourceId, command)
     if (result.blocked) return fail(`Blocked by policy: ${result.reason ?? 'denied'}`, true)
     if (result.rateLimited) return fail(`Rate limited: ${result.reason ?? ''}`.trim())
@@ -166,17 +261,19 @@ export async function executeMigrateProject(
       ok: result.ok,
       serverId: sourceId,
       command: `migrate ${sourcePath} -> ${targetId}:${targetPath}`,
-      detail: `exit ${result.exitCode}`
+      detail: `exit ${result.exitCode}; ${plan.files} file(s), ${plan.deletes} delete(s)`
     })
     const output = [result.stdout, result.stderr].filter((part) => part.trim().length > 0).join('\n').trim()
     if (!result.ok) {
-      return fail(output || `rsync exited with code ${result.exitCode}`)
+      return fail(`${preview}\n\n${output || `rsync exited with code ${result.exitCode}`}`)
     }
     return {
       ok: true,
       content:
-        output ||
-        `Migrated ${sourcePath} to ${target.username}@${target.host}:${targetPath} (exit 0)`
+        `${preview}\n\n` +
+        (output ||
+          `Migrated ${sourcePath} to ${target.username}@${target.host}:${targetPath} (exit 0)`),
+      plan
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

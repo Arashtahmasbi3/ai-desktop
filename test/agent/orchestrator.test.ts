@@ -523,3 +523,109 @@ describe('createAdapterSummarizer', () => {
     expect(summary).toContain('compacted')
   })
 })
+
+describe('AgentOrchestrator Plan Mode gate (v2.3.2, A.5)', () => {
+  const writeAction = (): ReturnType<typeof toolCall> =>
+    toolCall('write_file', { path: 'plan.txt', content: 'from plan' })
+
+  it('shows a plan and executes it after approval', async () => {
+    const manager = createLocalManager(base)
+    const written: Array<{ path: string; after: string }> = []
+    const adapter = new ScriptedAdapter('deepseek', [
+      { toolCalls: [writeAction()] },
+      { content: 'Executed the plan.' }
+    ])
+    const plans: string[] = []
+    const orchestrator = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(adapter)],
+      planApproval: 'ask',
+      planGate: async (plan) => {
+        plans.push(plan.task)
+        return { type: 'approve' }
+      },
+      onFileWritten: (change) => written.push({ path: change.path, after: change.after })
+    })
+
+    const result = await orchestrator.run('write a file')
+
+    expect(plans).toEqual(['write a file'])
+    expect(result.status).toBe('completed')
+    expect(result.steps[0].observations[0]).toMatchObject({ ok: true })
+    expect(written).toEqual([{ path: 'plan.txt', after: 'from plan' }])
+    await manager.dispose()
+  })
+
+  it('stops without executing when the plan is cancelled', async () => {
+    const manager = createLocalManager(base)
+    const written: unknown[] = []
+    const adapter = new ScriptedAdapter('deepseek', [{ toolCalls: [writeAction()] }])
+    const orchestrator = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(adapter)],
+      planApproval: 'ask',
+      planGate: async () => ({ type: 'cancel' }),
+      onFileWritten: (change) => written.push(change)
+    })
+
+    const result = await orchestrator.run('write a file')
+
+    expect(result.status).toBe('needs_input')
+    expect(result.message).toMatch(/cancelled/i)
+    expect(adapter.calls).toHaveLength(1)
+    expect(written).toHaveLength(0)
+    await manager.dispose()
+  })
+
+  it('applies a modified plan before executing', async () => {
+    const manager = createLocalManager(base)
+    const written: Array<{ path: string; after: string }> = []
+    const adapter = new ScriptedAdapter('deepseek', [
+      { toolCalls: [writeAction()] },
+      { content: 'done' }
+    ])
+    const orchestrator = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(adapter)],
+      planApproval: 'auto-write',
+      planGate: async (plan) => ({
+        type: 'modify',
+        steps: plan.steps.map((step) => ({
+          ...step,
+          arguments: { path: 'edited.txt', content: 'edited' }
+        }))
+      }),
+      onFileWritten: (change) => written.push({ path: change.path, after: change.after })
+    })
+
+    await orchestrator.run('write a file')
+
+    expect(written).toEqual([{ path: 'edited.txt', after: 'edited' }])
+    await manager.dispose()
+  })
+
+  it('auto-approves in full access (no plan shown)', async () => {
+    const manager = createLocalManager(base)
+    let gateCalls = 0
+    const adapter = new ScriptedAdapter('deepseek', [
+      { toolCalls: [writeAction()] },
+      { content: 'done' }
+    ])
+    const orchestrator = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(adapter)],
+      planApproval: 'full',
+      planGate: async () => {
+        gateCalls++
+        return { type: 'approve' }
+      }
+    })
+
+    const result = await orchestrator.run('write a file')
+
+    expect(gateCalls).toBe(0)
+    expect(result.steps[0].observations[0]).toMatchObject({ ok: true })
+    await manager.dispose()
+  })
+})
+

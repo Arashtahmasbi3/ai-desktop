@@ -44,6 +44,17 @@ export default function VpsPanel(): JSX.Element {
     }
   }, [])
 
+  const restoreBackup = async (backupPath: string): Promise<void> => {
+    if (!activeId) return
+    setError(null)
+    try {
+      await window.api.vps.files.restoreBackup(activeId, backupPath)
+      await refreshAudit()
+    } catch (cause) {
+      setError(text(cause))
+    }
+  }
+
   useEffect(() => {
     void refresh()
     void refreshAudit()
@@ -243,9 +254,22 @@ export default function VpsPanel(): JSX.Element {
                       .map((entry, index) => (
                         <div
                           key={`${entry.at}-${index}`}
-                          className={entry.ok ? 'text-neutral-400' : 'text-red-400'}
+                          className={`flex items-center gap-2 ${
+                            entry.ok ? 'text-neutral-400' : 'text-red-400'
+                          }`}
                         >
-                          [{entry.at}] {entry.type} {entry.command ?? ''} {entry.detail ?? ''}
+                          <span className="min-w-0 flex-1 truncate">
+                            [{entry.at}] {entry.type} {entry.command ?? ''} {entry.detail ?? ''}
+                          </span>
+                          {entry.type === 'backup_created' && entry.detail ? (
+                            <button
+                              type="button"
+                              onClick={() => void restoreBackup(entry.detail as string)}
+                              className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] text-neutral-300 hover:bg-bg-tertiary"
+                            >
+                              Restore
+                            </button>
+                          ) : null}
                         </div>
                       ))
                   )}

@@ -39,8 +39,20 @@ import { ErrorRecovery, guidanceForToolError } from './agent/error-recovery'
 import { LoopDetector, type LoopCallDecision } from './agent/loop-detector'
 import { silentLogger } from './agent/logger'
 import { SESSION_SCHEMA_VERSION, type AgentSession, type SessionStore } from './agent/session-store'
-import { SANDBOX_TOOLS, SandboxToolExecutor, actionFromToolCall } from './agent/tools'
+import { SANDBOX_TOOLS, SandboxToolExecutor, actionFromToolCall, stableStringify } from './agent/tools'
 import { PLAN_MODE_HINT } from './agent/approval'
+import {
+  PLAN_SYSTEM_PROMPT,
+  applyModifications,
+  planFromActions,
+  shouldPlan,
+  validatePlan,
+  type Plan,
+  type PlanDecision,
+  type PlanWarning
+} from './agent/plan-mode'
+import type { ApprovalMode } from '@shared/approval'
+import type { RoutingDecision } from './agent/remote-routing'
 import type { ToolExecutor, ToolExecOptions } from './agent/tools'
 
 /** A file that an agent `write_file` action changed during a run. */
@@ -97,6 +109,20 @@ export interface AgentOrchestratorOptions {
    * (recorded as a `blocked` observation) without running it.
    */
   approvalGate?: (action: AgentAction) => Promise<boolean>
+  /**
+   * Plan Mode (v2.3.2, A.5). When present (and `planApproval` is not `full`),
+   * a batch containing mutating actions is offered as a plan and must be
+   * approved before anything runs. Full access and read-only batches skip it.
+   */
+  planGate?: (plan: Plan, warnings: PlanWarning[]) => Promise<PlanDecision>
+  /** Approval mode the plan gate reasons about. Absent ⇒ plan gate disabled. */
+  planApproval?: ApprovalMode
+  /**
+   * Remote-first routing (v2.3.2, A.1). Consulted before an action runs so local
+   * file/shell tools can be rewritten to their `remote_*` equivalents, or turned
+   * into a clear error, when the active project lives on a VPS.
+   */
+  toolRouting?: (toolName: string, args: Record<string, unknown>) => RoutingDecision
   /**
    * Called after a successful `write_file`, with the file's previous and new
    * contents, so callers can surface a reviewable diff.
@@ -264,6 +290,12 @@ export class AgentOrchestrator {
   private readonly sessionId?: string
   private readonly planMode: boolean
   private readonly approvalGate?: (action: AgentAction) => Promise<boolean>
+  private readonly planGate?: (plan: Plan, warnings: PlanWarning[]) => Promise<PlanDecision>
+  private readonly planApproval?: ApprovalMode
+  private readonly toolRouting?: (
+    toolName: string,
+    args: Record<string, unknown>
+  ) => RoutingDecision
   private readonly onFileWritten?: (change: FileChange) => void
   private readonly now: () => number
   private readonly runIdFactory: () => string
@@ -297,6 +329,9 @@ export class AgentOrchestrator {
     this.sessionId = options.sessionId
     this.planMode = options.planMode ?? false
     this.approvalGate = options.approvalGate
+    this.planGate = options.planGate
+    this.planApproval = options.planApproval
+    this.toolRouting = options.toolRouting
     this.onFileWritten = options.onFileWritten
     this.now = options.now ?? (() => Date.now())
     this.runCounter = 0
@@ -362,11 +397,19 @@ export class AgentOrchestrator {
     // Per-run state so sequential or concurrent `run()` calls never share loop state.
     const loopDetector = new LoopDetector(this.loopPolicy)
     const observedSignatures = new Set<string>()
+    // The last plan shown to the user, so a repeated plan can be flagged (A.5).
+    let lastPlan: Plan | undefined
+    const planHints = [this.systemHint]
+    if (this.planGate && this.planApproval && this.planApproval !== 'full') {
+      planHints.push(PLAN_SYSTEM_PROMPT)
+    }
     const context = new ContextManager({
       systemPrompt: buildSystemPrompt(
         provider,
         tools,
-        this.planMode ? [this.systemHint, PLAN_MODE_HINT].filter(Boolean).join('\n\n') : this.systemHint
+        this.planMode
+          ? [this.systemHint, PLAN_MODE_HINT].filter(Boolean).join('\n\n')
+          : planHints.filter(Boolean).join('\n\n')
       ),
       maxTokens: this.contextWindowTokens,
       compactionThreshold: this.compactionThreshold,
@@ -470,7 +513,7 @@ export class AgentOrchestrator {
         }
 
         // ---- Execution ----
-        const actions = toolCalls.map(actionFromToolCall)
+        let actions = toolCalls.map(actionFromToolCall)
         context.appendAssistant(assistantText, toolCalls)
         this.log('debug', 'step.execution', runId, {
           step: index,
@@ -486,8 +529,74 @@ export class AgentOrchestrator {
           'remote_read_file'
         ])
         let guardStop: LoopCallDecision | null = null
-        for (const action of actions) {
-          if (options.signal?.aborted) break
+        let planCancelled = false
+
+        // ---- Plan Mode gate (v2.3.2, A.5) ----
+        if (
+          this.planGate &&
+          this.planApproval !== undefined &&
+          shouldPlan(this.planApproval, actions)
+        ) {
+          const plan = planFromActions(task, actions, this.now())
+          const planWarnings = validatePlan(plan, lastPlan)
+          lastPlan = plan
+          this.log('debug', 'plan.requested', runId, {
+            step: index,
+            steps: plan.steps.length,
+            warnings: planWarnings.map((warning) => warning.code)
+          })
+          let decision: PlanDecision = { type: 'cancel' }
+          try {
+            decision = await this.planGate(plan, planWarnings)
+          } catch {
+            decision = { type: 'cancel' }
+          }
+          if (decision.type === 'modify') {
+            actions = applyModifications(actions, decision.steps)
+            this.log('debug', 'plan.modified', runId, { step: index })
+          } else if (decision.type === 'cancel') {
+            planCancelled = true
+            this.log('warn', 'plan.cancelled', runId, { step: index })
+            for (const action of actions) {
+              const blocked: AgentToolResult = {
+                actionId: action.id,
+                name: action.name,
+                ok: false,
+                output: '',
+                error: 'Plan cancelled by the user.',
+                code: 'blocked',
+                attempts: 1,
+                durationMs: 0
+              }
+              observations.push(blocked)
+              context.appendToolResult({
+                toolCallId: action.id,
+                name: action.name,
+                content: formatObservation(blocked)
+              })
+            }
+          } else {
+            this.log('debug', 'plan.approved', runId, { step: index })
+          }
+        }
+
+        for (let actionIndex = 0; actionIndex < actions.length; actionIndex++) {
+          if (options.signal?.aborted || planCancelled) break
+
+          // Remote-first routing: rewrite local tools to their remote_* form (or
+          // block with a clear message) before the action reaches an executor.
+          const routed = this.routeAction(actions[actionIndex])
+          if ('error' in routed) {
+            observations.push(routed.error)
+            context.appendToolResult({
+              toolCallId: actions[actionIndex].id,
+              name: actions[actionIndex].name,
+              content: formatObservation(routed.error)
+            })
+            continue
+          }
+          actions[actionIndex] = routed.action
+          const action = routed.action
 
           // Fuzzy loop guard: catch the same tool name repeated even when its
           // arguments change every call (e.g. remote_shell with new commands).
@@ -527,6 +636,13 @@ export class AgentOrchestrator {
             name: action.name,
             content: formatObservation(result)
           })
+        }
+
+        if (planCancelled) {
+          status = 'needs_input'
+          message = 'Plan cancelled by the user.'
+          finalAnswer = null
+          break
         }
 
         if (guardStop) {
@@ -849,6 +965,35 @@ export class AgentOrchestrator {
       }
     }
     throw lastError
+  }
+
+  /**
+   * Apply remote-first routing to a single action. Returns the (possibly
+   * rewritten) action, or a synthetic failed observation when routing refuses.
+   */
+  private routeAction(action: AgentAction): { action: AgentAction } | { error: AgentToolResult } {
+    if (!this.toolRouting || !action.valid) return { action }
+    const decision = this.toolRouting(action.name, action.arguments)
+    if (decision.kind === 'passthrough') return { action }
+    if (decision.kind === 'error') {
+      return {
+        error: {
+          actionId: action.id,
+          name: action.name,
+          ok: false,
+          output: '',
+          error: decision.message,
+          code: 'blocked',
+          attempts: 1,
+          durationMs: 0
+        }
+      }
+    }
+    const name = decision.tool
+    const args = decision.args
+    return {
+      action: { ...action, name, arguments: args, signature: `${name}:${stableStringify(args)}` }
+    }
   }
 
   /** Compose sandbox tools with any extra (e.g. remote) tool runtime. */

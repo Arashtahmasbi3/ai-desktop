@@ -7,6 +7,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.2] — 2026-10-05
+
+Sprint v2.3.2 "Remote-First Architecture & Security Alignment" — a remote-first
+agent that routes every tool to the VPS a project lives on, gates mutations behind
+an explicit plan, and hardens the host policy against traversal.
+
+### Added
+
+- **Remote-first file routing (A.1)** — when the active project is `remote`, local
+  file/shell tools are rewritten to their `remote_*` equivalents (relative paths are
+  rebased onto the remote project root and the server id is attached) before they
+  reach an executor. A remote project with no usable VPS yields a clear error instead
+  of silently touching the local machine.
+- **Context-aware host policy (A.3)** — a `HostPolicy` can carry `readOnlyCommands`
+  and `writeCommands`. Reads never need approval, writes are gated on `staging` and
+  blocked on `production`, and anything unrecognised stays fail-closed.
+- **Per-command timeouts (A.4)** — ordinary commands get 60s, builds/tests 5 minutes
+  and rsync/db dumps 30 minutes. A hung command is killed when its budget elapses
+  instead of freezing the app.
+- **Plan Mode (A.5)** — a batch containing mutating tool calls is offered as a short
+  plan that must be approved, modified or cancelled before anything runs. Full access
+  and read-only batches are exempt.
+- **Backups before remote writes (B.1)** — an existing file is copied to
+  `<path>.backup-<timestamp>` before it is overwritten, with a restore command, so a
+  bad agent write can always be undone.
+- **Post-deploy health checks (B.2)** — declarative process/port/HTTP/custom checks
+  run after a deploy and report the first failure.
+- **rsync dry-run preview (B.3)** — `migrate_project` always runs a `--dry-run` first
+  and shows files/bytes/deletes before the real transfer (never `--delete`).
+- **Context preview before send (B.4)** — a pre-send modal lists provider/model,
+  estimated tokens, included sections and always-withheld secret-looking files.
+- **`~/.ssh/config` import (B.5)** — import saved hosts (HostName/User/Port/IdentityFile
+  path only; key material is never read).
+- **Per-project metadata (C.1)** — projects carry environment, audit log path,
+  repository, docker-compose project, ports, domains, linux user, SSH key reference,
+  a policy override and a health-check config, edited from an expandable project card.
+- **Project isolation UI (C.2)** — sidebar rows show an environment dot
+  (🟢/🟡/🔴), a local/remote type badge, the VPS name or "local", the environment label
+  and a policy-mismatch warning; the approval dialog shows an amber "outside the
+  project policy" banner with **Proceed anyway** / **Cancel** before approving.
+
+### Security
+
+- **Path-traversal fix in `allowedPaths`.** `evaluateHostPolicy` now lexical-normalises
+  `.`/`..` before containment, so `/srv/app/../../etc/passwd` no longer passes a
+  `/srv/app` allow rule; a path that climbs above the root fails closed. Local
+  resolution (`normalizeSandboxPath`, `FileService.resolveSafe`) already rejected `..`.
+- **Policy Warning = blocked OR unknown.** A command is flagged before approval only
+  when the policy blocks it or does not recognise it; known writes go through normal
+  approval instead of the warning.
+- Deny-list matching normalises whitespace, so padded/tabbed `rm  -rf  /` variants are
+  still blocked; backgrounded commands cannot escape the per-command timeout.
+
+### Fixed
+
+- Sidebar project rows keep the connection dot while adding environment/type/scope
+  badges, and no longer truncate the project name behind the VPS label.
+
+### Tests
+
+- New: `test/e2e/v2.3.2-security.e2e.test.ts` (7 integration scenarios),
+  `test/security/v2.3.2.test.ts` (5 security scenarios),
+  `test/renderer/sidebar-projects.test.tsx`,
+  `test/renderer/chat-policy-warning.test.tsx`,
+  `test/renderer/settings-projects.test.tsx`.
+
 ## [2.3.1] - 2026-10-05
 
 Sprint v2.3.1 "Critical Fixes & Security Hardening" — a hardened agent loop,
@@ -275,4 +341,5 @@ First stable release. Ships as a Windows x64 NSIS installer and a portable execu
 - Optional code signing via `CSC_LINK` / `CSC_KEY_PASSWORD` (skipped safely when absent).
 
 [Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v1.0.0...HEAD
+[2.3.2]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.3.1...v2.3.2
 [1.0.0]: https://github.com/Arashtahmasbi3/ai-desktop/releases/tag/v1.0.0

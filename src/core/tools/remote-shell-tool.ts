@@ -19,14 +19,44 @@ export const REMOTE_SHELL_TOOL: ToolDefinition = {
 }
 
 export interface RemoteShellDeps {
-  exec(serverId: string, command: string): Promise<VpsExecResult>
+  exec(serverId: string, command: string, timeoutMs?: number): Promise<VpsExecResult>
   connectedServers(): string[]
+}
+
+/**
+ * Per-command timeouts (v2.3.2, A.4). A hung command must never freeze the app,
+ * but a build or a database migration legitimately takes minutes, so the budget
+ * is chosen from the command shape rather than a single global value.
+ */
+export const DEFAULT_TIMEOUT_MS = 60_000
+export const BUILD_TIMEOUT_MS = 300_000
+export const MIGRATION_TIMEOUT_MS = 1_800_000
+
+/** Pick the timeout for a remote command from what it is about to do. */
+export function getCommandTimeout(command: string): number {
+  if (/\b(npm|yarn|pnpm)\s+(run\s+)?(install|build|test)\b/.test(command)) return BUILD_TIMEOUT_MS
+  if (/\b(rsync|pg_dump|pg_restore|docker save|docker load)\b/.test(command)) {
+    return MIGRATION_TIMEOUT_MS
+  }
+  return DEFAULT_TIMEOUT_MS
 }
 
 export interface RemoteShellResult {
   ok: boolean
   content: string
   blocked?: boolean
+  timedOut?: boolean
+}
+
+/** Rejects its promise after `ms`, carrying the timeout marker. */
+function timeoutAfter(ms: number, command: string): Promise<never> {
+  return new Promise((_resolve, reject) => {
+    setTimeout(() => reject({ remoteTimeout: true, ms, command }), ms)
+  })
+}
+
+function isTimeout(error: unknown): error is { remoteTimeout: true; ms: number } {
+  return Boolean(error && typeof error === 'object' && 'remoteTimeout' in error)
 }
 
 /**
@@ -54,7 +84,24 @@ export async function executeRemoteShell(
   if (denial.blocked) {
     return { ok: false, blocked: true, content: `Blocked by policy: ${denial.reason}` }
   }
-  const result = await deps.exec(serverId, command)
+  const timeoutMs = getCommandTimeout(command)
+  let result: VpsExecResult
+  try {
+    result = await Promise.race([deps.exec(serverId, command, timeoutMs), timeoutAfter(timeoutMs, command)])
+  } catch (error) {
+    if (isTimeout(error)) {
+      return {
+        ok: false,
+        timedOut: true,
+        content: `Command timed out after ${error.ms}ms: ${command}`
+      }
+    }
+    const message = error instanceof Error ? error.message : String(error)
+    return { ok: false, content: `remote_shell failed: ${message}` }
+  }
+  if (result.timedOut) {
+    return { ok: false, timedOut: true, content: `Command timed out after ${timeoutMs}ms: ${command}` }
+  }
   if (result.blocked) {
     return { ok: false, blocked: true, content: `Blocked by policy: ${result.reason}` }
   }

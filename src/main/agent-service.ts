@@ -23,7 +23,10 @@ import { RemoteFsToolExecutor } from '@core/tools/remote-fs-executor'
 import { MIGRATE_PROJECT_TOOL, type MigrateProjectDeps } from '@core/tools/migrate-project-tool'
 import { MigrateProjectToolExecutor } from '@core/tools/migrate-project-executor'
 import { CompositeToolExecutor, type ToolRoute } from '@core/tools/composite-executor'
+import { routeToolCall, remoteWorkspaceHint } from '@core/agent/remote-routing'
+import type { RoutingDecision } from '@core/agent/remote-routing'
 import { DEFAULT_APPROVAL_MODE } from '@core/agent/approval'
+import type { Plan, PlanDecision, PlanWarning } from '@shared/plan'
 import { createApprovalGate } from './approval-gate'
 import type { ApprovalOutcome } from '@shared/approval'
 import type { ApprovedCommands } from '@core/agent/approved-commands'
@@ -71,6 +74,8 @@ interface RemoteRuntime {
   extraTools?: ToolDefinition[]
   extraExecutor?: ToolExecutor
   systemHint?: string
+  /** Remote-first routing for local file/shell tools (v2.3.2, A.1). */
+  toolRouting?: (toolName: string, args: Record<string, unknown>) => RoutingDecision
 }
 
 /**
@@ -223,6 +228,10 @@ export interface AgentServiceOptions {
   requestApproval?: (runId: string, action: AgentAction) => Promise<ApprovalOutcome>
   /** Deny any outstanding approval requests (e.g. the user aborted). */
   cancelApprovals?: () => void
+  /** Ask the user to approve a plan before mutating tool calls run (A.5). */
+  requestPlan?: (runId: string, plan: Plan, warnings: PlanWarning[]) => Promise<PlanDecision>
+  /** Cancel any outstanding plan requests (e.g. the user aborted). */
+  cancelPlans?: () => void
   /** Learned approvals that suppress future prompts (Sprint v2.3, B.3). */
   approvedCommands?: ApprovedCommands
   /** Optional: enables chat review of agent edits (apply/reject). */
@@ -262,6 +271,12 @@ export class AgentService {
   private readonly vps?: RemoteHost
   private readonly requestApproval?: (runId: string, action: AgentAction) => Promise<ApprovalOutcome>
   private readonly cancelApprovals?: () => void
+  private readonly requestPlan?: (
+    runId: string,
+    plan: Plan,
+    warnings: PlanWarning[]
+  ) => Promise<PlanDecision>
+  private readonly cancelPlans?: () => void
   private readonly approvedCommands?: ApprovedCommands
   private readonly files?: ProjectFiles
   private readonly controllers = new Set<AbortController>()
@@ -279,6 +294,8 @@ export class AgentService {
     if (options.vps) this.vps = options.vps
     this.requestApproval = options.requestApproval
     this.cancelApprovals = options.cancelApprovals
+    this.requestPlan = options.requestPlan
+    this.cancelPlans = options.cancelPlans
     if (options.approvedCommands) this.approvedCommands = options.approvedCommands
     if (options.files) this.files = options.files
   }
@@ -297,10 +314,35 @@ export class AgentService {
   ): Promise<RemoteRuntime> {
     const settings = await this.persistence.load()
     const active = settings.projects.find((project) => project.id === settings.activeProjectId)
-    const hint = activeRemoteProjectHint(active, this.vps ? this.vps.connectedServers() : [])
-    if (hint) return { systemHint: hint }
-    const pinned = vpsServerId ?? (active?.type === 'remote' ? active.vpsId : undefined)
-    return planRemoteRuntime(task, pinned, this.vps)
+    const connectedServers = this.vps ? this.vps.connectedServers() : []
+    const isRemote = active?.type === 'remote'
+    const serverId = active?.vpsId
+    const connected = Boolean(serverId && connectedServers.includes(serverId))
+
+    // A1: for a remote project, always install routing so a stray local tool call
+    // is rewritten (when the VPS is connected) or answered with a clear error.
+    const routing: RemoteRuntime = isRemote
+      ? {
+          toolRouting: (toolName, args) =>
+            routeToolCall(toolName, args, {
+              workspaceType: 'remote',
+              ...(serverId ? { serverId } : {}),
+              ...(active?.path ? { remotePath: active.path } : {}),
+              connected
+            })
+        }
+      : {}
+
+    const hint = activeRemoteProjectHint(active, connectedServers)
+    if (hint) return { systemHint: hint, ...routing }
+
+    const pinned = vpsServerId ?? (isRemote ? serverId : undefined)
+    const runtime = planRemoteRuntime(task, pinned, this.vps)
+    if (isRemote && connected && serverId && active?.path) {
+      const remoteHint = remoteWorkspaceHint(serverId, active.path)
+      runtime.systemHint = [runtime.systemHint, remoteHint].filter(Boolean).join(' ')
+    }
+    return { ...runtime, ...routing }
   }
 
   /**
@@ -418,6 +460,12 @@ export class AgentService {
         })
       : undefined
 
+    const requestPlan = this.requestPlan
+    const planGate = requestPlan
+      ? (plan: Plan, warnings: PlanWarning[]): Promise<PlanDecision> =>
+          requestPlan(runId, plan, warnings)
+      : undefined
+
     const orchestrator = new AgentOrchestrator({
       sandbox: this.sandbox,
       providers,
@@ -428,6 +476,7 @@ export class AgentService {
       ...(systemHint ? { systemHint } : {}),
       ...(planMode ? { planMode: true } : {}),
       ...(approvalGate ? { approvalGate } : {}),
+      ...(planGate ? { planGate, planApproval: approvalMode } : {}),
       ...(this.files
         ? { onFileWritten: (change: FileChange) => this.captureChange(runId, request.sessionId, change) }
         : {})
@@ -471,6 +520,7 @@ export class AgentService {
   abort(): void {
     for (const controller of this.controllers) controller.abort()
     this.cancelApprovals?.()
+    this.cancelPlans?.()
   }
   /** Records an agent edit and surfaces it in the chat for review. */
   private captureChange(runId: string, sessionId: string | undefined, change: FileChange): void {

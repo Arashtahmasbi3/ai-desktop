@@ -9,6 +9,8 @@ import type {
 } from '@shared/types'
 import { DEFAULT_SELECTION, resolveSelection } from '@shared/selection'
 import type { ApprovalMode, ApprovalOutcome } from '@shared/approval'
+import type { PlanDecision } from '@shared/plan'
+import type { ProjectMetadataPatch } from '@shared/project-metadata'
 import type { OnboardingStatus } from '@shared/onboarding'
 import type { VpsConnectionState, VpsServerView } from '@shared/vps'
 import type { ChatSummary, StoredMessage } from '@shared/chat'
@@ -27,6 +29,7 @@ import type {
   RemoteStatus,
   SessionInfo,
   SettingsView,
+  PlanRequest,
   WorkerJobRequest,
   WorkerStatus
 } from '@shared/ui'
@@ -63,6 +66,7 @@ export interface ChatMessage {
 const MAX_LOGS = 500
 const MAX_TERMINAL_LINES = 500
 const TOKEN_SETTINGS_KEY = 'ai-desktop:show-token-count'
+const CONTEXT_SETTINGS_KEY = 'ai-desktop:show-context-before-send'
 const CHAT_TREE_KEY = 'ai-desktop:chat-tree-open'
 const LAST_CHAT_KEY = 'ai-desktop:last-chat'
 const AUTOSAVE_INTERVAL_MS = 30_000
@@ -77,6 +81,14 @@ function newId(): string {
 function readShowTokenCount(): boolean {
   try {
     return globalThis.localStorage?.getItem(TOKEN_SETTINGS_KEY) !== '0'
+  } catch {
+    return true
+  }
+}
+
+function readShowContextBeforeSend(): boolean {
+  try {
+    return globalThis.localStorage?.getItem(CONTEXT_SETTINGS_KEY) !== '0'
   } catch {
     return true
   }
@@ -159,6 +171,8 @@ interface AppState {
   sidebarCollapsed: boolean
   /** Whether the token estimate is shown under the chat input. */
   showTokenCount: boolean
+  /** Whether the context preview is shown before each send (v2.3.2, B.4). */
+  showContextBeforeSend: boolean
   /** Saved chats for the sidebar list. */
   chats: ChatSummary[]
   /** Currently open chat id (created lazily on first message). */
@@ -173,6 +187,8 @@ interface AppState {
   planMode: boolean
   /** Tool call awaiting the user's approval, if any. */
   pendingApproval: ApprovalRequest | null
+  /** Plan awaiting the user's approval before it executes (v2.3.2, A.5). */
+  pendingPlan: PlanRequest | null
   /** A tool approved 3+ times; the UI suggests remembering it (v2.3, B.3). */
   approvalSuggestion: { tool: string; count: number } | null
   /** A "Deny & Explain" prompt to send once the current run settles. */
@@ -197,6 +213,8 @@ interface AppState {
   setLocale: (locale: Locale) => void
   toggleSidebar: () => void
   setShowTokenCount: (value: boolean) => void
+  /** Toggle the pre-send context preview. */
+  setShowContextBeforeSend: (value: boolean) => void
   refreshChats: () => Promise<void>
   /** Save the current messages/model/vps as the active chat. */
   persistChat: () => Promise<void>
@@ -218,6 +236,7 @@ interface AppState {
   setApprovalMode: (mode: ApprovalMode) => Promise<void>
   setPlanModeDefault: (value: boolean) => Promise<void>
   respondApproval: (answer: boolean | ApprovalOutcome) => void
+  respondPlan: (decision: PlanDecision) => void
   rememberApprovalTool: (tool: string) => Promise<void>
   dismissApprovalSuggestion: () => void
   setRememberApprovalMode: (enabled: boolean) => Promise<void>
@@ -266,6 +285,7 @@ interface AppState {
   removeProject: (id: string) => Promise<void>
   openProject: (id: string) => Promise<void>
   updateProjectPath: (id: string, path: string) => Promise<void>
+  updateProjectMetadata: (id: string, patch: ProjectMetadataPatch) => Promise<void>
   searchVpsProject: (name: string) => Promise<string[]>
   setApiKey: (provider: ProviderId, apiKey: string) => Promise<void>
   removeApiKey: (provider: ProviderId) => Promise<void>
@@ -320,6 +340,7 @@ export const useStore = create<AppState>((set, get) => ({
   locale: detectLocale(),
   sidebarCollapsed: false,
   showTokenCount: readShowTokenCount(),
+  showContextBeforeSend: readShowContextBeforeSend(),
   chats: [],
   activeChatId: null,
   vpsServerId: undefined,
@@ -327,6 +348,7 @@ export const useStore = create<AppState>((set, get) => ({
   vpsStatus: { status: 'disconnected' },
   planMode: false,
   pendingApproval: null,
+  pendingPlan: null,
   approvalSuggestion: null,
   queuedExplain: null,
   fileChanges: [],
@@ -347,6 +369,14 @@ export const useStore = create<AppState>((set, get) => ({
     set({ showTokenCount: value })
     try {
       globalThis.localStorage?.setItem(TOKEN_SETTINGS_KEY, value ? '1' : '0')
+    } catch {
+      // Persisting the preference is best-effort.
+    }
+  },
+  setShowContextBeforeSend(value) {
+    set({ showContextBeforeSend: value })
+    try {
+      globalThis.localStorage?.setItem(CONTEXT_SETTINGS_KEY, value ? '1' : '0')
     } catch {
       // Persisting the preference is best-effort.
     }
@@ -467,6 +497,12 @@ export const useStore = create<AppState>((set, get) => ({
     }
     set({ pendingApproval: null })
     void window.api.agent.respondApproval(pending.id, answer)
+  },
+  respondPlan(decision) {
+    const pending = get().pendingPlan
+    if (!pending) return
+    set({ pendingPlan: null })
+    void window.api.agent.respondPlan(pending.id, decision)
   },
   async rememberApprovalTool(tool) {
     await window.api.agent.rememberApprovalTool(tool)
@@ -659,11 +695,18 @@ export const useStore = create<AppState>((set, get) => ({
           error: null,
           logs: [],
           pendingApproval: null,
+          pendingPlan: null,
           loopStop: null
         })
         break
       case 'approval:request':
         set({ pendingApproval: event.request })
+        break
+      case 'plan:request':
+        set({ pendingPlan: event.request })
+        break
+      case 'plan:resolved':
+        if (get().pendingPlan?.id === event.id) set({ pendingPlan: null })
         break
       case 'approval:suggestion':
         set({ approvalSuggestion: { tool: event.tool, count: event.count } })
@@ -722,6 +765,7 @@ export const useStore = create<AppState>((set, get) => ({
           warnings: event.warnings,
           loopStop: event.stop ?? null,
           pendingApproval: null,
+          pendingPlan: null,
           messages
         })
         const explain = get().queuedExplain
@@ -738,6 +782,7 @@ export const useStore = create<AppState>((set, get) => ({
           running: false,
           currentRunId: null,
           pendingApproval: null,
+          pendingPlan: null,
           error: redact(event.message),
           loopStop: null,
           messages: [
@@ -794,6 +839,7 @@ export const useStore = create<AppState>((set, get) => ({
       currentRunId: null,
       error: null,
       pendingApproval: null,
+      pendingPlan: null,
       approvalSuggestion: null,
       queuedExplain: null,
       fileChanges: [],
@@ -840,6 +886,14 @@ export const useStore = create<AppState>((set, get) => ({
 
   async refreshFiles(path) {
     const target = path ?? get().cwd
+    const settings = get().settings
+    const active = settings?.projects.find((project) => project.id === settings.activeProjectId)
+    if (active?.type === 'remote') {
+      // A remote project lives on a VPS: never probe the local filesystem, or
+      // the UI would wrongly report "Path not found" (v2.3.2, A.2).
+      set({ entries: [], cwd: target, projectMissing: false })
+      return
+    }
     try {
       const entries = await window.api.fs.list(target)
       set({ entries, cwd: target, projectMissing: false })
@@ -932,6 +986,10 @@ export const useStore = create<AppState>((set, get) => ({
   async updateProjectPath(id, path) {
     set({ settings: await window.api.settings.updateProjectPath(id, path) })
     await get().refreshFiles('.')
+  },
+
+  async updateProjectMetadata(id, patch) {
+    set({ settings: await window.api.projects.updateMetadata(id, patch) })
   },
 
   async setApiKey(provider, apiKey) {

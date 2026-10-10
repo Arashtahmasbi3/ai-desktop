@@ -5,6 +5,7 @@ import {
   ArrowDown,
   Activity,
   Bot,
+  Eye,
   Loader2,
   PanelLeft,
   Paperclip,
@@ -16,7 +17,10 @@ import {
   X
 } from 'lucide-react'
 import { basename, useStore } from '../store'
+import { PROVIDERS } from '@shared/providers'
+import { buildContextPreview, type ContextPreview } from '@shared/context-preview'
 import MessageBubble from './MessageBubble'
+import ContextPreviewCard from './ContextPreviewCard'
 import FileChangesPanel from './FileChangesPanel'
 import TemplateMenu from './TemplateMenu'
 import TerminalPanel from './TerminalPanel'
@@ -25,10 +29,12 @@ import VpsSelector from './VpsSelector'
 import ProviderWarning from './ProviderWarning'
 import LoopStopCard from './LoopStopCard'
 import ApprovalDialog from './ApprovalDialog'
+import PlanCard from './PlanCard'
 import ProgressTimeline from './ProgressTimeline'
 import MicButton from './MicButton'
 import { FullAccessBanner, FullAccessToggle } from './FullAccessToggle'
 import { filterSlashCommands, resolveSlashCommand } from '../lib/slash'
+import { workspaceStatus, shouldShowWorkspaceBanner } from '../lib/project-status'
 import { contextBudget, estimateTokens } from '@shared/memory'
 
 const SUGGESTION_KEYS = [
@@ -56,8 +62,12 @@ export default function ChatPanel(): JSX.Element {
   const newSession = useStore((state) => state.newSession)
   const projectMissing = useStore((state) => state.projectMissing)
   const settings = useStore((state) => state.settings)
+  const vpsStatus = useStore((state) => state.vpsStatus)
+  const connectVps = useStore((state) => state.connectVps)
   const addProject = useStore((state) => state.addProject)
   const showTokenCount = useStore((state) => state.showTokenCount)
+  const showContextBeforeSend = useStore((state) => state.showContextBeforeSend)
+  const selection = useStore((state) => state.selection)
   const openSettings = useStore((state) => state.openSettings)
   const setView = useStore((state) => state.setView)
   const planMode = useStore((state) => state.planMode)
@@ -78,6 +88,11 @@ export default function ChatPanel(): JSX.Element {
   const [atBottom, setAtBottom] = useState(true)
   const [commandIndex, setCommandIndex] = useState(0)
   const [timelineOpen, setTimelineOpen] = useState(false)
+  const [contextCard, setContextCard] = useState<{
+    preview: ContextPreview
+    body: string
+    willSend: boolean
+  } | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -85,6 +100,42 @@ export default function ChatPanel(): JSX.Element {
   const activeProject = settings?.projects.find(
     (project) => project.id === settings.activeProjectId
   )
+  const vpsConnected = Boolean(
+    activeProject?.type === 'remote' &&
+      activeProject.vpsId &&
+      vpsStatus.status === 'connected' &&
+      vpsStatus.serverId === activeProject.vpsId
+  )
+  const wsStatus = workspaceStatus({
+    project: activeProject
+      ? {
+          ...activeProject,
+          exists:
+            activeProject.type !== 'remote' && projectMissing ? false : activeProject.exists
+        }
+      : undefined,
+    vpsConnected
+  })
+  const wsBanner = shouldShowWorkspaceBanner(wsStatus)
+  const runStatusAction = (): void => {
+    if (wsStatus.action === 'picker') void pickWorkspace()
+    else if (wsStatus.action === 'settings') openSettings()
+    else if (wsStatus.action === 'reconnect' && activeProject?.vpsId) {
+      void connectVps(activeProject.vpsId)
+    }
+  }
+  const statusTone =
+    wsStatus.tone === 'error'
+      ? 'border-red-500/30 bg-red-500/10 text-red-300'
+      : wsStatus.tone === 'warning'
+        ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+        : 'border-border bg-bg-tertiary text-neutral-300'
+  const statusActionTone =
+    wsStatus.tone === 'error'
+      ? 'border-red-500/40 text-red-200 hover:bg-red-500/15'
+      : wsStatus.tone === 'warning'
+        ? 'border-amber-500/40 text-amber-200 hover:bg-amber-500/15'
+        : 'border-border text-neutral-300 hover:bg-bg-secondary'
 
   const commands = useMemo<SlashCommand[]>(
     () => [
@@ -145,6 +196,25 @@ export default function ChatPanel(): JSX.Element {
     requestAnimationFrame(() => textareaRef.current?.focus())
   }
 
+  const previewContext = (body: string, willSend: boolean): void => {
+    const preview = buildContextPreview({
+      provider: PROVIDERS[selection.provider]?.label ?? selection.provider,
+      model: selection.model,
+      messages: [...messages, { role: 'user', content: body }],
+      files: attached.map((path) => basename(path)),
+      remotePaths: activeProject?.type === 'remote' ? [activeProject.path] : []
+    })
+    setContextCard({ preview, body, willSend })
+  }
+
+  const doSend = (body: string): void => {
+    if (!body || running) return
+    setInput('')
+    setAttached([])
+    setAtBottom(true)
+    void send(body)
+  }
+
   const submit = (): void => {
     const trimmed = input.trim()
     const command = resolveSlashCommand(commands, trimmed)
@@ -154,10 +224,11 @@ export default function ChatPanel(): JSX.Element {
     }
     const body = [trimmed, ...attached.map((path) => `@${path}`)].filter(Boolean).join('\n')
     if (!body || running) return
-    setInput('')
-    setAttached([])
-    setAtBottom(true)
-    void send(body)
+    if (showContextBeforeSend) {
+      previewContext(body, true)
+      return
+    }
+    doSend(body)
   }
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>): void => {
@@ -268,29 +339,21 @@ export default function ChatPanel(): JSX.Element {
         </button>
       </div>
 
-      {projectMissing ? (
-        <div className="mx-3 mt-2 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-300">
+      {wsBanner ? (
+        <div
+          className={`mx-3 mt-2 flex items-center gap-2 rounded-lg border px-3 py-2 text-[11px] ${statusTone}`}
+        >
           <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-          <span className="flex-1">{t('sidebar.missingPath')}</span>
-          <button
-            type="button"
-            onClick={openSettings}
-            className="rounded border border-amber-500/40 px-2 py-0.5 text-amber-200 hover:bg-amber-500/15"
-          >
-            {t('sidebar.locate')}
-          </button>
-        </div>
-      ) : !settings?.activeProjectId ? (
-        <div className="mx-3 mt-2 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-300">
-          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-          <span className="flex-1">{t('chat.noWorkspaceWarning')}</span>
-          <button
-            type="button"
-            onClick={() => void pickWorkspace()}
-            className="rounded border border-amber-500/40 px-2 py-0.5 text-amber-200 hover:bg-amber-500/15"
-          >
-            {t('titlebar.openFolder')}
-          </button>
+          <span className="flex-1">{t(wsStatus.messageKey as string, { path: wsStatus.path })}</span>
+          {wsStatus.actionKey ? (
+            <button
+              type="button"
+              onClick={runStatusAction}
+              className={`rounded border px-2 py-0.5 ${statusActionTone}`}
+            >
+              {t(wsStatus.actionKey)}
+            </button>
+          ) : null}
         </div>
       ) : null}
 
@@ -513,7 +576,23 @@ export default function ChatPanel(): JSX.Element {
             )}
           </div>
           <div className="mt-1.5 flex items-center justify-between px-1">
-            <FullAccessToggle />
+            <div className="flex items-center gap-2">
+              <FullAccessToggle />
+              <button
+                type="button"
+                onClick={() =>
+                  previewContext(
+                    [input.trim(), ...attached.map((path) => `@${path}`)].filter(Boolean).join('\n'),
+                    false
+                  )
+                }
+                title={t('chat.viewContext')}
+                className="flex items-center gap-1 rounded-lg px-1.5 py-0.5 text-[10px] text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300"
+              >
+                <Eye className="h-3 w-3" />
+                {t('chat.viewContext')}
+              </button>
+            </div>
             {showTokenCount ? (
               <span className="font-mono text-[10px] text-neutral-600">
                 {t('chat.tokens', { count: estimateTokens(input) })}
@@ -532,7 +611,19 @@ export default function ChatPanel(): JSX.Element {
         ) : null}
       </div>
 
+      <PlanCard />
       <ApprovalDialog />
+      {contextCard ? (
+        <ContextPreviewCard
+          preview={contextCard.preview}
+          onClose={() => setContextCard(null)}
+          onSend={() => {
+            const body = contextCard.body
+            setContextCard(null)
+            if (contextCard.willSend) doSend(body)
+          }}
+        />
+      ) : null}
     </section>
   )
 }

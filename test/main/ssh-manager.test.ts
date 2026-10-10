@@ -26,7 +26,11 @@ const cipher: SecretCipher = {
 }
 
 class FakeConnection implements SshConnection {
-  async exec(command: string): Promise<SshExecResult> {
+  lastTimeoutMs?: number
+  constructor(private readonly respond?: (command: string, timeoutMs?: number) => SshExecResult) {}
+  async exec(command: string, timeoutMs?: number): Promise<SshExecResult> {
+    this.lastTimeoutMs = timeoutMs
+    if (this.respond) return this.respond(command, timeoutMs)
     return { stdout: `ran:${command}`, stderr: '', exitCode: 0 }
   }
   async shell(): Promise<SshShell> {
@@ -54,6 +58,8 @@ class FakeConnection implements SshConnection {
 
 class FakeBackend implements SshBackend {
   lastConfig?: SshConnectConfig
+  lastConnection?: FakeConnection
+  respond?: (command: string, timeoutMs?: number) => SshExecResult
   failWith?: Error
 
   async connect(config: SshConnectConfig): Promise<SshConnection> {
@@ -61,7 +67,8 @@ class FakeBackend implements SshBackend {
     const accepted = config.hostVerifier(KEY)
     if (!accepted) throw new Error('Host key verification failed')
     if (this.failWith) throw this.failWith
-    return new FakeConnection()
+    this.lastConnection = new FakeConnection(this.respond)
+    return this.lastConnection
   }
 }
 
@@ -244,6 +251,25 @@ describe('ssh manager', () => {
     expect(write.blocked).toBe(true)
     expect(write.reason).toMatch(/read-only/)
     expect(audit.entries().some((entry) => entry.type === 'blocked' && /policy/.test(entry.detail ?? ''))).toBe(true)
+  })
+
+  it('passes the per-command timeout and surfaces a timed-out exec (A.4)', async () => {
+    backend.respond = () => ({ stdout: '', stderr: 'killed', exitCode: 124, timedOut: true })
+    const server = await store.save({
+      name: 'slow',
+      host: 'h',
+      username: 'u',
+      authType: 'password',
+      password: 'secret',
+      trustFingerprint: KEY_FINGERPRINT
+    })
+    await manager.connect(server.id)
+    const result = await manager.exec(server.id, 'npm install')
+    expect(result.timedOut).toBe(true)
+    expect(result.ok).toBe(false)
+    expect(result.exitCode).toBe(124)
+    expect(backend.lastConnection?.lastTimeoutMs).toBe(300_000)
+    expect(audit.entries().some((entry) => /timed out/i.test(entry.detail ?? ''))).toBe(true)
   })
 
   it('persists a host policy across store reloads (B.3)', async () => {

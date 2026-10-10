@@ -4,6 +4,7 @@ import { Laptop, Server, Smartphone, Terminal } from 'lucide-react'
 import { readPrefs, writePrefs } from '../lib/prefs'
 import { useStore } from '../store'
 import HostPolicyEditor from './Vps/HostPolicyEditor'
+import SshConfigImport from './SshConfigImport'
 
 type ConnectionTab = 'pc' | 'devices' | 'ssh'
 
@@ -119,6 +120,7 @@ export default function SettingsConnections(): JSX.Element {
           <p className="text-[11px] text-neutral-500">
             {t('settings.sshProjects')}: {sshCount}
           </p>
+          <SshConfigImport />
           <div className="flex flex-col gap-2">
             {vpsServers.length === 0 ? (
               <p className="text-[11px] text-neutral-600">{t('settings.hostPolicyNone')}</p>

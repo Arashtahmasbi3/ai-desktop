@@ -27,7 +27,11 @@ describe('Persistence projects', () => {
       id: 'project-1',
       name: 'Demo',
       path: '/home/me/demo',
-      createdAt: 1000
+      createdAt: 1000,
+      // v2.3.2 C.1 — new projects get metadata defaults.
+      updatedAt: 1000,
+      environment: 'development',
+      auditLogPath: '/home/me/demo/.ai-desktop/audit.log'
     })
     expect(persistence.getActiveProject()?.id).toBe('project-1')
     expect(persistence.listProjects()).toHaveLength(1)

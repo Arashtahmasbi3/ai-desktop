@@ -21,8 +21,11 @@ import {
   User
 } from 'lucide-react'
 import type { ChatSummary } from '@shared/chat'
+import type { HostPolicy } from '@shared/vps'
 import type { ProjectRecord } from '@shared/ui'
 import { basename, useStore, type ViewId } from '../store'
+import ProjectBadges from './ProjectBadges'
+import { hasPolicyMismatch } from '../lib/project-badge'
 
 const NAV: Array<{ id: ViewId; labelKey: string; icon: typeof MessageSquare }> = [
   { id: 'chat', labelKey: 'sidebar.navChat', icon: MessageSquare },
@@ -136,6 +139,9 @@ export default function Sidebar(): JSX.Element {
     }
     return 'connected'
   }
+
+  const hostPolicyFor = (vpsId?: string): HostPolicy | undefined =>
+    servers.find((server) => server.id === vpsId)?.policy
 
   const onRename = (chat: ChatSummary): void => {
     setChatMenuFor(null)
@@ -334,12 +340,16 @@ export default function Sidebar(): JSX.Element {
                           : 'text-neutral-300 hover:bg-bg-tertiary'
                       }`}
                     >
-                      <span className={`h-2 w-2 shrink-0 rounded-full ${dotClass(state)}`} />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-xs">
-                          {project.name}
-                          {server ? <span className="text-neutral-500"> ({server})</span> : null}
-                        </span>
+                        <ProjectBadges
+                          project={project}
+                          connectionDotClass={dotClass(state)}
+                          serverName={server}
+                          policyMismatch={hasPolicyMismatch(
+                            project.policy,
+                            hostPolicyFor(project.vpsId)
+                          )}
+                        />
                         {project.type === 'remote' && !project.vpsId ? (
                           <span className="block truncate text-[10px] text-amber-400/90">
                             ⚠ VPS را انتخاب کنید

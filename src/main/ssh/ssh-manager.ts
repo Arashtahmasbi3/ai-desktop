@@ -3,7 +3,17 @@ import { AuditLog, type AuditEntry } from '@core/agent/audit-log'
 import { checkDenyList } from '@core/agent/deny-list'
 import { RateLimiter } from '@core/agent/rate-limiter'
 import { evaluateHostPolicy } from '@core/remote/host-policy'
-import type { RemoteFileEntry, VpsConnectionState, VpsExecResult } from '@shared/vps'
+import { parseBackupPath, restoreCommandFor } from '@core/remote/backup'
+import { runHealthCheck } from '@core/remote/health-check'
+import { shellQuote } from '@core/tools/remote-fs-tools'
+import { getCommandTimeout } from '@core/tools/remote-shell-tool'
+import type {
+  HealthCheckConfig,
+  HealthCheckOutcome,
+  RemoteFileEntry,
+  VpsConnectionState,
+  VpsExecResult
+} from '@shared/vps'
 import { evaluateHostKey, fingerprintFromKey } from './host-key-verify'
 import type { SftpEntry, SshBackend, SshConnection } from './backend'
 import { TerminalSession } from './terminal-session'
@@ -220,7 +230,7 @@ export class SshManager {
     for (const serverId of [...this.connections.keys()]) await this.disconnect(serverId)
   }
 
-  async exec(serverId: string, command: string): Promise<VpsExecResult> {
+  async exec(serverId: string, command: string, timeoutMs?: number): Promise<VpsExecResult> {
     const entry = this.connections.get(serverId)
     if (!entry) {
       return { ok: false, stdout: '', stderr: '', exitCode: -1, reason: 'Not connected' }
@@ -289,7 +299,20 @@ export class SshManager {
     }
     this.touch(serverId)
     try {
-      const result = await entry.connection.exec(command)
+      const effectiveTimeout = timeoutMs ?? getCommandTimeout(command)
+      const result = await entry.connection.exec(command, effectiveTimeout)
+      if (result.timedOut) {
+        const reason = `Command timed out after ${effectiveTimeout}ms.`
+        await this.audit.record({ type: 'exec', ok: false, serverId, command: denied.command, detail: reason })
+        return {
+          ok: false,
+          stdout: result.stdout,
+          stderr: reason,
+          exitCode: 124,
+          timedOut: true,
+          reason
+        }
+      }
       await this.audit.record({
         type: 'exec',
         ok: result.exitCode === 0,
@@ -360,6 +383,41 @@ export class SshManager {
     this.touch(serverId)
     await entry.connection.sftpWrite(path, content)
     await this.audit.record({ type: 'exec', ok: true, serverId, command: `sftp:write ${path}` })
+  }
+
+  /**
+   * Restore a `<path>.backup-<ts>` copy over its original file (v2.3.2, B.1).
+   * Only paths we recognise as backups are accepted.
+   */
+  async restoreBackup(serverId: string, backupPath: string): Promise<void> {
+    const parsed = parseBackupPath(backupPath)
+    if (!parsed) {
+      throw new Error('Not a recognised backup path')
+    }
+    const result = await this.exec(serverId, restoreCommandFor(backupPath, shellQuote)!)
+    if (!result.ok) {
+      throw new Error(result.stderr || result.reason || 'Restore failed')
+    }
+    await this.audit.record({
+      type: 'backup_restored',
+      ok: true,
+      serverId,
+      command: `fs:restore ${parsed.original}`,
+      detail: backupPath
+    })
+  }
+
+  /** Run a project's post-deploy health checks over the SSH connection. */
+  async healthCheck(serverId: string, config: HealthCheckConfig): Promise<HealthCheckOutcome> {
+    return runHealthCheck(async (command) => {
+      const result = await this.exec(serverId, command)
+      return {
+        ok: result.ok,
+        stdout: result.stdout,
+        stderr: result.stderr,
+        exitCode: result.exitCode
+      }
+    }, config)
   }
 
   /** Exposed for tests / a manual sweep; also driven by the watchdog timer. */

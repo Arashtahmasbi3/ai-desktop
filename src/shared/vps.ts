@@ -16,6 +16,13 @@ export interface HostPolicy {
   denyCommands: string[]
   requireApproval: HostApprovalRequirement
   allowedPaths: string[]
+  /**
+   * Commands that are always allowed without approval, on every mode
+   * (v2.3.2, A.3). Empty/absent ⇒ fall back to the legacy read heuristic.
+   */
+  readOnlyCommands?: string[]
+  /** Commands that require approval on staging / are blocked on production. */
+  writeCommands?: string[]
 }
 
 export interface VpsServer {
@@ -31,6 +38,15 @@ export interface VpsServer {
   trustedFingerprint?: string
   lastConnectedAt?: number
   policy?: HostPolicy
+}
+
+/** One host imported from `~/.ssh/config` (v2.3.2, B.5). Private key contents are never read. */
+export interface SshConfigHost {
+  alias: string
+  hostName: string
+  user?: string
+  port?: number
+  identityFile?: string
 }
 
 export interface VpsServerInput {
@@ -96,6 +112,8 @@ export interface VpsExecResult {
   rateLimited?: boolean
   /** Set when this host's policy requires explicit approval before running. */
   requiresApproval?: boolean
+  /** Set when the command was killed for exceeding its timeout (v2.3.2, A.4). */
+  timedOut?: boolean
   reason?: string
 }
 
@@ -106,4 +124,22 @@ export interface AuditEntryView {
   serverId?: string
   command?: string
   detail?: string
+}
+
+/** Post-deploy health checks for a project (v2.3.2, B.2). */
+export interface HealthCheckConfig {
+  processName?: string
+  port?: number
+  /** Defaults to `http://localhost:<port>/health`. */
+  healthEndpoint?: string
+  /** An extra command that must exit 0. */
+  customCommand?: string
+}
+
+export interface HealthCheckOutcome {
+  ok: boolean
+  failed?: string
+  output?: string
+  /** Every check that ran, in order. */
+  ran: string[]
 }

@@ -2,10 +2,14 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { CustomProviderInput, CustomProviderTestResult, CustomProviderView, ProviderId } from '@shared/types'
 import type { OnboardingStatus } from '@shared/onboarding'
 import type { ApprovalMode, ApprovalHistoryEntry, ApprovalOutcome, ApprovedCommandView } from '@shared/approval'
+import type { PlanDecision } from '@shared/plan'
 import type { ChatSaveInput, ChatSummary, StoredChat } from '@shared/chat'
 import type {
   AuditEntryView,
+  HealthCheckConfig,
+  HealthCheckOutcome,
   RemoteFileEntry,
+  SshConfigHost,
   VpsConnectionState,
   VpsExecResult,
   VpsServerInput,
@@ -29,12 +33,14 @@ import type {
   SessionInfo,
   CodeMatch,
   LocalShellResult,
+  ProjectRecord,
   SessionRecordView,
   SettingsView,
   WorkerJobRequest,
   WorkerJobView,
   WorkerStatus
 } from '@shared/ui'
+import type { ProjectMetadataPatch } from '@shared/project-metadata'
 
 const invoke = <T>(channel: string, ...args: unknown[]): Promise<T> =>
   ipcRenderer.invoke(channel, ...args) as Promise<T>
@@ -83,7 +89,11 @@ export const api = {
   },
 
   projects: {
-    open: (id: string): Promise<SettingsView> => invoke('projects:open', id)
+    open: (id: string): Promise<SettingsView> => invoke('projects:open', id),
+    getMetadata: (id: string): Promise<ProjectRecord | null> =>
+      invoke('projects:getMetadata', id),
+    updateMetadata: (id: string, patch: ProjectMetadataPatch): Promise<SettingsView> =>
+      invoke('projects:updateMetadata', id, patch)
   },
 
   chats: {
@@ -145,6 +155,9 @@ export const api = {
       invoke('vps:approveFingerprint', id),
     exec: (id: string, command: string): Promise<VpsExecResult> => invoke('vps:exec', id, command),
     audit: (): Promise<AuditEntryView[]> => invoke('vps:audit'),
+    importSshConfig: (): Promise<SshConfigHost[]> => invoke('vps:importSshConfig'),
+    healthCheck: (id: string, config: HealthCheckConfig): Promise<HealthCheckOutcome> =>
+      invoke('vps:healthCheck', id, config),
     searchProject: (id: string, name: string): Promise<string[]> =>
       invoke('vps:searchProject', id, name),
     listDirs: (id: string, path: string): Promise<string[]> => invoke('vps:listDirs', id, path),
@@ -159,7 +172,9 @@ export const api = {
         invoke('vps:files:list', id, path),
       read: (id: string, path: string): Promise<string> => invoke('vps:files:read', id, path),
       write: (id: string, path: string, content: string): Promise<void> =>
-        invoke('vps:files:write', id, path, content)
+        invoke('vps:files:write', id, path, content),
+      restoreBackup: (id: string, backupPath: string): Promise<void> =>
+        invoke('vps:files:restoreBackup', id, backupPath)
     }
   },
 
@@ -178,6 +193,8 @@ export const api = {
     abort: (): Promise<void> => invoke('agent:abort'),
     respondApproval: (id: string, answer: boolean | ApprovalOutcome): Promise<boolean> =>
       invoke('agent:respondApproval', id, answer),
+    respondPlan: (id: string, decision: PlanDecision): Promise<boolean> =>
+      invoke('agent:respondPlan', id, decision),
     approvalHistory: (): Promise<ApprovalHistoryEntry[]> => invoke('agent:approvalHistory'),
     approvedCommands: (): Promise<ApprovedCommandView[]> => invoke('agent:approvedCommands'),
     revokeApprovedCommand: (id: string): Promise<boolean> =>

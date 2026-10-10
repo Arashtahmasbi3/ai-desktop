@@ -285,6 +285,23 @@ npx vitest run test/e2e   # end-to-end flows only
   **Settings → Connections → SSH → <server>** and adjust the mode, allow list or allowed paths.
 - **"Approval required by host policy: …".** The command is allowed but the host's approval
   requirement stopped it. Approve it, switch the mode, or add it to the host's allow list.
+- **Amber "This command is outside the project policy" banner.** The command is blocked by the
+  policy or is not recognised as an explicit read/write (fail-closed). Review the current mode
+  shown on the banner, then **Proceed anyway** or **Cancel**. Known write commands skip this
+  banner and use the normal approval dialog.
+- **A remote project refuses a local tool.** A remote project routes `read_file`/`write_file`/
+  `run_command` to the matching `remote_*` tool. If no VPS is selected or the VPS is
+  disconnected, the run reports a clear error — pick a VPS in **Settings → Projects** and
+  connect it in **Settings → Connections**.
+- **"out of the allowed paths" for a path that looks inside.** Allowed paths are
+  normalised, so `..` can never climb out of an allowed root (`/srv/app/../../etc/passwd`
+  is rejected even when `/srv/app` is allowed).
+- **A file was overwritten and you want it back.** Remote writes copy the previous contents to
+  `<path>.backup-<timestamp>` first; restore with `cp -p -- '<path>.backup-<ts>' '<path>'`.
+- **`migrate_project` printed a dry-run only.** It always previews first; re-run without
+  `dry_run` to perform the transfer. `--delete` is never used.
+- **Deploy finished but a health check failed.** Check the project's health-check config
+  (process/port/HTTP/custom) in **Settings → Projects**; the first failing check is reported.
 - **The agent stops with "I got stuck".** Loop detection cut a repeated action (warn at the
   threshold, stop at the hard limit). Rephrase the task or make the failing step different.
 - **"Path not found" for a project after upgrading.** Legacy projects with a POSIX path saved on

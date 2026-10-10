@@ -354,6 +354,22 @@ Projects carry an explicit workspace type (`src/core/agent/persistence.ts`).
   VPS chosen yet. The UI then prompts for a VPS instead of reporting "Path not found".
 - Remote project paths are normalized separately (`normalizeRemoteProjectPath`) from local ones.
 
+## Pattern: Layered Architecture & Remote-First Routing
+
+Keep the dependency direction and the routing seam intact (`src/core/agent/remote-routing.ts`).
+
+- **Layering is `shared ← core ← main ← renderer`.** `core` never imports from `main`;
+  logic both layers need is a pure module in `shared/` (e.g. `shared/project-metadata.ts`).
+  The renderer reaches main only through the typed `window.api` preload bridge.
+- **Routing is a pure function consulted before execution.** `routeToolCall(tool, args,
+  context)` returns `passthrough` / `redirect` / `error`; the orchestrator applies it and
+  rewrites local tool names (`read_file` → `remote_read_file`, `run_command` →
+  `remote_shell`) with the remote project root and `server_id` attached.
+- **Never let a local tool run against a remote project.** A remote project with no VPS or a
+  disconnected VPS gets a clear `error` decision instead of a `sandbox_error` on the wrong
+  machine. Add new routable tools to `LOCAL_TO_REMOTE_TOOL`.
+- The routing decision is data, so it is unit-testable without SSH or an LLM.
+
 ## Pattern: Secret Redaction
 
 Never log or persist a raw secret (`src/core/agent/redact.ts`).
@@ -377,6 +393,21 @@ Every remote command passes a fail-closed policy (`src/core/remote/host-policy.t
   approval requirement is audited and returned on `VpsExecResult` (`blocked` / `requiresApproval`),
   which `executeRemoteShell` surfaces to the model as `Blocked by policy:` /
   `Approval required by host policy:`.
+
+## Pattern: Policy Warning = blocked OR unknown
+
+When the renderer warns the user before an agent command runs (`src/renderer/src/lib/policy-warning.ts`).
+
+- A command is **"outside the project policy"** (⇒ amber pre-approval warning with
+  Proceed anyway / Cancel) in exactly two cases: the policy **blocks** it
+  (`evaluateHostPolicy().allowed === false` — deny/path/mode) or it is
+  **unknown** (fail-closed: not recognised as an explicit read or write).
+- A **known write** command is **not** a warning: it is inside the policy and only
+  goes through the normal approval flow (`requiresApproval`).
+- The warning reuses `@core/remote/host-policy` — never a parallel classifier. The
+  same helper derives the sidebar's policy-mismatch flag (`hasPolicyMismatch`:
+  different mode, or a looser approval requirement than the host mandates).
+
 
 ## Lessons learned
 
@@ -581,3 +612,6 @@ Autonomous decisions logged per the sprint's golden rule (`[AUTO-DECISION]`, no 
   master (`634a6d4`), i.e. it already contained both v2.1 and master. So the v2.1→master merge/tag step was a
   no-op and v2.2 needed no rebase — only the v2.2 merge. Released as `v2.2.0`: merge commit `110d6d4` on master,
   annotated tag `v2.2.0`, and a GitHub **pre-release** with the NSIS setup, portable exe, and `SHA256SUMS.txt`.
+- `[AUTO-DECISION]` **v2.3.2 B.4 — context preview before send.** A shared, pure module `src/shared/context-preview.ts` (`buildContextPreview`, `estimateTokens`, `isSecretPath`, `formatContextPreview`) powers a pre-send modal that lists provider/model, estimated tokens, included sections and always-withheld files. Hand-rolled a small `ContextPreviewCard` modal rather than a dependency; the on-by-default `showContextBeforeSend` preference lives in `localStorage` and toggles from Settings → General. Secret-looking files are filtered out of the included set and shown under "Withheld", never dropped silently.
+- `[AUTO-DECISION]` **v2.3.2 B.5 — `~/.ssh/config` import.** `src/core/remote/ssh-config.ts` is a pure parser (no filesystem access) so it is trivially testable; `vps:importSshConfig` reads the config in main and the renderer only ever sees HostName/User/Port/IdentityFile **path**. Deliberately skips wildcard/negated `Host` patterns and `Match` blocks, and keeps `~` in IdentityFile rather than expanding it — key material is only opened later via keytar at connect time.
+- `[PATTERN]` **Layered architecture: `shared ← core ← main ← renderer`.** `core` NEVER imports from `main` (enforced by tsconfig `paths` + review). Pure, dependency-free logic that both layers need lives in `shared/` (e.g. `shared/project-metadata.ts`, `shared/context-preview.ts`). Renderer talks to main only through the typed `window.api` preload bridge.

@@ -122,7 +122,10 @@ describe('migrate_project: sensitive system paths', () => {
     const deps = fakeSsh()
     const result = await executeMigrateProject(deps, args())
     expect(result.ok).toBe(true)
-    expect(deps.execCalls).toHaveLength(1)
+    // One dry-run plus the real transfer.
+    expect(deps.execCalls).toHaveLength(2)
+    expect(deps.execCalls[0]!.command).toContain('--dry-run')
+    expect(deps.execCalls[1]!.command).not.toContain('--dry-run')
   })
 })
 
