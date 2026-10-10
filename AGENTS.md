@@ -378,6 +378,21 @@ Every remote command passes a fail-closed policy (`src/core/remote/host-policy.t
   which `executeRemoteShell` surfaces to the model as `Blocked by policy:` /
   `Approval required by host policy:`.
 
+## Pattern: Policy Warning = blocked OR unknown
+
+When the renderer warns the user before an agent command runs (`src/renderer/src/lib/policy-warning.ts`).
+
+- A command is **"outside the project policy"** (⇒ amber pre-approval warning with
+  Proceed anyway / Cancel) in exactly two cases: the policy **blocks** it
+  (`evaluateHostPolicy().allowed === false` — deny/path/mode) or it is
+  **unknown** (fail-closed: not recognised as an explicit read or write).
+- A **known write** command is **not** a warning: it is inside the policy and only
+  goes through the normal approval flow (`requiresApproval`).
+- The warning reuses `@core/remote/host-policy` — never a parallel classifier. The
+  same helper derives the sidebar's policy-mismatch flag (`hasPolicyMismatch`:
+  different mode, or a looser approval requirement than the host mandates).
+
+
 ## Lessons learned
 
 - **Verify the packaged artifact, not just the build.** `npm run build` passing says nothing
