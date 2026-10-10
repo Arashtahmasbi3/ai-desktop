@@ -426,6 +426,15 @@
     "error": "خطا",
     "done": "تمام شد",
     "stopped": "توقف برای ورودی",
+    "recovery": "بازیابی",
+    "recoveredAfter": "پس از {{count}} تلاش بازیابی شد",
+    "retryFailed": "تلاش مجدد پس از {{count}} بار ناموفق ماند",
+    "switchedTo": "تغییر به {{to}}",
+    "noRetry": "بدون تلاش مجدد متوقف شد",
+    "phasePlanning": "برنامه‌ریزی",
+    "phaseExecution": "اجرا",
+    "phaseObservation": "مشاهده",
+    "phaseReflection": "بازنگری",
     "empty": "هنوز فعالیتی نیست."
   },
   "plan": {

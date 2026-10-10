@@ -426,6 +426,15 @@
     "error": "Failed",
     "done": "Completed",
     "stopped": "Paused for input",
+    "recovery": "Recovery",
+    "recoveredAfter": "Recovered after {{count}} attempts",
+    "retryFailed": "Retry failed after {{count}} attempts",
+    "switchedTo": "Switched to {{to}}",
+    "noRetry": "Stopped without retry",
+    "phasePlanning": "Planning",
+    "phaseExecution": "Executing",
+    "phaseObservation": "Observing",
+    "phaseReflection": "Reflecting",
     "empty": "No activity yet."
   },
   "plan": {

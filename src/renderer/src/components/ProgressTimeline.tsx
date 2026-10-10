@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AlertTriangle, Check, Circle, Loader2, PauseCircle, Sparkles, Wrench } from 'lucide-react'
-import { buildTimeline, type StepKind } from '../lib/timeline'
+import { AlertTriangle, Check, Circle, Loader2, PauseCircle, RotateCcw, Sparkles, Wrench } from 'lucide-react'
+import { buildTimeline, type StepKind, type TimelineStep } from '../lib/timeline'
 import { useStore } from '../store'
 
 const KIND_ICON: Record<StepKind, typeof Check> = {
@@ -10,7 +10,8 @@ const KIND_ICON: Record<StepKind, typeof Check> = {
   tool: Wrench,
   error: AlertTriangle,
   done: Check,
-  stopped: PauseCircle
+  stopped: PauseCircle,
+  recovery: RotateCcw
 }
 
 /** Collapsible right-hand vertical timeline of the current agent run (D.6). */
@@ -23,6 +24,26 @@ export default function ProgressTimeline(): JSX.Element {
   const label = (kind: StepKind, tool?: string): string => {
     if (kind === 'tool' && tool) return t('timeline.tool', { tool })
     return t(`timeline.${kind}`)
+  }
+
+  /** Secondary line: agent phase and/or the recovery decision (v2.5.2). */
+  const detail = (step: TimelineStep): string | undefined => {
+    const parts: string[] = []
+    if (step.phase) {
+      parts.push(t(`timeline.phase${step.phase[0].toUpperCase()}${step.phase.slice(1)}`))
+    }
+    if (step.recovery) {
+      const { decision, attempts, recovered, to } = step.recovery
+      if (decision === 'switch') parts.push(t('timeline.switchedTo', { to: to ?? '—' }))
+      else if (decision === 'retry') {
+        parts.push(
+          recovered
+            ? t('timeline.recoveredAfter', { count: attempts ?? 1 })
+            : t('timeline.retryFailed', { count: attempts ?? 1 })
+        )
+      } else parts.push(t('timeline.noRetry'))
+    }
+    return parts.length > 0 ? parts.join(' · ') : undefined
   }
 
   return (
@@ -59,12 +80,19 @@ export default function ProgressTimeline(): JSX.Element {
                 ) : (
                   <Icon className={`relative z-10 mt-0.5 h-3.5 w-3.5 shrink-0 ${state}`} />
                 )}
-                <span
-                  className={`min-w-0 flex-1 text-[11px] leading-snug ${
-                    step.status === 'pending' ? 'text-neutral-600' : 'text-neutral-300'
-                  }`}
-                >
-                  {label(step.kind, step.tool)}
+                <span className="min-w-0 flex-1">
+                  <span
+                    className={`block text-[11px] leading-snug ${
+                      step.status === 'pending' ? 'text-neutral-600' : 'text-neutral-300'
+                    }`}
+                  >
+                    {label(step.kind, step.tool)}
+                  </span>
+                  {detail(step) ? (
+                    <span className="mt-0.5 block text-[10px] leading-snug text-neutral-500">
+                      {detail(step)}
+                    </span>
+                  ) : null}
                 </span>
               </li>
             )

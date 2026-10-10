@@ -41,3 +41,46 @@ describe('buildTimeline', () => {
     expect(buildTimeline(logs, false)).toHaveLength(40)
   })
 })
+
+describe('buildTimeline v2.5.2 phases and recovery', () => {
+  it('attaches the agent phase to tool steps', () => {
+    const steps = buildTimeline(
+      [log('action.ok', { tool: 'run_command', phase: 'execution' })],
+      false
+    )
+    expect(steps[0].phase).toBe('execution')
+  })
+
+  it('attaches the recovery decision carried on a failed action', () => {
+    const steps = buildTimeline(
+      [
+        log('action.error', {
+          tool: 'run_command',
+          phase: 'execution',
+          recovery: { decision: 'stop', attempts: 1, recovered: false }
+        })
+      ],
+      false
+    )
+    expect(steps[0].kind).toBe('error')
+    expect(steps[0].recovery).toMatchObject({ decision: 'stop', attempts: 1 })
+  })
+
+  it('turns a tool-retry log into a recovery step', () => {
+    const steps = buildTimeline(
+      [log('recovery.action_retry', { tool: 'run_command', attempt: 1, decision: 'retry' })],
+      false
+    )
+    expect(steps[0].kind).toBe('recovery')
+    expect(steps[0].recovery).toMatchObject({ decision: 'retry', attempts: 2 })
+  })
+
+  it('records a provider switch with its endpoints', () => {
+    const steps = buildTimeline(
+      [log('recovery.provider_switch', { from: 'deepseek', to: 'openai', decision: 'switch' })],
+      false
+    )
+    expect(steps[0].kind).toBe('recovery')
+    expect(steps[0].recovery).toMatchObject({ decision: 'switch', from: 'deepseek', to: 'openai' })
+  })
+})
