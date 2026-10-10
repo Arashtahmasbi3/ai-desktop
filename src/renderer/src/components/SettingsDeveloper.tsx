@@ -23,7 +23,7 @@ export default function SettingsDeveloper(): JSX.Element {
 
       <div className="flex items-center justify-between rounded-xl border border-border bg-bg-primary px-3 py-2">
         <span className="text-xs text-neutral-400">{t('settings.version')}</span>
-        <span className="font-mono text-xs text-neutral-200">v2.3.1</span>
+        <span className="font-mono text-xs text-neutral-200">v2.3.3</span>
       </div>
 
       <label className="flex cursor-pointer items-center gap-2 text-xs text-neutral-300">
