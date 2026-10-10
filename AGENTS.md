@@ -30,9 +30,28 @@ plus performance/leak guards. Stage 9 packages the app for Windows (NSIS install
 exe, icon and version metadata), optimizes the production build (minify/tree-shake, no shipped
 `node_modules`) and adds `CHANGELOG.md` / `CONTRIBUTING.md`; release is `v0.1.0`.
 
+## Development process — mandatory
+
+**Before starting every Sprint, review [`DEVELOPMENT_CHECKLIST.md`](./DEVELOPMENT_CHECKLIST.md)**
+(sections 1–3 pre-sprint, 4–7 during, 8–11 post-sprint, plus the ten golden rules). The
+checklist is the single source of truth for our definition of Done; do not start a task
+without walking the relevant boxes. When a Sprint reveals a new lesson, record it here in
+AGENTS.md (as `[PATTERN]` / `[AUTO-DECISION]`) and, if it changes process, update the
+checklist too.
+
+Non-negotiable rules restated: no task is skipped without a technical reason (stop and ask
+otherwise); every fix ships with a test that covers a real scenario (never `assert(true)`);
+verify state (`git status`, inspect files) before changing anything; plan before executing;
+least privilege with an always-on deny-list, approval for risky ops and secret masking in
+all logs; per-project isolation (metadata / SSH key / Linux user / host policy where
+possible); everything reversible (git from day one, backups, checkpoints, rollback plan);
+transparency about what is read/changed and the result; automatic environment self-check
+(git/node/docker/disk/memory) before acting; and an honest report (say it when a test
+fails, a tool is missing, or the budget ran out — ask rather than guess).
+
 ## Status
 
-**v2.3.2 released. Sprint complete. Next: user testing on Windows.** (2026-10-05)
+**v2.3.3 in review (PR #2); v2.3.2 released. Next: Windows `build:win` + release.** (2026-10-05)
 
 - Latest release: **v2.3.2 (full release)** — installer + portable exe published on a GitHub
   Release with `SHA256SUMS.txt`
