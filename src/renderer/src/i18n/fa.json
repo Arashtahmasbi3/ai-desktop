@@ -179,7 +179,9 @@
     "policyWarningTitle": "این دستور خارج از سیاست پروژه است",
     "policyWarningMode": "سیاست فعلی: {{mode}}",
     "policyWarningProceed": "با این حال ادامه بده",
-    "policyWarningCancel": "لغو"
+    "policyWarningCancel": "لغو",
+    "toolOk": "موفق",
+    "toolError": "خطا"
   },
   "vpsSelector": {
     "label": "VPS",
@@ -334,7 +336,9 @@
     "projectErrorInvalidDomains": "یک یا چند دامنه نامعتبر است",
     "projectErrorNotKeyMaterial": "فقط ارجاع — خود کلید را وارد نکنید",
     "projectErrorInvalidPolicy": "حالت سیاست نامعتبر",
-    "projectErrorInvalidPort": "پورت باید بین ۱ و ۶۵۵۳۵ باشد"
+    "projectErrorInvalidPort": "پورت باید بین ۱ و ۶۵۵۳۵ باشد",
+    "tools": "ابزارها",
+    "toolsHint": "گروه‌های ابزار عامل را فعال یا غیرفعال کنید."
   },
   "toast": {
     "dismiss": "بستن",

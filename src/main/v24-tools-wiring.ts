@@ -10,6 +10,7 @@ import type { ToolDefinition } from '@shared/types'
 import type { VpsExecResult } from '@shared/vps'
 import type { AuditEntry } from '@core/agent/audit-log'
 import type { ToolRoute } from '@core/tools/composite-executor'
+import { TOOL_TOGGLE_GROUPS, enabledToolNames } from '@shared/tool-toggles'
 import { dbMigrateTool, DbMigrateToolExecutor, type DbMigrateDeps } from '@core/tools/db-migrate-tool'
 import {
   dockerMigrateTool,
@@ -38,35 +39,12 @@ export interface V24ToolHost {
   requestSudoApproval?(serverId: string, command: string): Promise<boolean>
 }
 
-/** Settings toggle groups (B.1). `id` is what the renderer stores. */
-export interface V24ToolGroup {
-  id: string
-  label: string
-  description: string
-  tools: string[]
-}
+/** Settings toggle groups (B.1). Kept as a re-export for existing tests. */
+export const V24_TOOL_GROUPS = TOOL_TOGGLE_GROUPS
 
-export const V24_TOOL_GROUPS: V24ToolGroup[] = [
-  { id: 'migrate_database', label: 'migrate_database', description: 'Cross-VPS database migration', tools: ['migrate_database'] },
-  { id: 'migrate_docker', label: 'migrate_docker', description: 'Docker image transfer', tools: ['migrate_docker'] },
-  { id: 'scaffold_project', label: 'scaffold_project', description: 'Create new projects', tools: ['scaffold_project'] },
-  { id: 'project_user', label: 'project_user', description: 'Manage Linux users per project', tools: ['project_user_create', 'project_user_remove'] },
-  { id: 'worktree_manager', label: 'worktree_manager', description: 'Git worktree for parallel tasks', tools: ['worktree_create', 'worktree_list', 'worktree_remove'] }
-]
-
-/**
- * Resolve which tool names are enabled. `undefined` means "all enabled"; a list of
- * group ids and/or tool names enables just those (so a toggle can be per-module or
- * per-tool).
- */
+/** Resolve which tool names are enabled. `undefined` means "all enabled". */
 export function enabledV24ToolNames(enabledTools?: string[]): Set<string> {
-  if (!enabledTools) return new Set(V24_TOOL_GROUPS.flatMap((group) => group.tools))
-  const allowed = new Set<string>()
-  for (const group of V24_TOOL_GROUPS) {
-    if (enabledTools.includes(group.id)) group.tools.forEach((name) => allowed.add(name))
-  }
-  for (const name of enabledTools) allowed.add(name)
-  return allowed
+  return enabledToolNames(enabledTools)
 }
 
 export interface V24Wiring {

@@ -29,6 +29,7 @@ import SettingsApproval from './SettingsApproval'
 import SettingsMemory from './SettingsMemory'
 import SettingsUsage from './SettingsUsage'
 import SettingsDeveloper from './SettingsDeveloper'
+import SettingsTools from './SettingsTools'
 
 type TabId =
   | 'general'
@@ -44,6 +45,7 @@ type TabId =
   | 'memory'
   | 'usage'
   | 'developer'
+  | 'tools'
 
 interface NavItem {
   id: TabId
@@ -76,6 +78,7 @@ const NAV_GROUPS: Array<{ labelKey?: string; items: NavItem[] }> = [
     labelKey: 'settings.groupAdvanced',
     items: [
       { id: 'memory', labelKey: 'settings.memory', icon: MemoryStick },
+      { id: 'tools', labelKey: 'settings.tools', icon: Wrench },
       { id: 'usage', labelKey: 'settings.usage', icon: BarChart3 },
       { id: 'developer', labelKey: 'settings.developer', icon: Wrench }
     ]
@@ -224,6 +227,7 @@ export default function SettingsPanel(): JSX.Element | null {
             {tab === 'memory' ? <SettingsMemory /> : null}
 
             {tab === 'usage' ? <SettingsUsage /> : null}
+            {tab === 'tools' ? <SettingsTools /> : null}
 
             {tab === 'developer' ? <SettingsDeveloper /> : null}
           </div>

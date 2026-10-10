@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import CodeBlock from './CodeBlock'
+import ToolResultCard from './ToolResultCard'
 import { readCode } from '../lib/markdown-code'
 import { AlertTriangle, Bot, Check, Copy, GitFork, Server, User } from 'lucide-react'
 import { useStore, type ChatMessage } from '../store'
@@ -54,9 +55,17 @@ export default function MessageBubble({ message }: { message: ChatMessage }): JS
   if (message.role === 'tool') {
     return (
       <div className="flex justify-start px-4">
-        <span className="rounded-full border border-border bg-bg-secondary px-2.5 py-1 font-mono text-[11px] text-sky-300">
-          {message.content}
-        </span>
+        {message.toolCall ? (
+          <ToolResultCard
+            name={message.toolCall.name}
+            ok={message.toolCall.ok}
+            {...(message.toolCall.detail ? { detail: message.toolCall.detail } : {})}
+          />
+        ) : (
+          <span className="rounded-full border border-border bg-bg-secondary px-2.5 py-1 font-mono text-[11px] text-sky-300">
+            {message.content}
+          </span>
+        )}
       </div>
     )
   }
