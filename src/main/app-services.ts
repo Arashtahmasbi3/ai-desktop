@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { SandboxManager } from '@shared/sandbox'
 import type { AgentEvent, RemoteStatus, SettingsView, WorkerStatus } from '@shared/ui'
+import type { ProjectRecord } from '@shared/ui'
 import type { Persistence } from '@core/agent/persistence'
 import type { SessionStore } from '@core/agent/session-store'
 import { ApprovedCommands } from '@core/agent/approved-commands'
@@ -217,6 +218,17 @@ export class AppServices {
       }
     }
     return view
+  }
+
+  /** One project's metadata (with computed `exists`), or undefined when unknown. */
+  getProjectMetadata(id: string): ProjectRecord | undefined {
+    const project = this.persistence.listProjects().find((entry) => entry.id === id)
+    if (!project) return undefined
+    const exists =
+      project.type === 'remote'
+        ? Boolean(project.vpsId && this.vps.isConnected(project.vpsId))
+        : existsSync(project.path)
+    return { ...project, exists }
   }
 
   /** Open the active project in the file service and notify the renderer. */

@@ -50,6 +50,9 @@ export function isProjectEnvironment(value: unknown): value is ProjectEnvironmen
   return typeof value === 'string' && (PROJECT_ENVIRONMENTS as readonly string[]).includes(value)
 }
 
+/** A validated patch of project metadata sent over IPC (Settings → Projects). */
+export type ProjectMetadataPatch = Partial<ProjectMetadata>
+
 /** Audit file for a project root: `<root>/.ai-desktop/audit.log` (POSIX-ish). */
 export function auditLogPathFor(root: string): string {
   const normalized = root.trim().replace(/\\/g, '/').replace(/\/+$/, '')

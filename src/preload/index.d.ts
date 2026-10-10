@@ -38,12 +38,14 @@ import type {
   LocalShellResult,
   RemoteStatus,
   SessionInfo,
+  ProjectRecord,
   SessionRecordView,
   SettingsView,
   WorkerJobRequest,
   WorkerJobView,
   WorkerStatus
 } from '@shared/ui'
+import type { ProjectMetadataPatch } from '@shared/project-metadata'
 
 /** Shape of the object exposed on `window.api` by the preload script. */
 export interface Api {
@@ -77,6 +79,8 @@ export interface Api {
   }
   projects: {
     open(id: string): Promise<SettingsView>
+    getMetadata(id: string): Promise<ProjectRecord | null>
+    updateMetadata(id: string, patch: ProjectMetadataPatch): Promise<SettingsView>
   }
   chats: {
     list(): Promise<ChatSummary[]>

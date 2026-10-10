@@ -33,5 +33,6 @@
     "src/shared/**/*",
     "src/core/**/*",
     "test/**/*"
-  ]
+  ],
+  "exclude": ["test/**/*.tsx"]
 }

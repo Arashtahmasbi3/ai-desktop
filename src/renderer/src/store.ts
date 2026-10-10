@@ -10,6 +10,7 @@ import type {
 import { DEFAULT_SELECTION, resolveSelection } from '@shared/selection'
 import type { ApprovalMode, ApprovalOutcome } from '@shared/approval'
 import type { PlanDecision } from '@shared/plan'
+import type { ProjectMetadataPatch } from '@shared/project-metadata'
 import type { OnboardingStatus } from '@shared/onboarding'
 import type { VpsConnectionState, VpsServerView } from '@shared/vps'
 import type { ChatSummary, StoredMessage } from '@shared/chat'
@@ -284,6 +285,7 @@ interface AppState {
   removeProject: (id: string) => Promise<void>
   openProject: (id: string) => Promise<void>
   updateProjectPath: (id: string, path: string) => Promise<void>
+  updateProjectMetadata: (id: string, patch: ProjectMetadataPatch) => Promise<void>
   searchVpsProject: (name: string) => Promise<string[]>
   setApiKey: (provider: ProviderId, apiKey: string) => Promise<void>
   removeApiKey: (provider: ProviderId) => Promise<void>
@@ -984,6 +986,10 @@ export const useStore = create<AppState>((set, get) => ({
   async updateProjectPath(id, path) {
     set({ settings: await window.api.settings.updateProjectPath(id, path) })
     await get().refreshFiles('.')
+  },
+
+  async updateProjectMetadata(id, patch) {
+    set({ settings: await window.api.projects.updateMetadata(id, patch) })
   },
 
   async setApiKey(provider, apiKey) {

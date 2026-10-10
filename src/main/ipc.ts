@@ -2,6 +2,7 @@ import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import type { CustomProviderInput, ProviderId } from '@shared/types'
 import type { ApprovalMode, ApprovalOutcome } from '@shared/approval'
 import type { PlanDecision } from '@shared/plan'
+import type { ProjectMetadataPatch } from '@shared/project-metadata'
 import type { GitCommitInput } from '@shared/github'
 import type { AgentRunRequest, WorkerJobRequest } from '@shared/ui'
 import type { AppServices } from './app-services'
@@ -160,6 +161,15 @@ export function registerIpc(
       async (id: string) => {
         await services.persistence.setActiveProject(id)
         await services.openActiveProject()
+        return changed()
+      }
+    ],
+
+    ['projects:getMetadata', (id: string) => services.getProjectMetadata(id)],
+    [
+      'projects:updateMetadata',
+      async (id: string, patch: ProjectMetadataPatch) => {
+        await services.persistence.updateProjectMetadata(id, patch)
         return changed()
       }
     ],

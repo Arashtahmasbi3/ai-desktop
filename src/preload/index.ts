@@ -33,12 +33,14 @@ import type {
   SessionInfo,
   CodeMatch,
   LocalShellResult,
+  ProjectRecord,
   SessionRecordView,
   SettingsView,
   WorkerJobRequest,
   WorkerJobView,
   WorkerStatus
 } from '@shared/ui'
+import type { ProjectMetadataPatch } from '@shared/project-metadata'
 
 const invoke = <T>(channel: string, ...args: unknown[]): Promise<T> =>
   ipcRenderer.invoke(channel, ...args) as Promise<T>
@@ -87,7 +89,11 @@ export const api = {
   },
 
   projects: {
-    open: (id: string): Promise<SettingsView> => invoke('projects:open', id)
+    open: (id: string): Promise<SettingsView> => invoke('projects:open', id),
+    getMetadata: (id: string): Promise<ProjectRecord | null> =>
+      invoke('projects:getMetadata', id),
+    updateMetadata: (id: string, patch: ProjectMetadataPatch): Promise<SettingsView> =>
+      invoke('projects:updateMetadata', id, patch)
   },
 
   chats: {
