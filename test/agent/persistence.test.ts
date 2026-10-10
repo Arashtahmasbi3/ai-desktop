@@ -96,7 +96,11 @@ describe('Persistence', () => {
       id: 'p1',
       name: 'AI Desktop',
       path: 'C:\\projects\\ai-desktop',
-      createdAt: expect.any(Number)
+      createdAt: expect.any(Number),
+      // v2.3.2 C.1 — new projects get metadata defaults.
+      updatedAt: expect.any(Number),
+      environment: 'development',
+      auditLogPath: 'C:/projects/ai-desktop/.ai-desktop/audit.log'
     })
     expect(store.listProjects()).toHaveLength(1)
 

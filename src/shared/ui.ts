@@ -3,9 +3,10 @@ import type { ChatMessage, ProviderId } from './types'
 import type { VpsConnectionState } from './vps'
 import type { ApprovalMode } from './approval'
 import type { Plan, PlanDecision, PlanWarning } from './plan'
+import type { ProjectMetadata } from './project-metadata'
 
 /** A project (folder) the user has added to the app. */
-export interface ProjectRecord {
+export interface ProjectRecord extends ProjectMetadata {
   id: string
   name: string
   path: string

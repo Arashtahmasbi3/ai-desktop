@@ -5,9 +5,16 @@ import { homedir } from 'node:os'
 import type { ProviderId } from '@shared/types'
 import { isWindowsAbsolutePath } from '@shared/paths'
 import { coerceApprovalMode, type ApprovalMode } from '@shared/approval'
+import {
+  applyProjectMetadataDefaults,
+  isProjectEnvironment,
+  type ProjectMetadata,
+  type ProjectRepositoryRef
+} from '@shared/project-metadata'
+import type { HealthCheckConfig, HostPolicy } from '@shared/vps'
 
 /** Current on-disk settings schema version. */
-export const SETTINGS_SCHEMA_VERSION = 2
+export const SETTINGS_SCHEMA_VERSION = 3
 
 /** Symmetric secret cipher. In the app it is backed by Electron `safeStorage`. */
 export interface SecretCipher {
@@ -16,7 +23,7 @@ export interface SecretCipher {
   decrypt(ciphertext: string): Promise<string>
 }
 
-export interface ProjectRecord {
+export interface ProjectRecord extends ProjectMetadata {
   id: string
   name: string
   path: string
@@ -112,10 +119,6 @@ export function normalizeRemoteProjectPath(path: string): string {
   return normalize(trimmed).replace(/\\/g, '/')
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
 function emptySettings(now: number): AppSettings {
   return { version: SETTINGS_SCHEMA_VERSION, providers: {}, projects: [], updatedAt: now }
 }
@@ -131,6 +134,65 @@ export interface PersistedProjectRecord {
   createdAt?: unknown
   type?: unknown
   vpsId?: unknown
+  // v3 metadata (all optional; copied through unchanged when valid).
+  updatedAt?: unknown
+  environment?: unknown
+  auditLogPath?: unknown
+  repository?: unknown
+  dockerComposeProject?: unknown
+  ports?: unknown
+  domains?: unknown
+  linuxUser?: unknown
+  sshKeyRef?: unknown
+  policy?: unknown
+  healthCheck?: unknown
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string')
+}
+
+function numberArray(value: unknown): number[] | undefined {
+  return Array.isArray(value) && value.every((item) => typeof item === 'number')
+    ? (value as number[])
+    : undefined
+}
+
+function repositoryRef(value: unknown): ProjectRepositoryRef | undefined {
+  if (!isRecord(value)) return undefined
+  const url = typeof value.url === 'string' ? value.url : undefined
+  const branch = typeof value.branch === 'string' ? value.branch : undefined
+  if (!url || !branch) return undefined
+  return { url, branch }
+}
+
+/**
+ * Copy the additive v3 metadata from a persisted record, dropping anything with
+ * the wrong shape. Nothing already on disk is removed — this only feeds fields
+ * forward into the migrated record.
+ */
+function copyProjectMetadata(old: PersistedProjectRecord, record: ProjectRecord): void {
+  if (typeof old.updatedAt === 'number') record.updatedAt = old.updatedAt
+  if (isProjectEnvironment(old.environment)) record.environment = old.environment
+  if (typeof old.auditLogPath === 'string' && old.auditLogPath !== '') {
+    record.auditLogPath = old.auditLogPath
+  }
+  const repository = repositoryRef(old.repository)
+  if (repository) record.repository = repository
+  if (typeof old.dockerComposeProject === 'string') {
+    record.dockerComposeProject = old.dockerComposeProject
+  }
+  const ports = numberArray(old.ports)
+  if (ports) record.ports = ports
+  if (isStringArray(old.domains)) record.domains = old.domains
+  if (typeof old.linuxUser === 'string') record.linuxUser = old.linuxUser
+  if (typeof old.sshKeyRef === 'string') record.sshKeyRef = old.sshKeyRef
+  if (isRecord(old.policy)) record.policy = old.policy as unknown as HostPolicy
+  if (isRecord(old.healthCheck)) record.healthCheck = old.healthCheck as unknown as HealthCheckConfig
 }
 
 /**
@@ -156,15 +218,15 @@ export function migrateProjectRecord(
   if (old.type === 'remote') {
     record.type = 'remote'
     if (typeof old.vpsId === 'string') record.vpsId = old.vpsId
-    return record
-  }
-  if (old.type === 'local') return record
-
-  if (platform === 'win32' && path.startsWith('/')) {
+  } else if (old.type === 'local') {
+    // explicitly local — keep as-is
+  } else if (platform === 'win32' && path.startsWith('/')) {
     record.type = 'remote'
     if (typeof old.vpsId === 'string') record.vpsId = old.vpsId
   }
-  return record
+
+  copyProjectMetadata(old, record)
+  return applyProjectMetadataDefaults(record, now)
 }
 
 function normalizeProjects(
@@ -430,12 +492,12 @@ export class Persistence {
   async addProject(
     name: string,
     path: string,
-    options: { type?: 'local' | 'remote'; vpsId?: string } = {}
+    options: { type?: 'local' | 'remote'; vpsId?: string; metadata?: ProjectMetadata } = {}
   ): Promise<ProjectRecord> {
     await this.load()
     const normalized =
       options.type === 'remote' ? normalizeRemoteProjectPath(path) : normalizeProjectPath(path)
-    const project: ProjectRecord = {
+    const base: ProjectRecord = {
       id: this.idFactory(),
       name: name.trim() || normalized,
       path: normalized,
@@ -443,6 +505,10 @@ export class Persistence {
       ...(options.type === 'remote' ? { type: 'remote' as const } : {}),
       ...(options.type === 'remote' && options.vpsId ? { vpsId: options.vpsId } : {})
     }
+    const project = applyProjectMetadataDefaults(
+      { ...base, ...(options.metadata ?? {}) },
+      this.now()
+    )
     // Avoid duplicate entries for the same folder (and, for remote projects, the
     // same server — the same path can exist on two different VPSs).
     const existing = this.settings.projects.find(
@@ -455,6 +521,20 @@ export class Persistence {
     }
     this.settings.projects.push(project)
     this.settings.activeProjectId = project.id
+    await this.persist()
+    return project
+  }
+
+  /** Merge validated v3 metadata into a project (used by Settings → Projects). */
+  async updateProjectMetadata(
+    id: string,
+    patch: Partial<ProjectMetadata>
+  ): Promise<ProjectRecord | null> {
+    await this.load()
+    const project = this.settings.projects.find((entry) => entry.id === id)
+    if (!project) return null
+    copyProjectMetadata(patch as PersistedProjectRecord, project)
+    project.updatedAt = this.now()
     await this.persist()
     return project
   }
