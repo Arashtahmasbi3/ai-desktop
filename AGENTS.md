@@ -354,6 +354,22 @@ Projects carry an explicit workspace type (`src/core/agent/persistence.ts`).
   VPS chosen yet. The UI then prompts for a VPS instead of reporting "Path not found".
 - Remote project paths are normalized separately (`normalizeRemoteProjectPath`) from local ones.
 
+## Pattern: Layered Architecture & Remote-First Routing
+
+Keep the dependency direction and the routing seam intact (`src/core/agent/remote-routing.ts`).
+
+- **Layering is `shared ← core ← main ← renderer`.** `core` never imports from `main`;
+  logic both layers need is a pure module in `shared/` (e.g. `shared/project-metadata.ts`).
+  The renderer reaches main only through the typed `window.api` preload bridge.
+- **Routing is a pure function consulted before execution.** `routeToolCall(tool, args,
+  context)` returns `passthrough` / `redirect` / `error`; the orchestrator applies it and
+  rewrites local tool names (`read_file` → `remote_read_file`, `run_command` →
+  `remote_shell`) with the remote project root and `server_id` attached.
+- **Never let a local tool run against a remote project.** A remote project with no VPS or a
+  disconnected VPS gets a clear `error` decision instead of a `sandbox_error` on the wrong
+  machine. Add new routable tools to `LOCAL_TO_REMOTE_TOOL`.
+- The routing decision is data, so it is unit-testable without SSH or an LLM.
+
 ## Pattern: Secret Redaction
 
 Never log or persist a raw secret (`src/core/agent/redact.ts`).
