@@ -45,7 +45,12 @@ export interface RecentToolCall {
 export interface LoopCallDecision {
   allow: boolean
   reason?: string
-  action?: 'warn' | 'stop'
+  /**
+   * `warn` — allow but advise. `stop` — end the run (a hard loop condition).
+   * `block` — skip this one action and let the model try something else
+   * (a tool that has failed repeatedly in this session, A.3).
+   */
+  action?: 'warn' | 'stop' | 'block'
   toolName?: string
   /** How many times this tool name appears in the current window. */
   count?: number
@@ -68,6 +73,12 @@ const STOP_THRESHOLD = 5
 const FAIL_THRESHOLD = 3
 const GUARD_WINDOW_SIZE = 15
 const PROGRESS_TIMEOUT_MS = 120_000
+/** A.3: consecutive failures of one tool before it is taken out of rotation. */
+const BLOCKED_TOOL_THRESHOLD = 2
+
+function blockedThreshold(): number {
+  return BLOCKED_TOOL_THRESHOLD
+}
 
 function hashCall(toolName: string, args: unknown): string {
   let serialized: string
@@ -154,6 +165,10 @@ export class LoopDetector {
   private lastProgressAt: number
   private guardStopReason: LoopStopReason | undefined
   private guardStopped = false
+  // A.3: a tool that fails twice in this session is taken out of rotation so the
+  // model stops retrying it and reaches for an alternative instead.
+  private readonly toolFailureCount = new Map<string, number>()
+  private readonly blockedTools = new Set<string>()
 
   constructor(policy: Partial<LoopDetectionPolicy> = {}, options: LoopDetectorOptions = {}) {
     this.policy = { ...DEFAULT_LOOP_POLICY, ...policy }
@@ -184,6 +199,11 @@ export class LoopDetector {
     return [...this.recentCalls]
   }
 
+  /** Tools taken out of rotation after repeated failures (A.3). */
+  get blockedToolNames(): string[] {
+    return [...this.blockedTools]
+  }
+
   signatureCount(signature: string): number {
     return this.counts.get(signature) ?? 0
   }
@@ -208,6 +228,8 @@ export class LoopDetector {
     this.lastProgressAt = this.now()
     this.guardStopReason = undefined
     this.guardStopped = false
+    this.toolFailureCount.clear()
+    this.blockedTools.clear()
   }
 
   // ---------------------------------------------------------------------------
@@ -226,6 +248,20 @@ export class LoopDetector {
     if (this.recentToolHashes.length > GUARD_WINDOW_SIZE) this.recentToolHashes.shift()
 
     const count = this.recentToolNames.filter((name) => name === toolName).length
+
+    // A.3: a tool that already failed twice is skipped, not fatal — the model is
+    // told to use an alternative and the run continues.
+    if (this.blockedTools.has(toolName)) {
+      return {
+        allow: false,
+        action: 'block',
+        reason:
+          `Tool "${toolName}" failed ${blockedThreshold()} times in this session. ` +
+          'Use an alternative tool instead.',
+        toolName,
+        count
+      }
+    }
 
     if (this.guardStopped) {
       const reason = this.guardStopReason ?? 'repeated_action'
@@ -297,8 +333,14 @@ export class LoopDetector {
 
     if (result.ok) {
       this.toolFailureStreak = 0
+      // A success proves the tool works again, so forget its earlier failures.
+      this.toolFailureCount.delete(toolName)
+      this.blockedTools.delete(toolName)
     } else {
       this.toolFailureStreak += 1
+      const failures = (this.toolFailureCount.get(toolName) ?? 0) + 1
+      this.toolFailureCount.set(toolName, failures)
+      if (failures >= blockedThreshold()) this.blockedTools.add(toolName)
       if (this.toolFailureStreak >= FAIL_THRESHOLD) {
         this.guardStopped = true
         this.guardStopReason = 'failure_streak'

@@ -608,6 +608,33 @@ export class AgentOrchestrator {
               count: guard.count
             })
           }
+          if (!guard.allow && guard.action === 'block') {
+            // A.3: the tool failed twice in this session, so skip just this call
+            // and hand the model a tool result telling it to choose another tool.
+            const toolBlocked: AgentToolResult = {
+              actionId: action.id,
+              name: action.name,
+              ok: false,
+              output: '',
+              error:
+                guard.reason ??
+                `Tool "${action.name}" is unavailable after repeated failures.`,
+              code: 'blocked',
+              attempts: 1,
+              durationMs: 0
+            }
+            this.log('warn', 'loop.tool_blocked', runId, {
+              step: index,
+              tool: action.name
+            })
+            observations.push(toolBlocked)
+            context.appendToolResult({
+              toolCallId: action.id,
+              name: action.name,
+              content: formatObservation(toolBlocked)
+            })
+            continue
+          }
           if (!guard.allow) {
             guardStop = guard
             this.log('warn', 'loop.stop', runId, {
