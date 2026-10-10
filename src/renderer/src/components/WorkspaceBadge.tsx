@@ -1,0 +1,69 @@
+import { useEffect, useState } from 'react'
+import { FolderTree, GitBranch } from 'lucide-react'
+import type { RemoteWorkspaceInfo } from '@shared/workspace-info'
+import { formatWorkspaceBadge, formatWorkspaceTooltip } from '@shared/workspace-info'
+import { useStore } from '../store'
+
+/**
+ * v2.3.3 (A.1): git badge for the chat header. Shows the branch (with a dirty
+ * dot) when the remote project is a repo, or "No git" when it is not.
+ */
+export default function WorkspaceBadge(): JSX.Element | null {
+  const settings = useStore((state) => state.settings)
+  const vpsStatus = useStore((state) => state.vpsStatus)
+  const [info, setInfo] = useState<RemoteWorkspaceInfo | undefined>(undefined)
+
+  const activeProject = settings?.projects.find(
+    (project) => project.id === settings.activeProjectId
+  )
+  const connected = Boolean(
+    activeProject?.type === 'remote' &&
+      activeProject.vpsId &&
+      vpsStatus.status === 'connected' &&
+      vpsStatus.serverId === activeProject.vpsId
+  )
+  const serverId = activeProject?.vpsId
+  const path = activeProject?.path
+
+  useEffect(() => {
+    if (!activeProject || activeProject.type !== 'remote' || !connected || !serverId || !path) {
+      setInfo(undefined)
+      return
+    }
+    let alive = true
+    const load = async (): Promise<void> => {
+      try {
+        const next = await window.api.vps.workspaceInfo(serverId, path)
+        if (alive) setInfo(next)
+      } catch {
+        if (alive) setInfo(undefined)
+      }
+    }
+    void load()
+    const timer = setInterval(() => void load(), 30_000)
+    return () => {
+      alive = false
+      clearInterval(timer)
+    }
+  }, [activeProject, connected, serverId, path])
+
+  if (!activeProject || activeProject.type !== 'remote' || !connected) return null
+
+  const isGit = Boolean(info?.isGitRepo)
+  return (
+    <span
+      className="flex items-center gap-1 rounded px-1.5 py-0.5 text-neutral-400"
+      title={formatWorkspaceTooltip(info)}
+    >
+      {isGit ? (
+        <GitBranch className="h-3 w-3 text-emerald-400" />
+      ) : (
+        <FolderTree className="h-3 w-3 text-neutral-500" />
+      )}
+      <span className="max-w-[10rem] truncate">{formatWorkspaceBadge(info)}</span>
+      {isGit && info?.gitDirty ? (
+        <span className="h-1.5 w-1.5 rounded-full bg-amber-400" title="Uncommitted changes" />
+      ) : null}
+    </span>
+  )
+}
