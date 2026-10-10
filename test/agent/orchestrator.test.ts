@@ -738,3 +738,76 @@ describe('success verification (v2.4 A.3)', () => {
   })
 })
 
+/**
+ * Sprint v2.4.2 — a successful shell command is real progress, so it resets the
+ * per-tool-call loop window. Distinct commands must never accumulate into a
+ * false loop stop, and the step-level analyzer must still catch real repeats.
+ */
+describe('AgentOrchestrator — shell progress (v2.4.2)', () => {
+  it('does not stop a run of distinct successful shell commands', async () => {
+    const manager = createLocalManager(base)
+    const commands = ['echo one', 'echo two', 'echo three', 'echo four', 'echo five', 'echo six']
+    const adapter = new ScriptedAdapter('deepseek', [
+      ...commands.map((command) => ({ toolCalls: [toolCall('run_command', { command })] })),
+      { content: 'All commands ran.' }
+    ])
+    const orchestrator = new AgentOrchestrator({ sandbox: manager, providers: [entry(adapter)] })
+
+    const result = await orchestrator.run('inspect the workspace')
+
+    expect(result.status).toBe('completed')
+    expect(result.finalAnswer).toBe('All commands ran.')
+    expect(result.steps[0].observations[0]).toMatchObject({ ok: true, name: 'run_command' })
+    await manager.dispose()
+  })
+
+  it('resets the loop window when a shell command succeeds', async () => {
+    const manager = createLocalManager(base)
+    // `echo x` appears five times, but every successful command starts a fresh
+    // window, so the per-call guard never reaches its stop threshold.
+    const script = [
+      'echo x',
+      'echo a',
+      'echo x',
+      'echo b',
+      'echo x',
+      'echo c',
+      'echo x',
+      'echo d',
+      'echo x'
+    ]
+    const adapter = new ScriptedAdapter('deepseek', [
+      ...script.map((command) => ({ toolCalls: [toolCall('run_command', { command })] })),
+      { content: 'Done.' }
+    ])
+    const orchestrator = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(adapter)],
+      // Isolate the per-call guard from the step-level repeated-action analyzer.
+      loopPolicy: { repeatedActionThreshold: 100, repeatedStopThreshold: 100 }
+    })
+
+    const result = await orchestrator.run('poll the service')
+
+    expect(result.status).toBe('completed')
+    expect(result.finalAnswer).toBe('Done.')
+    await manager.dispose()
+  })
+
+  it('still surfaces a run that repeats the same successful command', async () => {
+    const manager = createLocalManager(base)
+    const adapter = new ScriptedAdapter('deepseek', [
+      ...Array.from({ length: 6 }, () => ({
+        toolCalls: [toolCall('run_command', { command: 'echo x' })]
+      }))
+    ])
+    const orchestrator = new AgentOrchestrator({ sandbox: manager, providers: [entry(adapter)] })
+
+    const result = await orchestrator.run('loop the same command')
+
+    expect(result.status).toBe('needs_input')
+    expect(result.warnings.some((w) => w.kind === 'repeated_action')).toBe(true)
+    await manager.dispose()
+  })
+})
+

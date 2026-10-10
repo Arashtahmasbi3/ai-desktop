@@ -574,11 +574,17 @@ export class AgentOrchestrator {
         })
 
         const observations: AgentToolResult[] = []
+        // A successful call to any of these means the run advanced, so the loop
+        // guard starts a fresh window. Shell commands count too: `npm test`,
+        // `git status` and friends are real work, and without this a long script
+        // of distinct-but-successful commands could still exhaust the window.
         const progressTools = new Set([
           'write_file',
           'read_file',
           'remote_write_file',
-          'remote_read_file'
+          'remote_read_file',
+          'run_command',
+          'remote_shell'
         ])
         let guardStop: LoopCallDecision | null = null
         let planCancelled = false
