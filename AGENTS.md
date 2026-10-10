@@ -51,7 +51,7 @@ fails, a tool is missing, or the budget ran out — ask rather than guess).
 
 ## Status
 
-**v2.4 Sprint — in progress. A.1 (Job ID + long-running tasks), A.2 (preflight state checks) and A.3 (success-claim verification) done. Branch: feature/v2.4-full-compliance.** (2026-10-05)
+**v2.4 Sprint — phases A–E complete; version bumped to 2.4.0. A.1 jobs, A.2 preflight, A.3 success verification, B.1 db migration, B.2 docker transfer, B.3 checksum verify, C.1 project users, C.2 project SSH key, C.3 worktrees, D.1 scaffolding. Branch: feature/v2.4-full-compliance.** (2026-10-05)
 
 - Reviewed [`DEVELOPMENT_CHECKLIST.md`](./DEVELOPMENT_CHECKLIST.md) sections 1–3 (pre-sprint:
   precise definition, ordered backlog, ready environment) plus the ten golden rules; rules
