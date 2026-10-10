@@ -291,6 +291,7 @@ describe('D.1.7 Dry-run rsync → proceed to the real transfer', () => {
       resolveServer: async () => ({ host: 'target.example', port: 22, username: 'deploy' }),
       exec: async (_serverId, command) => {
         commands.push(command)
+        if (command.includes('sha256sum')) return ok(`${'a'.repeat(64)}  -`)
         if (command.includes('--dry-run')) {
           return ok(
             [
@@ -316,7 +317,7 @@ describe('D.1.7 Dry-run rsync → proceed to the real transfer', () => {
 
     expect(result.ok).toBe(true)
     expect(result.plan).toMatchObject({ files: 3, bytes: 12345, deletes: 0 })
-    expect(commands).toHaveLength(2)
+    expect(commands).toHaveLength(4)
     expect(commands[0]).toContain('--dry-run')
     expect(commands[1]).not.toContain('--dry-run')
     expect(result.content).toContain('Files to transfer: 3')
