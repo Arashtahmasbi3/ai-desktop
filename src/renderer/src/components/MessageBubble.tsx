@@ -56,11 +56,7 @@ export default function MessageBubble({ message }: { message: ChatMessage }): JS
     return (
       <div className="flex justify-start px-4">
         {message.toolCall ? (
-          <ToolResultCard
-            name={message.toolCall.name}
-            ok={message.toolCall.ok}
-            {...(message.toolCall.detail ? { detail: message.toolCall.detail } : {})}
-          />
+          <ToolResultCard {...message.toolCall} />
         ) : (
           <span className="rounded-full border border-border bg-bg-secondary px-2.5 py-1 font-mono text-[11px] text-sky-300">
             {message.content}

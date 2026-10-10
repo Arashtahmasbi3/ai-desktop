@@ -183,7 +183,18 @@
     "policyWarningProceed": "با این حال ادامه بده",
     "policyWarningCancel": "لغو",
     "toolOk": "موفق",
-    "toolError": "خطا"
+    "toolError": "خطا",
+    "toolCause": "علت",
+    "toolServer": "سرور",
+    "toolCwd": "پوشه کار",
+    "toolPath": "مسیر",
+    "toolStdout": "خروجی",
+    "toolStderr": "خطاها",
+    "toolExit": "کد خروج",
+    "toolAttempts": "{{count}} تلاش",
+    "toolRecovered": "پس از {{count}} تلاش موفق شد",
+    "toolRetryFailed": "پس از {{count}} تلاش ناموفق ماند",
+    "toolNoRetry": "تلاش مجدد خودکار انجام نشد"
   },
   "vpsSelector": {
     "label": "VPS",

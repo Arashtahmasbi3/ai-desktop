@@ -190,6 +190,30 @@ export interface ToolResultView {
   recovery?: ToolRecoveryInfo
 }
 
+/**
+ * Tool-call summary rendered inline in the chat (v2.5.2). A superset of the old
+ * `{name, ok, detail}` shape so stored/older messages keep rendering.
+ */
+export interface ToolCallView {
+  name: string
+  ok: boolean
+  code?: ToolErrorCode
+  /** Short legacy detail line (still supported). */
+  detail?: string
+  /** Short technical cause when the call failed. */
+  error?: string
+  command?: string
+  serverId?: string
+  cwd?: string
+  path?: string
+  stdout?: string
+  stderr?: string
+  exitCode?: number
+  durationMs?: number
+  attempts?: number
+  recovery?: ToolRecoveryInfo
+}
+
 export type AgentEvent =
   | { type: 'run:start'; runId: string; task: string; at: number }
   | { type: 'tool:result'; runId: string; result: ToolResultView; at: number }

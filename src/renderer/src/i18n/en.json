@@ -183,7 +183,18 @@
     "policyWarningProceed": "Proceed anyway",
     "policyWarningCancel": "Cancel",
     "toolOk": "ok",
-    "toolError": "error"
+    "toolError": "error",
+    "toolCause": "Cause",
+    "toolServer": "Server",
+    "toolCwd": "Working directory",
+    "toolPath": "Path",
+    "toolStdout": "stdout",
+    "toolStderr": "stderr",
+    "toolExit": "Exit code",
+    "toolAttempts": "{{count}} attempts",
+    "toolRecovered": "Recovered after {{count}} attempts",
+    "toolRetryFailed": "Failed after {{count}} attempts",
+    "toolNoRetry": "No automatic retry"
   },
   "vpsSelector": {
     "label": "VPS",
