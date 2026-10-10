@@ -26,18 +26,9 @@ import { defaultHostPolicy } from '@core/remote/host-policy'
 import { backupPathFor, parseBackupPath, restoreCommandFor } from '@core/remote/backup'
 import type { VpsExecResult } from '@shared/vps'
 import type { Plan } from '@shared/plan'
-import type { SecretCipher } from '@core/agent/persistence'
 import { SshManager } from '../../src/main/ssh/ssh-manager'
 import { VpsServerStore } from '../../src/main/ssh/server-store'
-import { fingerprintFromKey } from '../../src/main/ssh/host-key-verify'
-import type {
-  SftpEntry,
-  SshBackend,
-  SshConnectConfig,
-  SshConnection,
-  SshExecResult,
-  SshShell
-} from '../../src/main/ssh/backend'
+import { FakeBackend, KEY_FINGERPRINT, cipher } from '../helpers/fake-ssh'
 import { ScriptedAdapter, toolCall } from '../helpers/fake-adapter'
 import { createLocalManager } from '../helpers/local-sandbox-manager'
 
@@ -59,48 +50,6 @@ function entry(adapter: ScriptedAdapter): ProviderEntry {
 }
 
 const ok = (stdout = ''): VpsExecResult => ({ ok: true, stdout, stderr: '', exitCode: 0 })
-
-// ---- SSH fakes (verifying host key, like the SSH manager's own tests) ----
-const KEY = Buffer.from('fake-host-public-key')
-const KEY_FINGERPRINT = fingerprintFromKey(KEY)
-const cipher: SecretCipher = {
-  encrypt: async (plaintext) => `enc:${Buffer.from(plaintext).toString('base64')}`,
-  decrypt: async (ciphertext) => Buffer.from(ciphertext.replace(/^enc:/, ''), 'base64').toString()
-}
-
-class FakeConnection implements SshConnection {
-  async exec(command: string): Promise<SshExecResult> {
-    return { stdout: `ran:${command}`, stderr: '', exitCode: 0 }
-  }
-  async shell(): Promise<SshShell> {
-    return {
-      write: () => undefined,
-      resize: () => undefined,
-      close: () => undefined,
-      onData: () => undefined,
-      onClose: () => undefined
-    }
-  }
-  async sftpList(): Promise<SftpEntry[]> {
-    return []
-  }
-  async sftpRead(): Promise<string> {
-    return ''
-  }
-  async sftpWrite(): Promise<void> {
-    return undefined
-  }
-  end(): void {
-    return undefined
-  }
-}
-
-class FakeBackend implements SshBackend {
-  async connect(config: SshConnectConfig): Promise<SshConnection> {
-    if (!config.hostVerifier(KEY)) throw new Error('Host key verification failed')
-    return new FakeConnection()
-  }
-}
 
 function makeManager(): { manager: SshManager; store: VpsServerStore; audit: AuditLog } {
   const store = new VpsServerStore({ file: join(base, 'vps.json'), cipher })

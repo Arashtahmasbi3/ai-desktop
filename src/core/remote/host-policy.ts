@@ -168,6 +168,35 @@ export function referencedPaths(command: string): string[] {
   return matches.map((match) => match.trim()).filter((path) => path.length > 1)
 }
 
+/**
+ * Lexically collapse `.`/`..` segments in an absolute path (no filesystem
+ * access). Returns `null` when a `..` would climb above the root, so callers can
+ * fail closed instead of trusting an un-normalised path.
+ */
+export function normalizeAbsolutePath(path: string): string | null {
+  if (!path.startsWith('/')) return null
+  const out: string[] = []
+  for (const part of path.split('/')) {
+    if (part === '' || part === '.') continue
+    if (part === '..') {
+      if (out.length === 0) return null
+      out.pop()
+    } else {
+      out.push(part)
+    }
+  }
+  return `/${out.join('/')}`
+}
+
+/** Whether `path` is `root` itself or lives inside it (both normalised). */
+function isWithin(path: string, root: string): boolean {
+  const normalizedPath = normalizeAbsolutePath(path)
+  const normalizedRoot = normalizeAbsolutePath(root)
+  if (normalizedPath === null || normalizedRoot === null) return false
+  if (normalizedRoot === '/') return true
+  return normalizedPath === normalizedRoot || normalizedPath.startsWith(`${normalizedRoot}/`)
+}
+
 function matchesList(list: string[] | undefined, command: string): boolean {
   if (!list || list.length === 0) return false
   const lower = command.toLowerCase()
@@ -224,7 +253,7 @@ export function evaluateHostPolicy(policy: HostPolicy, command: string): PolicyD
 
   if (policy.allowedPaths && policy.allowedPaths.length > 0) {
     for (const path of referencedPaths(command)) {
-      if (!policy.allowedPaths.some((allowed) => path === allowed || path.startsWith(`${allowed}/`))) {
+      if (!policy.allowedPaths.some((allowed) => isWithin(path, allowed))) {
         return {
           ...base,
           allowed: false,
