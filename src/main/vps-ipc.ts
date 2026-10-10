@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron'
-import type { VpsServerInput } from '@shared/vps'
+import type { HealthCheckConfig, VpsServerInput } from '@shared/vps'
 import type { AppServices } from './app-services'
 
 /** POSIX single-quote a value so it can be safely embedded in a shell command. */
@@ -69,6 +69,10 @@ export function registerVpsIpc(services: AppServices): () => void {
     ['vps:approveFingerprint', (id: string) => services.vps.approveFingerprint(id)],
     ['vps:exec', (id: string, command: string) => services.vps.exec(id, command)],
     ['vps:audit', () => services.vps.auditEntries()],
+    [
+      'vps:healthCheck',
+      (id: string, config: HealthCheckConfig) => services.vps.healthCheck(id, config)
+    ],
     ['vps:searchProject', (id: string, name: string) => searchRemoteProject(services, id, name)],
     ['vps:listDirs', (id: string, path: string) => listRemoteDirs(services, id, path)],
     ['vps:gitStatus', (id: string, path: string) => remoteGitStatus(services, id, path)],

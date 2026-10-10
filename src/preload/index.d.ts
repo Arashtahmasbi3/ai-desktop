@@ -10,6 +10,8 @@ import type { PlanDecision } from '@shared/plan'
 import type { ChatSaveInput, ChatSummary, StoredChat } from '@shared/chat'
 import type {
   AuditEntryView,
+  HealthCheckConfig,
+  HealthCheckOutcome,
   RemoteFileEntry,
   VpsConnectionState,
   VpsExecResult,
@@ -119,6 +121,7 @@ export interface Api {
     approveFingerprint(id: string): Promise<VpsConnectionState>
     exec(id: string, command: string): Promise<VpsExecResult>
     audit(): Promise<AuditEntryView[]>
+    healthCheck(id: string, config: HealthCheckConfig): Promise<HealthCheckOutcome>
     searchProject(id: string, name: string): Promise<string[]>
     listDirs(id: string, path: string): Promise<string[]>
     gitStatus(id: string, path: string): Promise<string>

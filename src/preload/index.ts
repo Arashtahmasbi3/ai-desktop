@@ -6,6 +6,8 @@ import type { PlanDecision } from '@shared/plan'
 import type { ChatSaveInput, ChatSummary, StoredChat } from '@shared/chat'
 import type {
   AuditEntryView,
+  HealthCheckConfig,
+  HealthCheckOutcome,
   RemoteFileEntry,
   VpsConnectionState,
   VpsExecResult,
@@ -146,6 +148,8 @@ export const api = {
       invoke('vps:approveFingerprint', id),
     exec: (id: string, command: string): Promise<VpsExecResult> => invoke('vps:exec', id, command),
     audit: (): Promise<AuditEntryView[]> => invoke('vps:audit'),
+    healthCheck: (id: string, config: HealthCheckConfig): Promise<HealthCheckOutcome> =>
+      invoke('vps:healthCheck', id, config),
     searchProject: (id: string, name: string): Promise<string[]> =>
       invoke('vps:searchProject', id, name),
     listDirs: (id: string, path: string): Promise<string[]> => invoke('vps:listDirs', id, path),

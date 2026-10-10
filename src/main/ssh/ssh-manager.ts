@@ -4,9 +4,16 @@ import { checkDenyList } from '@core/agent/deny-list'
 import { RateLimiter } from '@core/agent/rate-limiter'
 import { evaluateHostPolicy } from '@core/remote/host-policy'
 import { parseBackupPath, restoreCommandFor } from '@core/remote/backup'
+import { runHealthCheck } from '@core/remote/health-check'
 import { shellQuote } from '@core/tools/remote-fs-tools'
 import { getCommandTimeout } from '@core/tools/remote-shell-tool'
-import type { RemoteFileEntry, VpsConnectionState, VpsExecResult } from '@shared/vps'
+import type {
+  HealthCheckConfig,
+  HealthCheckOutcome,
+  RemoteFileEntry,
+  VpsConnectionState,
+  VpsExecResult
+} from '@shared/vps'
 import { evaluateHostKey, fingerprintFromKey } from './host-key-verify'
 import type { SftpEntry, SshBackend, SshConnection } from './backend'
 import { TerminalSession } from './terminal-session'
@@ -398,6 +405,19 @@ export class SshManager {
       command: `fs:restore ${parsed.original}`,
       detail: backupPath
     })
+  }
+
+  /** Run a project's post-deploy health checks over the SSH connection. */
+  async healthCheck(serverId: string, config: HealthCheckConfig): Promise<HealthCheckOutcome> {
+    return runHealthCheck(async (command) => {
+      const result = await this.exec(serverId, command)
+      return {
+        ok: result.ok,
+        stdout: result.stdout,
+        stderr: result.stderr,
+        exitCode: result.exitCode
+      }
+    }, config)
   }
 
   /** Exposed for tests / a manual sweep; also driven by the watchdog timer. */

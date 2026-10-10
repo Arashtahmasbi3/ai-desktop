@@ -116,3 +116,21 @@ export interface AuditEntryView {
   command?: string
   detail?: string
 }
+
+/** Post-deploy health checks for a project (v2.3.2, B.2). */
+export interface HealthCheckConfig {
+  processName?: string
+  port?: number
+  /** Defaults to `http://localhost:<port>/health`. */
+  healthEndpoint?: string
+  /** An extra command that must exit 0. */
+  customCommand?: string
+}
+
+export interface HealthCheckOutcome {
+  ok: boolean
+  failed?: string
+  output?: string
+  /** Every check that ran, in order. */
+  ran: string[]
+}
