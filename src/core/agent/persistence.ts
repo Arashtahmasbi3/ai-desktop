@@ -144,6 +144,7 @@ export interface PersistedProjectRecord {
   domains?: unknown
   linuxUser?: unknown
   sshKeyRef?: unknown
+  sshKeyFingerprint?: unknown
   policy?: unknown
   healthCheck?: unknown
 }
@@ -191,6 +192,7 @@ function copyProjectMetadata(old: PersistedProjectRecord, record: ProjectRecord)
   if (isStringArray(old.domains)) record.domains = old.domains
   if (typeof old.linuxUser === 'string') record.linuxUser = old.linuxUser
   if (typeof old.sshKeyRef === 'string') record.sshKeyRef = old.sshKeyRef
+  if (typeof old.sshKeyFingerprint === 'string') record.sshKeyFingerprint = old.sshKeyFingerprint
   if (isRecord(old.policy)) record.policy = old.policy as unknown as HostPolicy
   if (isRecord(old.healthCheck)) record.healthCheck = old.healthCheck as unknown as HealthCheckConfig
 }
