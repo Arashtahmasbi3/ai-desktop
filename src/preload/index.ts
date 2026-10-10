@@ -9,6 +9,7 @@ import type {
   HealthCheckConfig,
   HealthCheckOutcome,
   RemoteFileEntry,
+  SshConfigHost,
   VpsConnectionState,
   VpsExecResult,
   VpsServerInput,
@@ -148,6 +149,7 @@ export const api = {
       invoke('vps:approveFingerprint', id),
     exec: (id: string, command: string): Promise<VpsExecResult> => invoke('vps:exec', id, command),
     audit: (): Promise<AuditEntryView[]> => invoke('vps:audit'),
+    importSshConfig: (): Promise<SshConfigHost[]> => invoke('vps:importSshConfig'),
     healthCheck: (id: string, config: HealthCheckConfig): Promise<HealthCheckOutcome> =>
       invoke('vps:healthCheck', id, config),
     searchProject: (id: string, name: string): Promise<string[]> =>

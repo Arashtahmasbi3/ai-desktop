@@ -13,6 +13,7 @@ import type {
   HealthCheckConfig,
   HealthCheckOutcome,
   RemoteFileEntry,
+  SshConfigHost,
   VpsConnectionState,
   VpsExecResult,
   VpsServerInput,
@@ -121,6 +122,7 @@ export interface Api {
     approveFingerprint(id: string): Promise<VpsConnectionState>
     exec(id: string, command: string): Promise<VpsExecResult>
     audit(): Promise<AuditEntryView[]>
+    importSshConfig(): Promise<SshConfigHost[]>
     healthCheck(id: string, config: HealthCheckConfig): Promise<HealthCheckOutcome>
     searchProject(id: string, name: string): Promise<string[]>
     listDirs(id: string, path: string): Promise<string[]>

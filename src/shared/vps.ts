@@ -40,6 +40,15 @@ export interface VpsServer {
   policy?: HostPolicy
 }
 
+/** One host imported from `~/.ssh/config` (v2.3.2, B.5). Private key contents are never read. */
+export interface SshConfigHost {
+  alias: string
+  hostName: string
+  user?: string
+  port?: number
+  identityFile?: string
+}
+
 export interface VpsServerInput {
   id?: string
   name: string

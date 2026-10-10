@@ -1,5 +1,9 @@
 import { ipcMain } from 'electron'
-import type { HealthCheckConfig, VpsServerInput } from '@shared/vps'
+import { readFile } from 'node:fs/promises'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
+import type { HealthCheckConfig, SshConfigHost, VpsServerInput } from '@shared/vps'
+import { parseSshConfig } from '@core/remote/ssh-config'
 import type { AppServices } from './app-services'
 
 /** POSIX single-quote a value so it can be safely embedded in a shell command. */
@@ -72,6 +76,18 @@ export function registerVpsIpc(services: AppServices): () => void {
     [
       'vps:healthCheck',
       (id: string, config: HealthCheckConfig) => services.vps.healthCheck(id, config)
+    ],
+    [
+      'vps:importSshConfig',
+      async (): Promise<SshConfigHost[]> => {
+        try {
+          const text = await readFile(join(homedir(), '.ssh', 'config'), 'utf8')
+          return parseSshConfig(text)
+        } catch {
+          // No config file (or unreadable) simply means nothing to import.
+          return []
+        }
+      }
     ],
     ['vps:searchProject', (id: string, name: string) => searchRemoteProject(services, id, name)],
     ['vps:listDirs', (id: string, path: string) => listRemoteDirs(services, id, path)],
