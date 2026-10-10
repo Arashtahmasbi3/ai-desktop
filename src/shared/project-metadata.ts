@@ -41,6 +41,8 @@ export interface ProjectMetadata {
   linuxUser?: string
   /** keytar entry name for the SSH key; never key material. */
   sshKeyRef?: string
+  /** Public key fingerprint (e.g. `SHA256:...`); never key material. */
+  sshKeyFingerprint?: string
   /** Overrides the VPS host policy for this project. */
   policy?: HostPolicy
   healthCheck?: HealthCheckConfig

@@ -74,6 +74,11 @@ export interface AgentRunRequest {
   resumeSessionId?: string
   /** Connected VPS to run `remote_shell` on (chosen in the chat header). */
   vpsServerId?: string
+  /**
+   * v2.4.1: tool toggle groups enabled in Settings. Omit for "all enabled".
+   * When present, only the listed groups/tools are exposed to the model.
+   */
+  enabledTools?: string[]
   /** Plan Mode: no tools are exposed; the model only drafts a plan. */
   planMode?: boolean
 }

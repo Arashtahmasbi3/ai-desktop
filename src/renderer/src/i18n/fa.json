@@ -179,7 +179,9 @@
     "policyWarningTitle": "این دستور خارج از سیاست پروژه است",
     "policyWarningMode": "سیاست فعلی: {{mode}}",
     "policyWarningProceed": "با این حال ادامه بده",
-    "policyWarningCancel": "لغو"
+    "policyWarningCancel": "لغو",
+    "toolOk": "موفق",
+    "toolError": "خطا"
   },
   "vpsSelector": {
     "label": "VPS",
@@ -334,7 +336,9 @@
     "projectErrorInvalidDomains": "یک یا چند دامنه نامعتبر است",
     "projectErrorNotKeyMaterial": "فقط ارجاع — خود کلید را وارد نکنید",
     "projectErrorInvalidPolicy": "حالت سیاست نامعتبر",
-    "projectErrorInvalidPort": "پورت باید بین ۱ و ۶۵۵۳۵ باشد"
+    "projectErrorInvalidPort": "پورت باید بین ۱ و ۶۵۵۳۵ باشد",
+    "tools": "ابزارها",
+    "toolsHint": "گروه‌های ابزار عامل را فعال یا غیرفعال کنید."
   },
   "toast": {
     "dismiss": "بستن",
@@ -423,5 +427,25 @@
     "warningTooLong": "این طرح طولانی است ({{count}} مرحله). بهتر است تقسیم شود.",
     "warningLoop": "این طرح همان طرح قبلی است.",
     "warningEmpty": "این طرح هیچ مرحله‌ای ندارد."
+  },
+  "jobs": {
+    "panelTitle": "کارهای پسزمینه ({{count}})",
+    "cardTitle": "کار #{{id}} ({{status}})",
+    "startedAgo": "شروع {{time}} پیش",
+    "viewLog": "مشاهده لاگ",
+    "hideLog": "بستن لاگ",
+    "kill": "کشتن",
+    "noOutput": "(هنوز خروجیای نیست)",
+    "finishedToast": "کار #{{id}} {{status}}"
+  },
+  "preflight": {
+    "title": "هشدارهای پیشپرواز:",
+    "proceed": "با این حال ادامه بده"
+  },
+  "successWarning": {
+    "title": "هوش مصنوعی بدون تأیید ادعای موفقیت میکند.",
+    "runTests": "اجرای تستها",
+    "runHealthCheck": "اجرای health check",
+    "accept": "با این حال بپذیر"
   }
 }

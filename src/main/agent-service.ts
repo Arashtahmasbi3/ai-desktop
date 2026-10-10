@@ -16,16 +16,18 @@ import type { ProviderEntry } from '@core/agent-orchestrator'
 import type { ToolExecutor } from '@core/agent/tools'
 import { PROVIDERS, createAdapterForConfig } from '@core/llm-adapters/registry'
 import type { AuditEntry } from '@core/agent/audit-log'
-import { REMOTE_SHELL_TOOL } from '@core/tools/remote-shell-tool'
+import { REMOTE_SHELL_TOOL, type RemoteJobRunner } from '@core/tools/remote-shell-tool'
 import { RemoteShellToolExecutor } from '@core/tools/remote-shell-executor'
 import { REMOTE_FS_TOOLS, type RemoteFsDeps } from '@core/tools/remote-fs-tools'
 import { RemoteFsToolExecutor } from '@core/tools/remote-fs-executor'
 import { MIGRATE_PROJECT_TOOL, type MigrateProjectDeps } from '@core/tools/migrate-project-tool'
 import { MigrateProjectToolExecutor } from '@core/tools/migrate-project-executor'
 import { CompositeToolExecutor, type ToolRoute } from '@core/tools/composite-executor'
+import { planV24Tools } from './v24-tools-wiring'
 import { routeToolCall, remoteWorkspaceHint } from '@core/agent/remote-routing'
 import type { RoutingDecision } from '@core/agent/remote-routing'
 import { detectWorkspace } from '@core/remote/workspace-detect'
+import { preflight, preflightActionFor, type PreflightResult } from '@core/agent/preflight'
 import { buildWorkspaceSystemHint } from '@core/agent/workspace-prompt'
 import type { RemoteWorkspaceInfo } from '@shared/workspace-info'
 import { DEFAULT_APPROVAL_MODE } from '@core/agent/approval'
@@ -116,7 +118,9 @@ export function activeRemoteProjectHint(
 export function planRemoteRuntime(
   task: string,
   vpsServerId: string | undefined,
-  vps: RemoteHost | undefined
+  vps: RemoteHost | undefined,
+  jobs?: RemoteJobRunner,
+  enabledTools?: string[]
 ): RemoteRuntime {
   if (!vps) return {}
   const connected = vps.connectedServers()
@@ -142,7 +146,8 @@ export function planRemoteRuntime(
   const shellExecutor = new RemoteShellToolExecutor(
     {
       exec: (serverId, command) => vps.exec(serverId, command),
-      connectedServers: () => vps.connectedServers()
+      connectedServers: () => vps.connectedServers(),
+      ...(jobs ? { jobs } : {})
     },
     target
   )
@@ -202,6 +207,24 @@ export function planRemoteRuntime(
       'source VPS to another saved VPS with rsync over SSH.'
   }
 
+  // v2.4.1: database/docker migration, project scaffold, per-project user and worktrees.
+  const v24 = planV24Tools(
+    {
+      connectedServers: () => vps.connectedServers(),
+      exec: (serverId, command) => vps.exec(serverId, command),
+      ...(typeof vps.resolveServer === 'function'
+        ? { resolveServer: (id: string) => vps.resolveServer!(id) }
+        : {}),
+      ...(typeof vps.recordAudit === 'function'
+        ? { recordAudit: (entry: Omit<AuditEntry, 'at'>) => vps.recordAudit!(entry) }
+        : {})
+    },
+    enabledTools
+  )
+  extraTools.push(...v24.extraTools)
+  routes.push(...v24.routes)
+  if (v24.hint) hint += ` ${v24.hint}`
+
   const executor: ToolExecutor =
     routes.length === 1 ? shellExecutor : new CompositeToolExecutor(routes)
 
@@ -227,6 +250,8 @@ export interface AgentServiceOptions {
   customProviders?: CustomProviderStore
   /** Optional: enables the `remote_shell` / remote-fs tools against connected VPS servers. */
   vps?: RemoteHost
+  /** Optional: detaches long remote commands as tracked jobs (v2.4, A.1). */
+  jobs?: RemoteJobRunner
   /** Ask the user to approve a tool call (Approval Modes). Defaults to allow. */
   requestApproval?: (runId: string, action: AgentAction) => Promise<ApprovalOutcome>
   /** Deny any outstanding approval requests (e.g. the user aborted). */
@@ -272,6 +297,7 @@ export class AgentService {
   private readonly now: () => number
   private readonly customProviders?: CustomProviderStore
   private readonly vps?: RemoteHost
+  private readonly jobs?: RemoteJobRunner
   private readonly requestApproval?: (runId: string, action: AgentAction) => Promise<ApprovalOutcome>
   private readonly cancelApprovals?: () => void
   private readonly requestPlan?: (
@@ -297,6 +323,7 @@ export class AgentService {
     this.now = options.now ?? (() => Date.now())
     if (options.customProviders) this.customProviders = options.customProviders
     if (options.vps) this.vps = options.vps
+    if (options.jobs) this.jobs = options.jobs
     this.requestApproval = options.requestApproval
     this.cancelApprovals = options.cancelApprovals
     this.requestPlan = options.requestPlan
@@ -315,7 +342,8 @@ export class AgentService {
    */
   private async buildRemoteRuntime(
     task: string,
-    vpsServerId?: string
+    vpsServerId?: string,
+    enabledTools?: string[]
   ): Promise<RemoteRuntime> {
     const settings = await this.persistence.load()
     const active = settings.projects.find((project) => project.id === settings.activeProjectId)
@@ -342,7 +370,7 @@ export class AgentService {
     if (hint) return { systemHint: hint, ...routing }
 
     const pinned = vpsServerId ?? (isRemote ? serverId : undefined)
-    const runtime = planRemoteRuntime(task, pinned, this.vps)
+    const runtime = planRemoteRuntime(task, pinned, this.vps, this.jobs, enabledTools)
     if (isRemote && connected && serverId && active?.path) {
       const remoteHint = remoteWorkspaceHint(serverId, active.path)
       runtime.systemHint = [runtime.systemHint, remoteHint].filter(Boolean).join(' ')
@@ -464,13 +492,34 @@ export class AgentService {
     return entries
   }
 
+  /**
+   * v2.4 A.2 — build a preflight gate for the active remote project, if any. The
+   * workspace state is read over the existing SSH exec before sensitive actions.
+   */
+  private async buildPreflightGate(): Promise<
+    ((action: AgentAction) => Promise<PreflightResult | undefined>) | undefined
+  > {
+    if (!this.vps) return undefined
+    const project = this.persistence.getActiveProject()
+    if (!project || project.type !== 'remote' || !project.vpsId) return undefined
+    const serverId = project.vpsId
+    if (!this.vps.connectedServers().includes(serverId)) return undefined
+    const path = project.path
+    const vps = this.vps
+    return (action) => {
+      const kind = preflightActionFor(action.name, action.arguments)
+      if (!kind) return Promise.resolve(undefined)
+      return preflight((command) => vps.exec(serverId, command), { path, isGitRepo: true }, kind)
+    }
+  }
+
   async run(request: AgentRunRequest, externalSignal?: AbortSignal): Promise<AgentRunResult> {
     const providers = await this.buildProviders({
       ...(request.provider ? { preferred: request.provider } : {}),
       ...(request.model ? { model: request.model } : {}),
       ...(request.customProviderId ? { customProviderId: request.customProviderId } : {})
     })
-    const remote = await this.buildRemoteRuntime(request.task, request.vpsServerId)
+    const remote = await this.buildRemoteRuntime(request.task, request.vpsServerId, request.enabledTools)
     const memory = await this.projectMemoryHint()
     const systemHint = [remote.systemHint, memory].filter(Boolean).join('\n\n')
 
@@ -495,17 +544,21 @@ export class AgentService {
           requestPlan(runId, plan, warnings)
       : undefined
 
+    const preflightGate = await this.buildPreflightGate()
+
     const orchestrator = new AgentOrchestrator({
       sandbox: this.sandbox,
       providers,
       logger: new EmittingLogger(this.emit),
       sessionStore: this.sessionStore,
+      enforceSuccessVerification: true,
       ...(request.sessionId ? { sessionId: request.sessionId } : {}),
       ...remote,
       ...(systemHint ? { systemHint } : {}),
       ...(planMode ? { planMode: true } : {}),
       ...(approvalGate ? { approvalGate } : {}),
       ...(planGate ? { planGate, planApproval: approvalMode } : {}),
+      ...(preflightGate ? { preflightGate } : {}),
       ...(this.files
         ? { onFileWritten: (change: FileChange) => this.captureChange(runId, request.sessionId, change) }
         : {})

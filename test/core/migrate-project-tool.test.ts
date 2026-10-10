@@ -4,8 +4,10 @@ import type { VpsExecResult } from '@shared/vps'
 import {
   MIGRATE_PROJECT_TOOL,
   buildRsyncCommand,
+  compareTreeHashes,
   executeMigrateProject,
   parseRsyncStats,
+  parseTreeHash,
   type MigrateProjectDeps,
   type ServerConnection
 } from '../../src/core/tools/migrate-project-tool'
@@ -14,6 +16,7 @@ import { planRemoteRuntime, type RemoteHost } from '../../src/main/agent-service
 import type { AuditEntry } from '../../src/core/agent/audit-log'
 
 const TARGET: ServerConnection = { host: '10.0.0.9', port: 2222, username: 'deploy' }
+const FAKE_HASH = 'a'.repeat(64)
 
 interface FakeSsh extends MigrateProjectDeps {
   connections: Record<string, ServerConnection>
@@ -40,6 +43,9 @@ function fakeSsh(
     resolveServer: async (id) => connections[id],
     exec: async (serverId, command): Promise<VpsExecResult> => {
       execCalls.push({ serverId, command })
+      if (command.includes('sha256sum')) {
+        return { ok: true, stdout: `${FAKE_HASH}  -\n`, stderr: '', exitCode: 0 }
+      }
       return { ok: true, stdout: 'sent 1.2K bytes', stderr: '', exitCode: 0, ...options.result }
     },
     audit: async (entry) => {
@@ -136,7 +142,7 @@ describe('executeMigrateProject', () => {
     const result = await executeMigrateProject(deps, ARGS)
 
     expect(result.ok).toBe(true)
-    expect(deps.execCalls).toHaveLength(2)
+    expect(deps.execCalls).toHaveLength(4)
     expect(deps.execCalls[0]!.serverId).toBe('srv-1')
     expect(deps.execCalls[0]!.command).toContain('--dry-run')
     expect(deps.execCalls[0]!.command).not.toContain('--delete')
@@ -144,6 +150,8 @@ describe('executeMigrateProject', () => {
     expect(real.command).toContain('rsync -az --info=stats2')
     expect(real.command).toContain("'deploy@10.0.0.9:/srv/app/'")
     expect(real.command).not.toContain('--delete')
+    expect(deps.execCalls[2]!.command).toContain('sha256sum')
+    expect(deps.execCalls[3]!.command).toContain('ssh -p 2222')
     expect(result.content).toContain('sent 1.2K bytes')
   })
 
@@ -282,3 +290,44 @@ describe('planRemoteRuntime migration injection', () => {
     expect(names).not.toContain('migrate_project')
   })
 })
+
+describe('checksum verification (v2.4 B.3)', () => {
+  it('parses and compares tree hashes', () => {
+    const hash = 'b'.repeat(64)
+    expect(parseTreeHash(`random\n${hash}  -\n`)).toBe(hash)
+    expect(parseTreeHash('no digest here')).toBeUndefined()
+    expect(compareTreeHashes(hash, hash).ok).toBe(true)
+    expect(compareTreeHashes(hash, 'c'.repeat(64)).ok).toBe(false)
+    expect(compareTreeHashes(undefined, hash).ok).toBe(false)
+    expect(compareTreeHashes(hash, undefined).ok).toBe(false)
+  })
+
+  it('fails the migration when the target hash differs', async () => {
+    const deps = fakeSsh()
+    let hashCalls = 0
+    deps.exec = async (serverId, command) => {
+      deps.execCalls.push({ serverId, command })
+      if (command.includes('sha256sum')) {
+        hashCalls++
+        const stdout = hashCalls === 1 ? `${'a'.repeat(64)}  -\n` : `${'d'.repeat(64)}  -\n`
+        return { ok: true, stdout, stderr: '', exitCode: 0 }
+      }
+      return { ok: true, stdout: 'sent 1.2K bytes', stderr: '', exitCode: 0 }
+    }
+
+    const result = await executeMigrateProject(deps, ARGS)
+
+    expect(result.ok).toBe(false)
+    expect(result.content).toContain('Checksum mismatch')
+  })
+
+  it('skips the checksum when verify_checksum is false', async () => {
+    const deps = fakeSsh()
+    const result = await executeMigrateProject(deps, { ...ARGS, verify_checksum: false })
+
+    expect(result.ok).toBe(true)
+    expect(deps.execCalls).toHaveLength(2)
+    expect(deps.execCalls.some((call) => call.command.includes('sha256sum'))).toBe(false)
+  })
+})
+

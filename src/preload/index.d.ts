@@ -26,6 +26,7 @@ import type {
   RemoteWorkspaceInfo
 } from '@shared/workspace-info'
 import type { SystemHealth } from '@shared/system-health'
+import type { Job } from '@shared/jobs'
 import type {
   GitCommitInput,
   GitOpResult,
@@ -182,6 +183,13 @@ export interface Api {
   }
   shell: {
     exec(command: string): Promise<LocalShellResult>
+  }
+
+  jobs: {
+    list(): Promise<Job[]>
+    refresh(): Promise<Job[]>
+    status(id: string): Promise<Job | undefined>
+    kill(id: string): Promise<boolean>
   }
   search: {
     code(query: string): Promise<CodeMatch[]>

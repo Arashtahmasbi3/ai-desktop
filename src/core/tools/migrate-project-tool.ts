@@ -21,6 +21,11 @@ export const MIGRATE_PROJECT_TOOL: ToolDefinition = {
       dry_run: {
         type: 'boolean',
         description: 'Only report what would transfer; do not copy anything.'
+      },
+      verify_checksum: {
+        type: 'boolean',
+        description:
+          'After transferring, hash every file on both sides and fail on mismatch (default true).'
       }
     },
     required: ['source_vps_id', 'source_path', 'target_vps_id', 'target_path'],
@@ -140,6 +145,25 @@ function toInt(raw: string | undefined): number {
   return Number.isFinite(value) ? value : 0
 }
 
+/**
+ * rsync a single file from the source host (where this runs) to a saved target.
+ * Used by the v2.4.1 database/docker pipelines to move one dump/archive file.
+ */
+export function buildFileTransferCommand(
+  fromPath: string,
+  target: ServerConnection,
+  toPath: string
+): string {
+  const directory = toPath.replace(/[^/]+$/, '')
+  const ssh = `ssh -p ${target.port} -o BatchMode=yes -o StrictHostKeyChecking=accept-new`
+  const to = `${target.username}@${target.host}:${toPath}`
+  // Create the destination directory first so rsync does not fail on a missing dir.
+  return (
+    `mkdir -p ${shellQuote(directory)} && ` +
+    `rsync -az -e ${shellQuote(ssh)} ${shellQuote(fromPath)} ${shellQuote(to)}`
+  )
+}
+
 /** Parse the `--info=stats2` summary rsync prints (works for dry-run too). */
 export function parseRsyncStats(stdout: string): RsyncPlan {
   const match = (re: RegExp): string | undefined => re.exec(stdout)?.[1]
@@ -169,6 +193,43 @@ export function formatBytes(bytes: number): string {
     unit += 1
   }
   return `${value.toFixed(1)} ${units[unit]}`
+}
+
+// --- v2.4 B.3: checksum verification after a transfer ---
+
+/**
+ * Command that hashes the contents of every file under `path` into a single digest.
+ * `find … -exec sha256sum` is POSIX and survives filenames with spaces.
+ */
+export function buildTreeHashCommand(path: string): string {
+  return `cd ${shellQuote(path)} && find . -type f -exec sha256sum {} \\; | sort | sha256sum`
+}
+
+/** Run the tree hash on `path` over `target` from the source host. */
+export function buildTreeHashViaSshCommand(target: ServerConnection, path: string): string {
+  const destination = shellQuote(`${target.username}@${target.host}`)
+  return `ssh -p ${target.port} -o BatchMode=yes ${destination} ${shellQuote(buildTreeHashCommand(path))}`
+}
+
+/** Extract the first 64-hex digest from sha256sum output. */
+export function parseTreeHash(stdout: string): string | undefined {
+  const match = stdout.match(/\b([0-9a-f]{64})\b/i)
+  return match ? match[1]!.toLowerCase() : undefined
+}
+
+export interface ChecksumComparison {
+  ok: boolean
+  message: string
+}
+
+/** Compare source and target tree digests (both must be present and equal). */
+export function compareTreeHashes(source?: string, target?: string): ChecksumComparison {
+  if (!source) return { ok: false, message: 'Could not compute the source checksum.' }
+  if (!target) return { ok: false, message: 'Could not compute the target checksum.' }
+  if (source !== target) {
+    return { ok: false, message: `Checksum mismatch! Transfer may be incomplete (${source.slice(0, 12)} != ${target.slice(0, 12)}).` }
+  }
+  return { ok: true, message: `Checksum verified (${source.slice(0, 12)}).` }
 }
 
 /** The preview block surfaced to the user before a real migration. */
@@ -267,12 +328,39 @@ export async function executeMigrateProject(
     if (!result.ok) {
       return fail(`${preview}\n\n${output || `rsync exited with code ${result.exitCode}`}`)
     }
+
+    // Step 3 (v2.4 B.3): verify the copy by hashing both trees, unless disabled.
+    let checksumNote = ''
+    if (args.verify_checksum !== false) {
+      const sourceHashRes = await deps.exec(sourceId, buildTreeHashCommand(sourcePath))
+      const targetHashRes = await deps.exec(
+        sourceId,
+        buildTreeHashViaSshCommand(target, targetPath)
+      )
+      const comparison = compareTreeHashes(
+        parseTreeHash(sourceHashRes.stdout),
+        parseTreeHash(targetHashRes.stdout)
+      )
+      if (!comparison.ok) {
+        await deps.audit?.({
+          type: 'exec',
+          ok: false,
+          serverId: sourceId,
+          command: `checksum ${sourcePath} -> ${targetId}:${targetPath}`,
+          detail: comparison.message
+        })
+        return fail(`${preview}\n\n${comparison.message}`)
+      }
+      checksumNote = comparison.message
+    }
+
     return {
       ok: true,
       content:
         `${preview}\n\n` +
         (output ||
-          `Migrated ${sourcePath} to ${target.username}@${target.host}:${targetPath} (exit 0)`),
+          `Migrated ${sourcePath} to ${target.username}@${target.host}:${targetPath} (exit 0)`) +
+        (checksumNote ? `\n${checksumNote}` : ''),
       plan
     }
   } catch (error) {

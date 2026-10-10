@@ -44,14 +44,14 @@ describe('remote_shell tool injection', () => {
 
   it('injects remote_shell when the task mentions a VPS and one is connected', () => {
     const runtime = planRemoteRuntime('restart nginx on my vps', undefined, fakeHost(['srv-1']))
-    expect(runtime.extraTools?.map((tool) => tool.name)).toEqual([REMOTE_SHELL_TOOL.name])
+    expect(runtime.extraTools?.map((tool) => tool.name)).toContain(REMOTE_SHELL_TOOL.name)
     expect(runtime.extraExecutor).toBeDefined()
     expect(runtime.systemHint).toContain('srv-1')
   })
 
   it('injects remote_shell when the user explicitly selects a connected VPS', () => {
     const runtime = planRemoteRuntime('list the files', 'srv-2', fakeHost(['srv-1', 'srv-2']))
-    expect(runtime.extraTools).toHaveLength(1)
+    expect(runtime.extraTools?.map((tool) => tool.name)).toContain(REMOTE_SHELL_TOOL.name)
     expect(runtime.systemHint).toContain('srv-2')
   })
 

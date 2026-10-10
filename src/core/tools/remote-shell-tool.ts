@@ -18,9 +18,21 @@ export const REMOTE_SHELL_TOOL: ToolDefinition = {
   }
 }
 
+/**
+ * Detached long-running job support (v2.4, A.1). Optional so existing callers keep
+ * their synchronous behaviour; when present, commands expected to outlive the
+ * request are handed off instead of awaited.
+ */
+export interface RemoteJobRunner {
+  shouldRunAsJob(command: string): boolean
+  startLongJob(vpsId: string, command: string): Promise<{ id: string; strategy: string }>
+}
+
 export interface RemoteShellDeps {
   exec(serverId: string, command: string, timeoutMs?: number): Promise<VpsExecResult>
   connectedServers(): string[]
+  /** When set, long commands are detached and tracked as jobs. */
+  jobs?: RemoteJobRunner
 }
 
 /**
@@ -46,6 +58,8 @@ export interface RemoteShellResult {
   content: string
   blocked?: boolean
   timedOut?: boolean
+  /** Set when the command was detached as a long-running job (v2.4, A.1). */
+  jobId?: string
 }
 
 /** Rejects its promise after `ms`, carrying the timeout marker. */
@@ -83,6 +97,20 @@ export async function executeRemoteShell(
   const denial = checkDenyList(command)
   if (denial.blocked) {
     return { ok: false, blocked: true, content: `Blocked by policy: ${denial.reason}` }
+  }
+  // Long commands are detached so closing the app no longer kills the work.
+  if (deps.jobs?.shouldRunAsJob(command)) {
+    try {
+      const job = await deps.jobs.startLongJob(serverId, command)
+      return {
+        ok: true,
+        jobId: job.id,
+        content: `Started background job #${job.id} (${job.strategy}) for: ${command}\nThe job keeps running on the host. Poll it or view its log.`
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      return { ok: false, content: `Failed to start background job: ${message}` }
+    }
   }
   const timeoutMs = getCommandTimeout(command)
   let result: VpsExecResult

@@ -17,6 +17,7 @@ import type { ChatSummary, StoredMessage } from '@shared/chat'
 import type { Locale } from './i18n/locale'
 import { detectLocale } from './i18n/locale'
 import { VPS_RECONNECT_KEY } from './lib/vps-state'
+import { readEnabledTools } from './lib/tool-toggles'
 import { redact } from '@core/agent/redact'
 import i18n from './i18n'
 import type {
@@ -61,6 +62,8 @@ export interface ChatMessage {
   model?: string
   /** True when this assistant turn used the remote_shell tool. */
   usedRemote?: boolean
+  /** v2.4.1: which tool ran and whether it succeeded (role === 'tool'). */
+  toolCall?: { name: string; ok: boolean; detail?: string }
 }
 
 const MAX_LOGS = 500
@@ -729,6 +732,7 @@ export const useStore = create<AppState>((set, get) => ({
         if (entry.event === 'action.ok' || entry.event === 'action.error') {
           const tool = String(entry.tool ?? 'tool')
           const code = entry.code !== undefined ? ` (${String(entry.code)})` : ''
+          const detail = typeof entry.message === 'string' ? entry.message : undefined
           set({
             messages: [
               ...get().messages,
@@ -736,7 +740,8 @@ export const useStore = create<AppState>((set, get) => ({
                 id: newId(),
                 role: 'tool',
                 content: `${tool}${code}`,
-                at: Date.now()
+                at: Date.now(),
+                toolCall: { name: tool, ok: entry.event === 'action.ok', ...(detail ? { detail } : {}) }
               }
             ]
           })
@@ -813,6 +818,7 @@ export const useStore = create<AppState>((set, get) => ({
         model: selection.model,
         ...(selection.customProviderId ? { customProviderId: selection.customProviderId } : {}),
         ...(get().vpsServerId ? { vpsServerId: get().vpsServerId } : {}),
+        enabledTools: readEnabledTools(),
         planMode: get().planMode
       })
     } catch (error) {

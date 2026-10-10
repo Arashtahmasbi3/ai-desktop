@@ -37,6 +37,9 @@ function fakeSsh(
     resolveServer: async (id) => servers[id],
     exec: async (serverId, command): Promise<VpsExecResult> => {
       execCalls.push({ serverId, command })
+      if (command.includes('sha256sum')) {
+        return { ok: true, stdout: `${'a'.repeat(64)}  -\n`, stderr: '', exitCode: 0 }
+      }
       return { ok: true, stdout: 'ok', stderr: '', exitCode: 0, ...options.result }
     },
     audit: async (entry) => {
@@ -122,8 +125,8 @@ describe('migrate_project: sensitive system paths', () => {
     const deps = fakeSsh()
     const result = await executeMigrateProject(deps, args())
     expect(result.ok).toBe(true)
-    // One dry-run plus the real transfer.
-    expect(deps.execCalls).toHaveLength(2)
+    // One dry-run, the real transfer, and two checksum hashes (v2.4 B.3).
+    expect(deps.execCalls).toHaveLength(4)
     expect(deps.execCalls[0]!.command).toContain('--dry-run')
     expect(deps.execCalls[1]!.command).not.toContain('--dry-run')
   })

@@ -32,6 +32,7 @@ import LoopStopCard from './LoopStopCard'
 import ApprovalDialog from './ApprovalDialog'
 import PlanCard from './PlanCard'
 import ProgressTimeline from './ProgressTimeline'
+import JobsPanel from './JobsPanel'
 import MicButton from './MicButton'
 import { FullAccessBanner, FullAccessToggle } from './FullAccessToggle'
 import { filterSlashCommands, resolveSlashCommand } from '../lib/slash'
@@ -421,6 +422,7 @@ export default function ChatPanel(): JSX.Element {
       </div>
       {timelineOpen ? <ProgressTimeline /> : null}
       </div>
+      <JobsPanel />
 
       {!atBottom && messages.length > 0 ? (
         <button
