@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Loop detector false positives (v2.4.2)** — the per-tool-call guard counted
+  repeats by tool *name*, so a legitimate script such as `remote_shell(pwd)` →
+  `remote_shell(ls)` → `remote_shell(cat)` tripped the 5-repeat STOP. The guard
+  now keys on the normalised call identity (`computeLoopHash`): the command for
+  shell tools, the path for filesystem tools, and the stable-serialised
+  arguments otherwise. Identical repeats still warn on the 3rd and stop on the
+  5th call.
+- A successful `run_command` / `remote_shell` is now treated as loop progress and
+  resets the window, so a long run of distinct-but-successful shell commands no
+  longer stops early. The step-level analyzer still surfaces genuinely repeated
+  commands.
+
 ## [2.4.1] — 2026-10-05
 
 Sprint v2.4.1 "Wiring" — the v2.4 modules are now real agent tools, toggleable
