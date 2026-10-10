@@ -51,7 +51,12 @@ fails, a tool is missing, or the budget ran out — ask rather than guess).
 
 ## Status
 
-**v2.3.3 in review (PR #2); v2.3.2 released. Next: Windows `build:win` + release.** (2026-10-05)
+**v2.3.3 merged to master (no release). Pending v2.4 for full source-doc compliance. Release will happen after v2.4.** (2026-10-05)
+
+- `master` at merge `e16e13f` (`Merge v2.3.3: Git-Aware Agent + Self-Diagnosis`,
+  `--no-ff` from `feature/v2.3.3-git-aware`). **No tag and no GitHub Release** for
+  v2.3.3 by decision — the release is deferred until after Sprint v2.4.
+- Latest actual release remains **v2.3.2**.
 
 - Latest release: **v2.3.2 (full release)** — installer + portable exe published on a GitHub
   Release with `SHA256SUMS.txt`
