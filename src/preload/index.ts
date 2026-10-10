@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { CustomProviderInput, CustomProviderTestResult, CustomProviderView, ProviderId } from '@shared/types'
 import type { OnboardingStatus } from '@shared/onboarding'
 import type { ApprovalMode, ApprovalHistoryEntry, ApprovalOutcome, ApprovedCommandView } from '@shared/approval'
+import type { PlanDecision } from '@shared/plan'
 import type { ChatSaveInput, ChatSummary, StoredChat } from '@shared/chat'
 import type {
   AuditEntryView,
@@ -178,6 +179,8 @@ export const api = {
     abort: (): Promise<void> => invoke('agent:abort'),
     respondApproval: (id: string, answer: boolean | ApprovalOutcome): Promise<boolean> =>
       invoke('agent:respondApproval', id, answer),
+    respondPlan: (id: string, decision: PlanDecision): Promise<boolean> =>
+      invoke('agent:respondPlan', id, decision),
     approvalHistory: (): Promise<ApprovalHistoryEntry[]> => invoke('agent:approvalHistory'),
     approvedCommands: (): Promise<ApprovedCommandView[]> => invoke('agent:approvedCommands'),
     revokeApprovedCommand: (id: string): Promise<boolean> =>

@@ -2,6 +2,7 @@ import type { AgentLogEntry, AgentStatus, LoopStopInfo, LoopWarning } from './ag
 import type { ChatMessage, ProviderId } from './types'
 import type { VpsConnectionState } from './vps'
 import type { ApprovalMode } from './approval'
+import type { Plan, PlanDecision, PlanWarning } from './plan'
 
 /** A project (folder) the user has added to the app. */
 export interface ProjectRecord {
@@ -144,6 +145,14 @@ export interface FileChangeView {
 
 export type FileChangeStatus = 'accepted' | 'rejected'
 
+/** A plan awaiting the user's approval (v2.3.2, A.5). */
+export interface PlanRequest {
+  id: string
+  runId: string
+  plan: Plan
+  warnings: PlanWarning[]
+}
+
 export type AgentEvent =
   | { type: 'run:start'; runId: string; task: string; at: number }
   | {
@@ -163,6 +172,8 @@ export type AgentEvent =
   | { type: 'log'; entry: AgentLogEntry }
   | { type: 'approval:request'; request: ApprovalRequest }
   | { type: 'approval:suggestion'; tool: string; count: number }
+  | { type: 'plan:request'; request: PlanRequest }
+  | { type: 'plan:resolved'; id: string; decision: PlanDecision; at: number }
   | { type: 'file:change'; change: FileChangeView; at: number }
   | { type: 'file:change:resolved'; id: string; status: FileChangeStatus; at: number }
   | { type: 'error'; runId: string; message: string }

@@ -6,6 +6,7 @@ import type {
 } from '@shared/types'
 import type { OnboardingStatus } from '@shared/onboarding'
 import type { ApprovalMode, ApprovalHistoryEntry, ApprovalOutcome, ApprovedCommandView } from '@shared/approval'
+import type { PlanDecision } from '@shared/plan'
 import type { ChatSaveInput, ChatSummary, StoredChat } from '@shared/chat'
 import type {
   AuditEntryView,
@@ -142,6 +143,7 @@ export interface Api {
     run(request: AgentRunRequest): Promise<unknown>
     abort(): Promise<void>
     respondApproval(id: string, answer: boolean | ApprovalOutcome): Promise<boolean>
+    respondPlan(id: string, decision: PlanDecision): Promise<boolean>
     approvalHistory(): Promise<ApprovalHistoryEntry[]>
     approvedCommands(): Promise<ApprovedCommandView[]>
     revokeApprovedCommand(id: string): Promise<boolean>

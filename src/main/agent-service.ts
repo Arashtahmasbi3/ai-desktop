@@ -26,6 +26,7 @@ import { CompositeToolExecutor, type ToolRoute } from '@core/tools/composite-exe
 import { routeToolCall, remoteWorkspaceHint } from '@core/agent/remote-routing'
 import type { RoutingDecision } from '@core/agent/remote-routing'
 import { DEFAULT_APPROVAL_MODE } from '@core/agent/approval'
+import type { Plan, PlanDecision, PlanWarning } from '@shared/plan'
 import { createApprovalGate } from './approval-gate'
 import type { ApprovalOutcome } from '@shared/approval'
 import type { ApprovedCommands } from '@core/agent/approved-commands'
@@ -227,6 +228,10 @@ export interface AgentServiceOptions {
   requestApproval?: (runId: string, action: AgentAction) => Promise<ApprovalOutcome>
   /** Deny any outstanding approval requests (e.g. the user aborted). */
   cancelApprovals?: () => void
+  /** Ask the user to approve a plan before mutating tool calls run (A.5). */
+  requestPlan?: (runId: string, plan: Plan, warnings: PlanWarning[]) => Promise<PlanDecision>
+  /** Cancel any outstanding plan requests (e.g. the user aborted). */
+  cancelPlans?: () => void
   /** Learned approvals that suppress future prompts (Sprint v2.3, B.3). */
   approvedCommands?: ApprovedCommands
   /** Optional: enables chat review of agent edits (apply/reject). */
@@ -266,6 +271,12 @@ export class AgentService {
   private readonly vps?: RemoteHost
   private readonly requestApproval?: (runId: string, action: AgentAction) => Promise<ApprovalOutcome>
   private readonly cancelApprovals?: () => void
+  private readonly requestPlan?: (
+    runId: string,
+    plan: Plan,
+    warnings: PlanWarning[]
+  ) => Promise<PlanDecision>
+  private readonly cancelPlans?: () => void
   private readonly approvedCommands?: ApprovedCommands
   private readonly files?: ProjectFiles
   private readonly controllers = new Set<AbortController>()
@@ -283,6 +294,8 @@ export class AgentService {
     if (options.vps) this.vps = options.vps
     this.requestApproval = options.requestApproval
     this.cancelApprovals = options.cancelApprovals
+    this.requestPlan = options.requestPlan
+    this.cancelPlans = options.cancelPlans
     if (options.approvedCommands) this.approvedCommands = options.approvedCommands
     if (options.files) this.files = options.files
   }
@@ -447,6 +460,12 @@ export class AgentService {
         })
       : undefined
 
+    const requestPlan = this.requestPlan
+    const planGate = requestPlan
+      ? (plan: Plan, warnings: PlanWarning[]): Promise<PlanDecision> =>
+          requestPlan(runId, plan, warnings)
+      : undefined
+
     const orchestrator = new AgentOrchestrator({
       sandbox: this.sandbox,
       providers,
@@ -457,6 +476,7 @@ export class AgentService {
       ...(systemHint ? { systemHint } : {}),
       ...(planMode ? { planMode: true } : {}),
       ...(approvalGate ? { approvalGate } : {}),
+      ...(planGate ? { planGate, planApproval: approvalMode } : {}),
       ...(this.files
         ? { onFileWritten: (change: FileChange) => this.captureChange(runId, request.sessionId, change) }
         : {})
@@ -500,6 +520,7 @@ export class AgentService {
   abort(): void {
     for (const controller of this.controllers) controller.abort()
     this.cancelApprovals?.()
+    this.cancelPlans?.()
   }
   /** Records an agent edit and surfaces it in the chat for review. */
   private captureChange(runId: string, sessionId: string | undefined, change: FileChange): void {

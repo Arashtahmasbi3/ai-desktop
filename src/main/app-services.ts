@@ -11,6 +11,7 @@ import { WorkerManager } from '@core/worker/worker-manager'
 import { RemoteServer } from '@core/remote/remote-server'
 import { AgentService } from './agent-service'
 import { ApprovalBroker } from './approval-broker'
+import { PlanBroker } from './plan-broker'
 import { FileService } from './file-service'
 import { ChatStore } from './chat-store'
 import {
@@ -69,6 +70,7 @@ export class AppServices {
   readonly sandbox: SandboxManager
   readonly agent: AgentService
   readonly approvals: ApprovalBroker
+  readonly plans: PlanBroker
   readonly approvedCommands: ApprovedCommands
   readonly worker: WorkerManager
   readonly remote: RemoteServer
@@ -101,6 +103,9 @@ export class AppServices {
     this.approvals = new ApprovalBroker({
       emit: (event: AgentEvent) => this.emit('agent:event', event)
     })
+    this.plans = new PlanBroker({
+      emit: (event: AgentEvent) => this.emit('agent:event', event)
+    })
     this.approvedCommands = new ApprovedCommands({
       file: join(this.dir, 'approved-commands.json')
     })
@@ -113,6 +118,8 @@ export class AppServices {
       requestApproval: async (runId, action) =>
         this.approvals.request(runId, action, await this.approvalContext()),
       cancelApprovals: () => this.approvals.cancelAll(),
+      requestPlan: async (runId, plan, warnings) => this.plans.request(runId, plan, warnings),
+      cancelPlans: () => this.plans.cancelAll(),
       approvedCommands: this.approvedCommands,
       files: this.files,
       emit: (event: AgentEvent) => this.emit('agent:event', event)

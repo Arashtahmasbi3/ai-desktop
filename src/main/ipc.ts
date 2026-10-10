@@ -1,6 +1,7 @@
 import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import type { CustomProviderInput, ProviderId } from '@shared/types'
 import type { ApprovalMode, ApprovalOutcome } from '@shared/approval'
+import type { PlanDecision } from '@shared/plan'
 import type { GitCommitInput } from '@shared/github'
 import type { AgentRunRequest, WorkerJobRequest } from '@shared/ui'
 import type { AppServices } from './app-services'
@@ -232,6 +233,7 @@ export function registerIpc(
     ['agent:run', (request: AgentRunRequest) => services.agent.run(request)],
     ['agent:abort', () => services.agent.abort()],
     ['agent:respondApproval', (id: string, answer: boolean | ApprovalOutcome) => services.approvals.resolve(id, answer)],
+    ['agent:respondPlan', (id: string, decision: PlanDecision) => services.plans.resolve(id, decision)],
     ['agent:approvalHistory', () => services.approvals.history()],
     ['agent:approvedCommands', () => services.approvedCommands.list()],
     ['agent:revokeApprovedCommand', (id: string) => services.approvedCommands.revoke(id)],

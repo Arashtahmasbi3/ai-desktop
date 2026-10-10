@@ -25,6 +25,7 @@ import VpsSelector from './VpsSelector'
 import ProviderWarning from './ProviderWarning'
 import LoopStopCard from './LoopStopCard'
 import ApprovalDialog from './ApprovalDialog'
+import PlanCard from './PlanCard'
 import ProgressTimeline from './ProgressTimeline'
 import MicButton from './MicButton'
 import { FullAccessBanner, FullAccessToggle } from './FullAccessToggle'
@@ -563,6 +564,7 @@ export default function ChatPanel(): JSX.Element {
         ) : null}
       </div>
 
+      <PlanCard />
       <ApprovalDialog />
     </section>
   )

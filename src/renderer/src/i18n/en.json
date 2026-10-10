@@ -356,5 +356,18 @@
     "done": "Completed",
     "stopped": "Paused for input",
     "empty": "No activity yet."
+  },
+  "plan": {
+    "title": "Plan",
+    "subtitle": "Review the steps before they run.",
+    "approve": "Approve plan",
+    "modify": "Modify",
+    "cancel": "Cancel",
+    "applyEdit": "Run modified plan",
+    "editHint": "Edit the command or path for each step, then run.",
+    "command": "Command / path",
+    "warningTooLong": "This plan is long ({{count}} steps). Consider splitting it.",
+    "warningLoop": "This plan repeats the previous one.",
+    "warningEmpty": "This plan has no steps."
   }
 }
