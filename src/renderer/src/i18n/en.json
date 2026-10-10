@@ -57,7 +57,9 @@
     "remoteMissing": "VPS not connected",
     "noProject": "No project",
     "osMismatch": "Path from another OS",
-    "recents": "Recents"
+    "recents": "Recents",
+    "local": "local",
+    "policyMismatch": "Project policy differs from the host policy"
   },
   "chat": {
     "placeholder": "Do anything",
@@ -173,7 +175,11 @@
     "remoteNoPath": "Set the remote path for this project",
     "reconnect": "Reconnect",
     "selectVps": "Select VPS",
-    "setPath": "Set path"
+    "setPath": "Set path",
+    "policyWarningTitle": "This command is outside the project policy",
+    "policyWarningMode": "Current policy: {{mode}}",
+    "policyWarningProceed": "Proceed anyway",
+    "policyWarningCancel": "Cancel"
   },
   "vpsSelector": {
     "label": "VPS",

@@ -11,6 +11,8 @@ import {
   X
 } from 'lucide-react'
 import { useStore } from '../store'
+import { evaluateProjectCommandWarning } from '../lib/policy-warning'
+import PolicyWarningBanner from './PolicyWarningBanner'
 import type {
   ApprovalHistoryEntry,
   ApprovalOutcome,
@@ -66,6 +68,8 @@ export default function ApprovalDialog(): JSX.Element | null {
   const { t } = useTranslation()
   const request = useStore((state) => state.pendingApproval)
   const respondApproval = useStore((state) => state.respondApproval)
+  const settings = useStore((state) => state.settings)
+  const servers = useStore((state) => state.vpsServers)
   const [rememberCommand, setRememberCommand] = useState(false)
   const [rememberTool, setRememberTool] = useState(false)
   const [rememberSession, setRememberSession] = useState(false)
@@ -96,6 +100,14 @@ export default function ApprovalDialog(): JSX.Element | null {
   }, [request])
 
   if (!request) return null
+
+  const activeProject = settings?.projects.find((p) => p.id === settings.activeProjectId)
+  const projectPolicy =
+    activeProject?.policy ?? servers.find((server) => server.id === activeProject?.vpsId)?.policy
+  const policyWarning = evaluateProjectCommandWarning(
+    projectPolicy,
+    request.preview ?? request.summary
+  )
 
   const pick = (scope: ApprovalRememberScope): void => {
     setRememberCommand(scope === 'action')
@@ -150,6 +162,14 @@ export default function ApprovalDialog(): JSX.Element | null {
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             {t('chat.approvalDangerous')}
           </p>
+        ) : null}
+
+        {policyWarning ? (
+          <PolicyWarningBanner
+            warning={policyWarning}
+            onProceed={() => respondApproval({ approved: true })}
+            onCancel={() => respondApproval(false)}
+          />
         ) : null}
 
         <div className="mt-3 flex flex-wrap items-center gap-2 text-[10px] text-neutral-500">

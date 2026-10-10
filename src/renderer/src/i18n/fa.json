@@ -57,7 +57,9 @@
     "remoteMissing": "VPS متصل نیست",
     "noProject": "بدون پروژه",
     "osMismatch": "مسیر از سیستم‌عامل دیگر",
-    "recents": "اخیر"
+    "recents": "اخیر",
+    "local": "محلی",
+    "policyMismatch": "سیاست پروژه با سیاست میزبان تفاوت دارد"
   },
   "chat": {
     "placeholder": "هر کاری انجام بده",
@@ -173,7 +175,11 @@
     "remoteNoPath": "مسیر ریموت این پروژه را تنظیم کنید",
     "reconnect": "اتصال مجدد",
     "selectVps": "انتخاب VPS",
-    "setPath": "تنظیم مسیر"
+    "setPath": "تنظیم مسیر",
+    "policyWarningTitle": "این دستور خارج از سیاست پروژه است",
+    "policyWarningMode": "سیاست فعلی: {{mode}}",
+    "policyWarningProceed": "با این حال ادامه بده",
+    "policyWarningCancel": "لغو"
   },
   "vpsSelector": {
     "label": "VPS",
