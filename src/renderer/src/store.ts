@@ -65,6 +65,7 @@ export interface ChatMessage {
 const MAX_LOGS = 500
 const MAX_TERMINAL_LINES = 500
 const TOKEN_SETTINGS_KEY = 'ai-desktop:show-token-count'
+const CONTEXT_SETTINGS_KEY = 'ai-desktop:show-context-before-send'
 const CHAT_TREE_KEY = 'ai-desktop:chat-tree-open'
 const LAST_CHAT_KEY = 'ai-desktop:last-chat'
 const AUTOSAVE_INTERVAL_MS = 30_000
@@ -79,6 +80,14 @@ function newId(): string {
 function readShowTokenCount(): boolean {
   try {
     return globalThis.localStorage?.getItem(TOKEN_SETTINGS_KEY) !== '0'
+  } catch {
+    return true
+  }
+}
+
+function readShowContextBeforeSend(): boolean {
+  try {
+    return globalThis.localStorage?.getItem(CONTEXT_SETTINGS_KEY) !== '0'
   } catch {
     return true
   }
@@ -161,6 +170,8 @@ interface AppState {
   sidebarCollapsed: boolean
   /** Whether the token estimate is shown under the chat input. */
   showTokenCount: boolean
+  /** Whether the context preview is shown before each send (v2.3.2, B.4). */
+  showContextBeforeSend: boolean
   /** Saved chats for the sidebar list. */
   chats: ChatSummary[]
   /** Currently open chat id (created lazily on first message). */
@@ -201,6 +212,8 @@ interface AppState {
   setLocale: (locale: Locale) => void
   toggleSidebar: () => void
   setShowTokenCount: (value: boolean) => void
+  /** Toggle the pre-send context preview. */
+  setShowContextBeforeSend: (value: boolean) => void
   refreshChats: () => Promise<void>
   /** Save the current messages/model/vps as the active chat. */
   persistChat: () => Promise<void>
@@ -325,6 +338,7 @@ export const useStore = create<AppState>((set, get) => ({
   locale: detectLocale(),
   sidebarCollapsed: false,
   showTokenCount: readShowTokenCount(),
+  showContextBeforeSend: readShowContextBeforeSend(),
   chats: [],
   activeChatId: null,
   vpsServerId: undefined,
@@ -353,6 +367,14 @@ export const useStore = create<AppState>((set, get) => ({
     set({ showTokenCount: value })
     try {
       globalThis.localStorage?.setItem(TOKEN_SETTINGS_KEY, value ? '1' : '0')
+    } catch {
+      // Persisting the preference is best-effort.
+    }
+  },
+  setShowContextBeforeSend(value) {
+    set({ showContextBeforeSend: value })
+    try {
+      globalThis.localStorage?.setItem(CONTEXT_SETTINGS_KEY, value ? '1' : '0')
     } catch {
       // Persisting the preference is best-effort.
     }

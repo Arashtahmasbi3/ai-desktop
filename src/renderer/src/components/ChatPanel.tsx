@@ -5,6 +5,7 @@ import {
   ArrowDown,
   Activity,
   Bot,
+  Eye,
   Loader2,
   PanelLeft,
   Paperclip,
@@ -16,7 +17,10 @@ import {
   X
 } from 'lucide-react'
 import { basename, useStore } from '../store'
+import { PROVIDERS } from '@shared/providers'
+import { buildContextPreview, type ContextPreview } from '@shared/context-preview'
 import MessageBubble from './MessageBubble'
+import ContextPreviewCard from './ContextPreviewCard'
 import FileChangesPanel from './FileChangesPanel'
 import TemplateMenu from './TemplateMenu'
 import TerminalPanel from './TerminalPanel'
@@ -62,6 +66,8 @@ export default function ChatPanel(): JSX.Element {
   const connectVps = useStore((state) => state.connectVps)
   const addProject = useStore((state) => state.addProject)
   const showTokenCount = useStore((state) => state.showTokenCount)
+  const showContextBeforeSend = useStore((state) => state.showContextBeforeSend)
+  const selection = useStore((state) => state.selection)
   const openSettings = useStore((state) => state.openSettings)
   const setView = useStore((state) => state.setView)
   const planMode = useStore((state) => state.planMode)
@@ -82,6 +88,11 @@ export default function ChatPanel(): JSX.Element {
   const [atBottom, setAtBottom] = useState(true)
   const [commandIndex, setCommandIndex] = useState(0)
   const [timelineOpen, setTimelineOpen] = useState(false)
+  const [contextCard, setContextCard] = useState<{
+    preview: ContextPreview
+    body: string
+    willSend: boolean
+  } | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -185,6 +196,25 @@ export default function ChatPanel(): JSX.Element {
     requestAnimationFrame(() => textareaRef.current?.focus())
   }
 
+  const previewContext = (body: string, willSend: boolean): void => {
+    const preview = buildContextPreview({
+      provider: PROVIDERS[selection.provider]?.label ?? selection.provider,
+      model: selection.model,
+      messages: [...messages, { role: 'user', content: body }],
+      files: attached.map((path) => basename(path)),
+      remotePaths: activeProject?.type === 'remote' ? [activeProject.path] : []
+    })
+    setContextCard({ preview, body, willSend })
+  }
+
+  const doSend = (body: string): void => {
+    if (!body || running) return
+    setInput('')
+    setAttached([])
+    setAtBottom(true)
+    void send(body)
+  }
+
   const submit = (): void => {
     const trimmed = input.trim()
     const command = resolveSlashCommand(commands, trimmed)
@@ -194,10 +224,11 @@ export default function ChatPanel(): JSX.Element {
     }
     const body = [trimmed, ...attached.map((path) => `@${path}`)].filter(Boolean).join('\n')
     if (!body || running) return
-    setInput('')
-    setAttached([])
-    setAtBottom(true)
-    void send(body)
+    if (showContextBeforeSend) {
+      previewContext(body, true)
+      return
+    }
+    doSend(body)
   }
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>): void => {
@@ -545,7 +576,23 @@ export default function ChatPanel(): JSX.Element {
             )}
           </div>
           <div className="mt-1.5 flex items-center justify-between px-1">
-            <FullAccessToggle />
+            <div className="flex items-center gap-2">
+              <FullAccessToggle />
+              <button
+                type="button"
+                onClick={() =>
+                  previewContext(
+                    [input.trim(), ...attached.map((path) => `@${path}`)].filter(Boolean).join('\n'),
+                    false
+                  )
+                }
+                title={t('chat.viewContext')}
+                className="flex items-center gap-1 rounded-lg px-1.5 py-0.5 text-[10px] text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300"
+              >
+                <Eye className="h-3 w-3" />
+                {t('chat.viewContext')}
+              </button>
+            </div>
             {showTokenCount ? (
               <span className="font-mono text-[10px] text-neutral-600">
                 {t('chat.tokens', { count: estimateTokens(input) })}
@@ -566,6 +613,17 @@ export default function ChatPanel(): JSX.Element {
 
       <PlanCard />
       <ApprovalDialog />
+      {contextCard ? (
+        <ContextPreviewCard
+          preview={contextCard.preview}
+          onClose={() => setContextCard(null)}
+          onSend={() => {
+            const body = contextCard.body
+            setContextCard(null)
+            if (contextCard.willSend) doSend(body)
+          }}
+        />
+      ) : null}
     </section>
   )
 }

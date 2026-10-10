@@ -100,6 +100,8 @@ export default function SettingsPanel(): JSX.Element | null {
   const setLocale = useStore((state) => state.setLocale)
   const showTokenCount = useStore((state) => state.showTokenCount)
   const setShowTokenCount = useStore((state) => state.setShowTokenCount)
+  const showContextBeforeSend = useStore((state) => state.showContextBeforeSend)
+  const setShowContextBeforeSend = useStore((state) => state.setShowContextBeforeSend)
 
   const [tab, setTab] = useState<TabId>('general')
   const [projectName, setProjectName] = useState('')
@@ -247,6 +249,15 @@ export default function SettingsPanel(): JSX.Element | null {
                       className="accent-accent"
                     />
                     {t('settings.showTokenCount')}
+                  </label>
+                  <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs text-neutral-300">
+                    <input
+                      type="checkbox"
+                      checked={showContextBeforeSend}
+                      onChange={(event) => setShowContextBeforeSend(event.target.checked)}
+                      className="accent-accent"
+                    />
+                    {t('settings.showContextBeforeSend')}
                   </label>
                 </div>
               </section>
