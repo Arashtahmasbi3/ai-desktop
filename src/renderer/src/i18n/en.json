@@ -433,5 +433,15 @@
     "kill": "Kill",
     "noOutput": "(no output yet)",
     "finishedToast": "Job #{{id}} {{status}}"
+  },
+  "preflight": {
+    "title": "Preflight warnings:",
+    "proceed": "Proceed anyway"
+  },
+  "successWarning": {
+    "title": "AI claims success without verification.",
+    "runTests": "Run tests",
+    "runHealthCheck": "Run health check",
+    "accept": "Accept anyway"
   }
 }

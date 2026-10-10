@@ -26,6 +26,7 @@ import { CompositeToolExecutor, type ToolRoute } from '@core/tools/composite-exe
 import { routeToolCall, remoteWorkspaceHint } from '@core/agent/remote-routing'
 import type { RoutingDecision } from '@core/agent/remote-routing'
 import { detectWorkspace } from '@core/remote/workspace-detect'
+import { preflight, preflightActionFor, type PreflightResult } from '@core/agent/preflight'
 import { buildWorkspaceSystemHint } from '@core/agent/workspace-prompt'
 import type { RemoteWorkspaceInfo } from '@shared/workspace-info'
 import { DEFAULT_APPROVAL_MODE } from '@core/agent/approval'
@@ -470,6 +471,27 @@ export class AgentService {
     return entries
   }
 
+  /**
+   * v2.4 A.2 — build a preflight gate for the active remote project, if any. The
+   * workspace state is read over the existing SSH exec before sensitive actions.
+   */
+  private async buildPreflightGate(): Promise<
+    ((action: AgentAction) => Promise<PreflightResult | undefined>) | undefined
+  > {
+    if (!this.vps) return undefined
+    const project = this.persistence.getActiveProject()
+    if (!project || project.type !== 'remote' || !project.vpsId) return undefined
+    const serverId = project.vpsId
+    if (!this.vps.connectedServers().includes(serverId)) return undefined
+    const path = project.path
+    const vps = this.vps
+    return (action) => {
+      const kind = preflightActionFor(action.name, action.arguments)
+      if (!kind) return Promise.resolve(undefined)
+      return preflight((command) => vps.exec(serverId, command), { path, isGitRepo: true }, kind)
+    }
+  }
+
   async run(request: AgentRunRequest, externalSignal?: AbortSignal): Promise<AgentRunResult> {
     const providers = await this.buildProviders({
       ...(request.provider ? { preferred: request.provider } : {}),
@@ -501,17 +523,21 @@ export class AgentService {
           requestPlan(runId, plan, warnings)
       : undefined
 
+    const preflightGate = await this.buildPreflightGate()
+
     const orchestrator = new AgentOrchestrator({
       sandbox: this.sandbox,
       providers,
       logger: new EmittingLogger(this.emit),
       sessionStore: this.sessionStore,
+      enforceSuccessVerification: true,
       ...(request.sessionId ? { sessionId: request.sessionId } : {}),
       ...remote,
       ...(systemHint ? { systemHint } : {}),
       ...(planMode ? { planMode: true } : {}),
       ...(approvalGate ? { approvalGate } : {}),
       ...(planGate ? { planGate, planApproval: approvalMode } : {}),
+      ...(preflightGate ? { preflightGate } : {}),
       ...(this.files
         ? { onFileWritten: (change: FileChange) => this.captureChange(runId, request.sessionId, change) }
         : {})

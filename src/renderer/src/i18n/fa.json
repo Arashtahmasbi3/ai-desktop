@@ -433,5 +433,15 @@
     "kill": "کشتن",
     "noOutput": "(هنوز خروجیای نیست)",
     "finishedToast": "کار #{{id}} {{status}}"
+  },
+  "preflight": {
+    "title": "هشدارهای پیشپرواز:",
+    "proceed": "با این حال ادامه بده"
+  },
+  "successWarning": {
+    "title": "هوش مصنوعی بدون تأیید ادعای موفقیت میکند.",
+    "runTests": "اجرای تستها",
+    "runHealthCheck": "اجرای health check",
+    "accept": "با این حال بپذیر"
   }
 }

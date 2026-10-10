@@ -629,3 +629,112 @@ describe('AgentOrchestrator Plan Mode gate (v2.3.2, A.5)', () => {
   })
 })
 
+
+describe('preflight gate (v2.4 A.2)', () => {
+  it('blocks an action whose preflight fails', async () => {
+    const manager = createLocalManager(base)
+    let gateCalls = 0
+    const adapter = new ScriptedAdapter('deepseek', [
+      { toolCalls: [toolCall('write_file', { path: 'blocked.txt', content: 'x' })] },
+      { content: 'finished' }
+    ])
+    const orchestrator = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(adapter)],
+      preflightGate: async () => {
+        gateCalls++
+        return {
+          ok: false,
+          checks: [{ name: 'workspace', status: 'fail' as const, message: 'missing' }]
+        }
+      }
+    })
+
+    const result = await orchestrator.run('write a file')
+
+    expect(gateCalls).toBe(1)
+    expect(result.steps[0].observations[0]).toMatchObject({ ok: false, code: 'blocked' })
+    await manager.dispose()
+  })
+
+  it('runs the action when preflight passes', async () => {
+    const manager = createLocalManager(base)
+    const adapter = new ScriptedAdapter('deepseek', [
+      { toolCalls: [toolCall('write_file', { path: 'ok.txt', content: 'x' })] },
+      { content: 'wrote it' }
+    ])
+    const orchestrator = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(adapter)],
+      preflightGate: async () => ({
+        ok: true,
+        checks: [{ name: 'workspace', status: 'pass' as const, message: 'ok' }]
+      })
+    })
+
+    const result = await orchestrator.run('write a file')
+
+    expect(result.steps[0].observations[0]).toMatchObject({ ok: true })
+    await manager.dispose()
+  })
+})
+
+describe('success verification (v2.4 A.3)', () => {
+  it('accepts a success claim backed by a passing verification command', async () => {
+    const manager = createLocalManager(base)
+    const adapter = new ScriptedAdapter('deepseek', [
+      { toolCalls: [toolCall('run_command', { command: 'echo test-ok' })] },
+      { content: 'All done.' }
+    ])
+    const orchestrator = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(adapter)],
+      enforceSuccessVerification: true
+    })
+
+    const result = await orchestrator.run('run the tests')
+
+    expect(result.status).toBe('completed')
+    expect(result.finalAnswer).toBe('All done.')
+    await manager.dispose()
+  })
+
+  it('nudges for verification first, then accepts a non-claim', async () => {
+    const manager = createLocalManager(base)
+    const adapter = new ScriptedAdapter('deepseek', [
+      { content: 'All done.' },
+      { content: 'nothing further to report' }
+    ])
+    const orchestrator = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(adapter)],
+      enforceSuccessVerification: true
+    })
+
+    const result = await orchestrator.run('do something')
+
+    expect(adapter.calls.length).toBe(2)
+    expect(result.status).toBe('completed')
+    await manager.dispose()
+  })
+
+  it('blocks a repeated unverified success claim', async () => {
+    const manager = createLocalManager(base)
+    const adapter = new ScriptedAdapter('deepseek', [
+      { content: 'All done.' },
+      { content: 'All done.' }
+    ])
+    const orchestrator = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(adapter)],
+      enforceSuccessVerification: true
+    })
+
+    const result = await orchestrator.run('do something')
+
+    expect(result.status).toBe('needs_input')
+    expect(result.message).toContain('verification')
+    await manager.dispose()
+  })
+})
+

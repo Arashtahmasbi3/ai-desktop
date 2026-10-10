@@ -54,6 +54,8 @@ import {
 import type { ApprovalMode } from '@shared/approval'
 import type { RoutingDecision } from './agent/remote-routing'
 import type { ToolExecutor, ToolExecOptions } from './agent/tools'
+import { preflightWarnings, type PreflightResult } from './agent/preflight'
+import { verifySuccess, type ToolCallRecord } from './agent/success-verifier'
 
 /** A file that an agent `write_file` action changed during a run. */
 export interface FileChange {
@@ -128,6 +130,16 @@ export interface AgentOrchestratorOptions {
    * contents, so callers can surface a reviewable diff.
    */
   onFileWritten?: (change: FileChange) => void
+  /**
+   * Reliability preflight (v2.4, A.2). Consulted before each action runs; a result
+   * with `ok: false` blocks the action and any warn/fail checks are logged.
+   */
+  preflightGate?: (action: AgentAction) => Promise<PreflightResult | undefined>
+  /**
+   * Enforcement (v2.4, A.3). When true, a final answer that claims success is only
+   * accepted if a verification-shaped tool call (test/build/health) recently passed.
+   */
+  enforceSuccessVerification?: boolean
   now?: () => number
   runIdFactory?: () => string
 }
@@ -297,6 +309,8 @@ export class AgentOrchestrator {
     args: Record<string, unknown>
   ) => RoutingDecision
   private readonly onFileWritten?: (change: FileChange) => void
+  private readonly preflightGate?: (action: AgentAction) => Promise<PreflightResult | undefined>
+  private readonly enforceSuccessVerification: boolean
   private readonly now: () => number
   private readonly runIdFactory: () => string
   private runCounter = 0
@@ -333,6 +347,8 @@ export class AgentOrchestrator {
     this.planApproval = options.planApproval
     this.toolRouting = options.toolRouting
     this.onFileWritten = options.onFileWritten
+    this.preflightGate = options.preflightGate
+    this.enforceSuccessVerification = options.enforceSuccessVerification ?? false
     this.now = options.now ?? (() => Date.now())
     this.runCounter = 0
     this.runIdFactory = options.runIdFactory ?? (() => `run-${++this.runCounter}`)
@@ -454,6 +470,9 @@ export class AgentOrchestrator {
     let status: AgentStatus = 'max_steps'
     let finalAnswer: string | null = null
     let message: string | null = null
+    // v2.4 A.3: recent tool results feed success-claim verification.
+    const recentToolCalls: ToolCallRecord[] = []
+    let verificationNudges = 0
 
     try {
       for (let index = 0; index < this.maxSteps; index++) {
@@ -490,6 +509,39 @@ export class AgentOrchestrator {
         const toolCalls = outcome.response.toolCalls ?? []
 
         if (toolCalls.length === 0) {
+          // v2.4 A.3: don't accept a bare success claim without a recent verification.
+          if (this.enforceSuccessVerification && assistantText) {
+            const verification = verifySuccess(assistantText, recentToolCalls, this.now())
+            if (!verification.allowed) {
+              this.log('warn', 'success.unverified', runId, {
+                step: index,
+                reason: verification.reason ?? 'unverified'
+              })
+              if (verificationNudges < 1) {
+                verificationNudges++
+                context.appendUser(
+                  'Verification required before claiming success: run a test/build/health-check ' +
+                    'command and report its actual result.'
+                )
+                continue
+              }
+              finalAnswer = assistantText
+              context.appendAssistant(assistantText)
+              status = 'needs_input'
+              message = verification.reason ?? 'Success claim could not be verified.'
+              steps.push({
+                index,
+                startedAt: startedStepAt,
+                finishedAt: this.now(),
+                thought: assistantText,
+                actions: [],
+                observations: [],
+                reflection: 'Blocked a success claim without recent verification.',
+                productive: false
+              })
+              break
+            }
+          }
           finalAnswer = assistantText
           context.appendAssistant(assistantText)
           status = 'completed'
@@ -646,6 +698,49 @@ export class AgentOrchestrator {
             break
           }
 
+          // v2.4 A.2: state check before a sensitive action executes.
+          if (this.preflightGate) {
+            let check: PreflightResult | undefined
+            try {
+              check = await this.preflightGate(action)
+            } catch {
+              check = undefined
+            }
+            if (check && !check.ok) {
+              const failed = check.checks.filter((entry) => entry.status === 'fail')
+              const blocked: AgentToolResult = {
+                actionId: action.id,
+                name: action.name,
+                ok: false,
+                output: '',
+                error: `Preflight failed: ${failed.map((entry) => entry.message).join('; ')}`,
+                code: 'blocked',
+                attempts: 1,
+                durationMs: 0
+              }
+              this.log('warn', 'preflight.blocked', runId, {
+                step: index,
+                tool: action.name,
+                checks: failed.map((entry) => entry.name)
+              })
+              observations.push(blocked)
+              context.appendToolResult({
+                toolCallId: action.id,
+                name: action.name,
+                content: formatObservation(blocked)
+              })
+              continue
+            }
+            const warnings = check ? preflightWarnings(check) : []
+            if (warnings.length > 0) {
+              this.log('warn', 'preflight.warnings', runId, {
+                step: index,
+                tool: action.name,
+                checks: warnings.map((entry) => entry.name)
+              })
+            }
+          }
+
           const before = await this.snapshotBefore(action, sandboxId)
           const result = await this.guardedExecute(executor, action, runId, index, options)
           loopDetector.afterToolCall(action.name, { ok: result.ok })
@@ -658,6 +753,14 @@ export class AgentOrchestrator {
             })
           }
           observations.push(result)
+          recentToolCalls.push({
+            toolName: action.name,
+            ...(typeof action.arguments.command === 'string'
+              ? { command: action.arguments.command }
+              : {}),
+            exitCode: result.ok ? 0 : 1,
+            timestamp: this.now()
+          })
           context.appendToolResult({
             toolCallId: action.id,
             name: action.name,

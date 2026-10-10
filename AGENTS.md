@@ -51,7 +51,7 @@ fails, a tool is missing, or the budget ran out — ask rather than guess).
 
 ## Status
 
-**v2.4 Sprint — in progress. A.1 (Job ID + long-running tasks) done: core JobManager (tmux/systemd-run/nohup), `shell:exec`-independent jobs IPC + `~/.ai-desktop/jobs.json` persistence, JobCard/JobsPanel UI. Branch: feature/v2.4-full-compliance.** (2026-10-05)
+**v2.4 Sprint — in progress. A.1 (Job ID + long-running tasks), A.2 (preflight state checks) and A.3 (success-claim verification) done. Branch: feature/v2.4-full-compliance.** (2026-10-05)
 
 - Reviewed [`DEVELOPMENT_CHECKLIST.md`](./DEVELOPMENT_CHECKLIST.md) sections 1–3 (pre-sprint:
   precise definition, ordered backlog, ready environment) plus the ten golden rules; rules
@@ -668,3 +668,5 @@ Autonomous decisions logged per the sprint's golden rule (`[AUTO-DECISION]`, no 
 - `[PATTERN]` **Pure core, injected boundaries.** Anything that both main and renderer need, or that must be tested without SSH/LLM, lives in `src/core/*` as a pure function over injected callbacks (`WorkspaceExec`, `exec`). `src/main/*` wires these to real `AppServices`; the renderer imports only the pure formatters/types. This kept v2.3.3's detection, parsing, health, recipes and command runners unit-testable end to end.
 
 - `[AUTO-DECISION]` **v2.4 A.1 — Job ID + long-running tasks.** `JobManager` (`src/core/agent/job-manager.ts`) classifies a command via `estimateDurationMs` (`@shared/jobs`) and, when it exceeds 60s, detaches it on the host under the strongest available supervisor (tmux -> systemd-run -> nohup), writing output/exit to `/tmp/<id>.log|.exit`. All SSH goes through an injected `exec`, and persistence through an injected `persist`, so `core` keeps no node imports and the renderer can typecheck it. `executeRemoteShell` gained an optional `jobs` runner; `AppServices` wires a real `JobManager` backed by `JobStore` (`~/.ai-desktop/jobs.json`), reloaded on boot. IPC: `jobs:list|refresh|status|kill`. UI: `JobCard` + self-polling `JobsPanel` mounted in `ChatPanel`.
+
+- `[AUTO-DECISION]` **v2.4 A.2 + A.3 — preflight and success verification.** `preflight(exec, workspace, action)` (`src/core/agent/preflight.ts`) checks workspace existence, git cleanliness, disk (`df --output=pcent`, fail >90%) and PM2 on deploy; `preflightGate` in the orchestrator blocks any action whose preflight has a `fail`, and AgentService builds a gate for the active remote project over the existing SSH exec. `verifySuccess(text, recentToolCalls)` (`src/core/agent/success-verifier.ts`) blocks success claims (`completed/done/.../انجام شد`) unless a test/build/health-shaped call succeeded within 30s; enabled in AgentService, with one nudge before the run ends as `needs_input`. UI: `PreflightBanner`, `SuccessWarning`. A.2 and A.3 share orchestrator/agent-service edits, so they were committed together to keep every commit green.
