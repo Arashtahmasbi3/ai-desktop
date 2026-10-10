@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.1] — 2026-10-05
+
+Sprint v2.4.1 "Wiring" — the v2.4 modules are now real agent tools, toggleable
+from Settings and surfaced in the chat. Scope: wiring + simple UI + tests only
+(single-user; no enterprise/multi-user/RBAC).
+
+### Added
+
+- **Agent tool wiring (A.1–A.4)** — `src/main/v24-tools-wiring.ts` registers
+  `migrate_database`, `migrate_docker`, `scaffold_project`, `project_user_create`,
+  `project_user_remove`, `worktree_create`, `worktree_list` and `worktree_remove`
+  as agent tools, each with a system-prompt hint. db/docker tools are only exposed
+  when a cross-host transfer is resolvable.
+- **Settings → Tools (B.1)** — a toggle per tool group, stored in `localStorage`;
+  `AgentRunRequest.enabledTools` carries the selection so a disabled group is never
+  exposed to the model. The canonical group list lives in `src/shared/tool-toggles.ts`.
+- **Chat tool result card (B.2)** — `ToolResultCard` renders each tool call inline
+  (name, ok/error, expandable detail) instead of a bare pill.
+- **Tests** — 24 new tests (`*wire`, `settings-tools`, `tool-result-card`,
+  `v2.4.1-wiring.e2e`, `v2.4.1-smoke.e2e`), 939 total.
+
+## [2.4.0] — 2026-10-05
+
+Sprint v2.4 "Full Compliance" — long-running jobs, preflight/success verification,
+database and Docker migration, per-project Linux users and SSH keys, git worktrees
+and project scaffolding. See `SPRINT_v2.4.md` for the full task list.
+
 ## [2.3.3] — 2026-10-05
 
 Sprint v2.3.3 "Git-Aware Agent + Self-Diagnosis" — the agent now knows whether a

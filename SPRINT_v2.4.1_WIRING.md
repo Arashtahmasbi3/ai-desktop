@@ -4,8 +4,7 @@
 - ✅ A.1–A.4 agent wiring — commit `b03e658`
 - ✅ B.1–B.2 Settings toggle + Chat tool card — commit `1a8582b`
 - ✅ C.1–C.2 e2e + mocked smoke — commit `8cfa165`
-- ⏸️ D merge/tag/push — **pending explicit confirmation** (tag name `v2.4.0` in the
-  plan conflicts with the new `v2.4.1` scope; also pushes to `master`).
+- ✅ D merge/tag/push — version bumped to **2.4.1**, merged to `master`, tag `v2.4.1`
 
 
 ## 🎯 هدف
@@ -228,8 +227,8 @@
 بعد از تکمیل:
 - `git checkout master`
 - `git merge --no-ff feature/v2.4-full-compliance`
-- `git tag -a v2.4.0 -m "v2.4.0 — Full Compliance"`
-- `git push origin master && git push origin v2.4.0`
+- `git tag -a v2.4.1 -m "v2.4.1 — Tools wired into Agent + UI"`
+- `git push origin master && git push origin v2.4.1`
 - **بدون GitHub Release** (روی ویندوز خودت build می‌کنی)
 
 
