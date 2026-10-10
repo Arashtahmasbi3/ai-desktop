@@ -51,6 +51,13 @@ fails, a tool is missing, or the budget ran out — ask rather than guess).
 
 ## Status
 
+**v2.4 Sprint — Checklist reviewed. Rules acknowledged. Branch: feature/v2.4-full-compliance.** (2026-10-05)
+
+- Reviewed [`DEVELOPMENT_CHECKLIST.md`](./DEVELOPMENT_CHECKLIST.md) sections 1–3 (pre-sprint:
+  precise definition, ordered backlog, ready environment) plus the ten golden rules; rules
+  acknowledged. Sprint plan: [`SPRINT_v2.4_FULL_COMPLIANCE.md`](./SPRINT_v2.4_FULL_COMPLIANCE.md).
+
+
 **v2.3.3 merged to master (no release). Pending v2.4 for full source-doc compliance. Release will happen after v2.4.** (2026-10-05)
 
 - `master` at merge `e16e13f` (`Merge v2.3.3: Git-Aware Agent + Self-Diagnosis`,
