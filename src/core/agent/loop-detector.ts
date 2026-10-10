@@ -4,6 +4,7 @@ import type {
   LoopWarning
 } from '@shared/agent'
 import { DEFAULT_LOOP_POLICY } from '@shared/agent'
+import { stableStringify } from './tools'
 
 /** What one completed step tells the detector. */
 export interface LoopObservation {
@@ -52,7 +53,7 @@ export interface LoopCallDecision {
    */
   action?: 'warn' | 'stop' | 'block'
   toolName?: string
-  /** How many times this tool name appears in the current window. */
+  /** How many times this call identity appears in the current window. */
   count?: number
   /** Farsi, user-facing explanation when a stop fires. */
   message?: string
@@ -64,9 +65,9 @@ export interface LoopDetectorOptions {
 }
 
 /**
- * Sliding-window budget for the fuzzy (per-tool-name) guard. These are the exact
- * thresholds from Sprint v2.3.1: warn on the 3rd repeat, stop on the 5th, stop
- * after 3 consecutive failures, and stop after 2 minutes without progress.
+ * Sliding-window budget for the per-call guard. These are the exact thresholds
+ * from Sprint v2.3.1: warn on the 3rd repeat, stop on the 5th, stop after 3
+ * consecutive failures, and stop after 2 minutes without progress.
  */
 const WARN_THRESHOLD = 3
 const STOP_THRESHOLD = 5
@@ -76,18 +77,79 @@ const PROGRESS_TIMEOUT_MS = 120_000
 /** A.3: consecutive failures of one tool before it is taken out of rotation. */
 const BLOCKED_TOOL_THRESHOLD = 2
 
+/**
+ * Tools whose identity is the command they run. Two `run_command` calls are only
+ * "the same call" when the command matches — `pwd`, `ls` and `cat` are three
+ * different pieces of work, not a loop.
+ */
+const GENERAL_PURPOSE_TOOLS = new Set(['run_command', 'remote_shell', 'shell_exec'])
+/** Tools whose identity is the path they target. */
+const PATH_BASED_TOOLS = new Set([
+  'read_file',
+  'write_file',
+  'list_dir',
+  'remote_read_file',
+  'remote_write_file',
+  'remote_list_dir',
+  'exists'
+])
+const COMMAND_ARG_KEYS = ['command', 'cmd', 'script']
+const PATH_ARG_KEYS = ['path', 'file', 'filepath', 'dir', 'directory']
+
 function blockedThreshold(): number {
   return BLOCKED_TOOL_THRESHOLD
 }
 
-function hashCall(toolName: string, args: unknown): string {
-  let serialized: string
-  try {
-    serialized = JSON.stringify(args) ?? 'undefined'
-  } catch {
-    serialized = String(args)
+function asRecord(args: unknown): Record<string, unknown> {
+  return args && typeof args === 'object' && !Array.isArray(args)
+    ? (args as Record<string, unknown>)
+    : {}
+}
+
+function firstString(args: Record<string, unknown>, keys: string[]): string {
+  for (const key of keys) {
+    const value = args[key]
+    if (typeof value === 'string') return value
   }
-  return `${toolName}:${serialized}`
+  return ''
+}
+
+/** Collapse insignificant whitespace so `git  status` and `git status` match. */
+function normalizeCommand(command: string): string {
+  return command.trim().replace(/\s+/g, ' ')
+}
+
+/** Normalise separators so `./src/app/` and `src\\app` compare equal. */
+function normalizePath(path: string): string {
+  const normalized = path
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/^(\.\/)+/, '')
+    .replace(/\/+$/, '')
+  return normalized === '' ? '.' : normalized
+}
+
+/**
+ * Identity of a tool call for the per-call guard. Grouping purely by tool *name*
+ * over-fires on general-purpose tools: a script of `remote_shell(pwd)` followed
+ * by `remote_shell(ls)` and `remote_shell(cat)` is legitimate exploration, yet
+ * the old name-only count treated it as a loop.
+ *
+ * The key therefore carries the arguments that actually distinguish one call
+ * from the next — the command for shell tools, the path for filesystem tools,
+ * and the full (stably serialised) arguments for everything else. Repeated
+ * *identical* calls still collide and hit the warn/stop thresholds, so genuine
+ * loops remain caught.
+ */
+export function computeLoopHash(toolName: string, args: unknown): string {
+  const record = asRecord(args)
+  if (GENERAL_PURPOSE_TOOLS.has(toolName)) {
+    return `${toolName}:${normalizeCommand(firstString(record, COMMAND_ARG_KEYS))}`
+  }
+  if (PATH_BASED_TOOLS.has(toolName)) {
+    return `${toolName}:${normalizePath(firstString(record, PATH_ARG_KEYS))}`
+  }
+  return `${toolName}:${stableStringify(record)}`
 }
 
 /** The Farsi stop message shown in the chat when a loop is detected. */
@@ -130,10 +192,12 @@ function buildHint(warnings: LoopWarning[]): string {
 /**
  * Detects unproductive cycles. Two layers share one instance:
  *
- *  1. A **per-tool-call** sliding window (Sprint v2.3.1) keyed on the tool
- *     *name* — so repeated `remote_shell` calls are caught even when the
- *     arguments change every time (`beforeToolCall` / `afterToolCall` /
- *     `markProgress`).
+ *  1. A **per-tool-call** sliding window (Sprint v2.3.1, refined in v2.4.2) keyed
+ *     on the *call identity* — for shell tools this is the normalised command,
+ *     for filesystem tools the path, otherwise the full arguments. Repeated
+ *     `remote_shell` calls with different commands are therefore not a loop,
+ *     while genuinely identical calls still are
+ *     (`beforeToolCall` / `afterToolCall` / `markProgress`).
  *  2. A **per-step** analyzer (`observe`) that also spots failure streaks,
  *     repeated reasoning, and steps that make no progress.
  *
@@ -157,9 +221,8 @@ export class LoopDetector {
 
   // --- Per-tool-call state (beforeToolCall / afterToolCall) -----------------
   private readonly now: () => number
-  private readonly recentToolNames: string[] = []
-  private readonly recentToolHashes: string[] = []
-  private readonly warnedToolNames = new Set<string>()
+  private readonly recentCallKeys: string[] = []
+  private readonly warnedCallKeys = new Set<string>()
   private readonly recentCalls: RecentToolCall[] = []
   private toolFailureStreak = 0
   private lastProgressAt: number
@@ -220,9 +283,8 @@ export class LoopDetector {
     this.stopReason = undefined
     this.stopped = false
     // Per-tool-call
-    this.recentToolNames.length = 0
-    this.recentToolHashes.length = 0
-    this.warnedToolNames.clear()
+    this.recentCallKeys.length = 0
+    this.warnedCallKeys.clear()
     this.recentCalls.length = 0
     this.toolFailureStreak = 0
     this.lastProgressAt = this.now()
@@ -238,16 +300,15 @@ export class LoopDetector {
 
   /**
    * Decide whether the next tool call may run. Pushes the call onto the sliding
-   * window first, then evaluates: no-progress timeout, tool-name repeat
+   * window first, then evaluates: no-progress timeout, repeated call identity
    * (warn at 3 / stop at 5), and consecutive-failure stop.
    */
   beforeToolCall(toolName: string, args: unknown): LoopCallDecision {
-    this.recentToolNames.push(toolName)
-    this.recentToolHashes.push(hashCall(toolName, args))
-    if (this.recentToolNames.length > GUARD_WINDOW_SIZE) this.recentToolNames.shift()
-    if (this.recentToolHashes.length > GUARD_WINDOW_SIZE) this.recentToolHashes.shift()
+    const callKey = computeLoopHash(toolName, args)
+    this.recentCallKeys.push(callKey)
+    if (this.recentCallKeys.length > GUARD_WINDOW_SIZE) this.recentCallKeys.shift()
 
-    const count = this.recentToolNames.filter((name) => name === toolName).length
+    const count = this.recentCallKeys.filter((key) => key === callKey).length
 
     // A.3: a tool that already failed twice is skipped, not fatal — the model is
     // told to use an alternative and the run continues.
@@ -315,12 +376,12 @@ export class LoopDetector {
     }
 
     const decision: LoopCallDecision = { allow: true, toolName, count }
-    if (count >= WARN_THRESHOLD && !this.warnedToolNames.has(toolName)) {
-      this.warnedToolNames.add(toolName)
+    if (count >= WARN_THRESHOLD && !this.warnedCallKeys.has(callKey)) {
+      this.warnedCallKeys.add(callKey)
       decision.action = 'warn'
       decision.reason =
         `Tool "${toolName}" called ${count} times in the last ${GUARD_WINDOW_SIZE} calls ` +
-        'with different arguments. Repeating it is unlikely to help.'
+        'with the same arguments. Repeating it is unlikely to help.'
       decision.message = `⚠️ هشدار حلقه: ${toolName} ${count} بار تکرار شد.`
     }
     return decision
@@ -350,15 +411,14 @@ export class LoopDetector {
 
   /**
    * Real progress happened (a file was written, tests passed, ...). Clears the
-   * fuzzy window, the failure streak and the no-progress timer so the model
+   * repeat window, the failure streak and the no-progress timer so the model
    * gets a fresh budget.
    */
   markProgress(): void {
     this.lastProgressAt = this.now()
     this.toolFailureStreak = 0
-    this.recentToolNames.length = 0
-    this.recentToolHashes.length = 0
-    this.warnedToolNames.clear()
+    this.recentCallKeys.length = 0
+    this.warnedCallKeys.clear()
     this.guardStopped = false
     this.guardStopReason = undefined
   }
