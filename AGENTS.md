@@ -32,6 +32,19 @@ exe, icon and version metadata), optimizes the production build (minify/tree-sha
 
 ## Status
 
+**v2.3.2 released. Sprint complete. Next: user testing on Windows.** (2026-10-05)
+
+- Latest release: **v2.3.2 (full release)** — installer + portable exe published on a GitHub
+  Release with `SHA256SUMS.txt`
+  (<https://github.com/Arashtahmasbi3/ai-desktop/releases/tag/v2.3.2>); `master` at the
+  v2.3.2 merge (`f8919a2`), tag `v2.3.2`.
+- **v2.3.2 — Remote-First Architecture & Security Alignment**: A.1 remote-first file routing,
+  A.2 remote-aware project status, A.3 context-aware host policy, A.4 per-command timeouts,
+  A.5 Plan Mode; B.1 backup-before-write, B.2 post-deploy health checks, B.3 rsync dry-run,
+  B.4 context preview, B.5 `~/.ssh/config` import; C.1 per-project metadata, C.2 isolation UI
+  + pre-approval policy warning. Also fixed an `allowedPaths` path-traversal bypass in
+  `evaluateHostPolicy`. Full suite: **763 passed | 1 skipped** across 101 files.
+
 **v2.3.1 released. Sprint complete. Next: user testing on Windows.** (2026-10-05)
 
 - Latest release: **v2.3.1 (full release)** — installer + portable exe published on a GitHub
@@ -615,3 +628,5 @@ Autonomous decisions logged per the sprint's golden rule (`[AUTO-DECISION]`, no 
 - `[AUTO-DECISION]` **v2.3.2 B.4 — context preview before send.** A shared, pure module `src/shared/context-preview.ts` (`buildContextPreview`, `estimateTokens`, `isSecretPath`, `formatContextPreview`) powers a pre-send modal that lists provider/model, estimated tokens, included sections and always-withheld files. Hand-rolled a small `ContextPreviewCard` modal rather than a dependency; the on-by-default `showContextBeforeSend` preference lives in `localStorage` and toggles from Settings → General. Secret-looking files are filtered out of the included set and shown under "Withheld", never dropped silently.
 - `[AUTO-DECISION]` **v2.3.2 B.5 — `~/.ssh/config` import.** `src/core/remote/ssh-config.ts` is a pure parser (no filesystem access) so it is trivially testable; `vps:importSshConfig` reads the config in main and the renderer only ever sees HostName/User/Port/IdentityFile **path**. Deliberately skips wildcard/negated `Host` patterns and `Match` blocks, and keeps `~` in IdentityFile rather than expanding it — key material is only opened later via keytar at connect time.
 - `[PATTERN]` **Layered architecture: `shared ← core ← main ← renderer`.** `core` NEVER imports from `main` (enforced by tsconfig `paths` + review). Pure, dependency-free logic that both layers need lives in `shared/` (e.g. `shared/project-metadata.ts`, `shared/context-preview.ts`). Renderer talks to main only through the typed `window.api` preload bridge.
+- `[PATTERN]` **Remote-First Workspace Routing.** `routeToolCall` (`core/agent/remote-routing.ts`) is a pure decision (`passthrough`/`redirect`/`error`) consulted by the orchestrator before every action: a `remote` project rewrites `read_file`/`write_file`/`run_command` to `remote_read_file`/`remote_write_file`/`remote_shell` with the remote root + `server_id`, and a remote project with no connected VPS errors instead of silently running locally. Decisions are data, so they are unit-testable without SSH or an LLM.
+- `[AUTO-DECISION]` **v2.3.2 release topology.** `f8919a2` merged `feature/v2.3.2-security` into `master` (`--no-ff`), annotated tag `v2.3.2`, and a full GitHub Release with `AI.Desktop.Setup.2.3.2.exe`, `AI.Desktop.2.3.2.Portable.exe` and `SHA256SUMS.txt`. The D.2 traversal probe found a real bypass: `allowedPaths` compared raw strings, so `/srv/app/../../etc/passwd` passed a `/srv/app` rule — now lexically normalised and fail-closed (`normalizeAbsolutePath`/`isWithin`).

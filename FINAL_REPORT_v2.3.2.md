@@ -71,21 +71,29 @@ already rejected `..`; both are now covered by regression tests.
 
 ## 4. Commits and release
 
-See `git log master..feature/v2.3.2-security`. Merge, tag and release details:
+19 commits on `feature/v2.3.2-security` (see `git log caa1f42..f830d06`).
 
-- Merge commit: `_pending_`
-- Tag: `v2.3.2` (annotated)
-- GitHub Release: `_pending_`
+Release:
+
+- Merge commit **`f8919a2`** `Merge v2.3.2: Security Alignment` on `master`.
+- Annotated tag **`v2.3.2`**.
+- **GitHub Release v2.3.2** (full, not pre-release):
+  <https://github.com/Arashtahmasbi3/ai-desktop/releases/tag/v2.3.2> with assets
+  `AI.Desktop.Setup.2.3.2.exe`, `AI.Desktop.2.3.2.Portable.exe` and `SHA256SUMS.txt`.
+- `e032bab` docs(screenshots): v2.3.2 headless smoke screenshot (post-tag docs commit).
 
 ## 5. Windows build (Wine)
 
-`_pending_` — filled in after `npm run build:win`.
+`npm run build:win` completed successfully on Linux via Wine
+(electron-builder + electron 44.6.0):
 
 | File | Size (bytes) | SHA-256 |
 | --- | --- | --- |
-| `AI Desktop Setup 2.3.2.exe` | _pending_ | _pending_ |
-| `AI Desktop 2.3.2 Portable.exe` | _pending_ | _pending_ |
-| `SHA256SUMS.txt` | _pending_ | - |
+| `AI Desktop Setup 2.3.2.exe` | 112,457,043 | `b2422f8c...fb65b527` |
+| `AI Desktop 2.3.2 Portable.exe` | 112,174,230 | `8b0bbd4b...a585df8c` |
+| `SHA256SUMS.txt` | 189 | - |
+
+Verify with `sha256sum -c SHA256SUMS.txt`. Both archives `OK`.
 
 ## 6. Remaining
 
