@@ -57,7 +57,7 @@ export interface ApprovalOutcome {
   explain?: boolean
 }
 
-export type ApprovedCommandKind = 'action' | 'tool' | 'session'
+export type ApprovedCommandKind = 'action' | 'tool' | 'session' | 'scoped'
 
 /** A learned approval shown in Settings → Advanced → Approved Commands. */
 export interface ApprovedCommandView {

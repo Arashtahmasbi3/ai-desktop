@@ -1,6 +1,13 @@
 import { promises as fs } from 'node:fs'
 import { dirname } from 'node:path'
 import type { ApprovedCommandView } from '@shared/approval'
+import {
+  canRememberTool,
+  isRememberedApprovalValid,
+  type RememberContext,
+  type RememberedApproval,
+  type RememberScope
+} from './remember-policy'
 
 /** On-disk schema for the learned-approval database. */
 export interface ApprovedCommandsData {
@@ -11,9 +18,11 @@ export interface ApprovedCommandsData {
   tools: string[]
   /** Per-session tool allow-lists (session id → tool names). */
   sessions: Record<string, string[]>
+  /** Scoped, expiring approvals (v2.5, P0-3). */
+  scoped: RememberedApproval[]
 }
 
-export const APPROVED_COMMANDS_VERSION = 1
+export const APPROVED_COMMANDS_VERSION = 2
 
 export interface ApprovedCommandsOptions {
   file: string
@@ -47,7 +56,31 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function emptyData(): ApprovedCommandsData {
-  return { version: APPROVED_COMMANDS_VERSION, always: [], tools: [], sessions: {} }
+  return { version: APPROVED_COMMANDS_VERSION, always: [], tools: [], sessions: {}, scoped: [] }
+}
+
+function parseScoped(raw: unknown): RememberedApproval[] {
+  if (!Array.isArray(raw)) return []
+  const entries: RememberedApproval[] = []
+  for (const value of raw) {
+    if (!isRecord(value)) continue
+    if (
+      typeof value.toolName === 'string' &&
+      typeof value.vpsId === 'string' &&
+      typeof value.projectId === 'string' &&
+      typeof value.createdAt === 'number' &&
+      typeof value.expiresAt === 'number'
+    ) {
+      entries.push({
+        toolName: value.toolName,
+        vpsId: value.vpsId,
+        projectId: value.projectId,
+        createdAt: value.createdAt,
+        expiresAt: value.expiresAt
+      })
+    }
+  }
+  return entries
 }
 
 /**
@@ -82,7 +115,8 @@ export class ApprovedCommands {
                   Array.isArray(value) ? value.filter((v) => typeof v === 'string') : []
                 ])
               )
-            : {}
+            : {},
+          scoped: parseScoped(raw.scoped)
         }
       }
     } catch (error) {
@@ -100,8 +134,23 @@ export class ApprovedCommands {
     await fs.rename(tmp, this.file)
   }
 
-  /** True when this exact action, its tool, or the session already allows it. */
-  isApproved(tool: string, args: Record<string, unknown>, sessionId?: string): boolean {
+  /**
+   * True when this exact action, its tool, the session, or a scoped remembered
+   * approval already allows it. Sensitive tools (anything not rememberable) are
+   * never auto-approved from the store, so a stale pre-P0-3 entry cannot keep
+   * whitelisting `remote_shell`/writes.
+   */
+  isApproved(
+    tool: string,
+    args: Record<string, unknown>,
+    sessionId?: string,
+    scope?: RememberScope
+  ): boolean {
+    if (!canRememberTool(tool)) return false
+    if (scope) {
+      const record: RememberContext = { toolName: tool, vpsId: scope.vpsId, projectId: scope.projectId }
+      if (this.data.scoped.some((entry) => isRememberedApprovalValid(entry, record))) return true
+    }
     if (this.data.tools.includes(tool)) return true
     if (this.data.always.includes(actionPattern(tool, args))) return true
     if (sessionId && this.data.sessions[sessionId]?.includes(tool)) return true
@@ -109,6 +158,7 @@ export class ApprovedCommands {
   }
 
   async rememberAction(tool: string, args: Record<string, unknown>): Promise<void> {
+    if (!canRememberTool(tool)) return
     await this.load()
     const pattern = actionPattern(tool, args)
     if (!this.data.always.includes(pattern)) this.data.always.push(pattern)
@@ -116,16 +166,37 @@ export class ApprovedCommands {
   }
 
   async rememberTool(tool: string): Promise<void> {
+    if (!canRememberTool(tool)) return
     await this.load()
     if (!this.data.tools.includes(tool)) this.data.tools.push(tool)
     await this.persist()
   }
 
   async rememberSession(sessionId: string, tool: string): Promise<void> {
+    if (!canRememberTool(tool)) return
     await this.load()
     const list = this.data.sessions[sessionId] ?? []
     if (!list.includes(tool)) list.push(tool)
     this.data.sessions[sessionId] = list
+    await this.persist()
+  }
+
+  /**
+   * Persist a scoped, expiring approval (v2.5, P0-3). Refuses non-rememberable
+   * tools and refreshes the window when the same tool+VPS+project is re-approved.
+   */
+  async rememberScoped(approval: RememberedApproval): Promise<void> {
+    if (!canRememberTool(approval.toolName)) return
+    await this.load()
+    this.data.scoped = this.data.scoped.filter(
+      (entry) =>
+        !(
+          entry.toolName === approval.toolName &&
+          entry.vpsId === approval.vpsId &&
+          entry.projectId === approval.projectId
+        )
+    )
+    this.data.scoped.push(approval)
     await this.persist()
   }
 
@@ -155,6 +226,15 @@ export class ApprovedCommands {
           changed = true
         }
       }
+    } else if (id.startsWith('scoped:')) {
+      const [tool, vpsId, ...projectParts] = id.slice('scoped:'.length).split(':')
+      const projectId = projectParts.join(':')
+      const before = this.data.scoped.length
+      this.data.scoped = this.data.scoped.filter(
+        (entry) =>
+          !(entry.toolName === tool && entry.vpsId === vpsId && entry.projectId === projectId)
+      )
+      changed = this.data.scoped.length !== before
     }
     if (changed) await this.persist()
     return changed
@@ -184,6 +264,17 @@ export class ApprovedCommands {
           sessionId
         })
       }
+    }
+    const now = Date.now()
+    for (const entry of this.data.scoped) {
+      if (now > entry.expiresAt) continue
+      const minutes = Math.max(0, Math.ceil((entry.expiresAt - now) / 60000))
+      views.push({
+        id: `scoped:${entry.toolName}:${entry.vpsId}:${entry.projectId}`,
+        kind: 'scoped',
+        tool: entry.toolName,
+        label: `${entry.toolName} on ${entry.vpsId || 'local'} in ${entry.projectId} (${minutes}m left)`
+      })
     }
     return views
   }

@@ -560,6 +560,10 @@ export class AgentService {
           mode: approvalMode,
           ...(this.approvedCommands ? { approvedCommands: this.approvedCommands } : {}),
           ...(request.sessionId ? { sessionId: request.sessionId } : {}),
+          // Scope remembered approvals to the active project + its VPS (P0-3).
+          ...(activeProject
+            ? { projectId: activeProject.id, vpsId: activeProject.vpsId ?? '' }
+            : {}),
           requestApproval: (action) => requestApproval(runId, action),
           onSuggestion: (tool, count) => this.emit({ type: 'approval:suggestion', tool, count })
         })
