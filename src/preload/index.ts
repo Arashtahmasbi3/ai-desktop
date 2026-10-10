@@ -41,6 +41,13 @@ import type {
   WorkerStatus
 } from '@shared/ui'
 import type { ProjectMetadataPatch } from '@shared/project-metadata'
+import type {
+  GitSetupOptions,
+  RemoteCommandRun,
+  RemoteGitStatus,
+  RemoteWorkspaceInfo
+} from '@shared/workspace-info'
+import type { SystemHealth } from '@shared/system-health'
 
 const invoke = <T>(channel: string, ...args: unknown[]): Promise<T> =>
   ipcRenderer.invoke(channel, ...args) as Promise<T>
@@ -162,6 +169,24 @@ export const api = {
       invoke('vps:searchProject', id, name),
     listDirs: (id: string, path: string): Promise<string[]> => invoke('vps:listDirs', id, path),
     gitStatus: (id: string, path: string): Promise<string> => invoke('vps:gitStatus', id, path),
+    // --- v2.3.3: git-aware + self-diagnosis ---
+    workspaceInfo: (id: string, path: string): Promise<RemoteWorkspaceInfo> =>
+      invoke('vps:workspaceInfo', id, path),
+    gitStatusParsed: (id: string, path: string): Promise<RemoteGitStatus> =>
+      invoke('vps:gitStatusParsed', id, path),
+    systemHealth: (id: string): Promise<SystemHealth> => invoke('vps:systemHealth', id),
+    gitSetup: (
+      id: string,
+      path: string,
+      options: GitSetupOptions
+    ): Promise<RemoteCommandRun> => invoke('vps:gitSetup', id, path, options),
+    installTool: (
+      id: string,
+      tool: string,
+      approved: boolean,
+      elevated: boolean
+    ): Promise<RemoteCommandRun> =>
+      invoke('vps:installTool', id, tool, approved, elevated),
     terminalOpen: (id: string, cols?: number, rows?: number): Promise<string> =>
       invoke('vps:terminalOpen', id, cols, rows),
     terminalWrite: (id: string, data: string): Promise<void> => invoke('vps:terminalWrite', id, data),

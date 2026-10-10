@@ -26,6 +26,7 @@ import TemplateMenu from './TemplateMenu'
 import TerminalPanel from './TerminalPanel'
 import ModelSwitcher from './ModelSwitcher'
 import VpsSelector from './VpsSelector'
+import WorkspaceBadge from './WorkspaceBadge'
 import ProviderWarning from './ProviderWarning'
 import LoopStopCard from './LoopStopCard'
 import ApprovalDialog from './ApprovalDialog'
@@ -288,6 +289,7 @@ export default function ChatPanel(): JSX.Element {
             <PanelLeft className="h-3.5 w-3.5" />
           </button>
           <VpsSelector />
+          <WorkspaceBadge />
           <span className="text-neutral-700">·</span>
           <button
             type="button"

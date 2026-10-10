@@ -4,6 +4,7 @@ import type { AuditEntryView, VpsConnectionState, VpsServerView } from '@shared/
 import RemoteFileExplorer from './RemoteFileExplorer'
 import VpsForm from './VpsForm'
 import VpsTerminal from './VpsTerminal'
+import DiagnosticsPanel from '../DiagnosticsPanel'
 
 type Tab = 'terminal' | 'files' | 'audit'
 
@@ -27,6 +28,7 @@ export default function VpsPanel(): JSX.Element {
   const [status, setStatus] = useState<VpsConnectionState>({ status: 'disconnected' })
   const [audit, setAudit] = useState<AuditEntryView[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [healthOpen, setHealthOpen] = useState(false)
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
@@ -232,6 +234,15 @@ export default function VpsPanel(): JSX.Element {
                   {item}
                 </button>
               ))}
+              {connected && activeId ? (
+                <button
+                  onClick={() => setHealthOpen(true)}
+                  className="ml-auto flex items-center gap-1 rounded px-2 py-1 text-xs text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200"
+                >
+                  <ShieldAlert className="h-3 w-3" />
+                  Health
+                </button>
+              ) : null}
             </div>
 
             <div className="min-h-0 flex-1">
@@ -279,6 +290,14 @@ export default function VpsPanel(): JSX.Element {
           </>
         )}
       </section>
+
+      {healthOpen && activeId ? (
+        <DiagnosticsPanel
+          serverId={activeId}
+          serverName={servers.find((s) => s.id === activeId)?.name ?? 'server'}
+          onClose={() => setHealthOpen(false)}
+        />
+      ) : null}
     </div>
   )
 }

@@ -30,9 +30,28 @@ plus performance/leak guards. Stage 9 packages the app for Windows (NSIS install
 exe, icon and version metadata), optimizes the production build (minify/tree-shake, no shipped
 `node_modules`) and adds `CHANGELOG.md` / `CONTRIBUTING.md`; release is `v0.1.0`.
 
+## Development process — mandatory
+
+**Before starting every Sprint, review [`DEVELOPMENT_CHECKLIST.md`](./DEVELOPMENT_CHECKLIST.md)**
+(sections 1–3 pre-sprint, 4–7 during, 8–11 post-sprint, plus the ten golden rules). The
+checklist is the single source of truth for our definition of Done; do not start a task
+without walking the relevant boxes. When a Sprint reveals a new lesson, record it here in
+AGENTS.md (as `[PATTERN]` / `[AUTO-DECISION]`) and, if it changes process, update the
+checklist too.
+
+Non-negotiable rules restated: no task is skipped without a technical reason (stop and ask
+otherwise); every fix ships with a test that covers a real scenario (never `assert(true)`);
+verify state (`git status`, inspect files) before changing anything; plan before executing;
+least privilege with an always-on deny-list, approval for risky ops and secret masking in
+all logs; per-project isolation (metadata / SSH key / Linux user / host policy where
+possible); everything reversible (git from day one, backups, checkpoints, rollback plan);
+transparency about what is read/changed and the result; automatic environment self-check
+(git/node/docker/disk/memory) before acting; and an honest report (say it when a test
+fails, a tool is missing, or the budget ran out — ask rather than guess).
+
 ## Status
 
-**v2.3.2 released. Sprint complete. Next: user testing on Windows.** (2026-10-05)
+**v2.3.3 in review (PR #2); v2.3.2 released. Next: Windows `build:win` + release.** (2026-10-05)
 
 - Latest release: **v2.3.2 (full release)** — installer + portable exe published on a GitHub
   Release with `SHA256SUMS.txt`
@@ -630,3 +649,8 @@ Autonomous decisions logged per the sprint's golden rule (`[AUTO-DECISION]`, no 
 - `[PATTERN]` **Layered architecture: `shared ← core ← main ← renderer`.** `core` NEVER imports from `main` (enforced by tsconfig `paths` + review). Pure, dependency-free logic that both layers need lives in `shared/` (e.g. `shared/project-metadata.ts`, `shared/context-preview.ts`). Renderer talks to main only through the typed `window.api` preload bridge.
 - `[PATTERN]` **Remote-First Workspace Routing.** `routeToolCall` (`core/agent/remote-routing.ts`) is a pure decision (`passthrough`/`redirect`/`error`) consulted by the orchestrator before every action: a `remote` project rewrites `read_file`/`write_file`/`run_command` to `remote_read_file`/`remote_write_file`/`remote_shell` with the remote root + `server_id`, and a remote project with no connected VPS errors instead of silently running locally. Decisions are data, so they are unit-testable without SSH or an LLM.
 - `[AUTO-DECISION]` **v2.3.2 release topology.** `f8919a2` merged `feature/v2.3.2-security` into `master` (`--no-ff`), annotated tag `v2.3.2`, and a full GitHub Release with `AI.Desktop.Setup.2.3.2.exe`, `AI.Desktop.2.3.2.Portable.exe` and `SHA256SUMS.txt`. The D.2 traversal probe found a real bypass: `allowedPaths` compared raw strings, so `/srv/app/../../etc/passwd` passed a `/srv/app` rule — now lexically normalised and fail-closed (`normalizeAbsolutePath`/`isWithin`).
+- `[AUTO-DECISION]` **v2.3.3 A.1/A.2 — git-aware workspace detection.** `detectWorkspace(exec, path)` (`src/core/remote/workspace-detect.ts`) runs a cheap `test -d .git` probe first and only asks git for branch/remote/dirty when it is a repo, all through an injected `exec` (testable without SSH). `AgentService.buildRemoteRuntime` detects once per run and caches for 30s per `server:path`, appending `buildWorkspaceSystemHint` to the prompt. The chat header shows `WorkspaceBadge` (branch or "No git"). Detection is **advisory**, not security-sensitive: it only shapes the prompt and UI.
+- `[AUTO-DECISION]` **v2.3.3 A.3 — per-tool failure blocking.** Rather than aborting the whole run when a tool keeps failing, `LoopDetector.beforeToolCall` returns `{action:'block'}` for a tool that failed twice in the session; the orchestrator emits a synthetic blocked result and the model is told to try an alternative (`read_file`/`list_dir`). A later success clears the block, and `reset()` clears all of them.
+- `[AUTO-DECISION]` **v2.3.3 B.1/B.2 — git setup & status.** `buildGitSetupCommands` is a pure planner (preview shown before anything runs); `.gitignore` is written via a heredoc (`cat > file << 'EOF'`), not a temp file, and the path is POSIX-quoted. `parseRemoteGitStatus` parses `--porcelain=v1 --branch` for the sidebar pill. Both keep `core` free of `node:child_process` so the renderer can reuse the formatters.
+- `[AUTO-DECISION]` **v2.3.3 C.1/C.2/C.3 — self-diagnosis + install assistant.** Health probes run in parallel over the injected `exec` and are parsed into a shared `SystemHealth`. Missing tools map to a declarative `InstallRecipe`; `assertInstallAllowed(recipe, approved, elevated)` is the single security gate (approval always required, sudo needs a second confirmation) and `runRemoteCommands` aborts at the first failure. The renderer only chooses options — every command runs in main through the guarded remote shell.
+- `[PATTERN]` **Pure core, injected boundaries.** Anything that both main and renderer need, or that must be tested without SSH/LLM, lives in `src/core/*` as a pure function over injected callbacks (`WorkspaceExec`, `exec`). `src/main/*` wires these to real `AppServices`; the renderer imports only the pure formatters/types. This kept v2.3.3's detection, parsing, health, recipes and command runners unit-testable end to end.

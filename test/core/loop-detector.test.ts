@@ -145,3 +145,66 @@ describe('LoopDetector — per-tool-call guard', () => {
     expect(detector.isStopped).toBe(false)
   })
 })
+
+/**
+ * Sprint v2.3.3 — Task A.3: a tool that fails twice in a session is taken out of
+ * rotation so the model tries an alternative instead of retrying it.
+ */
+describe('LoopDetector — per-tool failure blocking (A.3)', () => {
+  it('1. blocks a tool after it fails twice', () => {
+    const detector = new LoopDetector()
+    detector.beforeToolCall('remote_shell', { command: 'git status' })
+    detector.afterToolCall('remote_shell', { ok: false })
+    detector.beforeToolCall('remote_shell', { command: 'git log' })
+    detector.afterToolCall('remote_shell', { ok: false })
+
+    expect(detector.blockedToolNames).toContain('remote_shell')
+    const decision = detector.beforeToolCall('remote_shell', { command: 'git diff' })
+    expect(decision.allow).toBe(false)
+    expect(decision.action).toBe('block')
+    expect(decision.reason).toContain('alternative')
+  })
+
+  it('2. lets the model fall back to another tool (read_file)', () => {
+    const detector = new LoopDetector()
+    detector.afterToolCall('remote_shell', { ok: false })
+    detector.afterToolCall('remote_shell', { ok: false })
+
+    expect(detector.beforeToolCall('remote_shell', {}).action).toBe('block')
+    const fallback = detector.beforeToolCall('remote_read_file', { path: 'a.txt' })
+    expect(fallback.allow).toBe(true)
+    expect(fallback.action).toBeUndefined()
+  })
+
+  it('3. does not block unrelated tools', () => {
+    const detector = new LoopDetector()
+    detector.afterToolCall('remote_shell', { ok: false })
+    detector.afterToolCall('remote_shell', { ok: false })
+
+    expect(detector.beforeToolCall('remote_list_dir', { path: '.' }).allow).toBe(true)
+    expect(detector.blockedToolNames).toEqual(['remote_shell'])
+  })
+
+  it('4. reset() clears the blocked set', () => {
+    const detector = new LoopDetector()
+    detector.afterToolCall('remote_shell', { ok: false })
+    detector.afterToolCall('remote_shell', { ok: false })
+    expect(detector.beforeToolCall('remote_shell', {}).allow).toBe(false)
+
+    detector.reset()
+
+    expect(detector.blockedToolNames).toEqual([])
+    expect(detector.beforeToolCall('remote_shell', {}).allow).toBe(true)
+  })
+
+  it('5. a later success un-blocks the tool', () => {
+    const detector = new LoopDetector()
+    detector.afterToolCall('remote_shell', { ok: false })
+    detector.afterToolCall('remote_shell', { ok: false })
+    expect(detector.blockedToolNames).toContain('remote_shell')
+
+    detector.afterToolCall('remote_shell', { ok: true })
+    expect(detector.blockedToolNames).not.toContain('remote_shell')
+    expect(detector.beforeToolCall('remote_shell', {}).allow).toBe(true)
+  })
+})

@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.3] — 2026-10-05
+
+Sprint v2.3.3 "Git-Aware Agent + Self-Diagnosis" — the agent now knows whether a
+remote project is a git repository, adapts its system prompt and workflow to that,
+recovers from a tool that keeps failing, and can diagnose a host's environment and
+install missing tooling behind an explicit approval.
+
+### Added
+
+- **Automatic git detection (A.1)** — a cheap `test -d .git` probe plus branch /
+  remote / dirty lookups, run over the injected remote `exec`. Detection is cached
+  for 30s per `server:path`. New IPC `vps:workspaceInfo` and shared
+  `RemoteWorkspaceInfo`; the chat header shows a branch badge (or "No git").
+- **Dynamic, git-aware system prompt (A.2)** — `buildWorkspaceSystemHint` tells the
+  model to use `git status/diff/commit` on a repo and plain file tools otherwise.
+- **Smarter loop detector (A.3)** — a tool that fails twice in a session is taken out
+  of rotation (`action: 'block'`) and the model is told to try an alternative, instead
+  of aborting the whole run.
+- **Auto git setup (B.1)** — `buildGitSetupCommands` produces an ordered, previewable
+  plan (`git init`, `.gitignore` from node/python/generic templates, initial commit,
+  optional remote + push). Offered when a newly added remote project is not a repo.
+- **Git status panel (B.2)** — `parseRemoteGitStatus`/`formatGitStatusLabel` power a
+  sidebar pill (`branch · N changes · ↑a ↓b`) refreshed every 30s.
+- **Environment health check (C.1)** — probes node/npm/git/docker/pm2, disk and
+  memory, and derives recommendations for anything missing or a near-full disk.
+- **Diagnostics panel (C.2)** — per-tool report, disk/RAM gauges and the open
+  recommendations, opened from the VPS view.
+- **Installation assistant (C.3)** — declarative docker/pm2/git/node recipes with a
+  reviewable command preview and a mandatory, sudo-aware second confirmation.
+- **Tests** — 62 tests across the v2.3.3 suites (`workspace-detect`,
+  `workspace-prompt`, `loop-detector`, `git-setup`, `git-status`, `system-health`,
+  `install-recipes` and the `v2.3.3-git-aware` e2e integration + security suite).
+
+### Security
+
+- Installs require explicit approval; sudo recipes require a separate root
+  confirmation (`assertInstallAllowed`). Nothing auto-executes.
+- Remote command runners abort at the first failing command and surface the exact
+  error (e.g. a git push with an invalid token), never continuing blindly.
+
 ## [2.3.2] — 2026-10-05
 
 Sprint v2.3.2 "Remote-First Architecture & Security Alignment" — a remote-first

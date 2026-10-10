@@ -25,6 +25,9 @@ import { MigrateProjectToolExecutor } from '@core/tools/migrate-project-executor
 import { CompositeToolExecutor, type ToolRoute } from '@core/tools/composite-executor'
 import { routeToolCall, remoteWorkspaceHint } from '@core/agent/remote-routing'
 import type { RoutingDecision } from '@core/agent/remote-routing'
+import { detectWorkspace } from '@core/remote/workspace-detect'
+import { buildWorkspaceSystemHint } from '@core/agent/workspace-prompt'
+import type { RemoteWorkspaceInfo } from '@shared/workspace-info'
 import { DEFAULT_APPROVAL_MODE } from '@core/agent/approval'
 import type { Plan, PlanDecision, PlanWarning } from '@shared/plan'
 import { createApprovalGate } from './approval-gate'
@@ -283,6 +286,8 @@ export class AgentService {
   private readonly changes = new Map<string, FileChangeView>()
   private runCounter = 0
   private changeCounter = 0
+  /** 30s cache of detected remote workspaces, keyed `${serverId}:${path}` (A.1). */
+  private readonly workspaceCache = new Map<string, { info: RemoteWorkspaceInfo; at: number }>()
 
   constructor(options: AgentServiceOptions) {
     this.sandbox = options.sandbox
@@ -341,8 +346,32 @@ export class AgentService {
     if (isRemote && connected && serverId && active?.path) {
       const remoteHint = remoteWorkspaceHint(serverId, active.path)
       runtime.systemHint = [runtime.systemHint, remoteHint].filter(Boolean).join(' ')
+      const workspace = await this.getWorkspaceInfo(serverId, active.path)
+      if (workspace) {
+        runtime.systemHint = [runtime.systemHint, buildWorkspaceSystemHint(workspace)]
+          .filter(Boolean)
+          .join('\n\n')
+      }
     }
     return { ...runtime, ...routing }
+  }
+
+  /**
+   * Detect (and cache for 30s) whether a remote folder is a git repo (A.1).
+   * Returns undefined when the host is unreachable so callers just skip the hint.
+   */
+  async getWorkspaceInfo(serverId: string, path: string): Promise<RemoteWorkspaceInfo | undefined> {
+    if (!this.vps) return undefined
+    const key = `${serverId}:${path}`
+    const cached = this.workspaceCache.get(key)
+    if (cached && this.now() - cached.at < 30_000) return cached.info
+    try {
+      const info = await detectWorkspace((command) => this.vps!.exec(serverId, command), path)
+      this.workspaceCache.set(key, { info, at: this.now() })
+      return info
+    } catch {
+      return undefined
+    }
   }
 
   /**

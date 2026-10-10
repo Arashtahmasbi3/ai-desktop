@@ -20,6 +20,13 @@ import type {
   VpsServerView
 } from '@shared/vps'
 import type {
+  GitSetupOptions,
+  RemoteCommandRun,
+  RemoteGitStatus,
+  RemoteWorkspaceInfo
+} from '@shared/workspace-info'
+import type { SystemHealth } from '@shared/system-health'
+import type {
   GitCommitInput,
   GitOpResult,
   GitRepoStatus,
@@ -131,6 +138,16 @@ export interface Api {
     searchProject(id: string, name: string): Promise<string[]>
     listDirs(id: string, path: string): Promise<string[]>
     gitStatus(id: string, path: string): Promise<string>
+    workspaceInfo(id: string, path: string): Promise<RemoteWorkspaceInfo>
+    gitStatusParsed(id: string, path: string): Promise<RemoteGitStatus>
+    systemHealth(id: string): Promise<SystemHealth>
+    gitSetup(id: string, path: string, options: GitSetupOptions): Promise<RemoteCommandRun>
+    installTool(
+      id: string,
+      tool: string,
+      approved: boolean,
+      elevated: boolean
+    ): Promise<RemoteCommandRun>
     terminalOpen(id: string, cols?: number, rows?: number): Promise<string>
     terminalWrite(id: string, data: string): Promise<void>
     terminalResize(id: string, cols: number, rows: number): Promise<void>
