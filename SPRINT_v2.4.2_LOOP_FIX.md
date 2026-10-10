@@ -3,9 +3,10 @@
 ## 📌 Status
 - ✅ Fix 1 — per-call guard keyed on normalized call identity — commit `fabde1c`
 - ✅ Fix 2 — successful shell command resets the loop window — commit `34789dd`
-- ⏳ Release (bump / merge / tag / push) — pending
+- ✅ Release v2.4.2 — merge `b6207d4`, tag `v2.4.2`, GitHub Release published
 
-Branch: `feature/v2.4.2-loop-fix`
+Branch merged: `feature/v2.4.2-loop-fix` → `master`
+Release: https://github.com/Arashtahmasbi3/ai-desktop/releases/tag/v2.4.2
 
 
 ## 🎯 هدف
