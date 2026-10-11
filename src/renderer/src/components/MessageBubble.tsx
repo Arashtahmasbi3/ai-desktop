@@ -85,6 +85,7 @@ export default function MessageBubble({ message }: { message: ChatMessage }): JS
           {t(ROLE_LABEL[message.role])}
         </span>
         <div
+          dir="auto"
           className={`chat-markdown w-full rounded-xl px-3 py-2 text-sm leading-relaxed ${
             isUser ? 'bg-accent/20 text-neutral-100' : 'bg-bg-tertiary text-neutral-200'
           } ${message.role === 'system' ? 'border border-amber-500/30' : ''}`}
