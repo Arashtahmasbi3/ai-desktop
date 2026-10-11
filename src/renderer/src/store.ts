@@ -95,7 +95,7 @@ function toolCallFromView(view: ToolResultView): ToolCallView {
 const MAX_LOGS = 500
 const MAX_TERMINAL_LINES = 500
 const TOKEN_SETTINGS_KEY = 'ai-desktop:show-token-count'
-const CONTEXT_SETTINGS_KEY = 'ai-desktop:show-context-before-send'
+export const CONTEXT_SETTINGS_KEY = 'ai-desktop:show-context-before-send'
 const CHAT_TREE_KEY = 'ai-desktop:chat-tree-open'
 const LAST_CHAT_KEY = 'ai-desktop:last-chat'
 const AUTOSAVE_INTERVAL_MS = 30_000
@@ -115,7 +115,8 @@ function readShowTokenCount(): boolean {
   }
 }
 
-function readShowContextBeforeSend(): boolean {
+/** Read the persisted "preview context before send" preference (default on). */
+export function readShowContextBeforeSend(): boolean {
   try {
     return globalThis.localStorage?.getItem(CONTEXT_SETTINGS_KEY) !== '0'
   } catch {

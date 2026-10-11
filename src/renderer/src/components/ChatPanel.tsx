@@ -36,6 +36,7 @@ import JobsPanel from './JobsPanel'
 import MicButton from './MicButton'
 import { FullAccessBanner, FullAccessToggle } from './FullAccessToggle'
 import { filterSlashCommands, resolveSlashCommand } from '../lib/slash'
+import { decideSend } from '../lib/context-gate'
 import { workspaceStatus, shouldShowWorkspaceBanner } from '../lib/project-status'
 import { contextBudget, estimateTokens } from '@shared/memory'
 
@@ -249,13 +250,13 @@ export default function ChatPanel(): JSX.Element {
       applyCommand(command)
       return
     }
-    const body = [trimmed, ...attached.map((path) => `@${path}`)].filter(Boolean).join('\n')
-    if (!body || running) return
-    if (showContextBeforeSend) {
-      previewContext(body, true)
+    const decision = decideSend(trimmed, attached, showContextBeforeSend)
+    if (!decision || running) return
+    if (decision.preview) {
+      previewContext(decision.body, true)
       return
     }
-    doSend(body)
+    doSend(decision.body)
   }
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>): void => {

@@ -700,3 +700,7 @@ Autonomous decisions logged per the sprint's golden rule (`[AUTO-DECISION]`, no 
 - `[AUTO-DECISION v2.5.3]` Blocked path returns `action:'block'` not stop-run. Block does not increment failure streak. Better UX for retry strategy.
 
 
+
+## Sprint v2.5.4 — Usage Settings + Context Preview Toggle
+- `[ALREADY-DONE]` Task 1.1 — context preview toggle (implemented in v2.5.2). `showContextBeforeSend` lives in `store.ts` (persisted under `ai-desktop:show-context-before-send`, default ON), the toggle is in `SettingsPanel.tsx`, and the dialog is `ContextPreviewCard.tsx`. v2.5.4 only extracted the composer's submit branch into `src/renderer/src/lib/context-gate.ts` (`decideSend`) and added `test/renderer/context-preview-toggle.test.tsx` (4 scenarios: preview on, preview off, immediate store apply, restart persistence).
+
