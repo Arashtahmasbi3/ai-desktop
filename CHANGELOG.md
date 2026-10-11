@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.2] — 2026-10-05
+
+Sprint v2.5.2 "Rich Tool Details & Transparent Chat UI" — the chat is no longer
+blind. When the agent runs a command on a VPS or local project, the transcript
+now shows the exact command, the target host, stdout/stderr, the exit code, the
+agent phase, and the recovery decision after a failure. Scope: Phases 1–5 only;
+Phase 6 (remote diff) and Phase 7 (crash diagnosis) are deferred to the next
+milestone. No security-sensitive changes — the v2.5-P0 hardening is untouched.
+
+### Added
+
+- **Structured tool detail** — `AgentToolResult` and `RemoteShellResult` now
+  carry `command / serverId / cwd / path / stdout / stderr / exitCode` plus a
+  `recovery` field, populated by the local sandbox, remote-shell and remote-fs
+  executors. What the model sees (`content`/`output`) is unchanged.
+- **Transparent `tool:result` event** — `src/core/agent/tool-detail.ts` redacts
+  every string via `redact()` and caps output (stdout 10KB, stderr 2KB, 50
+  lines) before the orchestrator streams a `tool:result` event and enriches the
+  existing `action.ok/error` log with the same structured fields.
+- **`ToolResultCard` in Chat** — command preview, exit-code badge and duration,
+  expanding to stdout / stderr / target server / cwd / cause / recovery. The
+  store builds inline `role:'tool'` messages from `tool:result` only; logs feed
+  the timeline/diagnostics, never the chat.
+- **Phase + recovery in the timeline** — `buildTimeline` carries the agent
+  `phase` on steps and adds a `recovery` step kind for `recovery.*` logs
+  (retry / switch / stop, attempts, from→to), shown as a muted second line in
+  `ProgressTimeline`.
+- **Context-aware LoopStop card** — `buildLoopStopModel` gives a per-reason
+  hint, extracts the stuck command and VPS host from `recentActions`,
+  highlights the recommended action, and disables **Continue** after a
+  `failure_streak`.
+
+### Tests
+
+- 28 new tests (`test/core/tool-details.test.ts`, `test/core/tool-detail.test.ts`,
+  `test/renderer/tool-detail-ui.test.tsx`, `test/renderer/timeline.test.ts`,
+  `test/renderer/loop-stop.test.tsx`), 1044 total (1 skipped). Typecheck and
+  production build pass.
+
+### Notes
+
+- `ToolCallView` is a superset of the legacy `{name, ok, detail}` tool-call
+  shape, so stored/older messages still render.
+- New devDependencies only: `@testing-library/react` and `jsdom` (no new
+  runtime dependencies).
+- Deferred to the next milestone: remote diff (Phase 6) and crash diagnosis
+  (Phase 7).
+
 ## [2.4.2] — 2026-10-05
 
 Sprint v2.4.2 "Loop Detector Fix" — removes two false-positive sources that
