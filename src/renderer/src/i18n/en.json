@@ -35,9 +35,13 @@
     "commandPalette": "Command palette"
   },
   "sidebar": {
-    "newChat": "+ New chat",
+    "newChat": "New chat",
     "chats": "Chats",
     "projects": "Projects",
+    "chatCount": "{{count}} chats",
+    "connConnected": "Connected",
+    "connDisconnected": "Disconnected",
+    "connMissing": "Path not found",
     "today": "Today",
     "yesterday": "Yesterday",
     "thisWeek": "This week",

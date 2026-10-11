@@ -11,6 +11,8 @@ export interface ProjectBadgesProps {
   project: ProjectRecord
   /** Connected/alive indicator class for the row (sidebar connection state). */
   connectionDotClass?: string
+  /** Tooltip/label for the connection dot (e.g. "Connected", "Disconnected"). */
+  connectionTitle?: string
   /** Name of the VPS a remote project lives on, when known. */
   serverName?: string
   /** Whether the project's policy override diverges from its host policy. */
@@ -24,6 +26,7 @@ export interface ProjectBadgesProps {
 export default function ProjectBadges({
   project,
   connectionDotClass,
+  connectionTitle,
   serverName,
   policyMismatch = false
 }: ProjectBadgesProps): JSX.Element {
@@ -33,7 +36,12 @@ export default function ProjectBadges({
   return (
     <span className="flex min-w-0 items-center gap-1">
       {connectionDotClass ? (
-        <span className={`h-2 w-2 shrink-0 rounded-full ${connectionDotClass}`} aria-hidden />
+        <span
+          className={`h-2 w-2 shrink-0 rounded-full ${connectionDotClass}`}
+          {...(connectionTitle
+            ? { role: 'img', 'aria-label': connectionTitle, title: connectionTitle }
+            : { 'aria-hidden': true })}
+        />
       ) : null}
       <span className="shrink-0" aria-hidden>
         {environmentDot(project)}

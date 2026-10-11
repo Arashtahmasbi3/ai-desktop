@@ -35,9 +35,13 @@
     "commandPalette": "پالت دستورات"
   },
   "sidebar": {
-    "newChat": "+ چت جدید",
+    "newChat": "چت جدید",
     "chats": "چت‌ها",
     "projects": "پروژه‌ها",
+    "chatCount": "{{count}} چت",
+    "connConnected": "متصل",
+    "connDisconnected": "قطع",
+    "connMissing": "مسیر یافت نشد",
     "today": "امروز",
     "yesterday": "دیروز",
     "thisWeek": "این هفته",
