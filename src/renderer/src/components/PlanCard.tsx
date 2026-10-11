@@ -70,18 +70,21 @@ export default function PlanCard(): JSX.Element | null {
       ariaLabel={t('plan.title')}
     >
       <header className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3">
-          <ClipboardList className="h-4 w-4 text-accent" />
-          <h3 className="text-sm font-semibold text-neutral-100">{t('plan.title')}</h3>
-          <span className="text-[11px] text-neutral-500">{t('plan.subtitle')}</span>
-          <button
-            type="button"
-            onClick={() => respondPlan({ type: 'cancel' })}
-            className="ml-auto rounded p-1 text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-200"
-            aria-label={t('plan.cancel')}
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </header>
+        <ClipboardList className="h-4 w-4 shrink-0 text-accent" />
+        <h3 className="text-sm font-semibold text-neutral-100">{t('plan.title')}</h3>
+        <span className="rounded bg-bg-tertiary px-1.5 py-0.5 text-[10px] text-neutral-400">
+          {t('plan.stepsCount', { count: drafts.length })}
+        </span>
+        <span className="hidden text-[11px] text-neutral-500 sm:inline">{t('plan.subtitle')}</span>
+        <button
+          type="button"
+          onClick={() => respondPlan({ type: 'cancel' })}
+          className="ml-auto shrink-0 rounded p-1 text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-200"
+          aria-label={t('plan.cancel')}
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
           {pending.warnings.length > 0 ? (
@@ -108,6 +111,7 @@ export default function PlanCard(): JSX.Element | null {
               return (
                 <li
                   key={step.id}
+                  data-testid="plan-step"
                   className="rounded-lg border border-border bg-bg-tertiary px-3 py-2"
                 >
                   <div className="flex items-baseline gap-2">
@@ -130,6 +134,14 @@ export default function PlanCard(): JSX.Element | null {
                         className="w-full resize-y rounded border border-border bg-bg-secondary px-2 py-1 font-mono text-[11px] text-neutral-200 outline-none focus:border-accent"
                       />
                     </div>
+                  ) : key ? (
+                    <pre
+                      dir="ltr"
+                      data-testid="plan-step-command"
+                      className="mt-2 overflow-x-auto break-all rounded bg-bg-secondary/70 px-2 py-1 font-mono text-[11px] whitespace-pre-wrap text-neutral-300"
+                    >
+                      {String(step.arguments[key] ?? '')}
+                    </pre>
                   ) : null}
                 </li>
               )
@@ -137,7 +149,10 @@ export default function PlanCard(): JSX.Element | null {
           </ol>
         </div>
 
-        <footer className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-3">
+        <footer
+          data-testid="plan-footer"
+          className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-3"
+        >
           <label className="flex cursor-pointer items-center gap-2 text-[11px] text-neutral-400">
             <input
               type="checkbox"
@@ -147,18 +162,21 @@ export default function PlanCard(): JSX.Element | null {
             />
             {t('plan.trust')}
           </label>
-          <div className="flex items-center gap-2">
+          <div
+            data-testid="plan-actions"
+            className="flex flex-wrap items-center justify-end gap-2"
+          >
             <button
               type="button"
               onClick={() => respondPlan({ type: 'cancel' })}
-              className="rounded-md px-3 py-1.5 text-xs text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200"
+              className="whitespace-nowrap rounded-md px-3 py-1.5 text-xs text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200"
             >
               {t('plan.cancel')}
             </button>
             <button
               type="button"
               onClick={() => setEditing((value) => !value)}
-              className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs text-neutral-300 hover:bg-bg-tertiary"
+              className="flex items-center gap-1.5 whitespace-nowrap rounded-md border border-border px-3 py-1.5 text-xs text-neutral-300 hover:bg-bg-tertiary"
             >
               <Pencil className="h-3.5 w-3.5" />
               {t('plan.modify')}
@@ -166,7 +184,7 @@ export default function PlanCard(): JSX.Element | null {
             <button
               type="button"
               onClick={approve}
-              className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white hover:brightness-110"
+              className="flex items-center gap-1.5 whitespace-nowrap rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white hover:brightness-110"
             >
               <Play className="h-3.5 w-3.5" />
               {editing ? t('plan.applyEdit') : t('plan.approve')}

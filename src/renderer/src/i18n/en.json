@@ -482,6 +482,7 @@
   },
   "plan": {
     "title": "Plan",
+    "stepsCount": "{{count}} steps",
     "subtitle": "Review the steps before they run.",
     "approve": "Approve plan",
     "modify": "Modify",
