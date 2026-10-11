@@ -188,7 +188,8 @@ export default function ApprovalDialog(): JSX.Element | null {
       className={request.dangerous ? 'border-red-500/60' : ''}
       ariaLabel={t('chat.approvalTitle')}
     >
-      <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-4 py-3">
+      <div className="flex shrink-0 flex-col gap-2 border-b border-border px-4 py-3">
+        <div className="flex items-start justify-between gap-3">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-neutral-100">
             <ShieldAlert
               className={`h-4 w-4 ${request.dangerous ? 'text-red-400' : 'text-amber-400'}`}
@@ -204,6 +205,51 @@ export default function ApprovalDialog(): JSX.Element | null {
           >
             <X className="h-3.5 w-3.5" />
           </button>
+        </div>
+
+        <div
+          className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]"
+          data-testid="approval-summary"
+        >
+          <span
+            className={`inline-flex shrink-0 items-center gap-1 rounded border px-1.5 py-0.5 ${
+              CATEGORY_STYLE[categoryOf(request.dangerous, request.kind)]
+            }`}
+          >
+            {kindIcon(request.kind)}
+            {t(categoryKey(categoryOf(request.dangerous, request.kind)))}
+          </span>
+          <span className="flex min-w-0 items-center gap-1 text-neutral-500">
+            {t('chat.approvalTool')}:
+            <code className="max-w-[16rem] truncate font-mono text-neutral-200" dir="ltr">
+              {request.tool}
+            </code>
+          </span>
+          {request.server ? (
+            <span className="flex min-w-0 items-center gap-1 text-neutral-500">
+              {t('chat.approvalServer')}:
+              <span className="max-w-[12rem] truncate font-mono text-neutral-300" dir="ltr">
+                {request.server}
+              </span>
+            </span>
+          ) : null}
+          {request.workingDirectory ? (
+            <span className="flex min-w-0 items-center gap-1 text-neutral-500">
+              {t('chat.approvalWorkingDir')}:
+              <span className="max-w-[16rem] truncate font-mono text-neutral-300" dir="ltr">
+                {request.workingDirectory}
+              </span>
+            </span>
+          ) : null}
+        </div>
+
+        {request.reason ? (
+          <p className="flex items-center gap-2 text-[11px] text-neutral-400">
+            <ShieldAlert className="h-3.5 w-3.5 shrink-0 text-neutral-500" />
+            {t('chat.approvalReason')}:{' '}
+            <span className="font-medium text-neutral-200">{t(reasonKey(request.reason))}</span>
+          </p>
+        ) : null}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
@@ -219,14 +265,6 @@ export default function ApprovalDialog(): JSX.Element | null {
           </p>
         ) : null}
 
-        {request.reason ? (
-          <p className="mt-3 flex items-center gap-2 text-[11px] text-neutral-400">
-            <ShieldAlert className="h-3.5 w-3.5 shrink-0 text-neutral-500" />
-            {t('chat.approvalReason')}:{' '}
-            <span className="font-medium text-neutral-200">{t(reasonKey(request.reason))}</span>
-          </p>
-        ) : null}
-
         {policyWarning ? (
           <PolicyWarningBanner
             warning={policyWarning}
@@ -234,40 +272,6 @@ export default function ApprovalDialog(): JSX.Element | null {
             onCancel={() => respondApproval(false)}
           />
         ) : null}
-
-        <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[11px]">
-          <dt className="text-neutral-500">{t('chat.approvalTool')}</dt>
-          <dd className="truncate font-mono text-neutral-200" dir="ltr">
-            {request.tool}
-          </dd>
-          {request.server ? (
-            <>
-              <dt className="text-neutral-500">{t('chat.approvalServer')}</dt>
-              <dd className="truncate text-neutral-300" dir="ltr">
-                {request.server}
-              </dd>
-            </>
-          ) : null}
-          {request.workingDirectory ? (
-            <>
-              <dt className="text-neutral-500">{t('chat.approvalWorkingDir')}</dt>
-              <dd className="truncate text-neutral-300" dir="ltr">
-                {request.workingDirectory}
-              </dd>
-            </>
-          ) : null}
-          <dt className="text-neutral-500">{t('chat.approvalCategory')}</dt>
-          <dd>
-            <span
-              className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 ${
-                CATEGORY_STYLE[categoryOf(request.dangerous, request.kind)]
-              }`}
-            >
-              {kindIcon(request.kind)}
-              {t(categoryKey(categoryOf(request.dangerous, request.kind)))}
-            </span>
-          </dd>
-        </dl>
 
         <p className="mt-3 text-[10px] uppercase tracking-wide text-neutral-600">
           {t('chat.approvalCommand')}
@@ -345,61 +349,6 @@ export default function ApprovalDialog(): JSX.Element | null {
           </>
         )}
 
-      </div>
-
-      <div className="shrink-0 border-t border-border">
-        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setShowDetails((value) => !value)}
-              className="text-[11px] text-neutral-500 hover:text-neutral-300"
-            >
-              {showDetails ? t('chat.approvalHideDetails') : t('chat.approvalShowDetails')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowHistory((value) => !value)}
-              className="flex items-center gap-1 text-[11px] text-neutral-500 hover:text-neutral-300"
-            >
-              <History className="h-3 w-3" />
-              {t('chat.approvalHistory')}
-            </button>
-          </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => respondApproval(false)}
-              className="rounded-lg border border-border px-3 py-1.5 text-xs text-neutral-300 hover:bg-bg-tertiary"
-            >
-              {t('chat.deny')}
-            </button>
-            <button
-              type="button"
-              onClick={() => respondApproval({ approved: false, explain: true })}
-              className="rounded-lg border border-amber-500/40 px-3 py-1.5 text-xs text-amber-300 hover:bg-amber-500/10"
-            >
-              {t('chat.approvalDenyExplain')}
-            </button>
-            <button
-              type="button"
-              onClick={approve}
-              className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover"
-            >
-              {t('chat.approve')}
-            </button>
-            {rememberable ? (
-              <button
-                type="button"
-                onClick={() => respondApproval({ approved: true, remember: 'session' })}
-                className="rounded-lg border border-accent/50 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/10"
-              >
-                {t('chat.approvalApproveAll')}
-              </button>
-            ) : null}
-          </div>
-        </div>
-
         {showHistory ? (
           <div className="mx-4 mb-3 max-h-48 overflow-auto rounded-lg border border-border bg-bg-primary p-2">
             <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-neutral-600">
@@ -456,6 +405,55 @@ export default function ApprovalDialog(): JSX.Element | null {
             )}
           </div>
         ) : null}
+
+      </div>
+
+      <div className="shrink-0 border-t border-border" data-testid="approval-footer">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowDetails((value) => !value)}
+              className="whitespace-nowrap text-[11px] text-neutral-500 hover:text-neutral-300"
+            >
+              {showDetails ? t('chat.approvalHideDetails') : t('chat.approvalShowDetails')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowHistory((value) => !value)}
+              className="flex items-center gap-1 whitespace-nowrap text-[11px] text-neutral-500 hover:text-neutral-300"
+            >
+              <History className="h-3 w-3" />
+              {t('chat.approvalHistory')}
+            </button>
+          </div>
+          <div
+            className="flex flex-wrap items-center justify-end gap-2"
+            data-testid="approval-actions"
+          >
+            <button
+              type="button"
+              onClick={() => respondApproval(false)}
+              className="whitespace-nowrap rounded-lg border border-border px-3 py-1.5 text-xs text-neutral-300 hover:bg-bg-tertiary"
+            >
+              {t('chat.deny')}
+            </button>
+            <button
+              type="button"
+              onClick={() => respondApproval({ approved: false, explain: true })}
+              className="whitespace-nowrap rounded-lg border border-amber-500/40 px-3 py-1.5 text-xs text-amber-300 hover:bg-amber-500/10"
+            >
+              {t('chat.approvalDenyExplain')}
+            </button>
+            <button
+              type="button"
+              onClick={approve}
+              className="whitespace-nowrap rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover"
+            >
+              {t('chat.approve')}
+            </button>
+          </div>
+        </div>
       </div>
     </Modal>
   )
