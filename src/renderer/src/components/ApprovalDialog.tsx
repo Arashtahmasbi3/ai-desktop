@@ -25,6 +25,7 @@ import type {
 const RISKY_TOKENS = new Set([
   'rm',
   'del',
+  'rd',
   'rmdir',
   'format',
   'mkfs',
@@ -33,6 +34,15 @@ const RISKY_TOKENS = new Set([
   'reboot',
   'kill',
   'pkill',
+  'sudo',
+  'chmod',
+  'chown',
+  'curl',
+  'wget',
+  'npm',
+  'pnpm',
+  'yarn',
+  'pip',
   ':(){:|:&};:'
 ])
 

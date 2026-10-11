@@ -102,6 +102,21 @@ describe('Task 2.3 - clearer approval dialog', () => {
     expect(screen.getByText('Destructive')).toBeTruthy()
     expect(screen.getByText('Dangerous command')).toBeTruthy()
   })
+
+  it('4. highlights destructive package-manager and chmod tokens in the preview', () => {
+    useStore.setState({
+      pendingApproval: request({
+        tool: 'remote_shell',
+        kind: 'shell',
+        summary: 'npm install && chmod 777 file',
+        preview: 'npm install && chmod 777 file'
+      })
+    })
+    render(<ApprovalDialog />)
+
+    expect(screen.getByText('npm').className).toContain('text-red-400')
+    expect(screen.getByText('chmod').className).toContain('text-red-400')
+  })
 })
 
 /**
