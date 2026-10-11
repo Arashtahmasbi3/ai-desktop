@@ -23,6 +23,8 @@ import { RemoteFsToolExecutor } from '@core/tools/remote-fs-executor'
 import { MIGRATE_PROJECT_TOOL, type MigrateProjectDeps } from '@core/tools/migrate-project-tool'
 import { MigrateProjectToolExecutor } from '@core/tools/migrate-project-executor'
 import { CompositeToolExecutor, type ToolRoute } from '@core/tools/composite-executor'
+import { DIAGNOSE_CRASH_TOOL } from '@core/tools/crash-diagnosis-tool'
+import { CrashDiagnosisToolExecutor } from '@core/tools/crash-diagnosis-tool'
 import { planV24Tools, enabledV24ToolNames } from './v24-tools-wiring'
 import { routeToolCall, remoteWorkspaceHint } from '@core/agent/remote-routing'
 import type { RoutingDecision } from '@core/agent/remote-routing'
@@ -222,6 +224,24 @@ export function planRemoteRuntime(
       ` You also have the remote file tools ${fsTools.map((tool) => tool.name).join(', ')} ` +
       'for reading, writing, listing, grepping and checking git status on that server.'
   }
+
+  // Structured crash diagnosis (v2.5.6): a fixed, read-only probe set the model
+  // calls instead of guessing commands.
+  const diagnosisExecutor = new CrashDiagnosisToolExecutor(
+    {
+      connectedServers: () => vps.connectedServers(),
+      exec: (serverId, command) => vps.exec(serverId, command),
+      ...(projectRoot ? { projectRoot } : {}),
+      ...(diagnostic ? { diagnostic } : {})
+    },
+    target
+  )
+  extraTools.push({ ...DIAGNOSE_CRASH_TOOL, description: `${DIAGNOSE_CRASH_TOOL.description} Target server: "${target}".` })
+  routes.push({ names: new Set([DIAGNOSE_CRASH_TOOL.name]), executor: diagnosisExecutor })
+  hint +=
+    ' You can also call "diagnose_crash" to run a fixed set of read-only probes ' +
+    '(process managers, logs, resources, network) and get a probable cause with ' +
+    'recommendations when the user asks why the project is crashing or failing.'
 
   // Cross-server project migration needs to resolve both saved servers' hosts.
   if (typeof vps.resolveServer === 'function') {

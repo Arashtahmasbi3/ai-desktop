@@ -46,7 +46,9 @@ const READ_ONLY_REMOTE_TOOLS = new Set([
   'remote_list_dir',
   'remote_exists',
   'remote_grep',
-  'remote_git_status'
+  'remote_git_status',
+  // v2.5.6: the crash diagnosis probes are fixed and read-only.
+  'diagnose_crash'
 ])
 
 export interface ApprovalRequirement {
