@@ -4,6 +4,7 @@ import { checkDenyList } from '@core/agent/deny-list'
 import type { AuditEntry } from '@core/agent/audit-log'
 import { backupPathFor } from '@core/remote/backup'
 import { enforceProjectPath } from '@core/remote/path-guard'
+import type { DiagnosticPolicy } from '@core/remote/diagnostic-policy'
 
 /** POSIX single-quote a value so it can be safely embedded in a shell command. */
 export function shellQuote(value: string): string {
@@ -99,6 +100,8 @@ export interface RemoteFsDeps {
    * inside it before touching the VPS (v2.5, P0-2).
    */
   projectRoot?: string
+  /** Read-only widening while Diagnostic Mode is on (v2.5.3). */
+  diagnostic?: DiagnosticPolicy | null
 }
 
 export interface RemoteFsResult {
@@ -124,9 +127,13 @@ function cleanPath(value: unknown): string | undefined {
  * (callers that do not know the active project) skips the check so the tools stay
  * usable on their own; AgentService always supplies it for remote projects.
  */
-function containPath(deps: RemoteFsDeps, path: string): RemoteFsResult | undefined {
+function containPath(
+  deps: RemoteFsDeps,
+  path: string,
+  mode: 'read' | 'write' = 'read'
+): RemoteFsResult | undefined {
   if (!deps.projectRoot) return undefined
-  const guard = enforceProjectPath(path, deps.projectRoot)
+  const guard = enforceProjectPath(path, deps.projectRoot, deps.diagnostic, mode)
   if (!guard.ok) return fail(`Blocked: ${guard.error}`, true)
   return undefined
 }
@@ -225,7 +232,8 @@ async function writeFile(
   if (!path || content === undefined) {
     return fail('remote_write_file requires "path" and "content"')
   }
-  const blocked = containPath(deps, path)
+  // Writes never use the Diagnostic Mode widening, even for an exposed path.
+  const blocked = containPath(deps, path, 'write')
   if (blocked) return blocked
 
   // Back up an existing file before overwriting it so the change can be undone.

@@ -13,11 +13,15 @@
  * themselves before calling.
  */
 import * as path from 'path'
+import { isDiagnosticAllowed, type DiagnosticPolicy } from './diagnostic-policy'
+import { isCommandAlwaysAllowed, isDiagnosticReadOnlyCommand } from './command-whitelist'
 
 export interface PathGuardResult {
   ok: boolean
   resolvedPath?: string
   error?: string
+  /** Which rule admitted the path: the project root or Diagnostic Mode (v2.5.3). */
+  source?: 'project' | 'diagnostic'
 }
 
 /** Device/pseudo files that are safe to reference regardless of the project. */
@@ -40,7 +44,16 @@ function normalizeRoot(projectRoot: string): string {
  * Resolve `requestedPath` (absolute or relative) against `projectRoot` and prove
  * it stays inside the root. Rejects empty input, control characters and escapes.
  */
-export function enforceProjectPath(requestedPath: string, projectRoot: string): PathGuardResult {
+export function enforceProjectPath(
+  requestedPath: string,
+  projectRoot: string,
+  diagnostic?: DiagnosticPolicy | null,
+  /**
+   * Diagnostic Mode is read-only: a write (`mode: 'write'`) may never leave the
+   * project root, even for a path the diagnostic policy would otherwise expose.
+   */
+  mode: 'read' | 'write' = 'read'
+): PathGuardResult {
   if (!requestedPath || typeof requestedPath !== 'string') {
     return { ok: false, error: 'Invalid path' }
   }
@@ -58,14 +71,24 @@ export function enforceProjectPath(requestedPath: string, projectRoot: string): 
   }
 
   const contained = root === '/' || resolved === root || resolved.startsWith(root + '/')
-  if (!contained) {
-    return {
-      ok: false,
-      error: `Path "${requestedPath}" is outside project root "${root}"`
-    }
+  if (contained) {
+    return { ok: true, resolvedPath: resolved, source: 'project' }
   }
 
-  return { ok: true, resolvedPath: resolved }
+  // P0-2 says no; Diagnostic Mode (user-enabled, read-only, expiring) may still
+  // admit an absolute system path so the agent can inspect logs and metrics.
+  if (
+    mode === 'read' &&
+    path.posix.isAbsolute(resolved) &&
+    isDiagnosticAllowed(resolved, diagnostic)
+  ) {
+    return { ok: true, resolvedPath: resolved, source: 'diagnostic' }
+  }
+
+  return {
+    ok: false,
+    error: `Path "${requestedPath}" is outside project root "${root}"`
+  }
 }
 
 /**
@@ -86,11 +109,28 @@ export function extractAbsolutePaths(command: string): string[] {
  * project root. Benign device paths (`/dev/null`, ...) are allowed so ordinary
  * redirections keep working. Returns the first rejection found.
  */
-export function enforceCommandPaths(command: string, projectRoot: string): PathGuardResult {
+export function enforceCommandPaths(
+  command: string,
+  projectRoot: string,
+  diagnostic?: DiagnosticPolicy | null
+): PathGuardResult {
+  // Read-only host introspection (uname, df, ...) carries no project/system path
+  // by design and is allowed before the path scan (v2.5.3, Fix 2). Metacharacters
+  // are refused by the whitelist itself, so this cannot smuggle a second command.
+  if (isCommandAlwaysAllowed(command)) return { ok: true }
+  // A diagnostic bypass is only valid for a read-only command; anything that can
+  // write (redirection, `rm`, `sed -i`, chaining) must not reach system paths.
+  const readOnly = isDiagnosticReadOnlyCommand(command)
   for (const candidate of extractAbsolutePaths(command)) {
     if (isBenign(path.posix.normalize(candidate))) continue
-    const guard = enforceProjectPath(candidate, projectRoot)
+    const guard = enforceProjectPath(candidate, projectRoot, diagnostic)
     if (!guard.ok) return guard
+    if (guard.source === 'diagnostic' && !readOnly) {
+      return {
+        ok: false,
+        error: `Path "${candidate}" is exposed by Diagnostic Mode but "${command}" is not a read-only command`
+      }
+    }
   }
   return { ok: true }
 }

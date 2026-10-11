@@ -2,6 +2,7 @@ import type { ToolDefinition } from '@shared/types'
 import type { VpsExecResult } from '@shared/vps'
 import { checkDenyList } from '@core/agent/deny-list'
 import { enforceCommandPaths } from '@core/remote/path-guard'
+import type { DiagnosticPolicy } from '@core/remote/diagnostic-policy'
 
 /** Tool the agent can call to run a command on a connected VPS. */
 export const REMOTE_SHELL_TOOL: ToolDefinition = {
@@ -39,6 +40,11 @@ export interface RemoteShellDeps {
    * the command that leaves the project is refused (v2.5, P0-2).
    */
   projectRoot?: string
+  /**
+   * Read-only widening of P0-2 while the user has Diagnostic Mode on (v2.5.3).
+   * `null`/absent keeps the default confinement.
+   */
+  diagnostic?: DiagnosticPolicy | null
 }
 
 /**
@@ -117,7 +123,7 @@ export async function executeRemoteShell(
   // Containment first: refuse any absolute path in the command that leaves the
   // project root, then apply the deny list (v2.5, P0-2).
   if (deps.projectRoot) {
-    const guard = enforceCommandPaths(command, deps.projectRoot)
+    const guard = enforceCommandPaths(command, deps.projectRoot, deps.diagnostic)
     if (!guard.ok) {
       return { ok: false, blocked: true, content: `Blocked: ${guard.error}`, ...target }
     }

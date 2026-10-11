@@ -13,6 +13,7 @@ import type { PlanDecision } from '@shared/plan'
 import type { ProjectMetadataPatch } from '@shared/project-metadata'
 import type { OnboardingStatus } from '@shared/onboarding'
 import type { VpsConnectionState, VpsServerView } from '@shared/vps'
+import type { DiagnosticStatus } from '@shared/ui'
 import type { ChatSummary, StoredMessage } from '@shared/chat'
 import type { Locale } from './i18n/locale'
 import { detectLocale } from './i18n/locale'
@@ -211,6 +212,8 @@ interface AppState {
   vpsServers: VpsServerView[]
   /** Live VPS connection state from the main process. */
   vpsStatus: VpsConnectionState
+  /** Diagnostic Mode state (v2.5.3); null until first fetched. */
+  diagnostic: DiagnosticStatus | null
   /** Plan Mode: the agent drafts a plan without running tools. */
   planMode: boolean
   /** Tool call awaiting the user's approval, if any. */
@@ -252,6 +255,10 @@ interface AppState {
   /** Fork a chat from a message (inclusive); returns the new chat id. */
   forkChat: (id: string, messageId: string) => Promise<string | null>
   setVpsServerId: (id: string | undefined) => void
+  /** Refresh Diagnostic Mode state from the main process. */
+  refreshDiagnostic: () => Promise<void>
+  /** Enable/disable Diagnostic Mode; updates the shared status. */
+  setDiagnosticMode: (enabled: boolean) => Promise<void>
   /** Load the saved VPS list and current connection state into the store. */
   refreshVps: () => Promise<void>
   /** Connect to a VPS (updates the shared status on every UI surface). */
@@ -374,6 +381,7 @@ export const useStore = create<AppState>((set, get) => ({
   vpsServerId: undefined,
   vpsServers: [],
   vpsStatus: { status: 'disconnected' },
+  diagnostic: null,
   planMode: false,
   pendingApproval: null,
   pendingPlan: null,
@@ -416,6 +424,23 @@ export const useStore = create<AppState>((set, get) => ({
       else globalThis.localStorage?.removeItem(VPS_RECONNECT_KEY)
     } catch {
       // Persisting the last VPS is best-effort.
+    }
+  },
+  async refreshDiagnostic() {
+    try {
+      set({ diagnostic: await window.api.diagnostic.status() })
+    } catch {
+      set({ diagnostic: null })
+    }
+  },
+  async setDiagnosticMode(enabled) {
+    try {
+      const status = enabled
+        ? await window.api.diagnostic.enable()
+        : await window.api.diagnostic.disable()
+      set({ diagnostic: status })
+    } catch {
+      await get().refreshDiagnostic()
     }
   },
   async refreshVps() {
@@ -1059,6 +1084,9 @@ export function subscribeToEvents(): void {
   const offVps = window.api.events.on('vps:status', (status) =>
     useStore.getState().setVpsStatus(status)
   )
+  const offDiagnostic = window.api.events.on('diagnostic:status', (diagnostic) =>
+    useStore.setState({ diagnostic })
+  )
   unsubscribe = () => {
     offAgent()
     offWorker()
@@ -1066,6 +1094,7 @@ export function subscribeToEvents(): void {
     offSettings()
     offFiles()
     offVps()
+    offDiagnostic()
     unsubscribe = null
   }
 }

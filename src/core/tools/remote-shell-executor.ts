@@ -54,6 +54,8 @@ export class RemoteShellToolExecutor implements ToolExecutor {
                   ? ('blocked' as const)
                   : ('remote_error' as const)
             }),
+        // Signal a policy refusal so the loop detector can block a retry (v2.5.3).
+        ...(result.blocked ? { blocked: true } : {}),
         // Structured detail for the UI (raw; redacted/capped before emit).
         ...(result.command !== undefined ? { command: result.command } : {}),
         ...(result.serverId !== undefined ? { serverId: result.serverId } : {}),

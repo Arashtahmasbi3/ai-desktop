@@ -66,6 +66,12 @@ export interface AgentToolResult {
   stderr?: string
   /** Process exit code when the action ran a command. */
   exitCode?: number
+  /**
+   * True when policy (P0-2 path containment, deny list, diagnostic read-only
+   * gate, ...) refused the action before it could run. Lets the loop detector
+   * remember the rejected path/command so the model does not retry it (v2.5.3).
+   */
+  blocked?: boolean
   /** What the run did after a failure (retry / stop). */
   recovery?: ToolRecoveryInfo
 }

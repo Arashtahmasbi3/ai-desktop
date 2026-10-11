@@ -27,6 +27,7 @@ import { planV24Tools, enabledV24ToolNames } from './v24-tools-wiring'
 import { routeToolCall, remoteWorkspaceHint } from '@core/agent/remote-routing'
 import type { RoutingDecision } from '@core/agent/remote-routing'
 import { detectWorkspace } from '@core/remote/workspace-detect'
+import type { DiagnosticPolicy } from '@core/remote/diagnostic-policy'
 import { preflight, preflightActionFor, type PreflightResult } from '@core/agent/preflight'
 import { buildWorkspaceSystemHint } from '@core/agent/workspace-prompt'
 import type { RemoteWorkspaceInfo } from '@shared/workspace-info'
@@ -125,7 +126,9 @@ export function planRemoteRuntime(
   jobs?: RemoteJobRunner,
   enabledTools?: string[],
   /** Absolute root of the active remote project; enables path containment (P0-2). */
-  projectRoot?: string
+  projectRoot?: string,
+  /** Read-only widening while Diagnostic Mode is on (v2.5.3). */
+  diagnostic?: DiagnosticPolicy | null
 ): RemoteRuntime {
   if (!vps) return {}
   const connected = vps.connectedServers()
@@ -172,7 +175,8 @@ export function planRemoteRuntime(
       exec: (serverId, command) => vps.exec(serverId, command),
       connectedServers: () => vps.connectedServers(),
       ...(jobs ? { jobs } : {}),
-      ...(projectRoot ? { projectRoot } : {})
+      ...(projectRoot ? { projectRoot } : {}),
+      ...(diagnostic ? { diagnostic } : {})
     },
     target
   )
@@ -194,7 +198,8 @@ export function planRemoteRuntime(
       writeFile: (serverId, path, content) => vps.writeFile!(serverId, path, content),
       listFiles: (serverId, path) => vps.listFiles!(serverId, path),
       exec: (serverId, command) => vps.exec(serverId, command),
-      ...(projectRoot ? { projectRoot } : {})
+      ...(projectRoot ? { projectRoot } : {}),
+      ...(diagnostic ? { diagnostic } : {})
     }
     if (typeof vps.recordAudit === 'function') {
       fsDeps.audit = (entry) => vps.recordAudit!(entry).then(() => undefined)
@@ -292,6 +297,16 @@ export interface AgentServiceOptions {
   files?: ProjectFiles
   /** Tracks run -> project binding so stale patches cannot leak across projects. */
   runStore?: RunStore
+  /**
+   * v2.5.3: current Diagnostic Policy (read-only widening of P0-2), or null.
+   * Read at the start of every run so enabling/disabling takes effect next run.
+   */
+  getDiagnosticPolicy?: () => DiagnosticPolicy | null
+  /**
+   * v2.5.3: resolve a saved VPS id to its display name so the prompt can name the
+   * host the run is on. Optional; the id is used when absent.
+   */
+  resolveVpsName?: (id: string) => Promise<string | undefined>
 }
 
 /** Which provider/model to put first for an agent run. */
@@ -337,6 +352,8 @@ export class AgentService {
   private readonly approvedCommands?: ApprovedCommands
   private readonly files?: ProjectFiles
   private readonly runStore: RunStore
+  private readonly getDiagnosticPolicy?: () => DiagnosticPolicy | null
+  private readonly resolveVpsName?: (id: string) => Promise<string | undefined>
   private readonly controllers = new Set<AbortController>()
   private readonly changes = new Map<string, FileChangeView>()
   private runCounter = 0
@@ -360,6 +377,8 @@ export class AgentService {
     if (options.approvedCommands) this.approvedCommands = options.approvedCommands
     if (options.files) this.files = options.files
     this.runStore = options.runStore ?? new RunStore()
+    this.getDiagnosticPolicy = options.getDiagnosticPolicy
+    this.resolveVpsName = options.resolveVpsName
   }
 
   isRunning(): boolean {
@@ -381,6 +400,9 @@ export class AgentService {
     const isRemote = active?.type === 'remote'
     const serverId = active?.vpsId
     const connected = Boolean(serverId && connectedServers.includes(serverId))
+    // Read the diagnostic policy once per run so a toggle mid-run does not change
+    // the containment rules under the agent's feet (v2.5.3).
+    const diagnostic = this.getDiagnosticPolicy?.() ?? null
 
     // A1: for a remote project, always install routing so a stray local tool call
     // is rewritten (when the VPS is connected) or answered with a clear error.
@@ -391,7 +413,8 @@ export class AgentService {
               workspaceType: 'remote',
               ...(serverId ? { serverId } : {}),
               ...(active?.path ? { remotePath: active.path } : {}),
-              connected
+              connected,
+              ...(diagnostic ? { diagnostic } : {})
             })
         }
       : {}
@@ -413,7 +436,8 @@ export class AgentService {
       this.vps,
       this.jobs,
       enabledTools,
-      isRemote ? active?.path : undefined
+      isRemote ? active?.path : undefined,
+      diagnostic
     )
     if (isRemote && connected && serverId && active?.path) {
       const remoteHint = remoteWorkspaceHint(serverId, active.path)
@@ -579,6 +603,25 @@ export class AgentService {
         projectRoot: activeProject.path
       })
     }
+    // v2.5.3 Smarter Prompt: bake the run's project/VPS/environment into the
+    // prompt so "which project am I on?" is answered without tool calls.
+    let vpsName: string | undefined
+    if (activeProject?.vpsId && this.resolveVpsName) {
+      try {
+        vpsName = await this.resolveVpsName(activeProject.vpsId)
+      } catch {
+        vpsName = undefined
+      }
+    }
+    const remoteContext = activeProject
+      ? {
+          projectName: activeProject.name,
+          projectPath: activeProject.path,
+          ...(activeProject.vpsId ? { vpsId: activeProject.vpsId } : {}),
+          ...(vpsName ? { vpsName } : {}),
+          ...(activeProject.environment ? { environment: activeProject.environment } : {})
+        }
+      : undefined
     const approvalMode = settings.approvalMode ?? DEFAULT_APPROVAL_MODE
     const planMode = request.planMode ?? settings.planModeDefault ?? false
     const requestApproval = this.requestApproval
@@ -617,6 +660,10 @@ export class AgentService {
       ...(approvalGate ? { approvalGate } : {}),
       ...(planGate ? { planGate, planApproval: approvalMode } : {}),
       ...(preflightGate ? { preflightGate } : {}),
+      // v2.5.3: report the live diagnostic posture so the system prompt matches
+      // the containment rules the remote tools will actually apply this run.
+      diagnosticMode: () => Boolean(this.getDiagnosticPolicy?.()),
+      ...(remoteContext ? { remoteContext } : {}),
       ...(this.files
         ? { onFileWritten: (change: FileChange) => this.captureChange(runId, request.sessionId, change) }
         : {}),

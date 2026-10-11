@@ -232,6 +232,11 @@ export class LoopDetector {
   // model stops retrying it and reaches for an alternative instead.
   private readonly toolFailureCount = new Map<string, number>()
   private readonly blockedTools = new Set<string>()
+  // Fix 5: paths/commands policy refused this run. Re-asking for the same target
+  // can only be refused again, so the model is steered to a different approach
+  // instead of burning a step on a guaranteed failure.
+  private readonly blockedPaths = new Set<string>()
+  private readonly blockedCommands = new Set<string>()
 
   constructor(policy: Partial<LoopDetectionPolicy> = {}, options: LoopDetectorOptions = {}) {
     this.policy = { ...DEFAULT_LOOP_POLICY, ...policy }
@@ -267,6 +272,27 @@ export class LoopDetector {
     return [...this.blockedTools]
   }
 
+  /** Paths policy refused this run, retries of which are now skipped (Fix 5). */
+  get blockedPathNames(): string[] {
+    return [...this.blockedPaths]
+  }
+
+  /** Commands policy refused this run, retries of which are now skipped (Fix 5). */
+  get blockedCommandNames(): string[] {
+    return [...this.blockedCommands]
+  }
+
+  /** The normalised path a call targets, or '' when it targets none. */
+  private callPath(args: unknown): string {
+    const path = normalizePath(firstString(asRecord(args), PATH_ARG_KEYS))
+    return path === '.' ? '' : path
+  }
+
+  /** The normalised command a call runs, or '' when it runs none. */
+  private callCommand(args: unknown): string {
+    return normalizeCommand(firstString(asRecord(args), COMMAND_ARG_KEYS))
+  }
+
   signatureCount(signature: string): number {
     return this.counts.get(signature) ?? 0
   }
@@ -292,6 +318,8 @@ export class LoopDetector {
     this.guardStopped = false
     this.toolFailureCount.clear()
     this.blockedTools.clear()
+    this.blockedPaths.clear()
+    this.blockedCommands.clear()
   }
 
   // ---------------------------------------------------------------------------
@@ -304,6 +332,29 @@ export class LoopDetector {
    * (warn at 3 / stop at 5), and consecutive-failure stop.
    */
   beforeToolCall(toolName: string, args: unknown): LoopCallDecision {
+    // Fix 5: policy already refused this exact path/command earlier in the run, so
+    // skip just this call (not the whole run) and tell the model to change tack.
+    const targetPath = this.callPath(args)
+    if (targetPath && this.blockedPaths.has(targetPath)) {
+      return {
+        allow: false,
+        action: 'block',
+        toolName,
+        reason:
+          `Path "${targetPath}" was blocked before. Try a different approach or ask the user ` +
+          'to enable Diagnostic Mode.'
+      }
+    }
+    const command = this.callCommand(args)
+    if (command && this.blockedCommands.has(command)) {
+      return {
+        allow: false,
+        action: 'block',
+        toolName,
+        reason: `Command "${command}" was blocked before. Try an alternative.`
+      }
+    }
+
     const callKey = computeLoopHash(toolName, args)
     this.recentCallKeys.push(callKey)
     if (this.recentCallKeys.length > GUARD_WINDOW_SIZE) this.recentCallKeys.shift()
@@ -388,7 +439,7 @@ export class LoopDetector {
   }
 
   /** Record the outcome of the tool call just executed. */
-  afterToolCall(toolName: string, result: { ok: boolean }): void {
+  afterToolCall(toolName: string, result: { ok: boolean; blocked?: boolean }, args?: unknown): void {
     this.recentCalls.push({ toolName, ok: result.ok, at: this.now() })
     if (this.recentCalls.length > GUARD_WINDOW_SIZE) this.recentCalls.shift()
 
@@ -397,6 +448,14 @@ export class LoopDetector {
       // A success proves the tool works again, so forget its earlier failures.
       this.toolFailureCount.delete(toolName)
       this.blockedTools.delete(toolName)
+    } else if (result.blocked === true) {
+      // A policy refusal is not a broken tool: remember the refused target so the
+      // model does not retry it (Fix 5), but do not count it toward the failure
+      // streak or remove the tool from rotation.
+      const path = this.callPath(args)
+      if (path) this.blockedPaths.add(path)
+      const command = this.callCommand(args)
+      if (command) this.blockedCommands.add(command)
     } else {
       this.toolFailureStreak += 1
       const failures = (this.toolFailureCount.get(toolName) ?? 0) + 1
