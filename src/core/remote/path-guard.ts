@@ -14,6 +14,7 @@
  */
 import * as path from 'path'
 import { isDiagnosticAllowed, type DiagnosticPolicy } from './diagnostic-policy'
+import { isCommandAlwaysAllowed } from './command-whitelist'
 
 export interface PathGuardResult {
   ok: boolean
@@ -104,6 +105,10 @@ export function enforceCommandPaths(
   projectRoot: string,
   diagnostic?: DiagnosticPolicy | null
 ): PathGuardResult {
+  // Read-only host introspection (uname, df, ...) carries no project/system path
+  // by design and is allowed before the path scan (v2.5.3, Fix 2). Metacharacters
+  // are refused by the whitelist itself, so this cannot smuggle a second command.
+  if (isCommandAlwaysAllowed(command)) return { ok: true }
   for (const candidate of extractAbsolutePaths(command)) {
     if (isBenign(path.posix.normalize(candidate))) continue
     const guard = enforceProjectPath(candidate, projectRoot, diagnostic)
