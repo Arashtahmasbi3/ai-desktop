@@ -7,6 +7,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.6] — 2026-10-05
+
+Sprint v2.5.6 "Crash Diagnosis + Read-Only Shell Relaxation" — the agent can now
+diagnose a crash with a fixed, read-only probe set instead of guessing shell
+one-liners, and read-only compound commands no longer trigger an approval prompt.
+
+### Added
+
+- **`diagnose_crash` tool** — a fixed, read-only probe set (process managers,
+  logs, resources, network) run against the connected VPS. Evidence is reduced to
+  a probable cause (`pm2_process_error` / `out_of_memory` / `disk_full` /
+  `systemd_service_failed` / `unknown`) with a confidence level and concrete
+  recommendations (`src/core/agent/crash-diagnosis.ts`,
+  `src/core/tools/crash-diagnosis-tool.ts`).
+- **Crash diagnosis prompt guidance** — remote runs expose `diagnose_crash` and
+  the system prompt teaches the evidence-then-diagnosis workflow
+  (`buildRemoteGuidance(..., crashDiagnosis)` / `buildSystemPrompt`).
+
+### Changed
+
+- **Read-only compound shell commands are allowed without approval** — `;`,
+  `&&`, `||` and pipelines are accepted when every segment is read-only, with
+  guards: `cd` to an absolute path only, any `..` refused, `curl`/`wget` with an
+  output flag treated as a write, mutating `git` subcommands refused,
+  `find -exec`/`-delete` refused, `sudo`/`sed -i` treated as writes
+  (`src/core/remote/command-whitelist.ts`, `src/core/remote/path-guard.ts`).
+- `diagnose_crash` is a read-only remote tool, so it never prompts for approval.
+
+### Notes
+
+- P0-2 path containment is unchanged; probes that touch a system path
+  (`/var/log`) are skipped unless Diagnostic Mode is on.
+- 30 new tests (`test/core/read-only-shell.test.ts`,
+  `test/core/crash-diagnosis.test.ts`, `test/core/crash-diagnosis-prompt.test.ts`).
+
+## [2.5.5] — 2026-10-05
+
+Sprint v2.5.5 "Approval UX" — fewer, clearer approval prompts.
+
+### Added
+
+- **Trust this plan for 30 minutes** — approving a plan can store an
+  `ApprovedPlan` so its own steps auto-approve for 30 minutes; a deny-listed
+  command is never auto-approved (`src/core/agent/approved-plan.ts`).
+- A `reason` (`outside_plan` / `write` / `dangerous` / …) is attached to prompts
+  and shown in the approval dialog.
+
+### Changed
+
+- **Whitelisted read-only commands skip approval** — a conservative classifier
+  admits a single read-only command or an all-read-only pipeline
+  (`command-whitelist.ts`).
+- The approval dialog now explains reason, tool, server, working dir and
+  category, with clearer safety copy and a no-undo warning.
+
+## [2.5.4] — 2026-10-05
+
+Sprint v2.5.4 "Usage Settings + Context Preview Toggle".
+
+### Added
+
+- **Settings → Usage** — token accounting (input/output tokens, estimated cost)
+  aggregated per run, per provider and per model, with a 7-day chart, reset and
+  CSV export (`src/renderer/src/lib/usage.ts`, `SettingsUsage.tsx`).
+- **Context preview toggle** (extracted `decideSend` gate in
+  `src/renderer/src/lib/context-gate.ts`).
+
+### Changed
+
+- The lightweight live composer token counter is kept.
+- The **Agent** status indicator is driven by `worker.online`.
+
 ## [2.5.2] — 2026-10-05
 
 Sprint v2.5.2 "Rich Tool Details & Transparent Chat UI" — the chat is no longer
