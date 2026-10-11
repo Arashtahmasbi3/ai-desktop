@@ -515,5 +515,21 @@
     "runTests": "Run tests",
     "runHealthCheck": "Run health check",
     "accept": "Accept anyway"
+  },
+  "workspace": {
+    "title": "Workspace",
+    "output": "Output",
+    "sources": "Sources",
+    "outputEmpty": "No tool output yet.",
+    "sourcesEmpty": "No sources yet.",
+    "close": "Hide panel",
+    "open": "Show output & sources",
+    "running": "Running",
+    "exit": "exit {{code}}",
+    "filesRead": "Files read",
+    "context": "Context sent",
+    "included": "Included",
+    "withheld": "Withheld",
+    "excluded": "Excluded"
   }
 }

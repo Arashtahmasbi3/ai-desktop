@@ -8,6 +8,7 @@ import {
   Eye,
   Loader2,
   PanelLeft,
+  PanelRight,
   Paperclip,
   Send,
   ShieldAlert,
@@ -112,6 +113,8 @@ export default function ChatPanel(): JSX.Element {
   const toggleChatTree = useStore((state) => state.toggleChatTree)
   const terminalOpen = useStore((state) => state.terminalOpen)
   const toggleTerminal = useStore((state) => state.toggleTerminal)
+  const workspacePanelOpen = useStore((state) => state.workspacePanelOpen)
+  const toggleWorkspacePanel = useStore((state) => state.toggleWorkspacePanel)
 
   const [input, setInput] = useState('')
   const [attached, setAttached] = useState<string[]>([])
@@ -360,6 +363,20 @@ export default function ChatPanel(): JSX.Element {
             }`}
           >
             <Terminal className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={toggleWorkspacePanel}
+            title={t('workspace.open')}
+            aria-label={t('workspace.open')}
+            aria-pressed={workspacePanelOpen}
+            className={`flex h-5 w-5 items-center justify-center rounded transition ${
+              workspacePanelOpen
+                ? 'bg-accent/20 text-accent'
+                : 'text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300'
+            }`}
+          >
+            <PanelRight className="h-3.5 w-3.5" />
           </button>
         </div>
         <button

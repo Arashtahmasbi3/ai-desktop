@@ -515,5 +515,21 @@
     "runTests": "اجرای تستها",
     "runHealthCheck": "اجرای health check",
     "accept": "با این حال بپذیر"
+  },
+  "workspace": {
+    "title": "کارگاه",
+    "output": "خروجی",
+    "sources": "منابع",
+    "outputEmpty": "هنوز خروجی ابزاری وجود ندارد.",
+    "sourcesEmpty": "هنوز منبعی وجود ندارد.",
+    "close": "پنهان کردن پنل",
+    "open": "نمایش خروجی و منابع",
+    "running": "در حال اجرا",
+    "exit": "کد خروج {{code}}",
+    "filesRead": "فایل‌های خوانده‌شده",
+    "context": "زمینه ارسالی",
+    "included": "شامل",
+    "withheld": "کنترل‌شده",
+    "excluded": "حذف‌شده"
   }
 }

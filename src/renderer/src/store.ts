@@ -47,6 +47,9 @@ import type {
 
 export type ViewId = 'chat' | 'tasks' | 'files' | 'browser' | 'github' | 'vps'
 
+/** Tabs of the right-hand workspace column (v2.6.0, B.4). */
+export type WorkspacePanelTab = 'output' | 'sources'
+
 export type ToastKind = 'success' | 'error' | 'warning'
 
 export interface Toast {
@@ -253,6 +256,10 @@ interface AppState {
   toasts: Toast[]
   /** Whether the file tree is shown next to the chat. */
   chatTreeOpen: boolean
+  /** Whether the right workspace column (output/sources) is shown. */
+  workspacePanelOpen: boolean
+  /** Active tab of the right workspace column. */
+  workspacePanelTab: WorkspacePanelTab
   /** Whether the local terminal panel is open under the chat. */
   terminalOpen: boolean
   /** Whether the codebase search modal is open. */
@@ -309,6 +316,8 @@ interface AppState {
   dismissToast: (id: string) => void
   setPaletteOpen: (open: boolean) => void
   toggleChatTree: () => void
+  toggleWorkspacePanel: () => void
+  setWorkspacePanelTab: (tab: WorkspacePanelTab) => void
   toggleTerminal: () => void
   runTerminalCommand: (command: string) => Promise<void>
   setSearchOpen: (open: boolean) => void
@@ -432,6 +441,8 @@ export const useStore = create<AppState>((set, get) => ({
   fileChanges: [],
   toasts: [],
   chatTreeOpen: readChatTreeOpen(),
+  workspacePanelOpen: true,
+  workspacePanelTab: 'output',
   terminalOpen: false,
   terminalLines: [],
   searchOpen: false,
@@ -568,6 +579,8 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
   setPlanMode: (value) => set({ planMode: value }),
+  toggleWorkspacePanel: () => set({ workspacePanelOpen: !get().workspacePanelOpen }),
+  setWorkspacePanelTab: (tab) => set({ workspacePanelTab: tab, workspacePanelOpen: true }),
   async setApprovalMode(mode) {
     set({ settings: await window.api.settings.setApprovalMode(mode) })
     if (mode === 'full') {
