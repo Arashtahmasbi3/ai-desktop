@@ -5,6 +5,7 @@ import type {
 } from '@shared/agent'
 import { DEFAULT_LOOP_POLICY } from '@shared/agent'
 import { stableStringify } from './tools'
+import type { StrategyAlternative } from './strategies'
 
 /** What one completed step tells the detector. */
 export interface LoopObservation {
@@ -50,18 +51,32 @@ export interface LoopCallDecision {
    * `warn` — allow but advise. `stop` — end the run (a hard loop condition).
    * `block` — skip this one action and let the model try something else
    * (a tool that has failed repeatedly in this session, A.3).
+   * `redirect` — the call keeps failing; suggest a concrete alternative instead
+   * of stopping (v2.5.7).
    */
-  action?: 'warn' | 'stop' | 'block'
+  action?: 'warn' | 'stop' | 'block' | 'redirect'
   toolName?: string
   /** How many times this call identity appears in the current window. */
   count?: number
   /** Farsi, user-facing explanation when a stop fires. */
   message?: string
+  /** Concrete alternative the user/model can run instead (v2.5.7). */
+  alternative?: StrategyAlternative
 }
 
 export interface LoopDetectorOptions {
   /** Injectable clock so timeout behaviour is testable. */
   now?: () => number
+  /**
+   * v2.5.7: map a failing call to a concrete alternative. When provided, a loop
+   * or a repeatedly-blocked target is answered with `action: 'redirect'` (carrying
+   * the alternative) instead of a hard stop, so the run can recover.
+   */
+  findAlternative?: (
+    toolName: string,
+    args: Record<string, unknown>,
+    error: string
+  ) => StrategyAlternative | null
 }
 
 /**
@@ -237,11 +252,21 @@ export class LoopDetector {
   // instead of burning a step on a guaranteed failure.
   private readonly blockedPaths = new Set<string>()
   private readonly blockedCommands = new Set<string>()
+  // v2.5.7: loop recovery. The last failure text feeds the alternative lookup,
+  // and a call key that was already redirected once stops on the next repeat.
+  private readonly findAlternative?: (
+    toolName: string,
+    args: Record<string, unknown>,
+    error: string
+  ) => StrategyAlternative | null
+  private readonly redirectedCallKeys = new Set<string>()
+  private lastError = ''
 
   constructor(policy: Partial<LoopDetectionPolicy> = {}, options: LoopDetectorOptions = {}) {
     this.policy = { ...DEFAULT_LOOP_POLICY, ...policy }
     this.now = options.now ?? (() => Date.now())
     this.lastProgressAt = this.now()
+    this.findAlternative = options.findAlternative
   }
 
   get noProgressSteps(): number {
@@ -297,6 +322,52 @@ export class LoopDetector {
     return this.counts.get(signature) ?? 0
   }
 
+  /** A concrete alternative for a failing call, or `null` (v2.5.7). */
+  private alternativeFor(toolName: string, args: unknown): StrategyAlternative | null {
+    if (!this.findAlternative) return null
+    return this.findAlternative(toolName, asRecord(args), this.lastError)
+  }
+
+  /**
+   * Decide what to do with a call that is already refused (blocked path/command
+   * or a repeatedly-failing tool). With a known alternative, redirect once; if
+   * the same call is repeated anyway, stop. Otherwise keep the historical block.
+   */
+  private blockedDecision(
+    toolName: string,
+    args: unknown,
+    callKey: string,
+    reason: string,
+    count?: number
+  ): LoopCallDecision {
+    const alternative = this.alternativeFor(toolName, args)
+    if (alternative && !this.redirectedCallKeys.has(callKey)) {
+      this.redirectedCallKeys.add(callKey)
+      return {
+        allow: false,
+        action: 'redirect',
+        toolName,
+        reason,
+        alternative,
+        ...(count !== undefined ? { count } : {})
+      }
+    }
+    if (alternative) {
+      // The model ignored the suggestion and repeated the failing call.
+      this.guardStopped = true
+      this.guardStopReason = 'repeated_action'
+      return {
+        allow: false,
+        action: 'stop',
+        reason: 'repeated_action',
+        toolName,
+        message: loopStopMessage(toolName, count ?? 0),
+        ...(count !== undefined ? { count } : {})
+      }
+    }
+    return { allow: false, action: 'block', toolName, reason, ...(count !== undefined ? { count } : {}) }
+  }
+
   reset(): void {
     // Step-level
     this.counts.clear()
@@ -320,6 +391,8 @@ export class LoopDetector {
     this.blockedTools.clear()
     this.blockedPaths.clear()
     this.blockedCommands.clear()
+    this.redirectedCallKeys.clear()
+    this.lastError = ''
   }
 
   // ---------------------------------------------------------------------------
@@ -332,30 +405,30 @@ export class LoopDetector {
    * (warn at 3 / stop at 5), and consecutive-failure stop.
    */
   beforeToolCall(toolName: string, args: unknown): LoopCallDecision {
+    const callKey = computeLoopHash(toolName, args)
+
     // Fix 5: policy already refused this exact path/command earlier in the run, so
     // skip just this call (not the whole run) and tell the model to change tack.
     const targetPath = this.callPath(args)
     if (targetPath && this.blockedPaths.has(targetPath)) {
-      return {
-        allow: false,
-        action: 'block',
+      return this.blockedDecision(
         toolName,
-        reason:
-          `Path "${targetPath}" was blocked before. Try a different approach or ask the user ` +
+        args,
+        callKey,
+        `Path "${targetPath}" was blocked before. Try a different approach or ask the user ` +
           'to enable Diagnostic Mode.'
-      }
+      )
     }
     const command = this.callCommand(args)
     if (command && this.blockedCommands.has(command)) {
-      return {
-        allow: false,
-        action: 'block',
+      return this.blockedDecision(
         toolName,
-        reason: `Command "${command}" was blocked before. Try an alternative.`
-      }
+        args,
+        callKey,
+        `Command "${command}" was blocked before. Try an alternative.`
+      )
     }
 
-    const callKey = computeLoopHash(toolName, args)
     this.recentCallKeys.push(callKey)
     if (this.recentCallKeys.length > GUARD_WINDOW_SIZE) this.recentCallKeys.shift()
 
@@ -364,19 +437,30 @@ export class LoopDetector {
     // A.3: a tool that already failed twice is skipped, not fatal — the model is
     // told to use an alternative and the run continues.
     if (this.blockedTools.has(toolName)) {
-      return {
-        allow: false,
-        action: 'block',
-        reason:
-          `Tool "${toolName}" failed ${blockedThreshold()} times in this session. ` +
-          'Use an alternative tool instead.',
+      return this.blockedDecision(
         toolName,
+        args,
+        callKey,
+        `Tool "${toolName}" failed ${blockedThreshold()} times in this session. ` +
+          'Use an alternative tool instead.',
         count
-      }
+      )
     }
 
     if (this.guardStopped) {
       const reason = this.guardStopReason ?? 'repeated_action'
+      // v2.5.7: a recoverable guard stop (not a turn timeout) redirects once to a
+      // concrete alternative, then resumes; a second repeat stops for good.
+      if (reason !== 'turn_timeout') {
+        const alternative = this.alternativeFor(toolName, args)
+        if (alternative && !this.redirectedCallKeys.has(callKey)) {
+          this.redirectedCallKeys.add(callKey)
+          this.guardStopped = false
+          this.guardStopReason = undefined
+          this.toolFailureStreak = 0
+          return { allow: false, action: 'redirect', reason, toolName, count, alternative }
+        }
+      }
       return {
         allow: false,
         action: 'stop',
@@ -414,6 +498,20 @@ export class LoopDetector {
     }
 
     if (count >= STOP_THRESHOLD) {
+      // v2.5.7: if we know a concrete alternative, redirect instead of stopping —
+      // but only once per call identity, so a model that ignores the hint stops.
+      const alternative = this.alternativeFor(toolName, args)
+      if (alternative && !this.redirectedCallKeys.has(callKey)) {
+        this.redirectedCallKeys.add(callKey)
+        return {
+          allow: false,
+          action: 'redirect',
+          reason: loopStopMessage(toolName, count),
+          toolName,
+          count,
+          alternative
+        }
+      }
       this.guardStopped = true
       this.guardStopReason = 'repeated_action'
       return {
@@ -439,9 +537,17 @@ export class LoopDetector {
   }
 
   /** Record the outcome of the tool call just executed. */
-  afterToolCall(toolName: string, result: { ok: boolean; blocked?: boolean }, args?: unknown): void {
+  afterToolCall(
+    toolName: string,
+    result: { ok: boolean; blocked?: boolean; error?: string },
+    args?: unknown
+  ): void {
     this.recentCalls.push({ toolName, ok: result.ok, at: this.now() })
     if (this.recentCalls.length > GUARD_WINDOW_SIZE) this.recentCalls.shift()
+
+    // Remember the failure text so the next `beforeToolCall` can pick an
+    // alternative strategy (v2.5.7).
+    this.lastError = result.ok ? '' : (result.error ?? '')
 
     if (result.ok) {
       this.toolFailureStreak = 0

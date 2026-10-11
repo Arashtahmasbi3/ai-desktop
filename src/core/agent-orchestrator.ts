@@ -40,6 +40,7 @@ import {
 import { compressMessage, type CompressOptions } from './agent/context-compressor'
 import { ErrorRecovery, guidanceForToolError } from './agent/error-recovery'
 import { LoopDetector, type LoopCallDecision } from './agent/loop-detector'
+import { findAlternatives } from './agent/strategies'
 import { silentLogger } from './agent/logger'
 import { SESSION_SCHEMA_VERSION, type AgentSession, type SessionStore } from './agent/session-store'
 import { SANDBOX_TOOLS, SandboxToolExecutor, actionFromToolCall, stableStringify } from './agent/tools'
@@ -606,7 +607,9 @@ export class AgentOrchestrator {
     // Plan Mode exposes no tools so the model can only describe what it would do.
     const tools = this.planMode ? [] : this.tools
     // Per-run state so sequential or concurrent `run()` calls never share loop state.
-    const loopDetector = new LoopDetector(this.loopPolicy)
+    const loopDetector = new LoopDetector(this.loopPolicy, {
+      findAlternative: (toolName, args, error) => findAlternatives(toolName, args, error)
+    })
     const observedSignatures = new Set<string>()
     // The last plan shown to the user, so a repeated plan can be flagged (A.5).
     let lastPlan: Plan | undefined
@@ -899,6 +902,35 @@ export class AgentOrchestrator {
             })
             continue
           }
+          if (!guard.allow && guard.action === 'redirect' && guard.alternative) {
+            // v2.5.7: instead of stopping, hand the model a concrete alternative
+            // (never execute the blocked/repeated call) and let it change tack.
+            const alternative = guard.alternative
+            const redirected: AgentToolResult = {
+              actionId: action.id,
+              name: action.name,
+              ok: false,
+              output: '',
+              error:
+                `${guard.reason ?? 'That call keeps failing.'} Try instead: ` +
+                `${alternative.toolName} ${JSON.stringify(alternative.args)} — ${alternative.reason}`,
+              code: 'redirect',
+              attempts: 0,
+              durationMs: 0
+            }
+            this.log('warn', 'loop.redirect', runId, {
+              step: index,
+              tool: action.name,
+              alternative: alternative.toolName
+            })
+            observations.push(redirected)
+            context.appendToolResult({
+              toolCallId: action.id,
+              name: action.name,
+              content: formatObservation(redirected)
+            })
+            continue
+          }
           if (!guard.allow) {
             guardStop = guard
             this.log('warn', 'loop.stop', runId, {
@@ -957,7 +989,11 @@ export class AgentOrchestrator {
           const result = await this.guardedExecute(executor, action, runId, index, options)
           loopDetector.afterToolCall(
             action.name,
-            { ok: result.ok, blocked: result.blocked === true || result.code === 'blocked' },
+            {
+              ok: result.ok,
+              blocked: result.blocked === true || result.code === 'blocked',
+              ...(result.error ? { error: result.error } : {})
+            },
             action.arguments
           )
           if (result.ok && progressTools.has(action.name)) loopDetector.markProgress()

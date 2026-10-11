@@ -85,6 +85,7 @@ export type ToolErrorCode =
   | 'exit_nonzero'
   | 'remote_error'
   | 'blocked'
+  | 'redirect'
 
 export interface AgentStep {
   index: number
