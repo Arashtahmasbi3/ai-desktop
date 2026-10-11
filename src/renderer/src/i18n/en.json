@@ -156,6 +156,7 @@
     "approvalCategoryRead": "Read",
     "approvalCategoryWrite": "Write",
     "approvalCategoryDestructive": "Destructive",
+    "approvalNoUndo": "Changes will be applied directly to the server. No undo available.",
     "rememberSuggestion": "Remember \"{{tool}}\" to skip these prompts?",
     "fullAccessRemember": "Remember",
     "fullAccessTurnOff": "Turn off",

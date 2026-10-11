@@ -318,10 +318,18 @@ export default function ApprovalDialog(): JSX.Element | null {
             <p className="text-[10px] text-neutral-600">{t('chat.approvalRememberScope')}</p>
           </div>
         ) : (
-          <p className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-[11px] text-amber-300">
-            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            {t('chat.approvalCannotRemember')}
-          </p>
+          <>
+            <p className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-[11px] text-amber-300">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              {t('chat.approvalCannotRemember')}
+            </p>
+            {request.dangerous || request.kind === 'write' || request.kind === 'shell' ? (
+              <p className="mt-2 flex items-start gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-2 text-[11px] text-red-300">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                {t('chat.approvalNoUndo')}
+              </p>
+            ) : null}
+          </>
         )}
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2">

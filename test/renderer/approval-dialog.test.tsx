@@ -103,3 +103,35 @@ describe('Task 2.3 - clearer approval dialog', () => {
     expect(screen.getByText('Dangerous command')).toBeTruthy()
   })
 })
+
+/**
+ * Task 2.4 - a clearer "cannot be remembered" message plus a no-undo warning on
+ * anything that can mutate the server.
+ */
+describe('Task 2.4 - clearer safety messaging', () => {
+  it('1. a non-whitelisted read tool explains why it cannot be remembered', () => {
+    useStore.setState({
+      pendingApproval: request({
+        tool: 'remote_custom_inspect',
+        kind: 'read',
+        summary: 'inspect something',
+        preview: 'inspect something',
+        reason: 'not_whitelisted'
+      })
+    })
+    render(<ApprovalDialog />)
+
+    expect(screen.getByText(/cannot be remembered because it can modify the system/)).toBeTruthy()
+    expect(screen.queryByText(/No undo available/)).toBeNull()
+  })
+
+  it('2. a write tool adds the "changes applied directly / no undo" warning', () => {
+    useStore.setState({
+      pendingApproval: request({ tool: 'remote_write_file', kind: 'write', reason: 'write' })
+    })
+    render(<ApprovalDialog />)
+
+    expect(screen.getByText(/cannot be remembered because it can modify the system/)).toBeTruthy()
+    expect(screen.getByText(/No undo available/)).toBeTruthy()
+  })
+})

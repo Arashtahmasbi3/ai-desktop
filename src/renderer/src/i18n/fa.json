@@ -156,6 +156,7 @@
     "approvalCategoryRead": "خواندنی",
     "approvalCategoryWrite": "نوشتن",
     "approvalCategoryDestructive": "مخرب",
+    "approvalNoUndo": "تغییرات مستقیماً روی سرور اعمال می‌شوند. امکان بازگردانی وجود ندارد.",
     "rememberSuggestion": "«{{tool}}» را به خاطر بسپار تا این پرسش‌ها رد شود؟",
     "fullAccessRemember": "به خاطر بسپار",
     "fullAccessTurnOff": "خاموش کن",
