@@ -146,9 +146,12 @@ describe('Task 2.4 - clearer safety messaging', () => {
 describe('v2.5.8 - dialog centring', () => {
   it('1. the backdrop is fixed to the viewport and centres its panel', () => {
     useStore.setState({ pendingApproval: request({ reason: 'write' }) })
-    const { container } = render(<ApprovalDialog />)
+    render(<ApprovalDialog />)
 
-    const backdrop = container.firstElementChild as HTMLElement
+    // v2.6.0 renders the dialog through a portal into document.body, so the
+    // panel's parent (the backdrop) is found from the dialog role itself.
+    const panel = screen.getByRole('dialog')
+    const backdrop = panel.parentElement as HTMLElement
     expect(backdrop.classList.contains('fixed')).toBe(true)
     expect(backdrop.classList.contains('inset-0')).toBe(true)
     expect(backdrop.classList.contains('items-center')).toBe(true)

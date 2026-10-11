@@ -13,6 +13,7 @@ import {
 import { useStore } from '../store'
 import { evaluateProjectCommandWarning } from '../lib/policy-warning'
 import PolicyWarningBanner from './PolicyWarningBanner'
+import Modal from './ui/Modal'
 import { canRememberTool } from '@core/agent/remember-policy'
 import type {
   ApprovalHistoryEntry,
@@ -170,13 +171,14 @@ export default function ApprovalDialog(): JSX.Element | null {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-      <div
-        className={`w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border bg-bg-secondary p-4 shadow-2xl ${
-          request.dangerous ? 'border-red-500/60' : 'border-border'
-        }`}
-      >
-        <div className="flex items-start justify-between gap-3">
+    <Modal
+      open
+      onClose={() => respondApproval({ approved: false })}
+      maxWidth="32rem"
+      className={request.dangerous ? 'border-red-500/60' : ''}
+      ariaLabel={t('chat.approvalTitle')}
+    >
+      <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-4 py-3">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-neutral-100">
             <ShieldAlert
               className={`h-4 w-4 ${request.dangerous ? 'text-red-400' : 'text-amber-400'}`}
@@ -192,8 +194,9 @@ export default function ApprovalDialog(): JSX.Element | null {
           >
             <X className="h-3.5 w-3.5" />
           </button>
-        </div>
+      </div>
 
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
         {request.dangerous ? (
           <p className="mt-3 flex items-start gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-2 text-[11px] text-red-300">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
@@ -332,7 +335,10 @@ export default function ApprovalDialog(): JSX.Element | null {
           </>
         )}
 
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+      </div>
+
+      <div className="shrink-0 border-t border-border">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -385,7 +391,7 @@ export default function ApprovalDialog(): JSX.Element | null {
         </div>
 
         {showHistory ? (
-          <div className="mt-3 max-h-48 overflow-auto rounded-lg border border-border bg-bg-primary p-2">
+          <div className="mx-4 mb-3 max-h-48 overflow-auto rounded-lg border border-border bg-bg-primary p-2">
             <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-neutral-600">
               {t('chat.approvalHistory')}
             </p>
@@ -441,6 +447,6 @@ export default function ApprovalDialog(): JSX.Element | null {
           </div>
         ) : null}
       </div>
-    </div>
+    </Modal>
   )
 }

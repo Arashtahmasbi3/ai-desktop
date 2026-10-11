@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { AlertTriangle, ClipboardList, Pencil, Play, X } from 'lucide-react'
 import { useStore } from '../store'
 import type { PlanStep } from '@shared/plan'
+import Modal from './ui/Modal'
 
 /** The argument a user is most likely to tweak on a step, if any. */
 function editableKey(step: PlanStep): string | null {
@@ -62,9 +63,13 @@ export default function PlanCard(): JSX.Element | null {
   }
 
   return (
-    <div className="absolute inset-0 z-40 flex items-end justify-center bg-black/50 backdrop-blur-sm">
-      <div className="mb-4 w-full max-w-2xl rounded-xl border border-border bg-bg-secondary shadow-2xl">
-        <header className="flex items-center gap-2 border-b border-border px-4 py-3">
+    <Modal
+      open
+      onClose={() => respondPlan({ type: 'cancel' })}
+      maxWidth="42rem"
+      ariaLabel={t('plan.title')}
+    >
+      <header className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3">
           <ClipboardList className="h-4 w-4 text-accent" />
           <h3 className="text-sm font-semibold text-neutral-100">{t('plan.title')}</h3>
           <span className="text-[11px] text-neutral-500">{t('plan.subtitle')}</span>
@@ -78,7 +83,7 @@ export default function PlanCard(): JSX.Element | null {
           </button>
         </header>
 
-        <div className="max-h-[45vh] overflow-y-auto px-4 py-3">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
           {pending.warnings.length > 0 ? (
             <ul className="mb-3 space-y-1">
               {pending.warnings.map((warning) => (
@@ -132,7 +137,7 @@ export default function PlanCard(): JSX.Element | null {
           </ol>
         </div>
 
-        <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-3">
+        <footer className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-3">
           <label className="flex cursor-pointer items-center gap-2 text-[11px] text-neutral-400">
             <input
               type="checkbox"
@@ -168,7 +173,6 @@ export default function PlanCard(): JSX.Element | null {
             </button>
           </div>
         </footer>
-      </div>
-    </div>
+    </Modal>
   )
 }
