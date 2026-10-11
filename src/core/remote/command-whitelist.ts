@@ -216,7 +216,9 @@ export function isReadOnlyShellCommand(command: string): boolean {
   if (hasWriteIndicator(trimmed)) return false
   // A parent-directory reference (`..`, `../x`) can step outside the project
   // root without ever naming an absolute path, so it is never auto-approved.
-  if (/(^|[\s/])\.\.($|[\s/])/.test(trimmed)) return false
+  // `=` is included as a boundary so an assignment value (`B=../secret`) is
+  // caught too - otherwise marking assignments read-only would let it through.
+  if (/(^|[\s=/])\.\.($|[\s/])/.test(trimmed)) return false
 
   const segments = trimmed
     .split(/\s*(?:;|&&|\|\|)\s*/)
@@ -227,8 +229,14 @@ export function isReadOnlyShellCommand(command: string): boolean {
   return segments.every((segment) =>
     segment.split('|').every((part) => {
       const tokens = part.trim().split(/\s+/).filter(Boolean)
+      const hadTokens = tokens.length > 0
       while (tokens.length > 0 && isEnvAssignment(tokens[0])) tokens.shift()
-      if (tokens.length === 0) return false
+      if (tokens.length === 0) {
+        // A part that is *only* environment assignments (`B=/path`) mutates the
+        // shell's own environment, never the filesystem, so it is a read. An
+        // actually empty part (e.g. a trailing `|`) is still rejected.
+        return hadTokens
+      }
       const base = tokens[0].split('/').pop() ?? tokens[0]
       if (!READ_ONLY_BASE_COMMANDS.has(base)) return false
       if (base === 'find' && tokens.some((token) => /^-(exec|delete|ok)$/.test(token))) return false

@@ -170,9 +170,9 @@ export default function ApprovalDialog(): JSX.Element | null {
   }
 
   return (
-    <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
       <div
-        className={`w-full max-w-lg rounded-xl border bg-bg-secondary p-4 shadow-2xl ${
+        className={`w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border bg-bg-secondary p-4 shadow-2xl ${
           request.dangerous ? 'border-red-500/60' : 'border-border'
         }`}
       >
