@@ -149,6 +149,12 @@ export interface AgentOrchestratorOptions {
    * accepted if a verification-shaped tool call (test/build/health) recently passed.
    */
   enforceSuccessVerification?: boolean
+  /**
+   * v2.5.3 Fix 3: reports whether Diagnostic Mode is active right now. Read at
+   * run start so the system prompt copies the current read-only posture. A
+   * function (not a boolean) because the 30-minute window can lapse between runs.
+   */
+  diagnosticMode?: () => boolean
   now?: () => number
   runIdFactory?: () => string
 }
@@ -237,10 +243,72 @@ function summarizeTools(tools: ToolDefinition[]): string {
     .join('\n')
 }
 
+export interface SystemPromptOptions {
+  /** A remote VPS is in play, so remote discovery/loop rules apply (v2.5.3). */
+  remote?: boolean
+  /** Diagnostic Mode is currently active (read-only system access). */
+  diagnosticEnabled?: boolean
+}
+
+/**
+ * Guidance appended to the system prompt for remote/VPS work (v2.5.3, Fix 3).
+ *
+ * The v2.5.2 tool cards made a specific failure visible: the agent probed
+ * `/etc/os-release` and `/proc/loadavg` (blocked by P0-2) and re-tried a path
+ * that did not exist instead of discovering the real layout. This block teaches
+ * the two habits that fix it — discover before acting, and change strategy after
+ * a block — plus what to use when Diagnostic Mode is off.
+ */
+export function buildRemoteGuidance(diagnosticEnabled = false): string {
+  return `# Remote diagnostics (VPS / remote project)
+You are working on a remote host. Follow these habits.
+
+## Discover the project layout before acting
+- Never assume \`package.json\` (or any manifest) sits at the project root; it is
+  commonly under \`apps/\`, \`packages/\`, \`services/\` or \`src/\`.
+- Find it first, then read it:
+  \`find <projectRoot> -maxdepth 3 -name package.json 2>/dev/null\`
+- Use \`list_dir\` on the project root before guessing nested paths.
+
+## Read-only system facts (allowed without a path)
+- \`uname -a\` kernel, \`hostname\` server name, \`uptime\` load average
+- \`free -h\` memory, \`df -h\` disk, \`nproc\` CPUs
+- \`systemctl status <service>\` service state
+These carry no path argument and are always permitted.
+
+## If a path is blocked
+The project root is confined (P0-2). A message like
+\`Blocked: Path "..." is outside project root\` means the target is off-limits.
+- Do NOT retry the same path; it will be blocked again.
+- Use a whitelisted command above, or stay inside the project root.
+- If you truly need logs or \`/proc\`, ask the user to enable Diagnostic Mode.
+
+## If a file is not found
+Do NOT assume where it lives. Run \`find\` (or \`list_dir\`) first, then act on the
+real path.
+
+## Context awareness
+The current project, its path, the VPS and the environment are shown in the chat
+header. For a simple question about them, answer from that context instead of
+making tool calls. Only call tools when you need new information from the host.
+
+${
+  diagnosticEnabled
+    ? `## Diagnostic Mode: ON (read-only, ~30 min)
+You may read \`/var/log\`, \`/root/.pm2/logs\`, \`/proc\`, \`/etc/os-release\` and
+other allowed system paths to diagnose a crash. Read-only — never write there.`
+    : `## Diagnostic Mode: OFF
+System paths (\`/var/log\`, \`/proc\`, \`/etc/os-release\`, \`journalctl\`) are
+blocked. Use the whitelisted commands above, or ask the user to enable
+Diagnostic Mode in Settings for a crash investigation.`
+}`
+}
+
 export function buildSystemPrompt(
   provider: SandboxProvider,
   tools: ToolDefinition[],
-  systemHint?: string
+  systemHint?: string,
+  options: SystemPromptOptions = {}
 ): string {
   return `You are AI Desktop, an autonomous coding agent working inside a sandbox.
 
@@ -266,7 +334,8 @@ If you are blocked, explain what you need from the user and make NO tool calls.
 - Do not repeat an action that already succeeded.
 - If an action failed, correct the arguments before retrying.
 - Prefer write_file to create files and run_command to execute them.
-- Reply in the same language the user wrote in (Persian or English).`
+- Reply in the same language the user wrote in (Persian or English).
+${options.remote ? `\n${buildRemoteGuidance(options.diagnosticEnabled)}\n` : ''}`
 }
 
 function formatObservation(result: AgentToolResult): string {
@@ -321,6 +390,7 @@ export class AgentOrchestrator {
   private readonly onToolResult?: (result: ToolResultView) => void
   private readonly preflightGate?: (action: AgentAction) => Promise<PreflightResult | undefined>
   private readonly enforceSuccessVerification: boolean
+  private readonly diagnosticMode?: () => boolean
   private readonly now: () => number
   private readonly runIdFactory: () => string
   private runCounter = 0
@@ -360,6 +430,7 @@ export class AgentOrchestrator {
     this.onToolResult = options.onToolResult
     this.preflightGate = options.preflightGate
     this.enforceSuccessVerification = options.enforceSuccessVerification ?? false
+    this.diagnosticMode = options.diagnosticMode
     this.now = options.now ?? (() => Date.now())
     this.runCounter = 0
     this.runIdFactory = options.runIdFactory ?? (() => `run-${++this.runCounter}`)
@@ -430,13 +501,17 @@ export class AgentOrchestrator {
     if (this.planGate && this.planApproval && this.planApproval !== 'full') {
       planHints.push(PLAN_SYSTEM_PROMPT)
     }
+    // `remote_shell` present ⇒ the run targets a VPS, so add the discovery /
+    // loop / diagnostic guidance (v2.5.3, Fix 3).
+    const remoteWork = this.extraToolNames.has('remote_shell')
     const context = new ContextManager({
       systemPrompt: buildSystemPrompt(
         provider,
         tools,
         this.planMode
           ? [this.systemHint, PLAN_MODE_HINT].filter(Boolean).join('\n\n')
-          : planHints.filter(Boolean).join('\n\n')
+          : planHints.filter(Boolean).join('\n\n'),
+        { remote: remoteWork, diagnosticEnabled: Boolean(this.diagnosticMode?.()) }
       ),
       maxTokens: this.contextWindowTokens,
       compactionThreshold: this.compactionThreshold,
