@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.1] — 2026-10-05
+
+Release v2.6.1 bundles the v2.6.0 "UI/UX Major Overhaul" with the v2.6.1
+"Memory Persistence" fixes.
+
+### Memory Fix (v2.6.1)
+
+- **Stable session id across chat messages** — every message in a chat now
+  reuses one session id, so the conversation is a single persisted transcript
+  instead of a new run per message.
+- **Full chat history sent to the LLM** — a follow-up message resumes the stored
+  session (`resumeSessionId`), so the model sees the earlier turns.
+- **Plan trust persisted per session** — a trusted plan is scoped to its chat and
+  stored with the session, so it survives a restart and rehydrates.
+- **Plan/Approval decisions in protected history** — approved, modified and denied
+  decisions are pinned as durable system notes that context compaction cannot drop.
+- **Memory visibility in Sources tab** — the workspace now shows what the chat
+  remembers (turns, messages, summary, trusted plan) with a confirmed Clear option.
+
+### UI/UX Overhaul (v2.6.0)
+
+- Three-column layout (Projects | Chat | Output/Sources).
+- Execution contract bar in the chat header.
+- Compact tool cards (success collapsed, error expanded).
+- Sticky modal dialogs (buttons always visible).
+- Connection status with icon + text + latency.
+- Danger token highlighting in approvals.
+- File accordion for diffs.
+- Loop stop card with clear recovery options.
+
+### Tests
+
+- 1322 tests pass / 1 skipped.
+- 60+ new tests since v2.5.8.
+
 ## [2.5.8] — 2026-10-05
 
 Sprint v2.5.8 "Read-Only Detection Fix" — a read-only shell chain that opened
