@@ -9,7 +9,7 @@ import type {
 } from '@shared/types'
 import { DEFAULT_SELECTION, resolveSelection } from '@shared/selection'
 import type { ApprovalMode, ApprovalOutcome } from '@shared/approval'
-import type { PlanDecision } from '@shared/plan'
+import type { ApprovedPlan, PlanDecision } from '@shared/plan'
 import type { ProjectMetadataPatch } from '@shared/project-metadata'
 import type { OnboardingStatus } from '@shared/onboarding'
 import type { VpsConnectionState, VpsServerView } from '@shared/vps'
@@ -231,6 +231,8 @@ interface AppState {
   pendingApproval: ApprovalRequest | null
   /** Plan awaiting the user's approval before it executes (v2.3.2, A.5). */
   pendingPlan: PlanRequest | null
+  /** A plan the user trusted for 30 minutes; its steps skip approval (v2.5.5). */
+  activePlan: ApprovedPlan | null
   /** A tool approved 3+ times; the UI suggests remembering it (v2.3, B.3). */
   approvalSuggestion: { tool: string; count: number } | null
   /** A "Deny & Explain" prompt to send once the current run settles. */
@@ -287,6 +289,7 @@ interface AppState {
   setPlanModeDefault: (value: boolean) => Promise<void>
   respondApproval: (answer: boolean | ApprovalOutcome) => void
   respondPlan: (decision: PlanDecision) => void
+  stopPlan: () => void
   rememberApprovalTool: (tool: string) => Promise<void>
   dismissApprovalSuggestion: () => void
   setRememberApprovalMode: (enabled: boolean) => Promise<void>
@@ -402,6 +405,7 @@ export const useStore = create<AppState>((set, get) => ({
   planMode: false,
   pendingApproval: null,
   pendingPlan: null,
+  activePlan: null,
   approvalSuggestion: null,
   queuedExplain: null,
   fileChanges: [],
@@ -583,6 +587,10 @@ export const useStore = create<AppState>((set, get) => ({
     if (!pending) return
     set({ pendingPlan: null })
     void window.api.agent.respondPlan(pending.id, decision)
+  },
+  stopPlan() {
+    set({ activePlan: null })
+    void window.api.agent.stopPlan()
   },
   async rememberApprovalTool(tool) {
     await window.api.agent.rememberApprovalTool(tool)
@@ -776,6 +784,7 @@ export const useStore = create<AppState>((set, get) => ({
           logs: [],
           pendingApproval: null,
           pendingPlan: null,
+          activePlan: null,
           loopStop: null
         })
         break
@@ -787,6 +796,12 @@ export const useStore = create<AppState>((set, get) => ({
         break
       case 'plan:resolved':
         if (get().pendingPlan?.id === event.id) set({ pendingPlan: null })
+        break
+      case 'plan:active':
+        set({ activePlan: event.plan })
+        break
+      case 'plan:inactive':
+        set({ activePlan: null })
         break
       case 'approval:suggestion':
         set({ approvalSuggestion: { tool: event.tool, count: event.count } })
@@ -847,6 +862,7 @@ export const useStore = create<AppState>((set, get) => ({
           loopStop: event.stop ?? null,
           pendingApproval: null,
           pendingPlan: null,
+          activePlan: null,
           messages
         })
         const explain = get().queuedExplain
@@ -873,6 +889,7 @@ export const useStore = create<AppState>((set, get) => ({
           currentRunId: null,
           pendingApproval: null,
           pendingPlan: null,
+          activePlan: null,
           error: redact(event.message),
           loopStop: null,
           messages: [
@@ -931,6 +948,7 @@ export const useStore = create<AppState>((set, get) => ({
       error: null,
       pendingApproval: null,
       pendingPlan: null,
+      activePlan: null,
       approvalSuggestion: null,
       queuedExplain: null,
       fileChanges: [],

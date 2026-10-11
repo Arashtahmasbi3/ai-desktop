@@ -8,8 +8,8 @@ import type {
 } from './agent'
 import type { ChatMessage, ProviderId, Usage } from './types'
 import type { VpsConnectionState } from './vps'
-import type { ApprovalMode } from './approval'
-import type { Plan, PlanDecision, PlanWarning } from './plan'
+import type { ApprovalMode, ApprovalReason } from './approval'
+import type { Plan, ApprovedPlan, PlanDecision, PlanWarning } from './plan'
 import type { ProjectMetadata } from './project-metadata'
 
 /** A project (folder) the user has added to the app. */
@@ -108,6 +108,8 @@ export interface ApprovalRequest {
   server?: string
   /** True when the action matches the deny list (never auto-approved). */
   dangerous?: boolean
+  /** Why this action needed approval (v2.5.5). */
+  reason?: ApprovalReason
 }
 
 /** The model the user has selected for the next/next messages. */
@@ -238,6 +240,8 @@ export type AgentEvent =
   | { type: 'approval:suggestion'; tool: string; count: number }
   | { type: 'plan:request'; request: PlanRequest }
   | { type: 'plan:resolved'; id: string; decision: PlanDecision; at: number }
+  | { type: 'plan:active'; plan: ApprovedPlan; at: number }
+  | { type: 'plan:inactive'; at: number }
   | { type: 'file:change'; change: FileChangeView; at: number }
   | { type: 'file:change:resolved'; id: string; status: FileChangeStatus; at: number }
   | { type: 'error'; runId: string; message: string }

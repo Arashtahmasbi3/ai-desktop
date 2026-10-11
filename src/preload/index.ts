@@ -222,6 +222,7 @@ export const api = {
       invoke('agent:respondApproval', id, answer),
     respondPlan: (id: string, decision: PlanDecision): Promise<boolean> =>
       invoke('agent:respondPlan', id, decision),
+    stopPlan: (runId?: string): Promise<boolean> => invoke('agent:stopPlan', runId),
     approvalHistory: (): Promise<ApprovalHistoryEntry[]> => invoke('agent:approvalHistory'),
     approvedCommands: (): Promise<ApprovedCommandView[]> => invoke('agent:approvedCommands'),
     revokeApprovedCommand: (id: string): Promise<boolean> =>

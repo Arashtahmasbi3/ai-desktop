@@ -148,8 +148,11 @@ export class AppServices {
       customProviders: this.customProviders,
       vps: this.vps,
       jobs: this.jobs,
-      requestApproval: async (runId, action) =>
-        this.approvals.request(runId, action, await this.approvalContext()),
+      requestApproval: async (runId, action, reason) =>
+        this.approvals.request(runId, action, {
+          ...(await this.approvalContext()),
+          ...(reason ? { reason } : {})
+        }),
       cancelApprovals: () => this.approvals.cancelAll(),
       requestPlan: async (runId, plan, warnings) => this.plans.request(runId, plan, warnings),
       cancelPlans: () => this.plans.cancelAll(),

@@ -31,6 +31,7 @@ import ProviderWarning from './ProviderWarning'
 import LoopStopCard from './LoopStopCard'
 import ApprovalDialog from './ApprovalDialog'
 import PlanCard from './PlanCard'
+import PlanTrustChip from './PlanTrustChip'
 import ProgressTimeline from './ProgressTimeline'
 import JobsPanel from './JobsPanel'
 import MicButton from './MicButton'
@@ -318,6 +319,7 @@ export default function ChatPanel(): JSX.Element {
           <VpsSelector />
           <WorkspaceBadge />
           <DiagnosticBadge />
+          <PlanTrustChip />
           <span className="text-neutral-700">·</span>
           <button
             type="button"

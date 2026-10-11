@@ -1,4 +1,4 @@
-import type { ApprovalHistoryEntry, ApprovalOutcome } from '@shared/approval'
+import type { ApprovalHistoryEntry, ApprovalOutcome, ApprovalReason } from '@shared/approval'
 import type { AgentAction } from '@shared/agent'
 import type { AgentEvent, ApprovalRequest } from '@shared/ui'
 import { classifyAction, isDenyListedAction } from '@core/agent/approval'
@@ -11,6 +11,8 @@ export interface ApprovalContext {
   server?: string
   /** Session id used when the user chooses "auto-approve for this session". */
   sessionId?: string
+  /** Why the action still needed approval (v2.5.5). */
+  reason?: ApprovalReason
 }
 
 export interface ApprovalBrokerOptions {
@@ -87,7 +89,8 @@ export class ApprovalBroker {
       preview: actionPreview(action),
       dangerous: isDenyListedAction(action),
       ...(context.workingDirectory ? { workingDirectory: context.workingDirectory } : {}),
-      ...(context.server ? { server: context.server } : {})
+      ...(context.server ? { server: context.server } : {}),
+      ...(context.reason ? { reason: context.reason } : {})
     }
     return new Promise<ApprovalOutcome>((resolve) => {
       const timer = setTimeout(() => this.resolve(id, false), this.timeoutMs)

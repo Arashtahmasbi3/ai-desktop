@@ -48,6 +48,24 @@ function kindIcon(kind: string | undefined): JSX.Element {
   }
 }
 
+/** i18n key for the gate's explanation of why this prompt appeared (v2.5.5). */
+function reasonKey(reason: string): string {
+  switch (reason) {
+    case 'outside_plan':
+      return 'chat.approvalReasonOutsidePlan'
+    case 'write':
+      return 'chat.approvalReasonWrite'
+    case 'dangerous':
+      return 'chat.approvalReasonDangerous'
+    case 'read_only_tool':
+    case 'read_only_shell':
+    case 'whitelisted_command':
+      return 'chat.approvalReasonReadOnly'
+    default:
+      return 'chat.approvalReasonNotWhitelisted'
+  }
+}
+
 /** Lightweight token colouring for shell previews (no full syntax highlighter). */
 function CommandPreview({ text }: { text: string }): JSX.Element {
   return (
@@ -163,6 +181,18 @@ export default function ApprovalDialog(): JSX.Element | null {
           <p className="mt-3 flex items-start gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-2 text-[11px] text-red-300">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             {t('chat.approvalDangerous')}
+          </p>
+        ) : request.kind === 'write' ? (
+          <p className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-[11px] text-amber-300">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            {t('chat.approvalWriteWarning')}
+          </p>
+        ) : null}
+
+        {request.reason ? (
+          <p className="mt-2 text-[11px] text-neutral-500">
+            {t('chat.approvalReason')}:{' '}
+            <span className="text-neutral-300">{t(reasonKey(request.reason))}</span>
           </p>
         ) : null}
 
