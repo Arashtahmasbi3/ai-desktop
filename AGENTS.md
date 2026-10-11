@@ -751,6 +751,8 @@ Autonomous decisions logged per the sprint's golden rule (`[AUTO-DECISION]`, no 
 - Files: `src/core/remote/command-whitelist.ts`, `src/renderer/src/components/ApprovalDialog.tsx`.
 - Tests: `test/core/read-only-debug.test.ts` (7), `test/approval/read-only-integration.test.ts` (4), `test/renderer/approval-dialog.test.tsx` (+1 centring) = **12 new** (18 counting the new files' scenarios). Full suite **1223 passed | 1 skipped**; `typecheck` + `build` green.
 - Commits: `964f77f` (Fix 1), `a88a06f` (dialog). Branch `feature/v2.5.8-readonly-detection`.
+- `[RELEASE]` **v2.5.8 released publicly.** Merged to `master` (`bc62945`, `--no-ff`), tagged `v2.5.8`, `package.json` bumped `2.5.7`→`2.5.8`. Windows artifacts built from Linux via Wine 10.0 (`npm run build:win`, exit 0): `AI.Desktop.Setup.2.5.8.exe` (sha256 `9d916bc0581b0c2662753915a47ae5900e1efdd63167b04b2e91f680301a0823`), `AI.Desktop.2.5.8.Portable.exe` (sha256 `e6ba4cb33cf749eb597eb5e883d883cc70b4fa3776cdda591dacf82a3663880b`), `SHA256SUMS.txt`. Published as a **public (non-prerelease, latest)** GitHub Release: https://github.com/Arashtahmasbi3/ai-desktop/releases/tag/v2.5.8 — server-side asset digests match the local hashes. Binaries are unsigned (SmartScreen may warn — noted in the release). **1223 tests pass. Read-Only Detection Fix complete. Ready for Windows testing.**
+  - Note: the initial `gh release create` produced a **draft** with only `SHA256SUMS.txt` (the two ~112 MB exe uploads exceeded the command timeout). Recovery: `gh release upload … --clobber` for the two exes (ran ~12 min), then `gh release edit --draft=false --latest`. No re-tag needed.
 
 
 
