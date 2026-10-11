@@ -271,6 +271,8 @@ export interface SystemPromptOptions {
   remoteContext?: RemotePromptContext
   /** The `diagnose_crash` tool is available, so teach the diagnosis workflow. */
   crashDiagnosis?: boolean
+  /** Teach the multi-step task-planning and alternative-strategy workflow. */
+  taskPlanning?: boolean
 }
 
 /**
@@ -285,7 +287,8 @@ export interface SystemPromptOptions {
 export function buildRemoteGuidance(
   diagnosticEnabled = false,
   context?: RemotePromptContext,
-  crashDiagnosis = false
+  crashDiagnosis = false,
+  taskPlanning = false
 ): string {
   const contextBlock = context
     ? [
@@ -373,6 +376,34 @@ Recommendations:
 ${contextBlock}
 
 ${
+  taskPlanning
+    ? `## Task Planning (CRITICAL)
+For a task with MORE THAN ONE step:
+1. FIRST plan: state the goal and list 3-7 concrete steps (what + which tool +
+   expected outcome).
+2. Present the plan to the user for approval before executing it.
+3. Execute step by step. After each step check success; if it failed, try an
+   alternative (below); if there is no alternative, STOP and ask the user.
+
+## Alternative Strategies
+If a command fails, change approach — do NOT retry the same call:
+- "pm2: command not found" -> \`systemctl --failed\` or \`docker ps -a\`
+- "permission denied"        -> \`journalctl -n 50\` or \`dmesg | tail -50\`
+- "path blocked"             -> a whitelisted command (\`uname -a\`, \`free -h\`, \`df -h\`)
+- "no such file"             -> \`find\` / \`list_dir\` first
+- "timeout"                  -> inspect the process with \`ps\`
+
+NEVER retry the same command more than twice. After 2 failed attempts: STOP and
+either try a DIFFERENT approach or ASK THE USER.
+
+## Progress Tracking
+- Success: proceed to the next step.
+- Failure with an alternative: try the alternative.
+- Failure without an alternative: STOP and report to the user.`
+    : ''
+}
+
+${
   diagnosticEnabled
     ? `## Diagnostic Mode: ON (read-only, ~30 min)
 You may read \`/var/log\`, \`/root/.pm2/logs\`, \`/proc\`, \`/etc/os-release\` and
@@ -415,7 +446,7 @@ If you are blocked, explain what you need from the user and make NO tool calls.
 - If an action failed, correct the arguments before retrying.
 - Prefer write_file to create files and run_command to execute them.
 - Reply in the same language the user wrote in (Persian or English).
-${options.remote ? `\n${buildRemoteGuidance(options.diagnosticEnabled, options.remoteContext, options.crashDiagnosis)}\n` : ''}`
+${options.remote ? `\n${buildRemoteGuidance(options.diagnosticEnabled, options.remoteContext, options.crashDiagnosis, options.taskPlanning)}\n` : ''}`
 }
 
 function formatObservation(result: AgentToolResult): string {
@@ -597,6 +628,7 @@ export class AgentOrchestrator {
           remote: remoteWork,
           diagnosticEnabled: Boolean(this.diagnosticMode?.()),
           crashDiagnosis: this.extraToolNames.has('diagnose_crash'),
+          taskPlanning: remoteWork,
           ...(this.remoteContext ? { remoteContext: this.remoteContext } : {})
         }
       ),
