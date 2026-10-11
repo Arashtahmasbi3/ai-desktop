@@ -991,6 +991,13 @@ export const useStore = create<AppState>((set, get) => ({
     const trimmed = text.trim()
     if (!trimmed || get().running) return
     const selection = get().selection
+    // Fix 1 (v2.6.1): pin a stable chat id *before* the first run. Without this
+    // a new chat sent message 1 under the throwaway `sessionId`, then
+    // `persistChat()` assigned a different server-generated `activeChatId`, so
+    // message 2 ran under a different session id. Reusing `sessionId` as the
+    // chat id keeps `sessionId === activeChatId` for the chat's whole life.
+    const activeChatId = get().activeChatId ?? get().sessionId
+    if (!get().activeChatId) set({ activeChatId })
     set({
       messages: [...get().messages, { id: newId(), role: 'user', content: trimmed, at: Date.now() }],
       running: true,
@@ -1000,7 +1007,7 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       await window.api.agent.run({
         task: trimmed,
-        sessionId: get().activeChatId ?? get().sessionId,
+        sessionId: activeChatId,
         provider: selection.provider,
         model: selection.model,
         ...(selection.customProviderId ? { customProviderId: selection.customProviderId } : {}),

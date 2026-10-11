@@ -16,6 +16,11 @@ export default function StatusBar(): JSX.Element {
   const setOnline = useStore((state) => state.setOnline)
   const toggleRemote = useStore((state) => state.toggleRemote)
   const sessionId = useStore((state) => state.sessionId)
+  const activeChatId = useStore((state) => state.activeChatId)
+  // Fix 1 (v2.6.1): show the id the agent actually runs under. For a new chat
+  // `activeChatId` is the stable chat id created on the first send; `sessionId`
+  // is only the fallback before that first send.
+  const effectiveSessionId = activeChatId ?? sessionId
   const selection = useStore((state) => state.selection)
   const locale = useStore((state) => state.locale)
   const setLocale = useStore((state) => state.setLocale)
@@ -75,7 +80,7 @@ export default function StatusBar(): JSX.Element {
           {approvalMode === 'full' ? <Zap className="h-3 w-3" /> : <ShieldCheck className="h-3 w-3" />}
           {approvalMode}
         </button>
-        <span className="text-neutral-600">session {sessionId.slice(0, 8)}</span>
+        <span className="text-neutral-600">session {effectiveSessionId.slice(0, 8)}</span>
         <span
           data-connection={connection.kind}
           className={`flex items-center gap-1 ${CONNECTION_TONE_CLASS[connection.tone]}`}
