@@ -1008,6 +1008,10 @@ export const useStore = create<AppState>((set, get) => ({
       await window.api.agent.run({
         task: trimmed,
         sessionId: activeChatId,
+        // Fix 2 (v2.6.1): load the stored session so the model sees the whole
+        // conversation, not just this turn. The agent persists each run under
+        // this same id, so the history accumulates across messages.
+        resumeSessionId: activeChatId,
         provider: selection.provider,
         model: selection.model,
         ...(selection.customProviderId ? { customProviderId: selection.customProviderId } : {}),
