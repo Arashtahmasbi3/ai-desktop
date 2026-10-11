@@ -6,11 +6,9 @@ import {
   ChevronDown,
   ChevronRight,
   CornerDownRight,
-  FileText,
   RotateCcw,
   Server,
-  Terminal,
-  Wrench
+  FileText
 } from 'lucide-react'
 import type { ToolCallView } from '@shared/ui'
 
@@ -61,24 +59,36 @@ export default function ToolResultCard(props: ToolCallView): JSX.Element {
       <button
         type="button"
         onClick={toggle}
-        className="flex items-center gap-2 px-3 py-1.5 text-left"
+        data-testid="tool-card-header"
+        className="flex w-full items-center gap-2 px-3 py-1.5 text-left"
         aria-expanded={open}
         aria-label={`${name} ${ok ? 'ok' : 'error'}`}
       >
-        <Wrench className="h-3.5 w-3.5 shrink-0 text-neutral-500" />
-        <span className="font-mono text-[11px] text-neutral-200">{name}</span>
-        <StatusIcon className={`h-3.5 w-3.5 shrink-0 ${ok ? 'text-emerald-400' : 'text-red-400'}`} />
-        <span className={`text-[10px] ${ok ? 'text-emerald-400' : 'text-red-400'}`}>
+        <StatusIcon
+          className={`h-3.5 w-3.5 shrink-0 ${ok ? 'text-emerald-400' : 'text-red-400'}`}
+        />
+        <span className="shrink-0 font-mono text-[11px] text-neutral-200">{name}</span>
+        <span className={`shrink-0 text-[10px] ${ok ? 'text-emerald-400' : 'text-red-400'}`}>
           {ok ? t('chat.toolOk') : t('chat.toolError')}
         </span>
+        {primary ? (
+          <span
+            className="min-w-0 flex-1 truncate font-mono text-[11px] text-neutral-500"
+            title={primary}
+          >
+            {primary}
+          </span>
+        ) : (
+          <span className="flex-1" />
+        )}
         {code ? (
-          <span className="rounded bg-bg-primary px-1 font-mono text-[10px] text-neutral-500">
+          <span className="shrink-0 rounded bg-bg-primary px-1 font-mono text-[10px] text-neutral-500">
             {code}
           </span>
         ) : null}
         {exitCode !== undefined ? (
           <span
-            className={`rounded px-1 font-mono text-[10px] ${
+            className={`shrink-0 rounded px-1 font-mono text-[10px] ${
               exitCode === 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
             }`}
             title={t('chat.toolExit')}
@@ -86,26 +96,13 @@ export default function ToolResultCard(props: ToolCallView): JSX.Element {
             exit {exitCode}
           </span>
         ) : null}
-        {seconds ? <span className="text-[10px] text-neutral-600">{seconds}</span> : null}
+        {seconds ? <span className="shrink-0 text-[10px] text-neutral-600">{seconds}</span> : null}
         {hasBody ? (
-          <span className="ml-auto text-neutral-500">
+          <span className="shrink-0 text-neutral-500">
             {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
           </span>
         ) : null}
       </button>
-
-      {primary && !open ? (
-        <div className="flex items-center gap-1.5 border-t border-border px-3 py-1.5">
-          {command ? (
-            <Terminal className="h-3 w-3 shrink-0 text-neutral-500" />
-          ) : (
-            <FileText className="h-3 w-3 shrink-0 text-neutral-500" />
-          )}
-          <code className="truncate font-mono text-[11px] text-neutral-300" title={primary}>
-            {primary}
-          </code>
-        </div>
-      ) : null}
 
       {open ? (
         <div className="flex flex-col gap-2 border-t border-border px-3 py-2">
