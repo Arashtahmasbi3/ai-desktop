@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.8] — 2026-10-05
+
+Sprint v2.5.8 "Read-Only Detection Fix" — a read-only shell chain that opened
+with an environment assignment (`B=/path; …`) no longer asks for approval, and
+the approval dialog is centred in the window.
+
+### Fixed
+
+- **Pure environment assignments are read-only** — `isReadOnlyShellCommand`
+  stripped leading `VAR=value` tokens and then treated the empty remainder as a
+  write, so `B=/opt/app; echo …; find "$B" …; cat "$B" …` asked for approval and
+  looped. An all-assignment segment is now a read
+  (`src/core/remote/command-whitelist.ts`).
+- **`..` guard covers assignment values** — `=` is now a boundary in the
+  parent-directory check, so `B=../secret` cannot escape the project root via a
+  now-read-only assignment.
+- **Approval dialog centred in the viewport** — it used `absolute inset-0`
+  (anchored to the chat panel); it is now `fixed inset-0 z-50` with
+  `max-h-[90vh] overflow-y-auto`, matching the other modals
+  (`src/renderer/src/components/ApprovalDialog.tsx`).
+
 ## [2.5.7] — 2026-10-05
 
 Sprint v2.5.7 "Task Planning + Loop Recovery" — a complex goal is now split into
