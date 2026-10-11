@@ -269,6 +269,8 @@ export interface SystemPromptOptions {
   diagnosticEnabled?: boolean
   /** Active project/VPS/environment shown to the model (v2.5.3). */
   remoteContext?: RemotePromptContext
+  /** The `diagnose_crash` tool is available, so teach the diagnosis workflow. */
+  crashDiagnosis?: boolean
 }
 
 /**
@@ -282,7 +284,8 @@ export interface SystemPromptOptions {
  */
 export function buildRemoteGuidance(
   diagnosticEnabled = false,
-  context?: RemotePromptContext
+  context?: RemotePromptContext,
+  crashDiagnosis = false
 ): string {
   const contextBlock = context
     ? [
@@ -332,6 +335,41 @@ The project root is confined (P0-2). A message like
 Do NOT assume where it lives. Run \`find\` (or \`list_dir\`) first, then act on the
 real path.
 
+${
+  crashDiagnosis
+    ? `## Crash diagnosis workflow
+When the user asks about a crash, an error or a service being down:
+1. FIRST call the \`diagnose_crash\` tool. It runs the standard read-only probes
+   (process managers, logs, resources, network) and collects the evidence for you.
+2. THEN report in two sections:
+   - **Evidence**: the key outputs from the probes.
+   - **Diagnosis**: the probable cause, a confidence level (HIGH/MEDIUM/LOW) and
+     concrete recommendations.
+3. NEVER guess without evidence, never claim the project is healthy without
+   checking, and do not invent complex shell one-liners yourself.
+4. If \`diagnose_crash\` is not enough, ask the user before reaching further:
+   "Should I check log file X?" or "Enable Diagnostic Mode so I can read the
+   system logs."
+
+Example report:
+\`\`\`
+== Evidence ==
+- PM2: app is errored (15 restarts)
+- Memory: 3.7/4 GB used (92%)
+- Disk: 45% used
+- No OOM events detected
+
+== Diagnosis ==
+Cause: pm2_process_error (confidence: HIGH)
+Summary: PM2 logs show repeated restarts
+Recommendations:
+- Check: pm2 logs <app> --err
+- Increase the memory limit in ecosystem.config.js
+- Review recent changes for a memory leak
+\`\`\``
+    : ''
+}
+
 ${contextBlock}
 
 ${
@@ -377,7 +415,7 @@ If you are blocked, explain what you need from the user and make NO tool calls.
 - If an action failed, correct the arguments before retrying.
 - Prefer write_file to create files and run_command to execute them.
 - Reply in the same language the user wrote in (Persian or English).
-${options.remote ? `\n${buildRemoteGuidance(options.diagnosticEnabled, options.remoteContext)}\n` : ''}`
+${options.remote ? `\n${buildRemoteGuidance(options.diagnosticEnabled, options.remoteContext, options.crashDiagnosis)}\n` : ''}`
 }
 
 function formatObservation(result: AgentToolResult): string {
@@ -558,6 +596,7 @@ export class AgentOrchestrator {
         {
           remote: remoteWork,
           diagnosticEnabled: Boolean(this.diagnosticMode?.()),
+          crashDiagnosis: this.extraToolNames.has('diagnose_crash'),
           ...(this.remoteContext ? { remoteContext: this.remoteContext } : {})
         }
       ),
