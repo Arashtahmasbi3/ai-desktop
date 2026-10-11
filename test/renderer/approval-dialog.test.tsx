@@ -135,3 +135,23 @@ describe('Task 2.4 - clearer safety messaging', () => {
     expect(screen.getByText(/No undo available/)).toBeTruthy()
   })
 })
+
+/**
+ * v2.5.8 - the dialog must be centred in the viewport.
+ *
+ * It used `absolute inset-0`, which anchored it to the ChatPanel section (and
+ * could drift when the panel scrolled). It now mirrors the other modals with a
+ * `fixed inset-0 ... items-center justify-center` backdrop.
+ */
+describe('v2.5.8 - dialog centring', () => {
+  it('1. the backdrop is fixed to the viewport and centres its panel', () => {
+    useStore.setState({ pendingApproval: request({ reason: 'write' }) })
+    const { container } = render(<ApprovalDialog />)
+
+    const backdrop = container.firstElementChild as HTMLElement
+    expect(backdrop.classList.contains('fixed')).toBe(true)
+    expect(backdrop.classList.contains('inset-0')).toBe(true)
+    expect(backdrop.classList.contains('items-center')).toBe(true)
+    expect(backdrop.classList.contains('justify-center')).toBe(true)
+  })
+})
