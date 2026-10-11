@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AlertTriangle, ShieldCheck, Zap } from 'lucide-react'
 import { useStore } from '../store'
 import { APPROVAL_MODES, isFullAccess, type ApprovalMode } from '@shared/approval'
+import { formatCountdown } from '../lib/countdown'
 
 const MODE_LABEL: Record<ApprovalMode, string> = {
   ask: 'chat.fullAccessAsk',
@@ -65,14 +66,29 @@ export function FullAccessBanner(): JSX.Element | null {
   const setApprovalMode = useStore((state) => state.setApprovalMode)
   const remember = useStore((state) => state.settings?.rememberApprovalMode ?? false)
   const setRememberApprovalMode = useStore((state) => state.setRememberApprovalMode)
+  const expiresAt = useStore((state) => state.fullAccessExpiresAt)
+  const [now, setNow] = useState(() => Date.now())
+
+  useEffect(() => {
+    if (!isFullAccess(mode) || !expiresAt) return
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [mode, expiresAt])
 
   if (!isFullAccess(mode)) return null
 
   return (
-    <div className="mx-3 mb-1 flex items-center justify-between gap-2 rounded-lg border border-red-500/50 bg-red-500/10 px-2 py-1.5 text-[11px] text-red-300">
-      <span className="flex items-center gap-1.5">
+    <div
+      data-testid="full-access-banner"
+      className="mx-3 mb-1 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-500/50 bg-red-500/10 px-2 py-1.5 text-[11px] text-red-300"
+    >
+      <span className="flex min-w-0 items-center gap-1.5">
         <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-        {t('chat.fullAccessWarning')}
+        <span>
+          {expiresAt
+            ? t('execution.fullAccessBanner', { time: formatCountdown(expiresAt - now) })
+            : t('chat.fullAccessWarning')}
+        </span>
       </span>
       <span className="flex shrink-0 items-center gap-2">
         <label className="flex cursor-pointer items-center gap-1 text-red-200">

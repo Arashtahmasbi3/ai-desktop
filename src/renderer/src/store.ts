@@ -229,6 +229,11 @@ interface AppState {
   vpsStatus: VpsConnectionState
   /** Diagnostic Mode state (v2.5.3); null until first fetched. */
   diagnostic: DiagnosticStatus | null
+  /**
+   * Wall-clock moment full access auto-disables, or null when it is off
+   * (v2.6.1, B.3). Lets the execution bar show the same countdown as the timer.
+   */
+  fullAccessExpiresAt: number | null
   /** Plan Mode: the agent drafts a plan without running tools. */
   planMode: boolean
   /** Tool call awaiting the user's approval, if any. */
@@ -429,6 +434,7 @@ export const useStore = create<AppState>((set, get) => ({
   vpsServers: [],
   vpsStatus: { status: 'disconnected' },
   diagnostic: null,
+  fullAccessExpiresAt: null,
   planMode: false,
   pendingApproval: null,
   pendingPlan: null,
@@ -584,15 +590,20 @@ export const useStore = create<AppState>((set, get) => ({
   async setApprovalMode(mode) {
     set({ settings: await window.api.settings.setApprovalMode(mode) })
     if (mode === 'full') {
+      const expiresAt = Date.now() + FULL_ACCESS_TTL_MS
+      set({ fullAccessExpiresAt: expiresAt })
       if (fullAccessTimer) clearTimeout(fullAccessTimer)
       fullAccessTimer = setTimeout(() => {
         void get().setApprovalMode('ask')
         get().pushToast('warning', 'Full access turned off after 30 minutes of inactivity.')
       }, FULL_ACCESS_TTL_MS)
       fullAccessTimer.unref?.()
-    } else if (fullAccessTimer) {
-      clearTimeout(fullAccessTimer)
-      fullAccessTimer = null
+    } else {
+      set({ fullAccessExpiresAt: null })
+      if (fullAccessTimer) {
+        clearTimeout(fullAccessTimer)
+        fullAccessTimer = null
+      }
     }
   },
   async setRememberApprovalMode(enabled) {

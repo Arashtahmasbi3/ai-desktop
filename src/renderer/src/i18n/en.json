@@ -548,5 +548,11 @@
     "disconnected": "Disconnected",
     "workerOffline": "Agent offline",
     "missing": "Workspace missing"
+  },
+  "execution": {
+    "modeAsk": "Safe mode",
+    "modeAuto": "Ask before write",
+    "modeFull": "Full access",
+    "fullAccessBanner": "Full access enabled. Auto-disable in {{time}}."
   }
 }

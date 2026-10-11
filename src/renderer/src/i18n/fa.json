@@ -548,5 +548,11 @@
     "disconnected": "قطع‌شده",
     "workerOffline": "عامل آفلاین",
     "missing": "کارگاه یافت نشد"
+  },
+  "execution": {
+    "modeAsk": "حالت ایمن",
+    "modeAuto": "پرسش قبل از نوشتن",
+    "modeFull": "دسترسی کامل",
+    "fullAccessBanner": "دسترسی کامل فعال است. غیرفعال‌سازی خودکار در {{time}}."
   }
 }

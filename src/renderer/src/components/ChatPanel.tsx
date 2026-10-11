@@ -3,18 +3,12 @@ import { useTranslation } from 'react-i18next'
 import {
   AlertTriangle,
   ArrowDown,
-  Activity,
   Bot,
   Eye,
   Loader2,
-  PanelLeft,
-  PanelRight,
   Paperclip,
   Send,
-  ShieldAlert,
   Square,
-  Terminal,
-  Trash2,
   X
 } from 'lucide-react'
 import { basename, useStore } from '../store'
@@ -26,14 +20,12 @@ import FileChangesPanel from './FileChangesPanel'
 import TemplateMenu from './TemplateMenu'
 import TerminalPanel from './TerminalPanel'
 import ModelSwitcher from './ModelSwitcher'
-import VpsSelector from './VpsSelector'
-import WorkspaceBadge from './WorkspaceBadge'
 import ProviderWarning from './ProviderWarning'
 import LoopStopCard from './LoopStopCard'
 import ApprovalDialog from './ApprovalDialog'
 import PlanCard from './PlanCard'
 import TaskTracker from './TaskTracker'
-import PlanTrustChip from './PlanTrustChip'
+import ExecutionBar from './ExecutionBar'
 import ProgressTimeline from './ProgressTimeline'
 import JobsPanel from './JobsPanel'
 import MicButton from './MicButton'
@@ -58,31 +50,6 @@ interface SlashCommand {
   insert?: string
 }
 
-/**
- * Shown in the chat header while Diagnostic Mode is on, so the user can see at a
- * glance that the agent currently has read-only access to system paths (v2.5.3).
- */
-function DiagnosticBadge(): JSX.Element | null {
-  const { t } = useTranslation()
-  const diagnostic = useStore((state) => state.diagnostic)
-  if (!diagnostic?.active) return null
-  const minutes =
-    diagnostic.expiresAt !== null
-      ? Math.max(0, Math.ceil((diagnostic.expiresAt - Date.now()) / 60_000))
-      : 0
-  return (
-    <span
-      title={`${t('settings.diagnosticOn')}${
-        minutes > 0 ? ` · ${t('settings.diagnosticRemaining', { minutes })}` : ''
-      }`}
-      className="flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-300"
-    >
-      <Activity className="h-3 w-3" />
-      {t('settings.diagnosticTitle')}
-    </span>
-  )
-}
-
 export default function ChatPanel(): JSX.Element {
   const { t, i18n } = useTranslation()
   const messages = useStore((state) => state.messages)
@@ -101,20 +68,13 @@ export default function ChatPanel(): JSX.Element {
   const selection = useStore((state) => state.selection)
   const openSettings = useStore((state) => state.openSettings)
   const setView = useStore((state) => state.setView)
-  const planMode = useStore((state) => state.planMode)
-  const setPlanMode = useStore((state) => state.setPlanMode)
   const approvalSuggestion = useStore((state) => state.approvalSuggestion)
   const rememberApprovalTool = useStore((state) => state.rememberApprovalTool)
   const dismissApprovalSuggestion = useStore((state) => state.dismissApprovalSuggestion)
   const loopStop = useStore((state) => state.loopStop)
   const dismissLoopStop = useStore((state) => state.dismissLoopStop)
   const fileChanges = useStore((state) => state.fileChanges)
-  const chatTreeOpen = useStore((state) => state.chatTreeOpen)
-  const toggleChatTree = useStore((state) => state.toggleChatTree)
   const terminalOpen = useStore((state) => state.terminalOpen)
-  const toggleTerminal = useStore((state) => state.toggleTerminal)
-  const workspacePanelOpen = useStore((state) => state.workspacePanelOpen)
-  const toggleWorkspacePanel = useStore((state) => state.toggleWorkspacePanel)
 
   const [input, setInput] = useState('')
   const [attached, setAttached] = useState<string[]>([])
@@ -305,89 +265,12 @@ export default function ChatPanel(): JSX.Element {
 
   return (
     <section className="relative flex min-h-0 flex-1 flex-col bg-bg-primary">
-      <div className="flex h-8 shrink-0 items-center justify-between gap-2 border-b border-border px-3 text-[11px] text-neutral-500">
-        <div className="flex min-w-0 items-center gap-2">
-          <button
-            type="button"
-            onClick={toggleChatTree}
-            title={t('chat.toggleTree')}
-            aria-label={t('chat.toggleTree')}
-            className={`flex h-5 w-5 items-center justify-center rounded transition ${
-              chatTreeOpen
-                ? 'bg-accent/20 text-accent'
-                : 'text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300'
-            }`}
-          >
-            <PanelLeft className="h-3.5 w-3.5" />
-          </button>
-          <VpsSelector />
-          <WorkspaceBadge />
-          <DiagnosticBadge />
-          <PlanTrustChip />
-          <span className="text-neutral-700">·</span>
-          <button
-            type="button"
-            onClick={() => setPlanMode(!planMode)}
-            title={t('chat.planModeHint')}
-            className={`flex items-center gap-1 rounded px-1.5 py-0.5 transition ${
-              planMode
-                ? 'bg-accent/20 text-accent'
-                : 'text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300'
-            }`}
-          >
-            <ShieldAlert className="h-3 w-3" />
-            {planMode ? t('chat.planMode') : t('chat.codeMode')}
-          </button>
-          <button
-            type="button"
-            onClick={() => setTimelineOpen((open) => !open)}
-            title={t('timeline.title')}
-            aria-label={t('timeline.title')}
-            className={`flex h-5 w-5 items-center justify-center rounded transition ${
-              timelineOpen
-                ? 'bg-accent/20 text-accent'
-                : 'text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300'
-            }`}
-          >
-            <Activity className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={toggleTerminal}
-            title={t('chat.terminalTitle')}
-            aria-label={t('chat.terminalTitle')}
-            className={`flex h-5 w-5 items-center justify-center rounded transition ${
-              terminalOpen
-                ? 'bg-accent/20 text-accent'
-                : 'text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300'
-            }`}
-          >
-            <Terminal className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={toggleWorkspacePanel}
-            title={t('workspace.open')}
-            aria-label={t('workspace.open')}
-            aria-pressed={workspacePanelOpen}
-            className={`flex h-5 w-5 items-center justify-center rounded transition ${
-              workspacePanelOpen
-                ? 'bg-accent/20 text-accent'
-                : 'text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300'
-            }`}
-          >
-            <PanelRight className="h-3.5 w-3.5" />
-          </button>
-        </div>
-        <button
-          type="button"
-          onClick={() => newSession()}
-          className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-bg-tertiary hover:text-neutral-300"
-        >
-          <Trash2 className="h-3 w-3" />
-          {t('chat.clear')}
-        </button>
-      </div>
+      <ExecutionBar
+        timelineOpen={timelineOpen}
+        onToggleTimeline={() => setTimelineOpen((open) => !open)}
+      />
+
+      <FullAccessBanner />
 
       {wsBanner ? (
         <div
@@ -498,7 +381,6 @@ export default function ChatPanel(): JSX.Element {
       {terminalOpen ? <TerminalPanel /> : null}
 
       <div className="shrink-0 border-t border-border bg-bg-secondary p-3">
-        <FullAccessBanner />
         {approvalSuggestion ? (
           <div className="mx-3 mb-1 flex items-center justify-between gap-2 rounded-lg border border-accent/40 bg-accent/10 px-2 py-1.5 text-[11px] text-neutral-200">
             <span>
