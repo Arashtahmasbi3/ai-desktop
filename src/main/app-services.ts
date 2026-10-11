@@ -157,6 +157,7 @@ export class AppServices {
       files: this.files,
       runStore: this.runs,
       getDiagnosticPolicy: () => this.getDiagnosticPolicy(),
+      resolveVpsName: async (id) => (await this.vpsServers.list()).find((s) => s.id === id)?.name,
       emit: (event: AgentEvent) => this.emit('agent:event', event)
     })
 

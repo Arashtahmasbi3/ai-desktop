@@ -66,3 +66,48 @@ describe('buildSystemPrompt remote option (Fix 3)', () => {
     expect(prompt).toContain('Diagnostic Mode: ON')
   })
 })
+
+/**
+ * v2.5.3 Smarter Prompt - the run's project/VPS/environment is baked into the
+ * prompt so a simple "which project am I on?" is answered from context.
+ */
+describe('buildRemoteGuidance context awareness (Smarter Prompt)', () => {
+  const context = {
+    projectName: 'sepehr-motor',
+    projectPath: '/opt/sepehr-motor',
+    vpsId: 'spmotor',
+    vpsName: 'spmotor',
+    environment: 'production'
+  }
+
+  it('renders the concrete project, path, VPS and environment', () => {
+    const text = buildRemoteGuidance(true, context)
+    expect(text).toContain('- Project: sepehr-motor')
+    expect(text).toContain('- Path: /opt/sepehr-motor')
+    expect(text).toContain('- VPS: spmotor (spmotor)')
+    expect(text).toContain('- Environment: production')
+    expect(text).toMatch(/do NOT spend tool calls/i)
+  })
+
+  it('uses the VPS id when no display name is known', () => {
+    const text = buildRemoteGuidance(true, { vpsId: 'spmotor' })
+    expect(text).toContain('- VPS: spmotor')
+    expect(text).not.toContain('(spmotor)')
+  })
+
+  it('falls back to the generic hint without context', () => {
+    const text = buildRemoteGuidance(true)
+    expect(text).toContain('## Context awareness')
+    expect(text).toMatch(/chat\nheader/i)
+    expect(text).not.toContain('- Project:')
+  })
+
+  it('is threaded through buildSystemPrompt', () => {
+    const prompt = buildSystemPrompt('docker', SANDBOX_TOOLS, undefined, {
+      remote: true,
+      remoteContext: context
+    })
+    expect(prompt).toContain('- Project: sepehr-motor')
+    expect(prompt).toContain('- Environment: production')
+  })
+})

@@ -302,6 +302,11 @@ export interface AgentServiceOptions {
    * Read at the start of every run so enabling/disabling takes effect next run.
    */
   getDiagnosticPolicy?: () => DiagnosticPolicy | null
+  /**
+   * v2.5.3: resolve a saved VPS id to its display name so the prompt can name the
+   * host the run is on. Optional; the id is used when absent.
+   */
+  resolveVpsName?: (id: string) => Promise<string | undefined>
 }
 
 /** Which provider/model to put first for an agent run. */
@@ -348,6 +353,7 @@ export class AgentService {
   private readonly files?: ProjectFiles
   private readonly runStore: RunStore
   private readonly getDiagnosticPolicy?: () => DiagnosticPolicy | null
+  private readonly resolveVpsName?: (id: string) => Promise<string | undefined>
   private readonly controllers = new Set<AbortController>()
   private readonly changes = new Map<string, FileChangeView>()
   private runCounter = 0
@@ -372,6 +378,7 @@ export class AgentService {
     if (options.files) this.files = options.files
     this.runStore = options.runStore ?? new RunStore()
     this.getDiagnosticPolicy = options.getDiagnosticPolicy
+    this.resolveVpsName = options.resolveVpsName
   }
 
   isRunning(): boolean {
@@ -596,6 +603,25 @@ export class AgentService {
         projectRoot: activeProject.path
       })
     }
+    // v2.5.3 Smarter Prompt: bake the run's project/VPS/environment into the
+    // prompt so "which project am I on?" is answered without tool calls.
+    let vpsName: string | undefined
+    if (activeProject?.vpsId && this.resolveVpsName) {
+      try {
+        vpsName = await this.resolveVpsName(activeProject.vpsId)
+      } catch {
+        vpsName = undefined
+      }
+    }
+    const remoteContext = activeProject
+      ? {
+          projectName: activeProject.name,
+          projectPath: activeProject.path,
+          ...(activeProject.vpsId ? { vpsId: activeProject.vpsId } : {}),
+          ...(vpsName ? { vpsName } : {}),
+          ...(activeProject.environment ? { environment: activeProject.environment } : {})
+        }
+      : undefined
     const approvalMode = settings.approvalMode ?? DEFAULT_APPROVAL_MODE
     const planMode = request.planMode ?? settings.planModeDefault ?? false
     const requestApproval = this.requestApproval
@@ -637,6 +663,7 @@ export class AgentService {
       // v2.5.3: report the live diagnostic posture so the system prompt matches
       // the containment rules the remote tools will actually apply this run.
       diagnosticMode: () => Boolean(this.getDiagnosticPolicy?.()),
+      ...(remoteContext ? { remoteContext } : {}),
       ...(this.files
         ? { onFileWritten: (change: FileChange) => this.captureChange(runId, request.sessionId, change) }
         : {}),

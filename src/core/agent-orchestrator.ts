@@ -155,6 +155,12 @@ export interface AgentOrchestratorOptions {
    * function (not a boolean) because the 30-minute window can lapse between runs.
    */
   diagnosticMode?: () => boolean
+  /**
+   * v2.5.3 Smarter Prompt: the active project, its path, the VPS and the
+   * environment, baked into the system prompt so simple "where am I?" questions
+   * are answered from context instead of tool calls.
+   */
+  remoteContext?: RemotePromptContext
   now?: () => number
   runIdFactory?: () => string
 }
@@ -243,11 +249,26 @@ function summarizeTools(tools: ToolDefinition[]): string {
     .join('\n')
 }
 
+/**
+ * Concrete run context baked into the prompt (v2.5.3, Smarter Prompt) so the
+ * model can answer "which project am I on?" from what it already knows instead
+ * of spending tool calls re-discovering it.
+ */
+export interface RemotePromptContext {
+  projectName?: string
+  projectPath?: string
+  vpsId?: string
+  vpsName?: string
+  environment?: string
+}
+
 export interface SystemPromptOptions {
   /** A remote VPS is in play, so remote discovery/loop rules apply (v2.5.3). */
   remote?: boolean
   /** Diagnostic Mode is currently active (read-only system access). */
   diagnosticEnabled?: boolean
+  /** Active project/VPS/environment shown to the model (v2.5.3). */
+  remoteContext?: RemotePromptContext
 }
 
 /**
@@ -259,7 +280,31 @@ export interface SystemPromptOptions {
  * the two habits that fix it — discover before acting, and change strategy after
  * a block — plus what to use when Diagnostic Mode is off.
  */
-export function buildRemoteGuidance(diagnosticEnabled = false): string {
+export function buildRemoteGuidance(
+  diagnosticEnabled = false,
+  context?: RemotePromptContext
+): string {
+  const contextBlock = context
+    ? [
+        '## Context awareness (already known - do NOT spend tool calls re-discovering)',
+        context.projectName ? `- Project: ${context.projectName}` : '',
+        context.projectPath ? `- Path: ${context.projectPath}` : '',
+        context.vpsName || context.vpsId
+          ? `- VPS: ${context.vpsName ?? context.vpsId}` +
+            `${context.vpsName && context.vpsId ? ` (${context.vpsId})` : ''}`
+          : '',
+        context.environment ? `- Environment: ${context.environment}` : '',
+        'Answer a question about any of these directly from this context instead of ' +
+          'making tool calls. Only call tools when you need new information from the host.'
+      ]
+        .filter(Boolean)
+        .join('\n')
+    : [
+        '## Context awareness',
+        'The current project, its path, the VPS and the environment are shown in the chat',
+        'header. For a simple question about them, answer from that context instead of',
+        'making tool calls. Only call tools when you need new information from the host.'
+      ].join('\n')
   return `# Remote diagnostics (VPS / remote project)
 You are working on a remote host. Follow these habits.
 
@@ -287,10 +332,7 @@ The project root is confined (P0-2). A message like
 Do NOT assume where it lives. Run \`find\` (or \`list_dir\`) first, then act on the
 real path.
 
-## Context awareness
-The current project, its path, the VPS and the environment are shown in the chat
-header. For a simple question about them, answer from that context instead of
-making tool calls. Only call tools when you need new information from the host.
+${contextBlock}
 
 ${
   diagnosticEnabled
@@ -335,7 +377,7 @@ If you are blocked, explain what you need from the user and make NO tool calls.
 - If an action failed, correct the arguments before retrying.
 - Prefer write_file to create files and run_command to execute them.
 - Reply in the same language the user wrote in (Persian or English).
-${options.remote ? `\n${buildRemoteGuidance(options.diagnosticEnabled)}\n` : ''}`
+${options.remote ? `\n${buildRemoteGuidance(options.diagnosticEnabled, options.remoteContext)}\n` : ''}`
 }
 
 function formatObservation(result: AgentToolResult): string {
@@ -391,6 +433,7 @@ export class AgentOrchestrator {
   private readonly preflightGate?: (action: AgentAction) => Promise<PreflightResult | undefined>
   private readonly enforceSuccessVerification: boolean
   private readonly diagnosticMode?: () => boolean
+  private readonly remoteContext?: RemotePromptContext
   private readonly now: () => number
   private readonly runIdFactory: () => string
   private runCounter = 0
@@ -431,6 +474,7 @@ export class AgentOrchestrator {
     this.preflightGate = options.preflightGate
     this.enforceSuccessVerification = options.enforceSuccessVerification ?? false
     this.diagnosticMode = options.diagnosticMode
+    this.remoteContext = options.remoteContext
     this.now = options.now ?? (() => Date.now())
     this.runCounter = 0
     this.runIdFactory = options.runIdFactory ?? (() => `run-${++this.runCounter}`)
@@ -511,7 +555,11 @@ export class AgentOrchestrator {
         this.planMode
           ? [this.systemHint, PLAN_MODE_HINT].filter(Boolean).join('\n\n')
           : planHints.filter(Boolean).join('\n\n'),
-        { remote: remoteWork, diagnosticEnabled: Boolean(this.diagnosticMode?.()) }
+        {
+          remote: remoteWork,
+          diagnosticEnabled: Boolean(this.diagnosticMode?.()),
+          ...(this.remoteContext ? { remoteContext: this.remoteContext } : {})
+        }
       ),
       maxTokens: this.contextWindowTokens,
       compactionThreshold: this.compactionThreshold,
