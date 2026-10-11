@@ -695,6 +695,7 @@ export class AgentService {
         ...(result.stop ? { stop: result.stop } : {}),
         provider: providers[0].provider,
         model: providers[0].config.model,
+        ...(result.usage ? { usage: result.usage } : {}),
         at: this.now()
       })
       this.runStore.markCompleted(runId)

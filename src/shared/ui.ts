@@ -6,7 +6,7 @@ import type {
   ToolErrorCode,
   ToolRecoveryInfo
 } from './agent'
-import type { ChatMessage, ProviderId } from './types'
+import type { ChatMessage, ProviderId, Usage } from './types'
 import type { VpsConnectionState } from './vps'
 import type { ApprovalMode } from './approval'
 import type { Plan, PlanDecision, PlanWarning } from './plan'
@@ -229,6 +229,8 @@ export type AgentEvent =
       /** Provider/model that actually served the primary call (after fallback). */
       provider?: ProviderId
       model?: string
+      /** Aggregate token usage for the whole run (v2.5.4). */
+      usage?: Usage
       at: number
     }
   | { type: 'log'; entry: AgentLogEntry }

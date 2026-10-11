@@ -19,6 +19,12 @@ import type { Locale } from './i18n/locale'
 import { detectLocale } from './i18n/locale'
 import { VPS_RECONNECT_KEY } from './lib/vps-state'
 import { readEnabledTools } from './lib/tool-toggles'
+import {
+  appendUsage,
+  loadUsage,
+  saveUsage,
+  type UsageRecord
+} from './lib/usage'
 import { redact } from '@core/agent/redact'
 import i18n from './i18n'
 import type {
@@ -203,6 +209,10 @@ interface AppState {
   showTokenCount: boolean
   /** Whether the context preview is shown before each send (v2.3.2, B.4). */
   showContextBeforeSend: boolean
+  /** Every recorded LLM call's token usage, oldest first (v2.5.4). */
+  usageRecords: UsageRecord[]
+  /** App-start timestamp; "this session" = records at or after this (v2.5.4). */
+  sessionStartedAt: number
   /** Saved chats for the sidebar list. */
   chats: ChatSummary[]
   /** Currently open chat id (created lazily on first message). */
@@ -247,6 +257,10 @@ interface AppState {
   setShowTokenCount: (value: boolean) => void
   /** Toggle the pre-send context preview. */
   setShowContextBeforeSend: (value: boolean) => void
+  /** Record one LLM call's usage and persist it (v2.5.4). */
+  recordUsage: (record: Omit<UsageRecord, 'timestamp'> & { timestamp?: number }) => void
+  /** Clear every usage record and storage (v2.5.4). */
+  resetUsage: () => void
   refreshChats: () => Promise<void>
   /** Save the current messages/model/vps as the active chat. */
   persistChat: () => Promise<void>
@@ -377,6 +391,8 @@ export const useStore = create<AppState>((set, get) => ({
   sidebarCollapsed: false,
   showTokenCount: readShowTokenCount(),
   showContextBeforeSend: readShowContextBeforeSend(),
+  usageRecords: loadUsage(),
+  sessionStartedAt: Date.now(),
   chats: [],
   activeChatId: null,
   vpsServerId: undefined,
@@ -417,6 +433,16 @@ export const useStore = create<AppState>((set, get) => ({
     } catch {
       // Persisting the preference is best-effort.
     }
+  },
+  recordUsage(record) {
+    const full: UsageRecord = { ...record, timestamp: record.timestamp ?? Date.now() }
+    const usageRecords = appendUsage(get().usageRecords, full)
+    set({ usageRecords })
+    saveUsage(usageRecords)
+  },
+  resetUsage() {
+    set({ usageRecords: [] })
+    saveUsage([])
   },
   setVpsServerId: (id) => {
     set({ vpsServerId: id })
@@ -827,6 +853,15 @@ export const useStore = create<AppState>((set, get) => ({
         if (explain) {
           set({ queuedExplain: null })
           void get().send(explain)
+        }
+        if (event.usage) {
+          get().recordUsage({
+            provider: event.provider ?? get().selection.provider,
+            model: event.model ?? get().selection.model,
+            inputTokens: event.usage.promptTokens,
+            outputTokens: event.usage.completionTokens,
+            timestamp: event.at
+          })
         }
         void get().persistChat()
         void get().refreshSessions()
