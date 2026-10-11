@@ -1,6 +1,8 @@
 import { useTranslation } from 'react-i18next'
 import { FileSearch, PanelRightClose, ScrollText } from 'lucide-react'
 import { useStore, type WorkspacePanelTab } from '../store'
+import OutputFeed from './OutputFeed'
+import SourcesList from './SourcesList'
 
 /**
  * The right-hand workspace column (v2.6.0, B.1/B.4).
@@ -55,11 +57,7 @@ export default function WorkspacePanel(): JSX.Element {
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3" dir="auto">
-        {tab === 'output' ? (
-          <p className="text-xs text-neutral-600">{t('workspace.outputEmpty')}</p>
-        ) : (
-          <p className="text-xs text-neutral-600">{t('workspace.sourcesEmpty')}</p>
-        )}
+        {tab === 'output' ? <OutputFeed /> : <SourcesList />}
       </div>
     </aside>
   )
