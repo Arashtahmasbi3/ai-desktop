@@ -38,9 +38,9 @@ import { resolveVpsForRun, requiresVps } from '@core/agent/vps-resolver'
 import type { ApprovedPlan, Plan, PlanDecision, PlanWarning } from '@shared/plan'
 import {
   createApprovedPlan,
-  isPlanActive,
   shouldAutoApprove
 } from '@core/agent/approved-plan'
+import { PlanTrustRegistry, PLAN_TRUST_METADATA_KEY } from '@core/agent/plan-trust'
 import { createApprovalGate, describeApprovalReason } from './approval-gate'
 import type { ApprovalOutcome, ApprovalReason } from '@shared/approval'
 import type { ApprovedCommands } from '@core/agent/approved-commands'
@@ -389,8 +389,12 @@ export class AgentService {
   private readonly resolveVpsName?: (id: string) => Promise<string | undefined>
   private readonly controllers = new Set<AbortController>()
   private readonly changes = new Map<string, FileChangeView>()
-  /** Trusted plans, keyed by run id (v2.5.5). Cleared when the run ends. */
-  private readonly planTrust = new Map<string, ApprovedPlan>()
+  /**
+   * Trusted plans, keyed by session (v2.6.1 Fix 3). A trusted plan survives the
+   * run that created it so it keeps auto-approving across a chat's messages,
+   * until its TTL lapses.
+   */
+  private readonly planTrust: PlanTrustRegistry
   private runCounter = 0
   private changeCounter = 0
   /** 30s cache of detected remote workspaces, keyed `${serverId}:${path}` (A.1). */
@@ -402,6 +406,7 @@ export class AgentService {
     this.sessionStore = options.sessionStore
     this.emit = options.emit
     this.now = options.now ?? (() => Date.now())
+    this.planTrust = new PlanTrustRegistry(() => this.now())
     if (options.customProviders) this.customProviders = options.customProviders
     if (options.vps) this.vps = options.vps
     if (options.jobs) this.jobs = options.jobs
@@ -627,6 +632,9 @@ export class AgentService {
     const systemHint = [remote.systemHint, memory].filter(Boolean).join('\n\n')
 
     const runId = `run-${++this.runCounter}`
+    // v2.6.1 Fix 3: trust (and memory) are scoped to the chat/session, not the
+    // run, so a plan stays trusted across the messages of one conversation.
+    const sessionKey = request.sessionId ?? runId
     const settings = await this.persistence.load()
     // Snapshot the project this run belongs to. Patches captured during the run
     // are bound to it and can never be applied to another project (P0-1).
@@ -663,16 +671,25 @@ export class AgentService {
     const requestPlan = this.requestPlan
     const now = (): number => this.now()
 
-    // v2.5.5: the plan the user chose to trust for this run, or null. Expiry is
-    // evaluated lazily and surfaces a plan:inactive event so the chat chip hides.
-    const activeTrust = (): ApprovedPlan | null => {
-      const plan = this.planTrust.get(runId) ?? null
-      if (plan && !isPlanActive(plan, now())) {
-        this.planTrust.delete(runId)
-        this.emit({ type: 'plan:inactive', at: now() })
-        return null
+    // v2.6.1 Fix 3: rehydrate any trusted plan persisted with the session (e.g.
+    // after a restart) so it keeps auto-approving in this chat.
+    if (request.sessionId) {
+      try {
+        const stored = await this.sessionStore.load(request.sessionId)
+        const raw = stored?.metadata?.[PLAN_TRUST_METADATA_KEY]
+        if (this.planTrust.restore(sessionKey, raw)) {
+          this.emit({ type: 'plan:active', plan: this.planTrust.get(sessionKey)!, at: now() })
+        }
+      } catch {
+        // A missing/corrupt session must never block the run.
       }
-      return plan
+    }
+
+    // v2.5.5: the plan the user chose to trust for this session, or null. Expiry
+    // is evaluated lazily; when it lapses we tell the chip to hide.
+    const activeTrust = (): ApprovedPlan | null => {
+      if (this.planTrust.prune(sessionKey)) this.emit({ type: 'plan:inactive', at: now() })
+      return this.planTrust.get(sessionKey)
     }
 
     const baseGate = requestApproval
@@ -702,11 +719,11 @@ export class AgentService {
     const planGate = requestPlan
       ? async (plan: Plan, warnings: PlanWarning[]): Promise<PlanDecision> => {
           const decision = await requestPlan(runId, plan, warnings)
-          const approved = createApprovedPlan(plan, runId, decision, now())
+          const approved = createApprovedPlan(plan, sessionKey, decision, now())
           if (approved) {
-            this.planTrust.set(runId, approved)
+            this.planTrust.set(sessionKey, approved)
             this.emit({ type: 'plan:active', plan: approved, at: now() })
-          } else if (this.planTrust.delete(runId)) {
+          } else if (this.planTrust.clear(sessionKey)) {
             this.emit({ type: 'plan:inactive', at: now() })
           }
           return decision
@@ -722,6 +739,9 @@ export class AgentService {
       sessionStore: this.sessionStore,
       enforceSuccessVerification: true,
       ...(request.sessionId ? { sessionId: request.sessionId } : {}),
+      // v2.6.1 Fix 3: persist the session's trusted plan with the session so it
+      // survives a restart and resumes auto-approving in the same chat.
+      sessionMetadata: () => this.planTrust.metadataFor(sessionKey),
       ...remote,
       ...(systemHint ? { systemHint } : {}),
       ...(planMode ? { planMode: true } : {}),
@@ -776,19 +796,23 @@ export class AgentService {
     } finally {
       externalSignal?.removeEventListener('abort', onExternalAbort)
       this.controllers.delete(controller)
-      if (this.planTrust.delete(runId)) this.emit({ type: 'plan:inactive', at: this.now() })
+      // v2.6.1 Fix 3: keep the trusted plan alive across the chat's runs; only an
+      // expired one is dropped (and the chip hidden).
+      if (this.planTrust.prune(sessionKey)) this.emit({ type: 'plan:inactive', at: this.now() })
     }
   }
 
-  /** Drop the trusted plan for a run (or all runs) so approvals come back. */
-  stopPlan(runId?: string): boolean {
-    if (runId !== undefined) {
-      if (!this.planTrust.delete(runId)) return false
+  /**
+   * Drop the trusted plan for a session (or every session) so approvals come
+   * back. The argument is a session key (v2.6.1 Fix 3; it was a run id before).
+   */
+  stopPlan(sessionKey?: string): boolean {
+    if (sessionKey !== undefined) {
+      if (!this.planTrust.clear(sessionKey)) return false
       this.emit({ type: 'plan:inactive', at: this.now() })
       return true
     }
-    if (this.planTrust.size === 0) return false
-    this.planTrust.clear()
+    if (!this.planTrust.clear()) return false
     this.emit({ type: 'plan:inactive', at: this.now() })
     return true
   }

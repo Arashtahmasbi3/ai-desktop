@@ -108,6 +108,11 @@ export interface AgentOrchestratorOptions {
   sessionStore?: SessionStore
   /** Base session id, reused across runs so resumes update the same session. */
   sessionId?: string
+  /**
+   * v2.6.1 Fix 3: extra metadata to persist with the session (e.g. the trusted
+   * plan). Read at save time so a plan approved during the run is included.
+   */
+  sessionMetadata?: () => Record<string, unknown> | undefined
   /** Plan Mode: expose no tools and only produce a plan. */
   planMode?: boolean
   /**
@@ -490,6 +495,7 @@ export class AgentOrchestrator {
   private readonly summarizer?: ContextSummarizer
   private readonly sessionStore?: SessionStore
   private readonly sessionId?: string
+  private readonly sessionMetadata?: () => Record<string, unknown> | undefined
   private readonly planMode: boolean
   private readonly approvalGate?: (action: AgentAction) => Promise<boolean>
   private readonly planGate?: (plan: Plan, warnings: PlanWarning[]) => Promise<PlanDecision>
@@ -534,6 +540,7 @@ export class AgentOrchestrator {
     this.summarizer = options.summarizer
     this.sessionStore = options.sessionStore
     this.sessionId = options.sessionId
+    this.sessionMetadata = options.sessionMetadata
     this.planMode = options.planMode ?? false
     this.approvalGate = options.approvalGate
     this.planGate = options.planGate
@@ -1195,6 +1202,7 @@ export class AgentOrchestrator {
   ): Promise<void> {
     if (!this.sessionStore) return
     const snapshot = context.snapshot()
+    const metadata = this.sessionMetadata?.()
     const session: AgentSession = {
       id: this.sessionId ?? resumeSessionId ?? result.runId,
       version: SESSION_SCHEMA_VERSION,
@@ -1204,7 +1212,8 @@ export class AgentOrchestrator {
       updatedAt: result.finishedAt,
       messages: snapshot.messages,
       summary: snapshot.summary,
-      result
+      result,
+      ...(metadata && Object.keys(metadata).length > 0 ? { metadata } : {})
     }
     try {
       await this.sessionStore.save(session)
