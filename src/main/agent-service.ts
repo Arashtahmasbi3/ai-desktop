@@ -8,7 +8,8 @@ import type {
   FileChangeView,
   ProjectRecord,
   SessionInfo,
-  SessionRecordView
+  SessionRecordView,
+  SessionMemoryView
 } from '@shared/ui'
 import { AgentOrchestrator } from '@core/agent-orchestrator'
 import type { FileChange } from '@core/agent-orchestrator'
@@ -911,5 +912,41 @@ export class AgentService {
       status: session.status,
       updatedAt: session.updatedAt
     }))
+  }
+
+  /** v2.6.1 Fix 5: what this chat still remembers, for the Sources tab panel. */
+  async memory(id: string): Promise<SessionMemoryView> {
+    let session: Awaited<ReturnType<SessionStore['load']>> = null
+    try {
+      session = await this.sessionStore.load(id)
+    } catch {
+      // An unknown/invalid id just means there is nothing stored yet.
+    }
+    const plan = this.planTrust.get(id)
+    return {
+      sessionId: id,
+      messages: session?.messages.length ?? 0,
+      turns: session?.messages.filter((message) => message.role === 'user').length ?? 0,
+      summary: session?.summary ?? null,
+      updatedAt: session?.updatedAt ?? 0,
+      trustedPlan: plan ? { steps: plan.stepIds.length, expiresAt: plan.expiresAt } : null
+    }
+  }
+
+  /**
+   * v2.6.1 Fix 5: forget a chat — drop its stored transcript and trusted plan, so
+   * the next message starts with no history. The renderer's visible messages stay.
+   */
+  async clearMemory(id: string): Promise<boolean> {
+    let removed = false
+    try {
+      await this.sessionStore.delete(id)
+      removed = true
+    } catch {
+      removed = false
+    }
+    const trustCleared = this.planTrust.clear(id)
+    if (trustCleared) this.emit({ type: 'plan:inactive', at: this.now() })
+    return removed || trustCleared
   }
 }

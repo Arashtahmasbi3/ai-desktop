@@ -37,6 +37,7 @@ import type {
   ModelSelection,
   RemoteStatus,
   SessionInfo,
+  SessionMemoryView,
   SettingsView,
   PlanRequest,
   ToolCallView,
@@ -182,6 +183,8 @@ interface AppState {
   /** Set when the last run stopped early because the agent looked stuck. */
   loopStop: LoopStopInfo | null
   sessions: SessionInfo[]
+  /** v2.6.1 Fix 5: what the active chat still remembers (Sources tab panel). */
+  memory: SessionMemoryView | null
 
   entries: FileEntry[]
   cwd: string
@@ -353,6 +356,10 @@ interface AppState {
   newSession: () => void
   loadSession: (id: string) => Promise<void>
   refreshSessions: () => Promise<void>
+  /** v2.6.1 Fix 5: load the active chat's memory summary. */
+  refreshMemory: () => Promise<void>
+  /** v2.6.1 Fix 5: forget the active chat's stored history + trusted plan. */
+  clearMemory: () => Promise<void>
 
   refreshFiles: (path?: string) => Promise<void>
   openFile: (path: string) => Promise<void>
@@ -405,6 +412,7 @@ export const useStore = create<AppState>((set, get) => ({
   warnings: [],
   loopStop: null,
   sessions: [],
+  memory: null,
 
   entries: [],
   cwd: '.',
@@ -940,6 +948,7 @@ export const useStore = create<AppState>((set, get) => ({
         }
         void get().persistChat()
         void get().refreshSessions()
+        void get().refreshMemory()
         break
       }
       case 'error':
@@ -1039,6 +1048,7 @@ export const useStore = create<AppState>((set, get) => ({
       logs: [],
       warnings: [],
       loopStop: null,
+      memory: null,
       running: false,
       currentRunId: null,
       error: null,
@@ -1079,6 +1089,7 @@ export const useStore = create<AppState>((set, get) => ({
       loopStop: null,
       view: 'chat'
     })
+    void get().refreshMemory()
   },
 
   async refreshSessions() {
@@ -1087,6 +1098,27 @@ export const useStore = create<AppState>((set, get) => ({
     } catch {
       // Sessions are best-effort.
     }
+  },
+
+  async refreshMemory() {
+    const id = get().activeChatId ?? get().sessionId
+    try {
+      set({ memory: await window.api.agent.memory(id) })
+    } catch {
+      // Memory is best-effort; never block the UI on it.
+    }
+  },
+
+  async clearMemory() {
+    const id = get().activeChatId ?? get().sessionId
+    try {
+      await window.api.agent.clearMemory(id)
+    } catch {
+      // Ignore a failed clear; refresh below shows the true state.
+    }
+    // The stored transcript is gone, so drop the UI's trust chip too.
+    set({ activePlan: null })
+    await get().refreshMemory()
   },
 
   async refreshFiles(path) {

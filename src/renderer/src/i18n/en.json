@@ -536,7 +536,15 @@
     "context": "Context sent",
     "included": "Included",
     "withheld": "Withheld",
-    "excluded": "Excluded"
+    "excluded": "Excluded",
+    "memoryTitle": "Chat memory",
+    "memoryTurns": "User turns",
+    "memoryMessages": "Messages",
+    "memorySummary": "Summary",
+    "memoryTrustedPlan": "Trusted plan steps",
+    "memoryClear": "Clear memory",
+    "memoryClearConfirm": "Click again to clear",
+    "memoryEmpty": "No memory yet."
   },
   "connection": {
     "title": "Connection",

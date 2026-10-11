@@ -536,7 +536,15 @@
     "context": "زمینه ارسالی",
     "included": "شامل",
     "withheld": "کنترل‌شده",
-    "excluded": "حذف‌شده"
+    "excluded": "حذف‌شده",
+    "memoryTitle": "حافظه چت",
+    "memoryTurns": "پیامهای کاربر",
+    "memoryMessages": "پیامها",
+    "memorySummary": "خلاصه",
+    "memoryTrustedPlan": "مراحل پلن مورد اعتماد",
+    "memoryClear": "پاک‌کردن حافظه",
+    "memoryClearConfirm": "برای پاک‌کردن دوباره کلیک کنید",
+    "memoryEmpty": "هنوز حافظه‌ای نیست."
   },
   "connection": {
     "title": "اتصال",

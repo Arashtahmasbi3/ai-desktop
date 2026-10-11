@@ -274,6 +274,8 @@ export function registerIpc(
     ['agent:rejectChange', (id: string) => services.agent.rejectChange(id)],
     ['agent:sessions', () => services.agent.listSessions()],
     ['agent:loadSession', (id: string) => services.agent.loadSession(id)],
+    ['agent:memory', (id: string) => services.agent.memory(id)],
+    ['agent:clearMemory', (id: string) => services.agent.clearMemory(id)],
 
     ['jobs:list', () => services.jobs.listJobs()],
     ['jobs:refresh', () => services.jobs.refreshAll()],

@@ -137,6 +137,21 @@ export interface SessionRecordView {
   messages: ChatMessage[]
 }
 
+/**
+ * v2.6.1 Fix 5: a read-only summary of what a chat still remembers, surfaced in
+ * the Sources tab so the user can see (and clear) the agent's memory.
+ */
+export interface SessionMemoryView {
+  sessionId: string
+  /** Total stored messages (including harness system notes). */
+  messages: number
+  /** Number of user turns the model still has context for. */
+  turns: number
+  summary: string | null
+  updatedAt: number
+  trustedPlan: { steps: number; expiresAt: number } | null
+}
+
 /** Events streamed main -> renderer while an agent run is in progress. */
 /** A file the agent wrote, captured for review in the chat. */
 export interface CodeMatch {
