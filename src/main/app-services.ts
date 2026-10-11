@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { SandboxManager } from '@shared/sandbox'
-import type { AgentEvent, RemoteStatus, SettingsView, WorkerStatus } from '@shared/ui'
+import type { AgentEvent, DiagnosticStatus, RemoteStatus, SettingsView, WorkerStatus } from '@shared/ui'
 import type { ProjectRecord } from '@shared/ui'
 import type { Persistence } from '@core/agent/persistence'
 import type { SessionStore } from '@core/agent/session-store'
@@ -34,6 +34,13 @@ import { SshManager } from './ssh/ssh-manager'
 import { Ssh2Backend } from './ssh/ssh2-backend'
 import type { VpsServerStore } from './ssh/server-store'
 import { JobManager } from '@core/agent/job-manager'
+import {
+  createDiagnosticPolicy,
+  diagnosticRemainingMs,
+  isDiagnosticActive,
+  DEFAULT_DIAGNOSTIC_PATHS,
+  type DiagnosticPolicy
+} from '@core/remote/diagnostic-policy'
 import { createJobStore } from './job-store'
 
 export type EventSender = (channel: string, payload: unknown) => void
@@ -86,6 +93,11 @@ export class AppServices {
 
   private sender?: EventSender
   private readonly jobStore: ReturnType<typeof createJobStore>
+  /**
+   * User-enabled, read-only widening of P0-2 (v2.5.3). Held in memory only, so it
+   * never survives an app restart; the 30-minute window is enforced on read.
+   */
+  private diagnosticPolicy: DiagnosticPolicy | null = null
 
   constructor(options: AppServicesOptions = {}) {
     this.sender = options.sender
@@ -144,6 +156,7 @@ export class AppServices {
       approvedCommands: this.approvedCommands,
       files: this.files,
       runStore: this.runs,
+      getDiagnosticPolicy: () => this.getDiagnosticPolicy(),
       emit: (event: AgentEvent) => this.emit('agent:event', event)
     })
 
@@ -162,6 +175,46 @@ export class AppServices {
 
   setSender(sender: EventSender | undefined): void {
     this.sender = sender
+  }
+
+  /**
+   * The active Diagnostic Policy for this run, or null. The object carries its own
+   * expiry, so a stale-but-not-yet-cleared policy is still a no-op. We clear it on
+   * read once expired so memory never holds a dead policy.
+   */
+  getDiagnosticPolicy(): DiagnosticPolicy | null {
+    if (this.diagnosticPolicy && !isDiagnosticActive(this.diagnosticPolicy)) {
+      this.diagnosticPolicy = null
+    }
+    return this.diagnosticPolicy
+  }
+
+  /** Snapshot for the renderer (Settings toggle + chat badge). */
+  diagnosticStatus(): DiagnosticStatus {
+    const policy = this.getDiagnosticPolicy()
+    const remainingMs = diagnosticRemainingMs(policy)
+    return {
+      active: isDiagnosticActive(policy),
+      expiresAt: policy?.expiresAt ?? null,
+      remainingMs,
+      allowedPaths: policy?.allowedPaths ?? DEFAULT_DIAGNOSTIC_PATHS
+    }
+  }
+
+  /** Enable Diagnostic Mode for the next 30 minutes and broadcast the change. */
+  enableDiagnosticMode(): DiagnosticStatus {
+    this.diagnosticPolicy = createDiagnosticPolicy()
+    const status = this.diagnosticStatus()
+    this.emit('diagnostic:status', status)
+    return status
+  }
+
+  /** Disable Diagnostic Mode immediately. */
+  disableDiagnosticMode(): DiagnosticStatus {
+    this.diagnosticPolicy = null
+    const status = this.diagnosticStatus()
+    this.emit('diagnostic:status', status)
+    return status
   }
 
   /** Working directory / server shown in the approval dialog. */

@@ -54,6 +54,31 @@ interface SlashCommand {
   insert?: string
 }
 
+/**
+ * Shown in the chat header while Diagnostic Mode is on, so the user can see at a
+ * glance that the agent currently has read-only access to system paths (v2.5.3).
+ */
+function DiagnosticBadge(): JSX.Element | null {
+  const { t } = useTranslation()
+  const diagnostic = useStore((state) => state.diagnostic)
+  if (!diagnostic?.active) return null
+  const minutes =
+    diagnostic.expiresAt !== null
+      ? Math.max(0, Math.ceil((diagnostic.expiresAt - Date.now()) / 60_000))
+      : 0
+  return (
+    <span
+      title={`${t('settings.diagnosticOn')}${
+        minutes > 0 ? ` · ${t('settings.diagnosticRemaining', { minutes })}` : ''
+      }`}
+      className="flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-300"
+    >
+      <Activity className="h-3 w-3" />
+      {t('settings.diagnosticTitle')}
+    </span>
+  )
+}
+
 export default function ChatPanel(): JSX.Element {
   const { t, i18n } = useTranslation()
   const messages = useStore((state) => state.messages)
@@ -291,6 +316,7 @@ export default function ChatPanel(): JSX.Element {
           </button>
           <VpsSelector />
           <WorkspaceBadge />
+          <DiagnosticBadge />
           <span className="text-neutral-700">·</span>
           <button
             type="button"

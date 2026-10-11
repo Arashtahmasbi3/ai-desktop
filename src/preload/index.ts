@@ -29,6 +29,7 @@ import type {
 import type {
   AgentRunRequest,
   AppEventMap,
+  DiagnosticStatus,
   RemoteStatus,
   SessionInfo,
   CodeMatch,
@@ -259,6 +260,13 @@ export const api = {
     start: (): Promise<RemoteStatus> => invoke('remote:start'),
     stop: (): Promise<RemoteStatus> => invoke('remote:stop'),
     status: (): Promise<RemoteStatus> => invoke('remote:status')
+  },
+
+  // v2.5.3: read-only Diagnostic Mode (widens P0-2 for a short window).
+  diagnostic: {
+    status: (): Promise<DiagnosticStatus> => invoke('diagnostic:status'),
+    enable: (): Promise<DiagnosticStatus> => invoke('diagnostic:enable'),
+    disable: (): Promise<DiagnosticStatus> => invoke('diagnostic:disable')
   },
 
   webUtils: {

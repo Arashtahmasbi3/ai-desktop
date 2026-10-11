@@ -10,6 +10,7 @@
  * The logic is a pure function so it can be unit-tested without SSH or an LLM.
  */
 import { enforceCommandPaths, enforceProjectPath } from '@core/remote/path-guard'
+import type { DiagnosticPolicy } from '@core/remote/diagnostic-policy'
 
 /** Local tool name → remote tool name. */
 export const LOCAL_TO_REMOTE_TOOL: Readonly<Record<string, string>> = {
@@ -33,6 +34,8 @@ export interface RoutingContext {
   remotePath?: string
   /** Whether that server is currently connected. */
   connected: boolean
+  /** Read-only widening while Diagnostic Mode is on (v2.5.3). */
+  diagnostic?: DiagnosticPolicy | null
 }
 
 export type RoutingDecision =
@@ -89,17 +92,21 @@ export function routeToolCall(
   // Every path the model hands us is rebased onto the remote root and then
   // proven to stay inside it (P0-2). An absolute path that escapes the project
   // is refused instead of being forwarded to the executor.
-  const guarded = (input: unknown): RoutingDecision | string => {
+  const guarded = (input: unknown, mode: 'read' | 'write' = 'read'): RoutingDecision | string => {
     const resolved = resolveRemotePath(root, input)
     // Without a known remote root there is nothing to contain the path to.
     if (context.remotePath === undefined) return resolved
-    const guard = enforceProjectPath(resolved, root)
+    const guard = enforceProjectPath(resolved, root, context.diagnostic, mode)
     return guard.ok ? guard.resolvedPath! : { kind: 'error', message: guard.error! }
   }
 
   const guardedCommand = (command: unknown): RoutingDecision | undefined => {
     if (context.remotePath === undefined) return undefined
-    const guard = enforceCommandPaths(typeof command === 'string' ? command : '', context.remotePath)
+    const guard = enforceCommandPaths(
+      typeof command === 'string' ? command : '',
+      context.remotePath,
+      context.diagnostic
+    )
     return guard.ok
       ? undefined
       : { kind: 'error', message: `Command references a path outside the project: ${guard.error}` }
@@ -117,7 +124,8 @@ export function routeToolCall(
       break
     }
     case 'write_file': {
-      const path = guarded(args.path)
+      // Diagnostic Mode exposes paths read-only, so a routed write stays confined.
+      const path = guarded(args.path, 'write')
       if (typeof path !== 'string') return path
       remoteArgs = { ...server, path, content: args.content }
       break

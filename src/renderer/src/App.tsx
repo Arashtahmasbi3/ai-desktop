@@ -50,6 +50,7 @@ export default function App(): JSX.Element {
 
     const boot = async (): Promise<void> => {
       await useStore.getState().refreshVps()
+      void useStore.getState().refreshDiagnostic()
       const { vpsServers, vpsStatus, connectVps, setVpsServerId } = useStore.getState()
       const target = resolveReconnectId(vpsServers, readLastVpsId())
       if (!target || cancelled) return

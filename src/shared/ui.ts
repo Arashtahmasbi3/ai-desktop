@@ -289,10 +289,22 @@ export interface RemoteStatus {
   token?: string
 }
 
+/** Diagnostic Mode state surfaced to the renderer (v2.5.3). */
+export interface DiagnosticStatus {
+  active: boolean
+  /** Epoch ms the window closes, or null when inactive. */
+  expiresAt: number | null
+  /** Milliseconds left in the window (0 when inactive). */
+  remainingMs: number
+  /** System paths temporarily readable while active. */
+  allowedPaths: string[]
+}
+
 export interface AppEventMap {
   'agent:event': AgentEvent
   'worker:status': WorkerStatus
   'remote:status': RemoteStatus
+  'diagnostic:status': DiagnosticStatus
   'settings:changed': SettingsView
   'files:changed': { root: string }
   'window:maximized': boolean

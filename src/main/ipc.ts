@@ -295,7 +295,12 @@ export function registerIpc(
 
     ['remote:start', () => services.remote.start()],
     ['remote:stop', () => services.remote.stop().then(() => services.remote.getStatus())],
-    ['remote:status', () => services.remote.getStatus()]
+    ['remote:status', () => services.remote.getStatus()],
+
+    // v2.5.3: user-controlled, in-memory read-only widening of P0-2.
+    ['diagnostic:status', () => services.diagnosticStatus()],
+    ['diagnostic:enable', () => services.enableDiagnosticMode()],
+    ['diagnostic:disable', () => services.disableDiagnosticMode()]
   ]
 
   for (const [channel, handler] of handlers) {

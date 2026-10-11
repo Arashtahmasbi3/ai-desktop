@@ -14,7 +14,7 @@
  */
 import * as path from 'path'
 import { isDiagnosticAllowed, type DiagnosticPolicy } from './diagnostic-policy'
-import { isCommandAlwaysAllowed } from './command-whitelist'
+import { isCommandAlwaysAllowed, isDiagnosticReadOnlyCommand } from './command-whitelist'
 
 export interface PathGuardResult {
   ok: boolean
@@ -47,7 +47,12 @@ function normalizeRoot(projectRoot: string): string {
 export function enforceProjectPath(
   requestedPath: string,
   projectRoot: string,
-  diagnostic?: DiagnosticPolicy | null
+  diagnostic?: DiagnosticPolicy | null,
+  /**
+   * Diagnostic Mode is read-only: a write (`mode: 'write'`) may never leave the
+   * project root, even for a path the diagnostic policy would otherwise expose.
+   */
+  mode: 'read' | 'write' = 'read'
 ): PathGuardResult {
   if (!requestedPath || typeof requestedPath !== 'string') {
     return { ok: false, error: 'Invalid path' }
@@ -72,7 +77,11 @@ export function enforceProjectPath(
 
   // P0-2 says no; Diagnostic Mode (user-enabled, read-only, expiring) may still
   // admit an absolute system path so the agent can inspect logs and metrics.
-  if (path.posix.isAbsolute(resolved) && isDiagnosticAllowed(resolved, diagnostic)) {
+  if (
+    mode === 'read' &&
+    path.posix.isAbsolute(resolved) &&
+    isDiagnosticAllowed(resolved, diagnostic)
+  ) {
     return { ok: true, resolvedPath: resolved, source: 'diagnostic' }
   }
 
@@ -109,10 +118,19 @@ export function enforceCommandPaths(
   // by design and is allowed before the path scan (v2.5.3, Fix 2). Metacharacters
   // are refused by the whitelist itself, so this cannot smuggle a second command.
   if (isCommandAlwaysAllowed(command)) return { ok: true }
+  // A diagnostic bypass is only valid for a read-only command; anything that can
+  // write (redirection, `rm`, `sed -i`, chaining) must not reach system paths.
+  const readOnly = isDiagnosticReadOnlyCommand(command)
   for (const candidate of extractAbsolutePaths(command)) {
     if (isBenign(path.posix.normalize(candidate))) continue
     const guard = enforceProjectPath(candidate, projectRoot, diagnostic)
     if (!guard.ok) return guard
+    if (guard.source === 'diagnostic' && !readOnly) {
+      return {
+        ok: false,
+        error: `Path "${candidate}" is exposed by Diagnostic Mode but "${command}" is not a read-only command`
+      }
+    }
   }
   return { ok: true }
 }

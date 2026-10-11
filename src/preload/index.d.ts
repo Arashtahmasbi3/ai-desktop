@@ -45,6 +45,7 @@ import type {
   FileEntry,
   LocalShellResult,
   RemoteStatus,
+  DiagnosticStatus,
   SessionInfo,
   ProjectRecord,
   SessionRecordView,
@@ -204,6 +205,12 @@ export interface Api {
     start(): Promise<RemoteStatus>
     stop(): Promise<RemoteStatus>
     status(): Promise<RemoteStatus>
+  }
+  /** v2.5.3: read-only Diagnostic Mode (widens P0-2 for a short window). */
+  diagnostic: {
+    status(): Promise<DiagnosticStatus>
+    enable(): Promise<DiagnosticStatus>
+    disable(): Promise<DiagnosticStatus>
   }
   webUtils: {
     pathForFile(file: File): string
