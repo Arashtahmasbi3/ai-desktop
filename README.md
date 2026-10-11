@@ -154,6 +154,13 @@ calls. It warns after an action is repeated more than three times, pauses with
 falls back to the next provider on auth/config errors. Pass an `AbortSignal` via
 `agent.run(task, { signal })` to cancel.
 
+For a complex goal the orchestrator plans before it acts: `TaskPlanner` splits the goal
+into ordered steps, emits `task:plan` / `task:step` events that drive the in-chat task
+tracker, and runs each step in turn. When the loop guard would stop a stuck run, it now
+returns a `redirect` carrying a concrete alternative from the strategy table
+(`src/core/agent/strategies.ts`) — the blocked call is never executed, and the model is
+told what to try instead. Only repeating the redirected call verbatim is a hard stop.
+
 ### Context, sessions and settings
 
 The orchestrator keeps the prompt inside a token budget and compacts history automatically:
@@ -274,6 +281,7 @@ npx vitest run test/e2e   # end-to-end flows only
 | `error-scenarios.e2e.test.ts` | API cut (bounded retries), provider fallback on auth error, unavailable sandbox, transient sandbox retry, path-escape rejection, context overflow with deterministic compaction fallback |
 | `performance.e2e.test.ts` | Renderer tokenize/diff budgets, no sandbox leaks across many runs, bounded heap growth and bounded persisted transcript under overflow |
 | `v2.3.1-critical-fixes.e2e.test.ts` | Chat → tool → approval → apply → audit, realistic loop stop, VPS connect → chat → `remote_shell` |
+| `v2.5.7-integration.test.ts` | Complex goal → plan → step-by-step execution; a `pm2` loop is redirected to `systemctl` at runtime |
 
 ## Troubleshooting
 

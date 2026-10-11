@@ -6,11 +6,12 @@ import type {
   ToolErrorCode,
   ToolRecoveryInfo
 } from './agent'
-import type { ChatMessage, ProviderId } from './types'
+import type { ChatMessage, ProviderId, Usage } from './types'
 import type { VpsConnectionState } from './vps'
-import type { ApprovalMode } from './approval'
-import type { Plan, PlanDecision, PlanWarning } from './plan'
+import type { ApprovalMode, ApprovalReason } from './approval'
+import type { Plan, ApprovedPlan, PlanDecision, PlanWarning } from './plan'
 import type { ProjectMetadata } from './project-metadata'
+import type { TaskPlan, TaskStep } from './task-plan'
 
 /** A project (folder) the user has added to the app. */
 export interface ProjectRecord extends ProjectMetadata {
@@ -108,6 +109,8 @@ export interface ApprovalRequest {
   server?: string
   /** True when the action matches the deny list (never auto-approved). */
   dangerous?: boolean
+  /** Why this action needed approval (v2.5.5). */
+  reason?: ApprovalReason
 }
 
 /** The model the user has selected for the next/next messages. */
@@ -229,6 +232,8 @@ export type AgentEvent =
       /** Provider/model that actually served the primary call (after fallback). */
       provider?: ProviderId
       model?: string
+      /** Aggregate token usage for the whole run (v2.5.4). */
+      usage?: Usage
       at: number
     }
   | { type: 'log'; entry: AgentLogEntry }
@@ -236,8 +241,14 @@ export type AgentEvent =
   | { type: 'approval:suggestion'; tool: string; count: number }
   | { type: 'plan:request'; request: PlanRequest }
   | { type: 'plan:resolved'; id: string; decision: PlanDecision; at: number }
+  | { type: 'plan:active'; plan: ApprovedPlan; at: number }
+  | { type: 'plan:inactive'; at: number }
   | { type: 'file:change'; change: FileChangeView; at: number }
   | { type: 'file:change:resolved'; id: string; status: FileChangeStatus; at: number }
+  | { type: 'task:plan'; plan: TaskPlan; at: number }
+  | { type: 'task:step'; plan: TaskPlan; step: TaskStep; at: number }
+  | { type: 'task:complete'; plan: TaskPlan; at: number }
+  | { type: 'task:failed'; plan: TaskPlan; at: number }
   | { type: 'error'; runId: string; message: string }
 
 export type WorkerState = 'stopped' | 'idle' | 'running'

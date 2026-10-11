@@ -9,7 +9,8 @@ import type {
 } from '@shared/types'
 import { DEFAULT_SELECTION, resolveSelection } from '@shared/selection'
 import type { ApprovalMode, ApprovalOutcome } from '@shared/approval'
-import type { PlanDecision } from '@shared/plan'
+import type { ApprovedPlan, PlanDecision } from '@shared/plan'
+import type { TaskPlan } from '@shared/task-plan'
 import type { ProjectMetadataPatch } from '@shared/project-metadata'
 import type { OnboardingStatus } from '@shared/onboarding'
 import type { VpsConnectionState, VpsServerView } from '@shared/vps'
@@ -19,6 +20,12 @@ import type { Locale } from './i18n/locale'
 import { detectLocale } from './i18n/locale'
 import { VPS_RECONNECT_KEY } from './lib/vps-state'
 import { readEnabledTools } from './lib/tool-toggles'
+import {
+  appendUsage,
+  loadUsage,
+  saveUsage,
+  type UsageRecord
+} from './lib/usage'
 import { redact } from '@core/agent/redact'
 import i18n from './i18n'
 import type {
@@ -95,7 +102,7 @@ function toolCallFromView(view: ToolResultView): ToolCallView {
 const MAX_LOGS = 500
 const MAX_TERMINAL_LINES = 500
 const TOKEN_SETTINGS_KEY = 'ai-desktop:show-token-count'
-const CONTEXT_SETTINGS_KEY = 'ai-desktop:show-context-before-send'
+export const CONTEXT_SETTINGS_KEY = 'ai-desktop:show-context-before-send'
 const CHAT_TREE_KEY = 'ai-desktop:chat-tree-open'
 const LAST_CHAT_KEY = 'ai-desktop:last-chat'
 const AUTOSAVE_INTERVAL_MS = 30_000
@@ -115,7 +122,8 @@ function readShowTokenCount(): boolean {
   }
 }
 
-function readShowContextBeforeSend(): boolean {
+/** Read the persisted "preview context before send" preference (default on). */
+export function readShowContextBeforeSend(): boolean {
   try {
     return globalThis.localStorage?.getItem(CONTEXT_SETTINGS_KEY) !== '0'
   } catch {
@@ -202,6 +210,10 @@ interface AppState {
   showTokenCount: boolean
   /** Whether the context preview is shown before each send (v2.3.2, B.4). */
   showContextBeforeSend: boolean
+  /** Every recorded LLM call's token usage, oldest first (v2.5.4). */
+  usageRecords: UsageRecord[]
+  /** App-start timestamp; "this session" = records at or after this (v2.5.4). */
+  sessionStartedAt: number
   /** Saved chats for the sidebar list. */
   chats: ChatSummary[]
   /** Currently open chat id (created lazily on first message). */
@@ -220,6 +232,17 @@ interface AppState {
   pendingApproval: ApprovalRequest | null
   /** Plan awaiting the user's approval before it executes (v2.3.2, A.5). */
   pendingPlan: PlanRequest | null
+  /** A plan the user trusted for 30 minutes; its steps skip approval (v2.5.5). */
+  activePlan: ApprovedPlan | null
+  /**
+   * The plan the agent is currently executing (v2.5.7). Named `taskPlan` (not
+   * `activePlan`) because `activePlan` already holds the 30-minute approved plan.
+   */
+  taskPlan: TaskPlan | null
+  /** Every plan seen this session, keyed by id (v2.5.7). */
+  taskPlans: Record<string, TaskPlan>
+  /** Whether the user paused the running task plan (v2.5.7). */
+  taskPaused: boolean
   /** A tool approved 3+ times; the UI suggests remembering it (v2.3, B.3). */
   approvalSuggestion: { tool: string; count: number } | null
   /** A "Deny & Explain" prompt to send once the current run settles. */
@@ -246,6 +269,10 @@ interface AppState {
   setShowTokenCount: (value: boolean) => void
   /** Toggle the pre-send context preview. */
   setShowContextBeforeSend: (value: boolean) => void
+  /** Record one LLM call's usage and persist it (v2.5.4). */
+  recordUsage: (record: Omit<UsageRecord, 'timestamp'> & { timestamp?: number }) => void
+  /** Clear every usage record and storage (v2.5.4). */
+  resetUsage: () => void
   refreshChats: () => Promise<void>
   /** Save the current messages/model/vps as the active chat. */
   persistChat: () => Promise<void>
@@ -272,6 +299,7 @@ interface AppState {
   setPlanModeDefault: (value: boolean) => Promise<void>
   respondApproval: (answer: boolean | ApprovalOutcome) => void
   respondPlan: (decision: PlanDecision) => void
+  stopPlan: () => void
   rememberApprovalTool: (tool: string) => Promise<void>
   dismissApprovalSuggestion: () => void
   setRememberApprovalMode: (enabled: boolean) => Promise<void>
@@ -298,6 +326,14 @@ interface AppState {
   testCustomProvider: (input: CustomProviderInput) => Promise<CustomProviderTestResult>
   completeOnboarding: () => Promise<void>
   applyEvent: (event: AgentEvent) => void
+  /** Replace (or clear) the tracked task plan (v2.5.7). */
+  setTaskPlan: (plan: TaskPlan | null) => void
+  /** Pause the running task plan (UI control). */
+  pauseTaskPlan: () => void
+  /** Resume a paused task plan. */
+  resumeTaskPlan: () => void
+  /** Stop the running task plan and mark it failed. */
+  stopTaskPlan: () => void
   send: (text: string) => Promise<void>
   abort: () => void
   newSession: () => void
@@ -376,6 +412,8 @@ export const useStore = create<AppState>((set, get) => ({
   sidebarCollapsed: false,
   showTokenCount: readShowTokenCount(),
   showContextBeforeSend: readShowContextBeforeSend(),
+  usageRecords: loadUsage(),
+  sessionStartedAt: Date.now(),
   chats: [],
   activeChatId: null,
   vpsServerId: undefined,
@@ -385,6 +423,10 @@ export const useStore = create<AppState>((set, get) => ({
   planMode: false,
   pendingApproval: null,
   pendingPlan: null,
+  activePlan: null,
+  taskPlan: null,
+  taskPlans: {},
+  taskPaused: false,
   approvalSuggestion: null,
   queuedExplain: null,
   fileChanges: [],
@@ -416,6 +458,16 @@ export const useStore = create<AppState>((set, get) => ({
     } catch {
       // Persisting the preference is best-effort.
     }
+  },
+  recordUsage(record) {
+    const full: UsageRecord = { ...record, timestamp: record.timestamp ?? Date.now() }
+    const usageRecords = appendUsage(get().usageRecords, full)
+    set({ usageRecords })
+    saveUsage(usageRecords)
+  },
+  resetUsage() {
+    set({ usageRecords: [] })
+    saveUsage([])
   },
   setVpsServerId: (id) => {
     set({ vpsServerId: id })
@@ -556,6 +608,10 @@ export const useStore = create<AppState>((set, get) => ({
     if (!pending) return
     set({ pendingPlan: null })
     void window.api.agent.respondPlan(pending.id, decision)
+  },
+  stopPlan() {
+    set({ activePlan: null })
+    void window.api.agent.stopPlan()
   },
   async rememberApprovalTool(tool) {
     await window.api.agent.rememberApprovalTool(tool)
@@ -749,6 +805,9 @@ export const useStore = create<AppState>((set, get) => ({
           logs: [],
           pendingApproval: null,
           pendingPlan: null,
+          activePlan: null,
+          taskPlan: null,
+          taskPaused: false,
           loopStop: null
         })
         break
@@ -760,6 +819,24 @@ export const useStore = create<AppState>((set, get) => ({
         break
       case 'plan:resolved':
         if (get().pendingPlan?.id === event.id) set({ pendingPlan: null })
+        break
+      case 'plan:active':
+        set({ activePlan: event.plan })
+        break
+      case 'plan:inactive':
+        set({ activePlan: null })
+        break
+      case 'task:plan':
+      case 'task:step':
+      case 'task:complete':
+      case 'task:failed':
+        set({
+          taskPlan: event.plan,
+          taskPlans: { ...get().taskPlans, [event.plan.id]: event.plan },
+          ...(event.type === 'task:complete' || event.type === 'task:failed'
+            ? { taskPaused: false }
+            : {})
+        })
         break
       case 'approval:suggestion':
         set({ approvalSuggestion: { tool: event.tool, count: event.count } })
@@ -820,12 +897,22 @@ export const useStore = create<AppState>((set, get) => ({
           loopStop: event.stop ?? null,
           pendingApproval: null,
           pendingPlan: null,
+          activePlan: null,
           messages
         })
         const explain = get().queuedExplain
         if (explain) {
           set({ queuedExplain: null })
           void get().send(explain)
+        }
+        if (event.usage) {
+          get().recordUsage({
+            provider: event.provider ?? get().selection.provider,
+            model: event.model ?? get().selection.model,
+            inputTokens: event.usage.promptTokens,
+            outputTokens: event.usage.completionTokens,
+            timestamp: event.at
+          })
         }
         void get().persistChat()
         void get().refreshSessions()
@@ -837,6 +924,7 @@ export const useStore = create<AppState>((set, get) => ({
           currentRunId: null,
           pendingApproval: null,
           pendingPlan: null,
+          activePlan: null,
           error: redact(event.message),
           loopStop: null,
           messages: [
@@ -847,6 +935,32 @@ export const useStore = create<AppState>((set, get) => ({
         get().pushToast('error', event.message)
         break
     }
+  },
+
+  setTaskPlan(plan) {
+    set({
+      taskPlan: plan,
+      ...(plan ? { taskPlans: { ...get().taskPlans, [plan.id]: plan } } : {})
+    })
+  },
+  pauseTaskPlan() {
+    set({ taskPaused: true })
+  },
+  resumeTaskPlan() {
+    set({ taskPaused: false })
+  },
+  stopTaskPlan() {
+    const plan = get().taskPlan
+    if (!plan) {
+      set({ taskPaused: false })
+      return
+    }
+    const stopped: TaskPlan = { ...plan, status: 'failed' }
+    set({
+      taskPlan: stopped,
+      taskPlans: { ...get().taskPlans, [stopped.id]: stopped },
+      taskPaused: false
+    })
   },
 
   async send(text) {
@@ -895,6 +1009,7 @@ export const useStore = create<AppState>((set, get) => ({
       error: null,
       pendingApproval: null,
       pendingPlan: null,
+      activePlan: null,
       approvalSuggestion: null,
       queuedExplain: null,
       fileChanges: [],

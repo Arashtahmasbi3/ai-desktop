@@ -31,11 +31,14 @@ import ProviderWarning from './ProviderWarning'
 import LoopStopCard from './LoopStopCard'
 import ApprovalDialog from './ApprovalDialog'
 import PlanCard from './PlanCard'
+import TaskTracker from './TaskTracker'
+import PlanTrustChip from './PlanTrustChip'
 import ProgressTimeline from './ProgressTimeline'
 import JobsPanel from './JobsPanel'
 import MicButton from './MicButton'
 import { FullAccessBanner, FullAccessToggle } from './FullAccessToggle'
 import { filterSlashCommands, resolveSlashCommand } from '../lib/slash'
+import { decideSend } from '../lib/context-gate'
 import { workspaceStatus, shouldShowWorkspaceBanner } from '../lib/project-status'
 import { contextBudget, estimateTokens } from '@shared/memory'
 
@@ -249,13 +252,13 @@ export default function ChatPanel(): JSX.Element {
       applyCommand(command)
       return
     }
-    const body = [trimmed, ...attached.map((path) => `@${path}`)].filter(Boolean).join('\n')
-    if (!body || running) return
-    if (showContextBeforeSend) {
-      previewContext(body, true)
+    const decision = decideSend(trimmed, attached, showContextBeforeSend)
+    if (!decision || running) return
+    if (decision.preview) {
+      previewContext(decision.body, true)
       return
     }
-    doSend(body)
+    doSend(decision.body)
   }
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>): void => {
@@ -317,6 +320,7 @@ export default function ChatPanel(): JSX.Element {
           <VpsSelector />
           <WorkspaceBadge />
           <DiagnosticBadge />
+          <PlanTrustChip />
           <span className="text-neutral-700">·</span>
           <button
             type="button"
@@ -641,6 +645,7 @@ export default function ChatPanel(): JSX.Element {
         ) : null}
       </div>
 
+      <TaskTracker />
       <PlanCard />
       <ApprovalDialog />
       {contextCard ? (

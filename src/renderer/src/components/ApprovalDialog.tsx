@@ -48,6 +48,50 @@ function kindIcon(kind: string | undefined): JSX.Element {
   }
 }
 
+/** i18n key for the gate's explanation of why this prompt appeared (v2.5.5). */
+function reasonKey(reason: string): string {
+  switch (reason) {
+    case 'outside_plan':
+      return 'chat.approvalReasonOutsidePlan'
+    case 'write':
+      return 'chat.approvalReasonWrite'
+    case 'dangerous':
+      return 'chat.approvalReasonDangerous'
+    case 'read_only_tool':
+    case 'read_only_shell':
+    case 'whitelisted_command':
+      return 'chat.approvalReasonReadOnly'
+    default:
+      return 'chat.approvalReasonNotWhitelisted'
+  }
+}
+
+type ActionCategory = 'read' | 'write' | 'destructive'
+
+/** Risk category shown as a badge (v2.5.5, Task 2.3). */
+function categoryOf(dangerous: boolean | undefined, kind: string | undefined): ActionCategory {
+  if (dangerous) return 'destructive'
+  if (kind === 'write' || kind === 'shell') return 'write'
+  return 'read'
+}
+
+function categoryKey(category: ActionCategory): string {
+  switch (category) {
+    case 'destructive':
+      return 'chat.approvalCategoryDestructive'
+    case 'write':
+      return 'chat.approvalCategoryWrite'
+    default:
+      return 'chat.approvalCategoryRead'
+  }
+}
+
+const CATEGORY_STYLE: Record<ActionCategory, string> = {
+  read: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300',
+  write: 'border-amber-500/40 bg-amber-500/10 text-amber-300',
+  destructive: 'border-red-500/40 bg-red-500/10 text-red-300'
+}
+
 /** Lightweight token colouring for shell previews (no full syntax highlighter). */
 function CommandPreview({ text }: { text: string }): JSX.Element {
   return (
@@ -125,15 +169,6 @@ export default function ApprovalDialog(): JSX.Element | null {
     respondApproval(outcome)
   }
 
-  const kindLabel =
-    request.kind === 'read'
-      ? t('chat.approvalKindRead')
-      : request.kind === 'write'
-        ? t('chat.approvalKindWrite')
-        : request.kind === 'shell'
-          ? t('chat.approvalKindShell')
-          : request.tool
-
   return (
     <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
       <div
@@ -164,6 +199,19 @@ export default function ApprovalDialog(): JSX.Element | null {
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             {t('chat.approvalDangerous')}
           </p>
+        ) : request.kind === 'write' ? (
+          <p className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-[11px] text-amber-300">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            {t('chat.approvalWriteWarning')}
+          </p>
+        ) : null}
+
+        {request.reason ? (
+          <p className="mt-3 flex items-center gap-2 text-[11px] text-neutral-400">
+            <ShieldAlert className="h-3.5 w-3.5 shrink-0 text-neutral-500" />
+            {t('chat.approvalReason')}:{' '}
+            <span className="font-medium text-neutral-200">{t(reasonKey(request.reason))}</span>
+          </p>
         ) : null}
 
         {policyWarning ? (
@@ -174,22 +222,43 @@ export default function ApprovalDialog(): JSX.Element | null {
           />
         ) : null}
 
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-[10px] text-neutral-500">
-          <span className="flex items-center gap-1 rounded bg-bg-tertiary px-1.5 py-0.5 text-neutral-300">
-            {kindIcon(request.kind)}
-            {kindLabel}
-          </span>
-          {request.workingDirectory ? (
-            <span className="truncate" dir="ltr">
-              {t('chat.approvalWorkingDir')}: {request.workingDirectory}
-            </span>
-          ) : null}
+        <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[11px]">
+          <dt className="text-neutral-500">{t('chat.approvalTool')}</dt>
+          <dd className="truncate font-mono text-neutral-200" dir="ltr">
+            {request.tool}
+          </dd>
           {request.server ? (
-            <span className="truncate" dir="ltr">
-              {t('chat.approvalServer')}: {request.server}
-            </span>
+            <>
+              <dt className="text-neutral-500">{t('chat.approvalServer')}</dt>
+              <dd className="truncate text-neutral-300" dir="ltr">
+                {request.server}
+              </dd>
+            </>
           ) : null}
-        </div>
+          {request.workingDirectory ? (
+            <>
+              <dt className="text-neutral-500">{t('chat.approvalWorkingDir')}</dt>
+              <dd className="truncate text-neutral-300" dir="ltr">
+                {request.workingDirectory}
+              </dd>
+            </>
+          ) : null}
+          <dt className="text-neutral-500">{t('chat.approvalCategory')}</dt>
+          <dd>
+            <span
+              className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 ${
+                CATEGORY_STYLE[categoryOf(request.dangerous, request.kind)]
+              }`}
+            >
+              {kindIcon(request.kind)}
+              {t(categoryKey(categoryOf(request.dangerous, request.kind)))}
+            </span>
+          </dd>
+        </dl>
+
+        <p className="mt-3 text-[10px] uppercase tracking-wide text-neutral-600">
+          {t('chat.approvalCommand')}
+        </p>
 
         <pre
           dir="ltr"
@@ -249,10 +318,18 @@ export default function ApprovalDialog(): JSX.Element | null {
             <p className="text-[10px] text-neutral-600">{t('chat.approvalRememberScope')}</p>
           </div>
         ) : (
-          <p className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-[11px] text-amber-300">
-            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            {t('chat.approvalCannotRemember')}
-          </p>
+          <>
+            <p className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-[11px] text-amber-300">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              {t('chat.approvalCannotRemember')}
+            </p>
+            {request.dangerous || request.kind === 'write' || request.kind === 'shell' ? (
+              <p className="mt-2 flex items-start gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-2 text-[11px] text-red-300">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                {t('chat.approvalNoUndo')}
+              </p>
+            ) : null}
+          </>
         )}
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2">

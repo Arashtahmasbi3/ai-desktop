@@ -33,12 +33,14 @@ export default function PlanCard(): JSX.Element | null {
   const respondPlan = useStore((state) => state.respondPlan)
   const [editing, setEditing] = useState(false)
   const [drafts, setDrafts] = useState<PlanStep[]>([])
+  const [trust, setTrust] = useState(false)
 
   const id = pending?.id
   useEffect(() => {
     if (pending) {
       setDrafts(pending.plan.steps)
       setEditing(false)
+      setTrust(false)
     }
     // Reset drafts whenever a new plan arrives.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -55,8 +57,8 @@ export default function PlanCard(): JSX.Element | null {
   }
 
   const approve = (): void => {
-    if (editing) respondPlan({ type: 'modify', steps: drafts })
-    else respondPlan({ type: 'approve' })
+    if (editing) respondPlan({ type: 'modify', steps: drafts, trust })
+    else respondPlan({ type: 'approve', trust })
   }
 
   return (
@@ -130,30 +132,41 @@ export default function PlanCard(): JSX.Element | null {
           </ol>
         </div>
 
-        <footer className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
-          <button
-            type="button"
-            onClick={() => respondPlan({ type: 'cancel' })}
-            className="rounded-md px-3 py-1.5 text-xs text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200"
-          >
-            {t('plan.cancel')}
-          </button>
-          <button
-            type="button"
-            onClick={() => setEditing((value) => !value)}
-            className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs text-neutral-300 hover:bg-bg-tertiary"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-            {t('plan.modify')}
-          </button>
-          <button
-            type="button"
-            onClick={approve}
-            className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white hover:brightness-110"
-          >
-            <Play className="h-3.5 w-3.5" />
-            {editing ? t('plan.applyEdit') : t('plan.approve')}
-          </button>
+        <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-3">
+          <label className="flex cursor-pointer items-center gap-2 text-[11px] text-neutral-400">
+            <input
+              type="checkbox"
+              checked={trust}
+              onChange={(event) => setTrust(event.target.checked)}
+              className="accent-accent"
+            />
+            {t('plan.trust')}
+          </label>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => respondPlan({ type: 'cancel' })}
+              className="rounded-md px-3 py-1.5 text-xs text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200"
+            >
+              {t('plan.cancel')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditing((value) => !value)}
+              className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs text-neutral-300 hover:bg-bg-tertiary"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              {t('plan.modify')}
+            </button>
+            <button
+              type="button"
+              onClick={approve}
+              className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white hover:brightness-110"
+            >
+              <Play className="h-3.5 w-3.5" />
+              {editing ? t('plan.applyEdit') : t('plan.approve')}
+            </button>
+          </div>
         </footer>
       </div>
     </div>

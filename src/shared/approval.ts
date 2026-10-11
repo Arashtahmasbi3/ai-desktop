@@ -49,6 +49,19 @@ export function nextApprovalMode(mode: ApprovalMode): ApprovalMode {
 /** What may be remembered from an approval, widest last. */
 export type ApprovalRememberScope = 'action' | 'tool' | 'session'
 
+/**
+ * Why an action still needed explicit approval (v2.5.5). Shown in the dialog so
+ * the user understands the gate instead of guessing.
+ */
+export type ApprovalReason =
+  | 'whitelisted_command'
+  | 'read_only_shell'
+  | 'read_only_tool'
+  | 'not_whitelisted'
+  | 'write'
+  | 'dangerous'
+  | 'outside_plan'
+
 /** The user's answer to an approval prompt. */
 export interface ApprovalOutcome {
   approved: boolean

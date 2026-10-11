@@ -173,6 +173,7 @@ export interface Api {
     abort(): Promise<void>
     respondApproval(id: string, answer: boolean | ApprovalOutcome): Promise<boolean>
     respondPlan(id: string, decision: PlanDecision): Promise<boolean>
+    stopPlan(runId?: string): Promise<boolean>
     approvalHistory(): Promise<ApprovalHistoryEntry[]>
     approvedCommands(): Promise<ApprovedCommandView[]>
     revokeApprovedCommand(id: string): Promise<boolean>

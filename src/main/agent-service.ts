@@ -23,6 +23,8 @@ import { RemoteFsToolExecutor } from '@core/tools/remote-fs-executor'
 import { MIGRATE_PROJECT_TOOL, type MigrateProjectDeps } from '@core/tools/migrate-project-tool'
 import { MigrateProjectToolExecutor } from '@core/tools/migrate-project-executor'
 import { CompositeToolExecutor, type ToolRoute } from '@core/tools/composite-executor'
+import { DIAGNOSE_CRASH_TOOL } from '@core/tools/crash-diagnosis-tool'
+import { CrashDiagnosisToolExecutor } from '@core/tools/crash-diagnosis-tool'
 import { planV24Tools, enabledV24ToolNames } from './v24-tools-wiring'
 import { routeToolCall, remoteWorkspaceHint } from '@core/agent/remote-routing'
 import type { RoutingDecision } from '@core/agent/remote-routing'
@@ -33,9 +35,14 @@ import { buildWorkspaceSystemHint } from '@core/agent/workspace-prompt'
 import type { RemoteWorkspaceInfo } from '@shared/workspace-info'
 import { DEFAULT_APPROVAL_MODE } from '@core/agent/approval'
 import { resolveVpsForRun, requiresVps } from '@core/agent/vps-resolver'
-import type { Plan, PlanDecision, PlanWarning } from '@shared/plan'
-import { createApprovalGate } from './approval-gate'
-import type { ApprovalOutcome } from '@shared/approval'
+import type { ApprovedPlan, Plan, PlanDecision, PlanWarning } from '@shared/plan'
+import {
+  createApprovedPlan,
+  isPlanActive,
+  shouldAutoApprove
+} from '@core/agent/approved-plan'
+import { createApprovalGate, describeApprovalReason } from './approval-gate'
+import type { ApprovalOutcome, ApprovalReason } from '@shared/approval'
 import type { ApprovedCommands } from '@core/agent/approved-commands'
 import type { Persistence } from '@core/agent/persistence'
 import type { SessionStore } from '@core/agent/session-store'
@@ -218,6 +225,24 @@ export function planRemoteRuntime(
       'for reading, writing, listing, grepping and checking git status on that server.'
   }
 
+  // Structured crash diagnosis (v2.5.6): a fixed, read-only probe set the model
+  // calls instead of guessing commands.
+  const diagnosisExecutor = new CrashDiagnosisToolExecutor(
+    {
+      connectedServers: () => vps.connectedServers(),
+      exec: (serverId, command) => vps.exec(serverId, command),
+      ...(projectRoot ? { projectRoot } : {}),
+      ...(diagnostic ? { diagnostic } : {})
+    },
+    target
+  )
+  extraTools.push({ ...DIAGNOSE_CRASH_TOOL, description: `${DIAGNOSE_CRASH_TOOL.description} Target server: "${target}".` })
+  routes.push({ names: new Set([DIAGNOSE_CRASH_TOOL.name]), executor: diagnosisExecutor })
+  hint +=
+    ' You can also call "diagnose_crash" to run a fixed set of read-only probes ' +
+    '(process managers, logs, resources, network) and get a probable cause with ' +
+    'recommendations when the user asks why the project is crashing or failing.'
+
   // Cross-server project migration needs to resolve both saved servers' hosts.
   if (typeof vps.resolveServer === 'function') {
     const migrateDeps: MigrateProjectDeps = {
@@ -284,7 +309,11 @@ export interface AgentServiceOptions {
   /** Optional: detaches long remote commands as tracked jobs (v2.4, A.1). */
   jobs?: RemoteJobRunner
   /** Ask the user to approve a tool call (Approval Modes). Defaults to allow. */
-  requestApproval?: (runId: string, action: AgentAction) => Promise<ApprovalOutcome>
+  requestApproval?: (
+    runId: string,
+    action: AgentAction,
+    reason?: ApprovalReason
+  ) => Promise<ApprovalOutcome>
   /** Deny any outstanding approval requests (e.g. the user aborted). */
   cancelApprovals?: () => void
   /** Ask the user to approve a plan before mutating tool calls run (A.5). */
@@ -341,7 +370,11 @@ export class AgentService {
   private readonly customProviders?: CustomProviderStore
   private readonly vps?: RemoteHost
   private readonly jobs?: RemoteJobRunner
-  private readonly requestApproval?: (runId: string, action: AgentAction) => Promise<ApprovalOutcome>
+  private readonly requestApproval?: (
+    runId: string,
+    action: AgentAction,
+    reason?: ApprovalReason
+  ) => Promise<ApprovalOutcome>
   private readonly cancelApprovals?: () => void
   private readonly requestPlan?: (
     runId: string,
@@ -356,6 +389,8 @@ export class AgentService {
   private readonly resolveVpsName?: (id: string) => Promise<string | undefined>
   private readonly controllers = new Set<AbortController>()
   private readonly changes = new Map<string, FileChangeView>()
+  /** Trusted plans, keyed by run id (v2.5.5). Cleared when the run ends. */
+  private readonly planTrust = new Map<string, ApprovedPlan>()
   private runCounter = 0
   private changeCounter = 0
   /** 30s cache of detected remote workspaces, keyed `${serverId}:${path}` (A.1). */
@@ -625,7 +660,22 @@ export class AgentService {
     const approvalMode = settings.approvalMode ?? DEFAULT_APPROVAL_MODE
     const planMode = request.planMode ?? settings.planModeDefault ?? false
     const requestApproval = this.requestApproval
-    const approvalGate = requestApproval
+    const requestPlan = this.requestPlan
+    const now = (): number => this.now()
+
+    // v2.5.5: the plan the user chose to trust for this run, or null. Expiry is
+    // evaluated lazily and surfaces a plan:inactive event so the chat chip hides.
+    const activeTrust = (): ApprovedPlan | null => {
+      const plan = this.planTrust.get(runId) ?? null
+      if (plan && !isPlanActive(plan, now())) {
+        this.planTrust.delete(runId)
+        this.emit({ type: 'plan:inactive', at: now() })
+        return null
+      }
+      return plan
+    }
+
+    const baseGate = requestApproval
       ? createApprovalGate({
           mode: approvalMode,
           ...(this.approvedCommands ? { approvedCommands: this.approvedCommands } : {}),
@@ -634,15 +684,33 @@ export class AgentService {
           ...(activeProject
             ? { projectId: activeProject.id, vpsId: activeProject.vpsId ?? '' }
             : {}),
-          requestApproval: (action) => requestApproval(runId, action),
+          requestApproval: (action, reason) => requestApproval(runId, action, reason),
+          reasonFor: (action) =>
+            activeTrust() ? 'outside_plan' : describeApprovalReason(action),
           onSuggestion: (tool, count) => this.emit({ type: 'approval:suggestion', tool, count })
         })
       : undefined
 
-    const requestPlan = this.requestPlan
+    // A trusted plan auto-approves its own steps — never a deny-listed command.
+    const approvalGate = baseGate
+      ? async (action: AgentAction): Promise<boolean> => {
+          if (shouldAutoApprove(activeTrust(), action, now())) return true
+          return baseGate(action)
+        }
+      : undefined
+
     const planGate = requestPlan
-      ? (plan: Plan, warnings: PlanWarning[]): Promise<PlanDecision> =>
-          requestPlan(runId, plan, warnings)
+      ? async (plan: Plan, warnings: PlanWarning[]): Promise<PlanDecision> => {
+          const decision = await requestPlan(runId, plan, warnings)
+          const approved = createApprovedPlan(plan, runId, decision, now())
+          if (approved) {
+            this.planTrust.set(runId, approved)
+            this.emit({ type: 'plan:active', plan: approved, at: now() })
+          } else if (this.planTrust.delete(runId)) {
+            this.emit({ type: 'plan:inactive', at: now() })
+          }
+          return decision
+        }
       : undefined
 
     const preflightGate = await this.buildPreflightGate()
@@ -695,6 +763,7 @@ export class AgentService {
         ...(result.stop ? { stop: result.stop } : {}),
         provider: providers[0].provider,
         model: providers[0].config.model,
+        ...(result.usage ? { usage: result.usage } : {}),
         at: this.now()
       })
       this.runStore.markCompleted(runId)
@@ -707,7 +776,21 @@ export class AgentService {
     } finally {
       externalSignal?.removeEventListener('abort', onExternalAbort)
       this.controllers.delete(controller)
+      if (this.planTrust.delete(runId)) this.emit({ type: 'plan:inactive', at: this.now() })
     }
+  }
+
+  /** Drop the trusted plan for a run (or all runs) so approvals come back. */
+  stopPlan(runId?: string): boolean {
+    if (runId !== undefined) {
+      if (!this.planTrust.delete(runId)) return false
+      this.emit({ type: 'plan:inactive', at: this.now() })
+      return true
+    }
+    if (this.planTrust.size === 0) return false
+    this.planTrust.clear()
+    this.emit({ type: 'plan:inactive', at: this.now() })
+    return true
   }
 
   abort(): void {

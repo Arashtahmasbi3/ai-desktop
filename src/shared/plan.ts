@@ -22,9 +22,25 @@ export interface Plan {
   createdAt: number
 }
 
+/** How long an approved plan keeps auto-approving its steps (v2.5.5). */
+export const PLAN_TRUST_TTL_MS = 30 * 60 * 1000
+
+/**
+ * A plan the user chose to trust: its steps skip the detailed approval prompt
+ * until {@link ApprovedPlan.expiresAt}. Scoped to one run so a trusted plan can
+ * never leak into a later task.
+ */
+export interface ApprovedPlan {
+  id: string
+  runId: string
+  stepIds: string[]
+  approvedAt: number
+  expiresAt: number
+}
+
 export type PlanDecision =
-  | { type: 'approve' }
-  | { type: 'modify'; steps: PlanStep[] }
+  | { type: 'approve'; trust?: boolean }
+  | { type: 'modify'; steps: PlanStep[]; trust?: boolean }
   | { type: 'cancel' }
 
 /** Structural problems with a plan, shown before approval. */

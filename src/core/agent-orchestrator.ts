@@ -40,6 +40,7 @@ import {
 import { compressMessage, type CompressOptions } from './agent/context-compressor'
 import { ErrorRecovery, guidanceForToolError } from './agent/error-recovery'
 import { LoopDetector, type LoopCallDecision } from './agent/loop-detector'
+import { findAlternatives } from './agent/strategies'
 import { silentLogger } from './agent/logger'
 import { SESSION_SCHEMA_VERSION, type AgentSession, type SessionStore } from './agent/session-store'
 import { SANDBOX_TOOLS, SandboxToolExecutor, actionFromToolCall, stableStringify } from './agent/tools'
@@ -269,6 +270,10 @@ export interface SystemPromptOptions {
   diagnosticEnabled?: boolean
   /** Active project/VPS/environment shown to the model (v2.5.3). */
   remoteContext?: RemotePromptContext
+  /** The `diagnose_crash` tool is available, so teach the diagnosis workflow. */
+  crashDiagnosis?: boolean
+  /** Teach the multi-step task-planning and alternative-strategy workflow. */
+  taskPlanning?: boolean
 }
 
 /**
@@ -282,7 +287,9 @@ export interface SystemPromptOptions {
  */
 export function buildRemoteGuidance(
   diagnosticEnabled = false,
-  context?: RemotePromptContext
+  context?: RemotePromptContext,
+  crashDiagnosis = false,
+  taskPlanning = false
 ): string {
   const contextBlock = context
     ? [
@@ -332,7 +339,70 @@ The project root is confined (P0-2). A message like
 Do NOT assume where it lives. Run \`find\` (or \`list_dir\`) first, then act on the
 real path.
 
+${
+  crashDiagnosis
+    ? `## Crash diagnosis workflow
+When the user asks about a crash, an error or a service being down:
+1. FIRST call the \`diagnose_crash\` tool. It runs the standard read-only probes
+   (process managers, logs, resources, network) and collects the evidence for you.
+2. THEN report in two sections:
+   - **Evidence**: the key outputs from the probes.
+   - **Diagnosis**: the probable cause, a confidence level (HIGH/MEDIUM/LOW) and
+     concrete recommendations.
+3. NEVER guess without evidence, never claim the project is healthy without
+   checking, and do not invent complex shell one-liners yourself.
+4. If \`diagnose_crash\` is not enough, ask the user before reaching further:
+   "Should I check log file X?" or "Enable Diagnostic Mode so I can read the
+   system logs."
+
+Example report:
+\`\`\`
+== Evidence ==
+- PM2: app is errored (15 restarts)
+- Memory: 3.7/4 GB used (92%)
+- Disk: 45% used
+- No OOM events detected
+
+== Diagnosis ==
+Cause: pm2_process_error (confidence: HIGH)
+Summary: PM2 logs show repeated restarts
+Recommendations:
+- Check: pm2 logs <app> --err
+- Increase the memory limit in ecosystem.config.js
+- Review recent changes for a memory leak
+\`\`\``
+    : ''
+}
+
 ${contextBlock}
+
+${
+  taskPlanning
+    ? `## Task Planning (CRITICAL)
+For a task with MORE THAN ONE step:
+1. FIRST plan: state the goal and list 3-7 concrete steps (what + which tool +
+   expected outcome).
+2. Present the plan to the user for approval before executing it.
+3. Execute step by step. After each step check success; if it failed, try an
+   alternative (below); if there is no alternative, STOP and ask the user.
+
+## Alternative Strategies
+If a command fails, change approach — do NOT retry the same call:
+- "pm2: command not found" -> \`systemctl --failed\` or \`docker ps -a\`
+- "permission denied"        -> \`journalctl -n 50\` or \`dmesg | tail -50\`
+- "path blocked"             -> a whitelisted command (\`uname -a\`, \`free -h\`, \`df -h\`)
+- "no such file"             -> \`find\` / \`list_dir\` first
+- "timeout"                  -> inspect the process with \`ps\`
+
+NEVER retry the same command more than twice. After 2 failed attempts: STOP and
+either try a DIFFERENT approach or ASK THE USER.
+
+## Progress Tracking
+- Success: proceed to the next step.
+- Failure with an alternative: try the alternative.
+- Failure without an alternative: STOP and report to the user.`
+    : ''
+}
 
 ${
   diagnosticEnabled
@@ -377,7 +447,7 @@ If you are blocked, explain what you need from the user and make NO tool calls.
 - If an action failed, correct the arguments before retrying.
 - Prefer write_file to create files and run_command to execute them.
 - Reply in the same language the user wrote in (Persian or English).
-${options.remote ? `\n${buildRemoteGuidance(options.diagnosticEnabled, options.remoteContext)}\n` : ''}`
+${options.remote ? `\n${buildRemoteGuidance(options.diagnosticEnabled, options.remoteContext, options.crashDiagnosis, options.taskPlanning)}\n` : ''}`
 }
 
 function formatObservation(result: AgentToolResult): string {
@@ -537,7 +607,9 @@ export class AgentOrchestrator {
     // Plan Mode exposes no tools so the model can only describe what it would do.
     const tools = this.planMode ? [] : this.tools
     // Per-run state so sequential or concurrent `run()` calls never share loop state.
-    const loopDetector = new LoopDetector(this.loopPolicy)
+    const loopDetector = new LoopDetector(this.loopPolicy, {
+      findAlternative: (toolName, args, error) => findAlternatives(toolName, args, error)
+    })
     const observedSignatures = new Set<string>()
     // The last plan shown to the user, so a repeated plan can be flagged (A.5).
     let lastPlan: Plan | undefined
@@ -558,6 +630,8 @@ export class AgentOrchestrator {
         {
           remote: remoteWork,
           diagnosticEnabled: Boolean(this.diagnosticMode?.()),
+          crashDiagnosis: this.extraToolNames.has('diagnose_crash'),
+          taskPlanning: remoteWork,
           ...(this.remoteContext ? { remoteContext: this.remoteContext } : {})
         }
       ),
@@ -828,6 +902,35 @@ export class AgentOrchestrator {
             })
             continue
           }
+          if (!guard.allow && guard.action === 'redirect' && guard.alternative) {
+            // v2.5.7: instead of stopping, hand the model a concrete alternative
+            // (never execute the blocked/repeated call) and let it change tack.
+            const alternative = guard.alternative
+            const redirected: AgentToolResult = {
+              actionId: action.id,
+              name: action.name,
+              ok: false,
+              output: '',
+              error:
+                `${guard.reason ?? 'That call keeps failing.'} Try instead: ` +
+                `${alternative.toolName} ${JSON.stringify(alternative.args)} — ${alternative.reason}`,
+              code: 'redirect',
+              attempts: 0,
+              durationMs: 0
+            }
+            this.log('warn', 'loop.redirect', runId, {
+              step: index,
+              tool: action.name,
+              alternative: alternative.toolName
+            })
+            observations.push(redirected)
+            context.appendToolResult({
+              toolCallId: action.id,
+              name: action.name,
+              content: formatObservation(redirected)
+            })
+            continue
+          }
           if (!guard.allow) {
             guardStop = guard
             this.log('warn', 'loop.stop', runId, {
@@ -886,7 +989,11 @@ export class AgentOrchestrator {
           const result = await this.guardedExecute(executor, action, runId, index, options)
           loopDetector.afterToolCall(
             action.name,
-            { ok: result.ok, blocked: result.blocked === true || result.code === 'blocked' },
+            {
+              ok: result.ok,
+              blocked: result.blocked === true || result.code === 'blocked',
+              ...(result.error ? { error: result.error } : {})
+            },
             action.arguments
           )
           if (result.ok && progressTools.has(action.name)) loopDetector.markProgress()
@@ -970,7 +1077,8 @@ export class AgentOrchestrator {
           productive,
           failures,
           newAction,
-          ...(reasoningSignature ? { reasoningSignature } : {})
+          ...(reasoningSignature ? { reasoningSignature } : {}),
+          ...(observations.some((result) => result.code === 'redirect') ? { redirected: true } : {})
         })
         if (loop.warnings.length > 0) {
           warnings.push(...loop.warnings)

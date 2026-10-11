@@ -245,6 +245,7 @@ export function registerIpc(
     ['agent:abort', () => services.agent.abort()],
     ['agent:respondApproval', (id: string, answer: boolean | ApprovalOutcome) => services.approvals.resolve(id, answer)],
     ['agent:respondPlan', (id: string, decision: PlanDecision) => services.plans.resolve(id, decision)],
+    ['agent:stopPlan', (runId?: string) => services.agent.stopPlan(runId)],
     ['agent:approvalHistory', () => services.approvals.history()],
     ['agent:approvedCommands', () => services.approvedCommands.list()],
     ['agent:revokeApprovedCommand', (id: string) => services.approvedCommands.revoke(id)],

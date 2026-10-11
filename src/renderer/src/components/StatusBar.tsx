@@ -27,6 +27,7 @@ export default function StatusBar(): JSX.Element {
   const online = worker?.online ?? true
   const vps = vpsIndicator(vpsServerId, vpsStatus)
   const vpsName = vpsServerName(vpsServers, vpsServerId) ?? vpsServerId
+  const agentAddress = remote?.enabled ? `${remote.host}:${remote.port}` : null
 
   return (
     <footer className="flex h-7 shrink-0 items-center justify-between border-t border-border bg-bg-secondary px-3 text-[11px] text-neutral-400">
@@ -34,6 +35,17 @@ export default function StatusBar(): JSX.Element {
         <span className="flex items-center gap-1">
           <Dot ok={ready} />
           {ready ? 'Ready' : t('common.loading')}
+        </span>
+        <span
+          className={`flex items-center gap-1 ${online ? 'text-neutral-400' : 'text-red-400'}`}
+          title={
+            online
+              ? `Agent running · worker ${worker?.state ?? 'online'}${agentAddress ? ` · ${agentAddress}` : ''}`
+              : 'Agent not running — the background worker is offline'
+          }
+        >
+          <Dot ok={online} />
+          Agent: {online ? 'running' : 'not running'}
         </span>
         <span className="flex items-center gap-1" title="Background worker">
           <Cpu className="h-3 w-3" />
