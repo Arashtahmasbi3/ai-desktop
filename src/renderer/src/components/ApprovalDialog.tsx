@@ -66,6 +66,32 @@ function reasonKey(reason: string): string {
   }
 }
 
+type ActionCategory = 'read' | 'write' | 'destructive'
+
+/** Risk category shown as a badge (v2.5.5, Task 2.3). */
+function categoryOf(dangerous: boolean | undefined, kind: string | undefined): ActionCategory {
+  if (dangerous) return 'destructive'
+  if (kind === 'write' || kind === 'shell') return 'write'
+  return 'read'
+}
+
+function categoryKey(category: ActionCategory): string {
+  switch (category) {
+    case 'destructive':
+      return 'chat.approvalCategoryDestructive'
+    case 'write':
+      return 'chat.approvalCategoryWrite'
+    default:
+      return 'chat.approvalCategoryRead'
+  }
+}
+
+const CATEGORY_STYLE: Record<ActionCategory, string> = {
+  read: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300',
+  write: 'border-amber-500/40 bg-amber-500/10 text-amber-300',
+  destructive: 'border-red-500/40 bg-red-500/10 text-red-300'
+}
+
 /** Lightweight token colouring for shell previews (no full syntax highlighter). */
 function CommandPreview({ text }: { text: string }): JSX.Element {
   return (
@@ -143,15 +169,6 @@ export default function ApprovalDialog(): JSX.Element | null {
     respondApproval(outcome)
   }
 
-  const kindLabel =
-    request.kind === 'read'
-      ? t('chat.approvalKindRead')
-      : request.kind === 'write'
-        ? t('chat.approvalKindWrite')
-        : request.kind === 'shell'
-          ? t('chat.approvalKindShell')
-          : request.tool
-
   return (
     <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
       <div
@@ -190,9 +207,10 @@ export default function ApprovalDialog(): JSX.Element | null {
         ) : null}
 
         {request.reason ? (
-          <p className="mt-2 text-[11px] text-neutral-500">
+          <p className="mt-3 flex items-center gap-2 text-[11px] text-neutral-400">
+            <ShieldAlert className="h-3.5 w-3.5 shrink-0 text-neutral-500" />
             {t('chat.approvalReason')}:{' '}
-            <span className="text-neutral-300">{t(reasonKey(request.reason))}</span>
+            <span className="font-medium text-neutral-200">{t(reasonKey(request.reason))}</span>
           </p>
         ) : null}
 
@@ -204,22 +222,43 @@ export default function ApprovalDialog(): JSX.Element | null {
           />
         ) : null}
 
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-[10px] text-neutral-500">
-          <span className="flex items-center gap-1 rounded bg-bg-tertiary px-1.5 py-0.5 text-neutral-300">
-            {kindIcon(request.kind)}
-            {kindLabel}
-          </span>
-          {request.workingDirectory ? (
-            <span className="truncate" dir="ltr">
-              {t('chat.approvalWorkingDir')}: {request.workingDirectory}
-            </span>
-          ) : null}
+        <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[11px]">
+          <dt className="text-neutral-500">{t('chat.approvalTool')}</dt>
+          <dd className="truncate font-mono text-neutral-200" dir="ltr">
+            {request.tool}
+          </dd>
           {request.server ? (
-            <span className="truncate" dir="ltr">
-              {t('chat.approvalServer')}: {request.server}
-            </span>
+            <>
+              <dt className="text-neutral-500">{t('chat.approvalServer')}</dt>
+              <dd className="truncate text-neutral-300" dir="ltr">
+                {request.server}
+              </dd>
+            </>
           ) : null}
-        </div>
+          {request.workingDirectory ? (
+            <>
+              <dt className="text-neutral-500">{t('chat.approvalWorkingDir')}</dt>
+              <dd className="truncate text-neutral-300" dir="ltr">
+                {request.workingDirectory}
+              </dd>
+            </>
+          ) : null}
+          <dt className="text-neutral-500">{t('chat.approvalCategory')}</dt>
+          <dd>
+            <span
+              className={`inline-flex items-center gap-1 rounded border px-1.5 py-0.5 ${
+                CATEGORY_STYLE[categoryOf(request.dangerous, request.kind)]
+              }`}
+            >
+              {kindIcon(request.kind)}
+              {t(categoryKey(categoryOf(request.dangerous, request.kind)))}
+            </span>
+          </dd>
+        </dl>
+
+        <p className="mt-3 text-[10px] uppercase tracking-wide text-neutral-600">
+          {t('chat.approvalCommand')}
+        </p>
 
         <pre
           dir="ltr"
