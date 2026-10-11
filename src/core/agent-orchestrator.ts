@@ -48,6 +48,7 @@ import { PLAN_MODE_HINT } from './agent/approval'
 import {
   PLAN_SYSTEM_PROMPT,
   applyModifications,
+  describePlanDecision,
   planFromActions,
   shouldPlan,
   validatePlan,
@@ -803,6 +804,10 @@ export class AgentOrchestrator {
         ])
         let guardStop: LoopCallDecision | null = null
         let planCancelled = false
+        // Fix 4: durable system notes for this step, flushed after the tool
+        // results so an approval/plan note never splits an assistant/tool pair.
+        const stepNotes: string[] = []
+        const approvalDecisions: Array<{ tool: string; approved: boolean }> = []
 
         // ---- Plan Mode gate (v2.3.2, A.5) ----
         if (
@@ -827,8 +832,10 @@ export class AgentOrchestrator {
           if (decision.type === 'modify') {
             actions = applyModifications(actions, decision.steps)
             this.log('debug', 'plan.modified', runId, { step: index })
+            stepNotes.push(describePlanDecision('modified', actions, decision.trust === true))
           } else if (decision.type === 'cancel') {
             planCancelled = true
+            stepNotes.push('The user cancelled the plan. Do not execute its steps.')
             this.log('warn', 'plan.cancelled', runId, { step: index })
             for (const action of actions) {
               const blocked: AgentToolResult = {
@@ -849,6 +856,7 @@ export class AgentOrchestrator {
               })
             }
           } else {
+            stepNotes.push(describePlanDecision('approved', actions, decision.trust === true))
             this.log('debug', 'plan.approved', runId, { step: index })
           }
         }
@@ -993,7 +1001,9 @@ export class AgentOrchestrator {
           }
 
           const before = await this.snapshotBefore(action, sandboxId)
-          const result = await this.guardedExecute(executor, action, runId, index, options)
+          const result = await this.guardedExecute(executor, action, runId, index, options, (tool, approved) =>
+            approvalDecisions.push({ tool, approved })
+          )
           loopDetector.afterToolCall(
             action.name,
             {
@@ -1026,6 +1036,20 @@ export class AgentOrchestrator {
             content: formatObservation(result)
           })
         }
+
+        // Fix 4: persist the step's plan/approval decisions as pinned system
+        // messages, now that every assistant/tool pair is complete.
+        if (approvalDecisions.length > 0) {
+          const approved = approvalDecisions.filter((d) => d.approved).map((d) => d.tool)
+          const denied = approvalDecisions.filter((d) => !d.approved).map((d) => d.tool)
+          const parts: string[] = []
+          if (approved.length > 0) parts.push(`approved: ${[...new Set(approved)].join(', ')}`)
+          if (denied.length > 0) {
+            parts.push(`denied (do not retry without asking again): ${[...new Set(denied)].join(', ')}`)
+          }
+          stepNotes.push(`Tool approval decisions — ${parts.join('; ')}.`)
+        }
+        for (const note of stepNotes) context.appendHint(note)
 
         if (planCancelled) {
           status = 'needs_input'
@@ -1414,7 +1438,8 @@ export class AgentOrchestrator {
     action: AgentAction,
     runId: string,
     step: number,
-    options: AgentRunOptions
+    options: AgentRunOptions,
+    onDecision?: (tool: string, approved: boolean) => void
   ): Promise<AgentToolResult> {
     if (this.approvalGate) {
       let allowed = false
@@ -1423,6 +1448,7 @@ export class AgentOrchestrator {
       } catch {
         allowed = false
       }
+      onDecision?.(action.name, allowed)
       if (!allowed) {
         this.log('warn', 'action.denied', runId, { step, tool: action.name })
         return {
