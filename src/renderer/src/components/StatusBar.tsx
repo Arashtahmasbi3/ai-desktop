@@ -2,7 +2,7 @@ import { Cpu, Globe, HardDrive, Languages, Server, ShieldCheck, Zap, Wifi, WifiO
 import { useTranslation } from 'react-i18next'
 import { nextApprovalMode } from '@shared/approval'
 import { useStore } from '../store'
-import { vpsIndicator, vpsServerName } from '../lib/vps-state'
+import { CONNECTION_TONE_CLASS, useConnectionStatus } from '../lib/connection-status'
 
 function Dot({ ok }: { ok: boolean }): JSX.Element {
   return <span className={`h-1.5 w-1.5 rounded-full ${ok ? 'bg-emerald-500' : 'bg-neutral-600'}`} />
@@ -20,13 +20,9 @@ export default function StatusBar(): JSX.Element {
   const locale = useStore((state) => state.locale)
   const setLocale = useStore((state) => state.setLocale)
   const approvalMode = useStore((state) => state.settings?.approvalMode ?? 'ask')
-  const vpsServerId = useStore((state) => state.vpsServerId)
-  const vpsStatus = useStore((state) => state.vpsStatus)
-  const vpsServers = useStore((state) => state.vpsServers)
+  const connection = useConnectionStatus()
 
   const online = worker?.online ?? true
-  const vps = vpsIndicator(vpsServerId, vpsStatus)
-  const vpsName = vpsServerName(vpsServers, vpsServerId) ?? vpsServerId
   const agentAddress = remote?.enabled ? `${remote.host}:${remote.port}` : null
 
   return (
@@ -80,21 +76,25 @@ export default function StatusBar(): JSX.Element {
           {approvalMode}
         </button>
         <span className="text-neutral-600">session {sessionId.slice(0, 8)}</span>
-        {vps !== 'off' ? (
-          <span
-            className={`flex items-center gap-1 ${
-              vps === 'connected'
-                ? 'text-emerald-400'
-                : vps === 'connecting'
-                  ? 'text-amber-400'
-                  : 'text-red-400'
-            }`}
-            title={`VPS: ${vpsName ?? ''} (${vps})`}
-          >
+        <span
+          data-connection={connection.kind}
+          className={`flex items-center gap-1 ${CONNECTION_TONE_CLASS[connection.tone]}`}
+          title={`${t('connection.title')}: ${t(connection.labelKey)}${
+            connection.detail ? ` · ${connection.detail}` : ''
+          }`}
+        >
+          {connection.kind === 'local' ? (
+            <HardDrive className="h-3 w-3" />
+          ) : connection.kind === 'connected' ? (
+            <Wifi className="h-3 w-3" />
+          ) : (
             <Server className="h-3 w-3" />
-            vps: {vpsName ?? ''} · {vps}
-          </span>
-        ) : null}
+          )}
+          <span>{t(connection.labelKey)}</span>
+          {connection.detail ? (
+            <span className="max-w-[12rem] truncate text-neutral-500">· {connection.detail}</span>
+          ) : null}
+        </span>
       </div>
 
       <div className="flex items-center gap-2">

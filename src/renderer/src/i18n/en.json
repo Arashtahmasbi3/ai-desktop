@@ -531,5 +531,16 @@
     "included": "Included",
     "withheld": "Withheld",
     "excluded": "Excluded"
+  },
+  "connection": {
+    "title": "Connection",
+    "initializing": "Starting…",
+    "local": "Local workspace",
+    "connected": "Connected",
+    "connecting": "Connecting…",
+    "error": "Connection failed",
+    "disconnected": "Disconnected",
+    "workerOffline": "Agent offline",
+    "missing": "Workspace missing"
   }
 }

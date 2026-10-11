@@ -3,6 +3,7 @@ import { FolderTree, GitBranch } from 'lucide-react'
 import type { RemoteWorkspaceInfo } from '@shared/workspace-info'
 import { formatWorkspaceBadge, formatWorkspaceTooltip } from '@shared/workspace-info'
 import { useStore } from '../store'
+import { useConnectionStatus } from '../lib/connection-status'
 
 /**
  * v2.3.3 (A.1): git badge for the chat header. Shows the branch (with a dirty
@@ -10,18 +11,13 @@ import { useStore } from '../store'
  */
 export default function WorkspaceBadge(): JSX.Element | null {
   const settings = useStore((state) => state.settings)
-  const vpsStatus = useStore((state) => state.vpsStatus)
+  const connection = useConnectionStatus()
   const [info, setInfo] = useState<RemoteWorkspaceInfo | undefined>(undefined)
 
   const activeProject = settings?.projects.find(
     (project) => project.id === settings.activeProjectId
   )
-  const connected = Boolean(
-    activeProject?.type === 'remote' &&
-      activeProject.vpsId &&
-      vpsStatus.status === 'connected' &&
-      vpsStatus.serverId === activeProject.vpsId
-  )
+  const connected = Boolean(activeProject?.type === 'remote' && connection.kind === 'connected')
   const serverId = activeProject?.vpsId
   const path = activeProject?.path
 

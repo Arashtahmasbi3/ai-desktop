@@ -531,5 +531,16 @@
     "included": "شامل",
     "withheld": "کنترل‌شده",
     "excluded": "حذف‌شده"
+  },
+  "connection": {
+    "title": "اتصال",
+    "initializing": "در حال راه‌اندازی…",
+    "local": "کارگاه محلی",
+    "connected": "متصل",
+    "connecting": "در حال اتصال…",
+    "error": "اتصال ناموفق",
+    "disconnected": "قطع‌شده",
+    "workerOffline": "عامل آفلاین",
+    "missing": "کارگاه یافت نشد"
   }
 }
