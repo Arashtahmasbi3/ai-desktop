@@ -61,11 +61,21 @@ export function getCommandTimeout(command: string): number {
 
 export interface RemoteShellResult {
   ok: boolean
+  /** Model-facing text; unchanged from earlier versions. */
   content: string
   blocked?: boolean
   timedOut?: boolean
   /** Set when the command was detached as a long-running job (v2.4, A.1). */
   jobId?: string
+  /**
+   * v2.5.2: raw streams kept separate from `content` so the UI can show them
+   * side by side. `content` still concatenates them for the model.
+   */
+  command?: string
+  serverId?: string
+  stdout?: string
+  stderr?: string
+  exitCode?: number
 }
 
 /** Rejects its promise after `ms`, carrying the timeout marker. */
@@ -90,27 +100,31 @@ export async function executeRemoteShell(
   const serverId = String(args.server_id ?? '').trim()
   const command = String(args.command ?? '').trim()
   const connected = deps.connectedServers()
+  // Carried on every reply so the chat can name the command and host even when
+  // the action never reached the host (unknown server, blocked, timeout).
+  const target = { command, ...(serverId ? { serverId } : {}) }
 
   if (!serverId) {
     return {
       ok: false,
-      content: `server_id is required. Connected: ${connected.join(', ') || 'none'}`
+      content: `server_id is required. Connected: ${connected.join(', ') || 'none'}`,
+      ...target
     }
   }
   if (!connected.includes(serverId)) {
-    return { ok: false, content: `Server ${serverId} is not connected.` }
+    return { ok: false, content: `Server ${serverId} is not connected.`, ...target }
   }
   // Containment first: refuse any absolute path in the command that leaves the
   // project root, then apply the deny list (v2.5, P0-2).
   if (deps.projectRoot) {
     const guard = enforceCommandPaths(command, deps.projectRoot)
     if (!guard.ok) {
-      return { ok: false, blocked: true, content: `Blocked: ${guard.error}` }
+      return { ok: false, blocked: true, content: `Blocked: ${guard.error}`, ...target }
     }
   }
   const denial = checkDenyList(command)
   if (denial.blocked) {
-    return { ok: false, blocked: true, content: `Blocked by policy: ${denial.reason}` }
+    return { ok: false, blocked: true, content: `Blocked by policy: ${denial.reason}`, ...target }
   }
   // Long commands are detached so closing the app no longer kills the work.
   if (deps.jobs?.shouldRunAsJob(command)) {
@@ -119,11 +133,12 @@ export async function executeRemoteShell(
       return {
         ok: true,
         jobId: job.id,
-        content: `Started background job #${job.id} (${job.strategy}) for: ${command}\nThe job keeps running on the host. Poll it or view its log.`
+        content: `Started background job #${job.id} (${job.strategy}) for: ${command}\nThe job keeps running on the host. Poll it or view its log.`,
+        ...target
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      return { ok: false, content: `Failed to start background job: ${message}` }
+      return { ok: false, content: `Failed to start background job: ${message}`, ...target }
     }
   }
   const timeoutMs = getCommandTimeout(command)
@@ -135,28 +150,50 @@ export async function executeRemoteShell(
       return {
         ok: false,
         timedOut: true,
-        content: `Command timed out after ${error.ms}ms: ${command}`
+        content: `Command timed out after ${error.ms}ms: ${command}`,
+        ...target
       }
     }
     const message = error instanceof Error ? error.message : String(error)
-    return { ok: false, content: `remote_shell failed: ${message}` }
+    return { ok: false, content: `remote_shell failed: ${message}`, ...target }
+  }
+  // A real command ran, so its streams/exit code are always carried — even when
+  // policy stopped it, so the user can see exactly what the host did.
+  const streams = {
+    stdout: result.stdout,
+    stderr: result.stderr,
+    exitCode: result.exitCode
   }
   if (result.timedOut) {
-    return { ok: false, timedOut: true, content: `Command timed out after ${timeoutMs}ms: ${command}` }
+    return {
+      ok: false,
+      timedOut: true,
+      content: `Command timed out after ${timeoutMs}ms: ${command}`,
+      ...target,
+      ...streams
+    }
   }
   if (result.blocked) {
-    return { ok: false, blocked: true, content: `Blocked by policy: ${result.reason}` }
+    return {
+      ok: false,
+      blocked: true,
+      content: `Blocked by policy: ${result.reason}`,
+      ...target,
+      ...streams
+    }
   }
   if (result.requiresApproval) {
     return {
       ok: false,
       blocked: true,
-      content: `Approval required by host policy: ${result.reason}`
+      content: `Approval required by host policy: ${result.reason}`,
+      ...target,
+      ...streams
     }
   }
   if (result.rateLimited) {
-    return { ok: false, content: `Rate limited: ${result.reason}` }
+    return { ok: false, content: `Rate limited: ${result.reason}`, ...target, ...streams }
   }
   const output = `${result.stdout}${result.stderr}`.trim()
-  return { ok: result.ok, content: output || `exit ${result.exitCode}` }
+  return { ok: result.ok, content: output || `exit ${result.exitCode}`, ...target, ...streams }
 }

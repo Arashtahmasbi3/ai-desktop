@@ -31,6 +31,8 @@ import type {
   SessionInfo,
   SettingsView,
   PlanRequest,
+  ToolCallView,
+  ToolResultView,
   WorkerJobRequest,
   WorkerStatus
 } from '@shared/ui'
@@ -62,8 +64,31 @@ export interface ChatMessage {
   model?: string
   /** True when this assistant turn used the remote_shell tool. */
   usedRemote?: boolean
-  /** v2.4.1: which tool ran and whether it succeeded (role === 'tool'). */
-  toolCall?: { name: string; ok: boolean; detail?: string }
+  /**
+   * v2.4.1/v2.5.2: which tool ran and whether it succeeded (role === 'tool'),
+   * with the structured detail (command, target, streams, exit code) when known.
+   */
+  toolCall?: ToolCallView
+}
+
+/** Project a `tool:result` event into the compact shape stored on a message. */
+function toolCallFromView(view: ToolResultView): ToolCallView {
+  return {
+    name: view.name,
+    ok: view.ok,
+    ...(view.code ? { code: view.code } : {}),
+    ...(view.error !== undefined ? { error: view.error, detail: view.error } : {}),
+    ...(view.command !== undefined ? { command: view.command } : {}),
+    ...(view.serverId !== undefined ? { serverId: view.serverId } : {}),
+    ...(view.cwd !== undefined ? { cwd: view.cwd } : {}),
+    ...(view.path !== undefined ? { path: view.path } : {}),
+    ...(view.stdout !== undefined ? { stdout: view.stdout } : {}),
+    ...(view.stderr !== undefined ? { stderr: view.stderr } : {}),
+    ...(view.exitCode !== undefined ? { exitCode: view.exitCode } : {}),
+    ...(view.durationMs !== undefined ? { durationMs: view.durationMs } : {}),
+    ...(view.attempts !== undefined ? { attempts: view.attempts } : {}),
+    ...(view.recovery ? { recovery: view.recovery } : {})
+  }
 }
 
 const MAX_LOGS = 500
@@ -728,24 +753,23 @@ export const useStore = create<AppState>((set, get) => ({
         const logs = [...get().logs, event.entry]
         if (logs.length > MAX_LOGS) logs.splice(0, logs.length - MAX_LOGS)
         set({ logs })
-        const entry = event.entry
-        if (entry.event === 'action.ok' || entry.event === 'action.error') {
-          const tool = String(entry.tool ?? 'tool')
-          const code = entry.code !== undefined ? ` (${String(entry.code)})` : ''
-          const detail = typeof entry.message === 'string' ? entry.message : undefined
-          set({
-            messages: [
-              ...get().messages,
-              {
-                id: newId(),
-                role: 'tool',
-                content: `${tool}${code}`,
-                at: Date.now(),
-                toolCall: { name: tool, ok: entry.event === 'action.ok', ...(detail ? { detail } : {}) }
-              }
-            ]
-          })
-        }
+        break
+      }
+      case 'tool:result': {
+        const toolCall = toolCallFromView(event.result)
+        const code = event.result.code !== undefined ? ` (${String(event.result.code)})` : ''
+        set({
+          messages: [
+            ...get().messages,
+            {
+              id: newId(),
+              role: 'tool',
+              content: `${toolCall.name}${code}`,
+              at: event.at,
+              toolCall
+            }
+          ]
+        })
         break
       }
       case 'run:end': {

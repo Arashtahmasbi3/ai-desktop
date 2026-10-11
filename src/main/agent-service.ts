@@ -619,7 +619,11 @@ export class AgentService {
       ...(preflightGate ? { preflightGate } : {}),
       ...(this.files
         ? { onFileWritten: (change: FileChange) => this.captureChange(runId, request.sessionId, change) }
-        : {})
+        : {}),
+      // v2.5.2: stream redacted/capped tool detail to the renderer so the chat can
+      // show commands, targets, streams and exit codes.
+      onToolResult: (result) =>
+        this.emit({ type: 'tool:result', runId, result, at: this.now() })
     })
 
     const controller = new AbortController()

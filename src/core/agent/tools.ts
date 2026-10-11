@@ -198,7 +198,8 @@ export class SandboxToolExecutor implements ToolExecutor {
       ok: true,
       output: `Wrote ${content.length} characters to ${path}`,
       attempts: 1,
-      durationMs: Date.now() - startedAt
+      durationMs: Date.now() - startedAt,
+      path
     }
   }
 
@@ -214,7 +215,8 @@ export class SandboxToolExecutor implements ToolExecutor {
       ok: true,
       output: content,
       attempts: 1,
-      durationMs: Date.now() - startedAt
+      durationMs: Date.now() - startedAt,
+      path
     }
   }
 
@@ -238,7 +240,7 @@ export class SandboxToolExecutor implements ToolExecutor {
       cwd,
       timeoutMs: this.defaultTimeoutMs
     })
-    return this.fromExecResult(action, result, startedAt)
+    return { ...this.fromExecResult(action, result, startedAt), command, cwd, path }
   }
 
   private async runCommand(
@@ -258,7 +260,11 @@ export class SandboxToolExecutor implements ToolExecutor {
       ...(cwd ? { cwd } : {}),
       timeoutMs
     })
-    return this.fromExecResult(action, result, startedAt)
+    return {
+      ...this.fromExecResult(action, result, startedAt),
+      command,
+      ...(cwd ? { cwd } : {})
+    }
   }
 
   private fromExecResult(
@@ -273,6 +279,13 @@ export class SandboxToolExecutor implements ToolExecutor {
     startedAt: number
   ): AgentToolResult {
     const output = [result.stdout, result.stderr].filter((part) => part.length > 0).join('\n')
+    // v2.5.2: keep stdout, stderr and the exit code separate for the UI. `output`
+    // stays the combined model-facing text.
+    const streams = {
+      stdout: result.stdout,
+      stderr: result.stderr,
+      exitCode: result.exitCode
+    }
 
     if (result.timedOut) {
       return {
@@ -283,7 +296,8 @@ export class SandboxToolExecutor implements ToolExecutor {
         error: `Command timed out after ${result.durationMs}ms`,
         code: 'timeout',
         attempts: 1,
-        durationMs: Date.now() - startedAt
+        durationMs: Date.now() - startedAt,
+        ...streams
       }
     }
     if (result.exitCode !== 0) {
@@ -295,7 +309,8 @@ export class SandboxToolExecutor implements ToolExecutor {
         error: result.stderr.trim() || `Command exited with code ${result.exitCode}`,
         code: 'exit_nonzero',
         attempts: 1,
-        durationMs: Date.now() - startedAt
+        durationMs: Date.now() - startedAt,
+        ...streams
       }
     }
     return {
@@ -304,7 +319,8 @@ export class SandboxToolExecutor implements ToolExecutor {
       ok: true,
       output,
       attempts: 1,
-      durationMs: Date.now() - startedAt
+      durationMs: Date.now() - startedAt,
+      ...streams
     }
   }
 }
