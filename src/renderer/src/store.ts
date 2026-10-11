@@ -10,6 +10,7 @@ import type {
 import { DEFAULT_SELECTION, resolveSelection } from '@shared/selection'
 import type { ApprovalMode, ApprovalOutcome } from '@shared/approval'
 import type { ApprovedPlan, PlanDecision } from '@shared/plan'
+import type { TaskPlan } from '@shared/task-plan'
 import type { ProjectMetadataPatch } from '@shared/project-metadata'
 import type { OnboardingStatus } from '@shared/onboarding'
 import type { VpsConnectionState, VpsServerView } from '@shared/vps'
@@ -233,6 +234,15 @@ interface AppState {
   pendingPlan: PlanRequest | null
   /** A plan the user trusted for 30 minutes; its steps skip approval (v2.5.5). */
   activePlan: ApprovedPlan | null
+  /**
+   * The plan the agent is currently executing (v2.5.7). Named `taskPlan` (not
+   * `activePlan`) because `activePlan` already holds the 30-minute approved plan.
+   */
+  taskPlan: TaskPlan | null
+  /** Every plan seen this session, keyed by id (v2.5.7). */
+  taskPlans: Record<string, TaskPlan>
+  /** Whether the user paused the running task plan (v2.5.7). */
+  taskPaused: boolean
   /** A tool approved 3+ times; the UI suggests remembering it (v2.3, B.3). */
   approvalSuggestion: { tool: string; count: number } | null
   /** A "Deny & Explain" prompt to send once the current run settles. */
@@ -316,6 +326,14 @@ interface AppState {
   testCustomProvider: (input: CustomProviderInput) => Promise<CustomProviderTestResult>
   completeOnboarding: () => Promise<void>
   applyEvent: (event: AgentEvent) => void
+  /** Replace (or clear) the tracked task plan (v2.5.7). */
+  setTaskPlan: (plan: TaskPlan | null) => void
+  /** Pause the running task plan (UI control). */
+  pauseTaskPlan: () => void
+  /** Resume a paused task plan. */
+  resumeTaskPlan: () => void
+  /** Stop the running task plan and mark it failed. */
+  stopTaskPlan: () => void
   send: (text: string) => Promise<void>
   abort: () => void
   newSession: () => void
@@ -406,6 +424,9 @@ export const useStore = create<AppState>((set, get) => ({
   pendingApproval: null,
   pendingPlan: null,
   activePlan: null,
+  taskPlan: null,
+  taskPlans: {},
+  taskPaused: false,
   approvalSuggestion: null,
   queuedExplain: null,
   fileChanges: [],
@@ -785,6 +806,8 @@ export const useStore = create<AppState>((set, get) => ({
           pendingApproval: null,
           pendingPlan: null,
           activePlan: null,
+          taskPlan: null,
+          taskPaused: false,
           loopStop: null
         })
         break
@@ -802,6 +825,18 @@ export const useStore = create<AppState>((set, get) => ({
         break
       case 'plan:inactive':
         set({ activePlan: null })
+        break
+      case 'task:plan':
+      case 'task:step':
+      case 'task:complete':
+      case 'task:failed':
+        set({
+          taskPlan: event.plan,
+          taskPlans: { ...get().taskPlans, [event.plan.id]: event.plan },
+          ...(event.type === 'task:complete' || event.type === 'task:failed'
+            ? { taskPaused: false }
+            : {})
+        })
         break
       case 'approval:suggestion':
         set({ approvalSuggestion: { tool: event.tool, count: event.count } })
@@ -900,6 +935,32 @@ export const useStore = create<AppState>((set, get) => ({
         get().pushToast('error', event.message)
         break
     }
+  },
+
+  setTaskPlan(plan) {
+    set({
+      taskPlan: plan,
+      ...(plan ? { taskPlans: { ...get().taskPlans, [plan.id]: plan } } : {})
+    })
+  },
+  pauseTaskPlan() {
+    set({ taskPaused: true })
+  },
+  resumeTaskPlan() {
+    set({ taskPaused: false })
+  },
+  stopTaskPlan() {
+    const plan = get().taskPlan
+    if (!plan) {
+      set({ taskPaused: false })
+      return
+    }
+    const stopped: TaskPlan = { ...plan, status: 'failed' }
+    set({
+      taskPlan: stopped,
+      taskPlans: { ...get().taskPlans, [stopped.id]: stopped },
+      taskPaused: false
+    })
   },
 
   async send(text) {

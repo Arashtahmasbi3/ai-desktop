@@ -11,6 +11,7 @@ import type { VpsConnectionState } from './vps'
 import type { ApprovalMode, ApprovalReason } from './approval'
 import type { Plan, ApprovedPlan, PlanDecision, PlanWarning } from './plan'
 import type { ProjectMetadata } from './project-metadata'
+import type { TaskPlan, TaskStep } from './task-plan'
 
 /** A project (folder) the user has added to the app. */
 export interface ProjectRecord extends ProjectMetadata {
@@ -244,6 +245,10 @@ export type AgentEvent =
   | { type: 'plan:inactive'; at: number }
   | { type: 'file:change'; change: FileChangeView; at: number }
   | { type: 'file:change:resolved'; id: string; status: FileChangeStatus; at: number }
+  | { type: 'task:plan'; plan: TaskPlan; at: number }
+  | { type: 'task:step'; plan: TaskPlan; step: TaskStep; at: number }
+  | { type: 'task:complete'; plan: TaskPlan; at: number }
+  | { type: 'task:failed'; plan: TaskPlan; at: number }
   | { type: 'error'; runId: string; message: string }
 
 export type WorkerState = 'stopped' | 'idle' | 'running'

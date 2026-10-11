@@ -31,6 +31,7 @@ import ProviderWarning from './ProviderWarning'
 import LoopStopCard from './LoopStopCard'
 import ApprovalDialog from './ApprovalDialog'
 import PlanCard from './PlanCard'
+import TaskTracker from './TaskTracker'
 import PlanTrustChip from './PlanTrustChip'
 import ProgressTimeline from './ProgressTimeline'
 import JobsPanel from './JobsPanel'
@@ -644,6 +645,7 @@ export default function ChatPanel(): JSX.Element {
         ) : null}
       </div>
 
+      <TaskTracker />
       <PlanCard />
       <ApprovalDialog />
       {contextCard ? (
