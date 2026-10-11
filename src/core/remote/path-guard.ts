@@ -14,7 +14,7 @@
  */
 import * as path from 'path'
 import { isDiagnosticAllowed, type DiagnosticPolicy } from './diagnostic-policy'
-import { isCommandAlwaysAllowed, isDiagnosticReadOnlyCommand } from './command-whitelist'
+import { isCommandAlwaysAllowed, isDiagnosticReadOnlyCommand, isReadOnlyShellCommand } from './command-whitelist'
 
 export interface PathGuardResult {
   ok: boolean
@@ -120,7 +120,8 @@ export function enforceCommandPaths(
   if (isCommandAlwaysAllowed(command)) return { ok: true }
   // A diagnostic bypass is only valid for a read-only command; anything that can
   // write (redirection, `rm`, `sed -i`, chaining) must not reach system paths.
-  const readOnly = isDiagnosticReadOnlyCommand(command)
+  // v2.5.6: compound read-only commands (`a 2>&1; b && c`) now qualify too.
+  const readOnly = isDiagnosticReadOnlyCommand(command) || isReadOnlyShellCommand(command)
   for (const candidate of extractAbsolutePaths(command)) {
     if (isBenign(path.posix.normalize(candidate))) continue
     const guard = enforceProjectPath(candidate, projectRoot, diagnostic)

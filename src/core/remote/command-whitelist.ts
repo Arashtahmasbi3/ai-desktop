@@ -109,12 +109,16 @@ export const READ_ONLY_BASE_COMMANDS = new Set([
   // System introspection
   'uname', 'hostname', 'uptime', 'whoami', 'id', 'pwd', 'date',
   'free', 'df', 'lscpu', 'lsmem', 'nproc', 'lsblk', 'mount',
-  'ps', 'top', 'htop', 'ss', 'netstat', 'ip', 'ifconfig',
+  'ps', 'top', 'htop', 'pgrep', 'ss', 'netstat', 'ip', 'ifconfig', 'ping',
   // Text / lookups
   'echo', 'printf', 'true', 'false', 'which', 'whereis', 'env', 'printenv',
   'journalctl', 'dmesg',
+  // Network fetch (read-only unless it writes to a file; guarded below)
+  'curl', 'wget',
+  // Change directory (absolute targets only; guarded below)
+  'cd',
   // Tool CLIs (subcommand-restricted below)
-  'systemctl', 'docker', 'pm2', 'kubectl', 'node', 'npm', 'python', 'python3'
+  'systemctl', 'docker', 'pm2', 'kubectl', 'node', 'npm', 'python', 'python3', 'git'
 ])
 
 /**
@@ -132,6 +136,25 @@ const READ_ONLY_SUBCOMMANDS: Record<string, string[] | null> = {
   python3: ['--version', '-V']
 }
 
+/** `git` subcommands that never mutate the repository (v2.5.6). */
+const GIT_READ_SUBCOMMANDS = new Set([
+  'status', 'log', 'diff', 'show', 'rev-parse', 'describe', 'blame',
+  'shortlog', 'ls-files', 'cat-file', 'reflog', 'branch', 'remote', 'config'
+])
+
+/** Mutating flags/verbs for the git subcommands that also have read forms. */
+const GIT_MUTATING_FLAGS = /^(-d|-D|-m|-M|--delete|--move|--rename|--edit-description)$/
+const GIT_REMOTE_MUTATIONS = new Set([
+  'add', 'remove', 'rm', 'rename', 'set-url', 'set-branches', 'set-head', 'prune'
+])
+const GIT_CONFIG_READ_FLAGS = /^(--get|--get-all|--get-regexp|--get-urlmatch|-l|--list|--show-origin|--show-scope)$/
+
+/** Flags that make `curl`/`wget` write a file, which is not a read. */
+const DOWNLOAD_WRITE_FLAGS = new Set([
+  '-o', '-O', '--output', '--output-document', '--remote-name',
+  '-P', '--directory-prefix', '--output-dir'
+])
+
 /** Output redirection to a real file, command substitution, or `tee`. */
 function hasWriteIndicator(command: string): boolean {
   // `2>&1` and `[2]>/dev/null` are benign: they discard or merge streams.
@@ -142,6 +165,9 @@ function hasWriteIndicator(command: string): boolean {
   if (/[`]/.test(command)) return true
   if (/\$\(/.test(command)) return true
   if (/(^|[^A-Za-z0-9_-])tee([^A-Za-z0-9_-]|$)/.test(command)) return true
+  // Privilege escalation and in-place edits are never a read.
+  if (/(^|\s|;|&|\|)sudo(\s|$)/.test(command)) return true
+  if (/(^|\s)sed\s+[^|;]*\s-i/.test(command)) return true
   return false
 }
 
@@ -160,6 +186,20 @@ function allowsSubcommand(base: string, tokens: string[]): boolean {
 }
 
 /**
+ * Read-only `git` invocation (v2.5.6). `branch`, `remote` and `config` have
+ * mutating forms, so their write flags/verbs are refused explicitly.
+ */
+function allowsGit(tokens: string[]): boolean {
+  const sub = tokens.find((token) => !token.startsWith('-'))
+  if (sub === undefined || !GIT_READ_SUBCOMMANDS.has(sub)) return false
+  const rest = tokens.slice(tokens.indexOf(sub) + 1)
+  if (sub === 'branch') return !rest.some((token) => GIT_MUTATING_FLAGS.test(token))
+  if (sub === 'config') return rest.some((token) => GIT_CONFIG_READ_FLAGS.test(token))
+  if (sub === 'remote') return !rest.some((token) => GIT_REMOTE_MUTATIONS.has(token))
+  return true
+}
+
+/**
  * True when `command` is a read-only shell command that may skip explicit
  * approval (v2.5.5). Compound commands (`;`, `&&`, `||`, pipelines) are allowed
  * as long as **every** segment is read-only; output redirection to a real file,
@@ -174,6 +214,9 @@ export function isReadOnlyShellCommand(command: string): boolean {
   const trimmed = command.trim()
   if (!trimmed) return false
   if (hasWriteIndicator(trimmed)) return false
+  // A parent-directory reference (`..`, `../x`) can step outside the project
+  // root without ever naming an absolute path, so it is never auto-approved.
+  if (/(^|[\s/])\.\.($|[\s/])/.test(trimmed)) return false
 
   const segments = trimmed
     .split(/\s*(?:;|&&|\|\|)\s*/)
@@ -189,6 +232,14 @@ export function isReadOnlyShellCommand(command: string): boolean {
       const base = tokens[0].split('/').pop() ?? tokens[0]
       if (!READ_ONLY_BASE_COMMANDS.has(base)) return false
       if (base === 'find' && tokens.some((token) => /^-(exec|delete|ok)$/.test(token))) return false
+      // `cd` is only a read when the target is absolute; a relative target (esp.
+      // `..`) could step outside the project root, so it needs approval.
+      if (base === 'cd') return typeof tokens[1] === 'string' && tokens[1].startsWith('/')
+      // `curl`/`wget` write to disk with an output flag; require the read form.
+      if (base === 'curl' || base === 'wget') {
+        return !tokens.some((token) => DOWNLOAD_WRITE_FLAGS.has(token))
+      }
+      if (base === 'git') return allowsGit(tokens.slice(1))
       return allowsSubcommand(base, tokens.slice(1))
     })
   )
