@@ -30,6 +30,7 @@ import SettingsMemory from './SettingsMemory'
 import SettingsUsage from './SettingsUsage'
 import SettingsDeveloper from './SettingsDeveloper'
 import SettingsTools from './SettingsTools'
+import Modal from './ui/Modal'
 
 type TabId =
   | 'general'
@@ -106,13 +107,14 @@ export default function SettingsPanel(): JSX.Element | null {
   if (!open) return null
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) close()
-      }}
+    <Modal
+      open
+      onClose={close}
+      maxWidth="min(58rem, 92vw)"
+      maxHeight="min(85vh, 44rem)"
+      ariaLabel={t('settings.title')}
     >
-      <div className="flex h-[min(85vh,44rem)] w-[min(58rem,92vw)] flex-col overflow-hidden rounded-2xl border border-border bg-bg-secondary shadow-2xl">
+      <div className="flex h-[min(85vh,44rem)] max-h-full flex-col overflow-hidden">
         <div className="flex h-11 shrink-0 items-center justify-between border-b border-border px-4">
           <h2 className="text-sm font-semibold text-neutral-100">{t('settings.title')}</h2>
           <button
@@ -233,6 +235,6 @@ export default function SettingsPanel(): JSX.Element | null {
           </div>
         </div>
       </div>
-    </div>
+    </Modal>
   )
 }

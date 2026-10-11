@@ -35,9 +35,13 @@
     "commandPalette": "Command palette"
   },
   "sidebar": {
-    "newChat": "+ New chat",
+    "newChat": "New chat",
     "chats": "Chats",
     "projects": "Projects",
+    "chatCount": "{{count}} chats",
+    "connConnected": "Connected",
+    "connDisconnected": "Disconnected",
+    "connMissing": "Path not found",
     "today": "Today",
     "yesterday": "Yesterday",
     "thisWeek": "This week",
@@ -167,6 +171,7 @@
     "approvalCannotRemember": "For safety, this operation requires explicit approval each time. It cannot be remembered because it can modify the system.",
     "showMoreFiles": "Show {{count}} more files",
     "reviewIndividually": "Review individually",
+    "toggleDiff": "Toggle diff for {{path}}",
     "applyChangesConfirm": "Apply {{count}} file change(s) to your project?",
     "emptyTitleProject": "What should we work on in {{project}}?",
     "suggestion4": "Fix last commit",
@@ -481,6 +486,7 @@
   },
   "plan": {
     "title": "Plan",
+    "stepsCount": "{{count}} steps",
     "subtitle": "Review the steps before they run.",
     "approve": "Approve plan",
     "modify": "Modify",
@@ -515,5 +521,46 @@
     "runTests": "Run tests",
     "runHealthCheck": "Run health check",
     "accept": "Accept anyway"
+  },
+  "workspace": {
+    "title": "Workspace",
+    "output": "Output",
+    "sources": "Sources",
+    "outputEmpty": "No tool output yet.",
+    "sourcesEmpty": "No sources yet.",
+    "close": "Hide panel",
+    "open": "Show output & sources",
+    "running": "Running",
+    "exit": "exit {{code}}",
+    "filesRead": "Files read",
+    "context": "Context sent",
+    "included": "Included",
+    "withheld": "Withheld",
+    "excluded": "Excluded",
+    "memoryTitle": "Chat memory",
+    "memoryTurns": "User turns",
+    "memoryMessages": "Messages",
+    "memorySummary": "Summary",
+    "memoryTrustedPlan": "Trusted plan steps",
+    "memoryClear": "Clear memory",
+    "memoryClearConfirm": "Click again to clear",
+    "memoryEmpty": "No memory yet."
+  },
+  "connection": {
+    "title": "Connection",
+    "initializing": "Starting…",
+    "local": "Local workspace",
+    "connected": "Connected",
+    "connecting": "Connecting…",
+    "error": "Connection failed",
+    "disconnected": "Disconnected",
+    "workerOffline": "Agent offline",
+    "missing": "Workspace missing"
+  },
+  "execution": {
+    "modeAsk": "Safe mode",
+    "modeAuto": "Ask before write",
+    "modeFull": "Full access",
+    "fullAccessBanner": "Full access enabled. Auto-disable in {{time}}."
   }
 }

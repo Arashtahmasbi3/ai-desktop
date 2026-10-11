@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import {
   Bell,
   ChevronDown,
+  ChevronRight,
   Copy,
   Download,
   FolderTree,
@@ -96,6 +97,7 @@ export default function Sidebar(): JSX.Element {
   const [chatMenuFor, setChatMenuFor] = useState<string | null>(null)
   const [projectMenuFor, setProjectMenuFor] = useState<string | null>(null)
   const [workspaceOpen, setWorkspaceOpen] = useState(false)
+  const [projectsOpen, setProjectsOpen] = useState(true)
   const [searchingId, setSearchingId] = useState<string | null>(null)
   const servers = useStore((state) => state.vpsServers)
   const vpsStatus = useStore((state) => state.vpsStatus)
@@ -143,6 +145,16 @@ export default function Sidebar(): JSX.Element {
 
   const hostPolicyFor = (vpsId?: string): HostPolicy | undefined =>
     servers.find((server) => server.id === vpsId)?.policy
+
+  const connectionTitleFor = (state: DotState): string => {
+    if (state === 'connected') return t('sidebar.connConnected')
+    if (state === 'missing') return t('sidebar.connMissing')
+    return t('sidebar.connDisconnected')
+  }
+
+  /** Chats saved under a project's workspace, shown as a per-project counter. */
+  const chatCountFor = (projectId: string): number =>
+    chats.filter((chat) => chat.workspaceId === projectId).length
 
   const onRename = (chat: ChatSummary): void => {
     setChatMenuFor(null)
@@ -321,15 +333,26 @@ export default function Sidebar(): JSX.Element {
 
       <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-2">
         <section className="mb-2">
-          <h3 className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
+          <button
+            type="button"
+            onClick={() => setProjectsOpen((open) => !open)}
+            aria-expanded={projectsOpen}
+            className="flex w-full items-center gap-1 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-500 hover:text-neutral-300"
+          >
+            {projectsOpen ? (
+              <ChevronDown className="h-3 w-3 shrink-0" />
+            ) : (
+              <ChevronRight className="h-3 w-3 shrink-0" />
+            )}
             {t('sidebar.projects')}
-          </h3>
-          {projects.length === 0 ? (
+          </button>
+          {projectsOpen && projects.length === 0 ? (
             <p className="px-2 py-1 text-[11px] text-neutral-600">{t('settings.noProjects')}</p>
-          ) : (
+          ) : projectsOpen ? (
             projects.map((project) => {
               const state = projectState(project)
               const server = serverName(project.vpsId)
+              const chatCount = chatCountFor(project.id)
               return (
                 <div key={project.id} className="group relative mb-0.5">
                   <div className="flex items-center gap-1">
@@ -346,6 +369,7 @@ export default function Sidebar(): JSX.Element {
                         <ProjectBadges
                           project={project}
                           connectionDotClass={dotClass(state)}
+                          connectionTitle={connectionTitleFor(state)}
                           serverName={server}
                           policyMismatch={hasPolicyMismatch(
                             project.policy,
@@ -370,6 +394,15 @@ export default function Sidebar(): JSX.Element {
                         )}
                       </span>
                     </button>
+                    {chatCount > 0 ? (
+                      <span
+                        data-testid="project-chat-count"
+                        title={t('sidebar.chatCount', { count: chatCount })}
+                        className="shrink-0 rounded bg-bg-primary px-1.5 py-0.5 text-[10px] text-neutral-500 group-hover:hidden"
+                      >
+                        {chatCount}
+                      </span>
+                    ) : null}
                     <button
                       type="button"
                       aria-label={t('common.more')}
@@ -456,7 +489,7 @@ export default function Sidebar(): JSX.Element {
                 </div>
               )
             })
-          )}
+          ) : null}
         </section>
 
         <section>

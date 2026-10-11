@@ -49,6 +49,7 @@ import type {
   SessionInfo,
   ProjectRecord,
   SessionRecordView,
+  SessionMemoryView,
   SettingsView,
   WorkerJobRequest,
   WorkerJobView,
@@ -182,6 +183,8 @@ export interface Api {
     rejectChange(id: string): Promise<boolean>
     sessions(): Promise<SessionInfo[]>
     loadSession(id: string): Promise<SessionRecordView | null>
+    memory(id: string): Promise<SessionMemoryView>
+    clearMemory(id: string): Promise<boolean>
   }
   shell: {
     exec(command: string): Promise<LocalShellResult>

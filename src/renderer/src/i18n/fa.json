@@ -35,9 +35,13 @@
     "commandPalette": "پالت دستورات"
   },
   "sidebar": {
-    "newChat": "+ چت جدید",
+    "newChat": "چت جدید",
     "chats": "چت‌ها",
     "projects": "پروژه‌ها",
+    "chatCount": "{{count}} چت",
+    "connConnected": "متصل",
+    "connDisconnected": "قطع",
+    "connMissing": "مسیر یافت نشد",
     "today": "امروز",
     "yesterday": "دیروز",
     "thisWeek": "این هفته",
@@ -167,6 +171,7 @@
     "approvalCannotRemember": "برای ایمنی، این عملیات هر بار نیاز به تأیید صریح دارد. قابل به‌خاطرسپاری نیست چون می‌تواند سیستم را تغییر دهد.",
     "showMoreFiles": "نمایش {{count}} فایل بیشتر",
     "reviewIndividually": "بررسی تک‌تک",
+    "toggleDiff": "نمایش/پنهان‌سازی دیف {{path}}",
     "applyChangesConfirm": "{{count}} تغییر فایل در پروژه اعمال شود؟",
     "emptyTitleProject": "روی چه چیزی در {{project}} کار کنیم؟",
     "suggestion4": "آخرین کامیت را درست کن",
@@ -481,6 +486,7 @@
   },
   "plan": {
     "title": "طرح",
+    "stepsCount": "{{count}} مرحله",
     "subtitle": "قبل از اجرا، مراحل را بررسی کنید.",
     "approve": "تأیید طرح",
     "modify": "ویرایش",
@@ -515,5 +521,46 @@
     "runTests": "اجرای تستها",
     "runHealthCheck": "اجرای health check",
     "accept": "با این حال بپذیر"
+  },
+  "workspace": {
+    "title": "کارگاه",
+    "output": "خروجی",
+    "sources": "منابع",
+    "outputEmpty": "هنوز خروجی ابزاری وجود ندارد.",
+    "sourcesEmpty": "هنوز منبعی وجود ندارد.",
+    "close": "پنهان کردن پنل",
+    "open": "نمایش خروجی و منابع",
+    "running": "در حال اجرا",
+    "exit": "کد خروج {{code}}",
+    "filesRead": "فایل‌های خوانده‌شده",
+    "context": "زمینه ارسالی",
+    "included": "شامل",
+    "withheld": "کنترل‌شده",
+    "excluded": "حذف‌شده",
+    "memoryTitle": "حافظه چت",
+    "memoryTurns": "پیامهای کاربر",
+    "memoryMessages": "پیامها",
+    "memorySummary": "خلاصه",
+    "memoryTrustedPlan": "مراحل پلن مورد اعتماد",
+    "memoryClear": "پاک‌کردن حافظه",
+    "memoryClearConfirm": "برای پاک‌کردن دوباره کلیک کنید",
+    "memoryEmpty": "هنوز حافظه‌ای نیست."
+  },
+  "connection": {
+    "title": "اتصال",
+    "initializing": "در حال راه‌اندازی…",
+    "local": "کارگاه محلی",
+    "connected": "متصل",
+    "connecting": "در حال اتصال…",
+    "error": "اتصال ناموفق",
+    "disconnected": "قطع‌شده",
+    "workerOffline": "عامل آفلاین",
+    "missing": "کارگاه یافت نشد"
+  },
+  "execution": {
+    "modeAsk": "حالت ایمن",
+    "modeAuto": "پرسش قبل از نوشتن",
+    "modeFull": "دسترسی کامل",
+    "fullAccessBanner": "دسترسی کامل فعال است. غیرفعال‌سازی خودکار در {{time}}."
   }
 }

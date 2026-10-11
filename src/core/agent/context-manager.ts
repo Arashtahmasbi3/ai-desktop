@@ -203,6 +203,14 @@ export class ContextManager {
     this.history.push({ role: 'system', content: text })
   }
 
+  /**
+   * v2.6.1 Fix 4: system messages carry durable harness facts (trusted plan,
+   * approval decisions). They are pinned — never summarized away or trimmed out.
+   */
+  private pinnedSystem(messages: readonly ChatMessage[]): ChatMessage[] {
+    return messages.filter((message) => message.role === 'system')
+  }
+
   get messages(): readonly ChatMessage[] {
     return this.history
   }
@@ -283,13 +291,17 @@ export class ContextManager {
     let keepFrom = this.history.length - kept.length
     // Never start the kept history with an orphaned tool result.
     while (keepFrom < this.history.length && this.history[keepFrom].role === 'tool') keepFrom++
-    const dropped = this.history.slice(0, keepFrom)
+    const prefix = this.history.slice(0, keepFrom)
+    // Fix 4: system messages in the prefix are pinned, not summarized away.
+    const pinned = this.pinnedSystem(prefix)
+    const dropped = prefix.filter((message) => message.role !== 'system')
     if (dropped.length === 0) return null
 
     const summary = await this.buildSummary(dropped, summarizer)
     this.summary = summary
     this.droppedCount += dropped.length
     this.history.splice(0, keepFrom)
+    if (pinned.length > 0) this.history.unshift(...pinned)
 
     return {
       droppedMessages: dropped.length,
@@ -335,6 +347,13 @@ export class ContextManager {
     // Never lead with an orphaned tool result: providers require the tool
     // message to be preceded by the assistant turn that requested it.
     while (kept.length > 0 && kept[0].role === 'tool') kept.shift()
+
+    // Fix 4: system messages (trusted plan, approval decisions) are never
+    // trimmed away, even when the character budget is tight.
+    const pinned = this.history.filter(
+      (message) => message.role === 'system' && !kept.includes(message)
+    )
+    if (pinned.length > 0) kept.unshift(...pinned)
 
     const transform = this.transformOldMessages
     if (!transform || kept.length <= this.keepRecent) return kept

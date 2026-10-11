@@ -1,5 +1,16 @@
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AlertOctagon, CornerDownRight, Lightbulb, RotateCcw, Server, Terminal, XOctagon } from 'lucide-react'
+import {
+  AlertOctagon,
+  ChevronDown,
+  ChevronRight,
+  CornerDownRight,
+  Lightbulb,
+  RotateCcw,
+  Server,
+  Terminal,
+  XOctagon
+} from 'lucide-react'
 import type { LoopStopInfo } from '@shared/agent'
 import { buildLoopStopModel, type LoopStopAction } from '../lib/loop-stop'
 
@@ -18,6 +29,7 @@ interface Props {
 export default function LoopStopCard({ stop, onContinue, onCorrect, onStop }: Props): JSX.Element {
   const { t } = useTranslation()
   const model = buildLoopStopModel(stop)
+  const [showRecent, setShowRecent] = useState(false)
   const emphasisClass = (action: LoopStopAction): string =>
     model.emphasis === action ? 'ring-2 ring-amber-400/70' : ''
 
@@ -28,12 +40,43 @@ export default function LoopStopCard({ stop, onContinue, onCorrect, onStop }: Pr
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold text-amber-200">{t('chat.loopStopTitle')}</p>
           <p className="mt-1 text-[11px] leading-relaxed text-amber-100/90">{stop.message}</p>
-          <p className="mt-2 flex items-start gap-1 text-[11px] leading-relaxed text-amber-200/90">
+          <p className="mt-1 flex items-start gap-1 text-[11px] leading-relaxed text-amber-200/90">
             <Lightbulb className="mt-0.5 h-3 w-3 shrink-0" />
             {t(model.hintKey)}
           </p>
+
+          {/* Actions sit directly under the hint so a long list of recent
+              actions can never push them out of view. */}
+          <div data-testid="loop-stop-actions" className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={onContinue}
+              disabled={!model.allowContinue}
+              className={`flex items-center gap-1 whitespace-nowrap rounded-lg bg-accent px-2.5 py-1 text-[11px] font-medium text-white hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40 ${emphasisClass('continue')}`}
+            >
+              <RotateCcw className="h-3 w-3" />
+              {t('chat.loopStopContinue')}
+            </button>
+            <button
+              type="button"
+              onClick={onCorrect}
+              className={`flex items-center gap-1 whitespace-nowrap rounded-lg border border-border px-2.5 py-1 text-[11px] text-neutral-200 hover:bg-bg-tertiary ${emphasisClass('correct')}`}
+            >
+              <CornerDownRight className="h-3 w-3" />
+              {t('chat.loopStopCorrect')}
+            </button>
+            <button
+              type="button"
+              onClick={onStop}
+              className={`flex items-center gap-1 whitespace-nowrap rounded-lg border border-border px-2.5 py-1 text-[11px] text-neutral-300 hover:bg-bg-tertiary ${emphasisClass('stop')}`}
+            >
+              <XOctagon className="h-3 w-3" />
+              {t('chat.loopStopStop')}
+            </button>
+          </div>
+
           {model.lastAction ? (
-            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-amber-100/80">
+            <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-amber-100/80">
               <span className="uppercase tracking-wide text-amber-300/70">
                 {t('chat.loopStopStuckOn')}
               </span>
@@ -46,57 +89,43 @@ export default function LoopStopCard({ stop, onContinue, onCorrect, onStop }: Pr
               ) : (
                 <Terminal className="h-3 w-3" />
               )}
-              <code className="truncate font-mono" dir="ltr" title={model.lastAction}>
+              <code className="min-w-0 flex-1 truncate font-mono" dir="ltr" title={model.lastAction}>
                 {model.lastCommand ?? model.lastAction}
               </code>
             </div>
           ) : null}
+
           {stop.recentActions.length > 0 ? (
             <div className="mt-2">
-              <p className="text-[10px] uppercase tracking-wide text-amber-300/70">
-                {t('chat.loopStopRecent')}
-              </p>
-              <ul className="mt-1 flex flex-col gap-0.5">
-                {stop.recentActions.map((action, index) => (
-                  <li
-                    key={`${action}-${index}`}
-                    dir="ltr"
-                    className="truncate font-mono text-[10px] text-amber-100/80"
-                  >
-                    <CornerDownRight className="mr-1 inline h-3 w-3" />
-                    {action}
-                  </li>
-                ))}
-              </ul>
+              <button
+                type="button"
+                onClick={() => setShowRecent((value) => !value)}
+                aria-expanded={showRecent}
+                className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-amber-300/70 hover:text-amber-200"
+              >
+                {showRecent ? (
+                  <ChevronDown className="h-3 w-3" />
+                ) : (
+                  <ChevronRight className="h-3 w-3" />
+                )}
+                {t('chat.loopStopRecent')} ({stop.recentActions.length})
+              </button>
+              {showRecent ? (
+                <ul className="mt-1 flex flex-col gap-0.5">
+                  {stop.recentActions.map((action, index) => (
+                    <li
+                      key={`${action}-${index}`}
+                      dir="ltr"
+                      className="truncate font-mono text-[10px] text-amber-100/80"
+                    >
+                      <CornerDownRight className="mr-1 inline h-3 w-3" />
+                      {action}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
             </div>
           ) : null}
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={onContinue}
-              disabled={!model.allowContinue}
-              className={`flex items-center gap-1 rounded-lg bg-accent px-2.5 py-1 text-[11px] font-medium text-white hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40 ${emphasisClass('continue')}`}
-            >
-              <RotateCcw className="h-3 w-3" />
-              {t('chat.loopStopContinue')}
-            </button>
-            <button
-              type="button"
-              onClick={onCorrect}
-              className={`flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-[11px] text-neutral-200 hover:bg-bg-tertiary ${emphasisClass('correct')}`}
-            >
-              <CornerDownRight className="h-3 w-3" />
-              {t('chat.loopStopCorrect')}
-            </button>
-            <button
-              type="button"
-              onClick={onStop}
-              className={`flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-[11px] text-neutral-300 hover:bg-bg-tertiary ${emphasisClass('stop')}`}
-            >
-              <XOctagon className="h-3 w-3" />
-              {t('chat.loopStopStop')}
-            </button>
-          </div>
         </div>
       </div>
     </div>

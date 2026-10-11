@@ -102,6 +102,21 @@ describe('Task 2.3 - clearer approval dialog', () => {
     expect(screen.getByText('Destructive')).toBeTruthy()
     expect(screen.getByText('Dangerous command')).toBeTruthy()
   })
+
+  it('4. highlights destructive package-manager and chmod tokens in the preview', () => {
+    useStore.setState({
+      pendingApproval: request({
+        tool: 'remote_shell',
+        kind: 'shell',
+        summary: 'npm install && chmod 777 file',
+        preview: 'npm install && chmod 777 file'
+      })
+    })
+    render(<ApprovalDialog />)
+
+    expect(screen.getByText('npm').className).toContain('text-red-400')
+    expect(screen.getByText('chmod').className).toContain('text-red-400')
+  })
 })
 
 /**
@@ -146,9 +161,12 @@ describe('Task 2.4 - clearer safety messaging', () => {
 describe('v2.5.8 - dialog centring', () => {
   it('1. the backdrop is fixed to the viewport and centres its panel', () => {
     useStore.setState({ pendingApproval: request({ reason: 'write' }) })
-    const { container } = render(<ApprovalDialog />)
+    render(<ApprovalDialog />)
 
-    const backdrop = container.firstElementChild as HTMLElement
+    // v2.6.0 renders the dialog through a portal into document.body, so the
+    // panel's parent (the backdrop) is found from the dialog role itself.
+    const panel = screen.getByRole('dialog')
+    const backdrop = panel.parentElement as HTMLElement
     expect(backdrop.classList.contains('fixed')).toBe(true)
     expect(backdrop.classList.contains('inset-0')).toBe(true)
     expect(backdrop.classList.contains('items-center')).toBe(true)

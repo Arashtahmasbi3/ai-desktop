@@ -17,6 +17,7 @@ import Sidebar from './components/Sidebar'
 import StatusBar from './components/StatusBar'
 import TaskPanel from './components/TaskPanel'
 import Titlebar from './components/Titlebar'
+import WorkspacePanel from './components/WorkspacePanel'
 import ToastHost from './components/ToastHost'
 import { basename, subscribeToEvents, useStore } from './store'
 import { readLastVpsId, resolveReconnectId } from './lib/vps-state'
@@ -34,6 +35,7 @@ export default function App(): JSX.Element {
   const clearError = useStore((state) => state.clearError)
   const addProject = useStore((state) => state.addProject)
   const chatTreeOpen = useStore((state) => state.chatTreeOpen)
+  const workspacePanelOpen = useStore((state) => state.workspacePanelOpen)
   const [dragging, setDragging] = useState(false)
 
   useEffect(() => {
@@ -180,13 +182,14 @@ export default function App(): JSX.Element {
           ) : (
             <ErrorBoundary label="Workspace" key={view}>
               {view === 'chat' ? (
-                <div className="flex min-h-0 min-w-0 flex-1">
+                <div className="relative flex min-h-0 min-w-0 flex-1">
                   {chatTreeOpen ? (
                     <aside className="hidden w-64 shrink-0 border-r border-border md:flex">
                       <FileExplorer />
                     </aside>
                   ) : null}
                   <ChatPanel />
+                  {workspacePanelOpen ? <WorkspacePanel /> : null}
                 </div>
               ) : null}
               {view === 'tasks' ? <TaskPanel /> : null}

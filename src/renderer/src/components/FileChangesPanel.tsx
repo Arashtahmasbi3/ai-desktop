@@ -4,6 +4,7 @@ import {
   Braces,
   Check,
   ChevronDown,
+  ChevronRight,
   Code2,
   Database,
   FileText,
@@ -14,6 +15,7 @@ import type { FileChangeView } from '@shared/ui'
 import { diffStat, fileKind } from '../lib/diff-stat'
 import { useStore } from '../store'
 import DiffViewer from './DiffViewer'
+import Modal from './ui/Modal'
 
 const LANGUAGE_BY_EXTENSION: Record<string, string> = {
   ts: 'typescript',
@@ -69,6 +71,7 @@ export default function FileChangesPanel({ changes }: FileChangesPanelProps): JS
   const approvalMode = useStore((state) => state.settings?.approvalMode ?? 'ask')
   const [showAll, setShowAll] = useState(false)
   const [reviewId, setReviewId] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
   if (changes.length === 0) return null
 
@@ -129,41 +132,70 @@ export default function FileChangesPanel({ changes }: FileChangesPanelProps): JS
       <div className="overflow-hidden rounded-lg border border-border bg-bg-secondary">
         {visible.map((change) => {
           const stat = diffStat(change.before, change.after)
+          const isOpen = expanded.has(change.id)
           return (
-            <div
-              key={change.id}
-              className="group flex items-center gap-2 border-b border-border px-3 py-1.5 text-[11px] last:border-b-0"
-            >
-              <button
-                type="button"
-                onClick={() => setReviewId(change.id)}
-                className="flex min-w-0 flex-1 items-center gap-2 text-left text-neutral-300 hover:text-neutral-100"
-              >
-                <KindIcon path={change.path} className="h-3.5 w-3.5 shrink-0 text-accent" />
-                <span className="truncate font-mono" dir="ltr">
-                  {change.path}
-                </span>
-              </button>
-              <span className="shrink-0 font-mono text-emerald-400">+{stat.added}</span>
-              <span className="shrink-0 font-mono text-red-400">-{stat.removed}</span>
-              <button
-                type="button"
-                onClick={() => void rejectFileChange(change.id)}
-                title={t('chat.rejectChange')}
-                aria-label={t('chat.rejectChange')}
-                className="shrink-0 rounded p-0.5 text-neutral-500 hover:bg-bg-primary hover:text-red-400"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => apply(change.id)}
-                title={t('chat.applyChange')}
-                aria-label={t('chat.applyChange')}
-                className="shrink-0 rounded p-0.5 text-neutral-500 hover:bg-bg-primary hover:text-emerald-400"
-              >
-                <Check className="h-3.5 w-3.5" />
-              </button>
+            <div key={change.id} className="border-b border-border last:border-b-0">
+              <div className="group flex items-center gap-2 px-3 py-1.5 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setExpanded((prev) => {
+                      const next = new Set(prev)
+                      if (next.has(change.id)) next.delete(change.id)
+                      else next.add(change.id)
+                      return next
+                    })
+                  }
+                  aria-expanded={isOpen}
+                  aria-label={t('chat.toggleDiff', { path: change.path })}
+                  className="shrink-0 rounded p-0.5 text-neutral-500 hover:bg-bg-primary hover:text-neutral-200"
+                >
+                  {isOpen ? (
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  ) : (
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReviewId(change.id)}
+                  className="flex min-w-0 flex-1 items-center gap-2 text-left text-neutral-300 hover:text-neutral-100"
+                >
+                  <KindIcon path={change.path} className="h-3.5 w-3.5 shrink-0 text-accent" />
+                  <span className="truncate font-mono" dir="ltr">
+                    {change.path}
+                  </span>
+                </button>
+                <span className="shrink-0 font-mono text-emerald-400">+{stat.added}</span>
+                <span className="shrink-0 font-mono text-red-400">-{stat.removed}</span>
+                <button
+                  type="button"
+                  onClick={() => void rejectFileChange(change.id)}
+                  title={t('chat.rejectChange')}
+                  aria-label={t('chat.rejectChange')}
+                  className="shrink-0 rounded p-0.5 text-neutral-500 hover:bg-bg-primary hover:text-red-400"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => apply(change.id)}
+                  title={t('chat.applyChange')}
+                  aria-label={t('chat.applyChange')}
+                  className="shrink-0 rounded p-0.5 text-neutral-500 hover:bg-bg-primary hover:text-emerald-400"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              {isOpen ? (
+                <div className="max-h-64 overflow-auto border-t border-border">
+                  <DiffViewer
+                    before={change.before}
+                    after={change.after}
+                    language={languageOf(change.path)}
+                  />
+                </div>
+              ) : null}
             </div>
           )
         })}
@@ -180,10 +212,16 @@ export default function FileChangesPanel({ changes }: FileChangesPanelProps): JS
         </button>
       ) : null}
 
-      {reviewing ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
-          <div className="flex max-h-[80vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-border bg-bg-secondary">
-            <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+      <Modal
+        open={Boolean(reviewing)}
+        onClose={() => setReviewId(null)}
+        maxWidth="min(64rem, 92vw)"
+        maxHeight="calc(100vh - 3rem)"
+        ariaLabel={reviewing?.path}
+      >
+        {reviewing ? (
+          <>
+            <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
               <KindIcon path={reviewing.path} className="h-3.5 w-3.5 text-accent" />
               <span className="min-w-0 flex-1 truncate font-mono text-xs text-neutral-200" dir="ltr">
                 {reviewing.path}
@@ -204,7 +242,7 @@ export default function FileChangesPanel({ changes }: FileChangesPanelProps): JS
                 language={languageOf(reviewing.path)}
               />
             </div>
-            <div className="flex justify-end gap-2 border-t border-border px-3 py-2">
+            <div className="flex shrink-0 justify-end gap-2 border-t border-border px-3 py-2">
               <button
                 type="button"
                 onClick={() => {
@@ -228,9 +266,9 @@ export default function FileChangesPanel({ changes }: FileChangesPanelProps): JS
                 {t('chat.applyChange')}
               </button>
             </div>
-          </div>
-        </div>
-      ) : null}
+          </>
+        ) : null}
+      </Modal>
     </div>
   )
 }

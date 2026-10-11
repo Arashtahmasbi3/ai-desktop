@@ -62,6 +62,22 @@ function humanizeAction(action: AgentAction): string {
   }
 }
 
+/**
+ * v2.6.1 Fix 4: a durable, model-readable note describing a plan decision.
+ * The orchestrator appends it as a pinned system message so the model knows what
+ * the user approved (and it survives context compaction).
+ */
+export function describePlanDecision(
+  kind: 'approved' | 'modified',
+  actions: readonly AgentAction[],
+  trusted = false
+): string {
+  const list = actions.map((action, index) => `${index + 1}) ${humanizeAction(action)}`).join('; ')
+  const verb = kind === 'approved' ? 'approved' : 'replaced with'
+  const trust = trusted ? ' The user trusts this plan for 30 minutes; do not ask again for its steps.' : ''
+  return `The user ${verb} this plan (${actions.length} step(s)): ${list}.${trust}`
+}
+
 /** Build a plan from the batch of actions the model just requested. */
 export function planFromActions(task: string, actions: AgentAction[], now = Date.now()): Plan {
   return {

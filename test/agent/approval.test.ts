@@ -203,7 +203,9 @@ describe('AgentOrchestrator plan mode + approval gate', () => {
 
     expect(seen).toEqual(['write_file'])
     expect(result.steps[0].observations[0]).toMatchObject({ ok: false, code: 'blocked' })
-    const observation = adapter.calls[1].messages.at(-1)?.content ?? ''
+    // Fix 4 adds a pinned system note after the tool result; find the result itself.
+    const observation =
+      adapter.calls[1].messages.find((message) => message.role === 'tool')?.content ?? ''
     expect(observation).toContain('not approved')
     await manager.dispose()
   })
