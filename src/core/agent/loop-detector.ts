@@ -19,6 +19,12 @@ export interface LoopObservation {
   reasoningSignature?: string
   /** Whether this step introduced at least one brand-new action. */
   newAction?: boolean
+  /**
+   * Whether the step was answered with a redirect (a suggested alternative).
+   * v2.5.7: a redirect is a recovery step, so it must not itself trip the
+   * failure-streak stop before the model can act on the suggestion.
+   */
+  redirected?: boolean
 }
 
 export interface LoopCheckResult {
@@ -343,6 +349,11 @@ export class LoopDetector {
     const alternative = this.alternativeFor(toolName, args)
     if (alternative && !this.redirectedCallKeys.has(callKey)) {
       this.redirectedCallKeys.add(callKey)
+      // The alternative may reuse the same tool with a different argument, so
+      // lift the tool's failure block for this one attempt.
+      this.blockedTools.delete(toolName)
+      this.toolFailureCount.delete(toolName)
+      this.toolFailureStreak = 0
       return {
         allow: false,
         action: 'redirect',
@@ -406,6 +417,20 @@ export class LoopDetector {
    */
   beforeToolCall(toolName: string, args: unknown): LoopCallDecision {
     const callKey = computeLoopHash(toolName, args)
+
+    // v2.5.7: this exact call was already redirected once. If the model repeats
+    // it verbatim instead of trying the suggested alternative, stop for good.
+    if (this.redirectedCallKeys.has(callKey) && this.alternativeFor(toolName, args)) {
+      this.guardStopped = true
+      this.guardStopReason = 'repeated_action'
+      return {
+        allow: false,
+        action: 'stop',
+        reason: 'repeated_action',
+        toolName,
+        message: loopStopMessage(toolName, 0)
+      }
+    }
 
     // Fix 5: policy already refused this exact path/command earlier in the run, so
     // skip just this call (not the whole run) and tell the model to change tack.
@@ -619,25 +644,32 @@ export class LoopDetector {
     }
 
     // --- Progress -------------------------------------------------------------
-    if (observation.productive) {
+    if (observation.redirected) {
+      // v2.5.7: a redirect is a deliberate change of approach, so it is neutral
+      // and must not count toward the no-progress or failure-streak stops.
       this.consecutiveNoProgress = 0
-    } else {
-      this.consecutiveNoProgress += 1
-    }
-
-    // --- Failure streak -------------------------------------------------------
-    if ((observation.failures ?? 0) > 0) {
-      this.consecutiveFailures += 1
-    } else {
       this.consecutiveFailures = 0
-    }
-    if (this.consecutiveFailures >= this.policy.failureThreshold) {
-      stopReason ??= 'failure_streak'
-      warnings.push({
-        kind: 'failure_streak',
-        count: this.consecutiveFailures,
-        message: `${this.consecutiveFailures} consecutive steps with failing actions`
-      })
+    } else {
+      if (observation.productive) {
+        this.consecutiveNoProgress = 0
+      } else {
+        this.consecutiveNoProgress += 1
+      }
+
+      // --- Failure streak -----------------------------------------------------
+      if ((observation.failures ?? 0) > 0) {
+        this.consecutiveFailures += 1
+      } else {
+        this.consecutiveFailures = 0
+      }
+      if (this.consecutiveFailures >= this.policy.failureThreshold) {
+        stopReason ??= 'failure_streak'
+        warnings.push({
+          kind: 'failure_streak',
+          count: this.consecutiveFailures,
+          message: `${this.consecutiveFailures} consecutive steps with failing actions`
+        })
+      }
     }
 
     // --- Reasoning loop -------------------------------------------------------

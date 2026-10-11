@@ -1077,7 +1077,8 @@ export class AgentOrchestrator {
           productive,
           failures,
           newAction,
-          ...(reasoningSignature ? { reasoningSignature } : {})
+          ...(reasoningSignature ? { reasoningSignature } : {}),
+          ...(observations.some((result) => result.code === 'redirect') ? { redirected: true } : {})
         })
         if (loop.warnings.length > 0) {
           warnings.push(...loop.warnings)

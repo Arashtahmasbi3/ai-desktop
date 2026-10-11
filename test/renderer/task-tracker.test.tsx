@@ -106,4 +106,20 @@ describe('Task 4.3 - task tracker', () => {
     const { container } = render(<TaskTracker />)
     expect(container.firstChild).toBeNull()
   })
+
+  it('6. agent task events update the store and the panel', () => {
+    const planEvent = plan([step({ id: 's1', number: 1, description: 'Check disk', status: 'running' })])
+    useStore.getState().applyEvent({ type: 'task:plan', plan: planEvent, at: 1 })
+    const { rerender } = render(<TaskTracker />)
+    expect(screen.getByText(/Check disk/)).toBeTruthy()
+
+    // A step-tick event replaces the plan and marks the step done.
+    const ticked = plan([step({ id: 's1', number: 1, description: 'Check disk', status: 'done' })], 'completed')
+    useStore
+      .getState()
+      .applyEvent({ type: 'task:step', plan: ticked, step: ticked.steps[0], at: 2 })
+    rerender(<TaskTracker />)
+    expect(document.querySelector('[data-status]')?.getAttribute('data-status')).toBe('done')
+    expect(useStore.getState().taskPlans['plan-1'].steps[0].status).toBe('done')
+  })
 })
