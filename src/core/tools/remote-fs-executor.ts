@@ -54,6 +54,8 @@ export class RemoteFsToolExecutor implements ToolExecutor {
       ...(result.ok
         ? {}
         : { error: result.content, code: result.blocked ? ('blocked' as const) : ('remote_error' as const) }),
+      // Signal a policy refusal so the loop detector can block a retry (v2.5.3).
+      ...(result.blocked ? { blocked: true } : {}),
       // Structured detail for the UI (target host + path).
       ...(serverId ? { serverId } : {}),
       ...(path ? { path } : {}),

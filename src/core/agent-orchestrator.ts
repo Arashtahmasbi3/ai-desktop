@@ -769,7 +769,8 @@ export class AgentOrchestrator {
             }
             this.log('warn', 'loop.tool_blocked', runId, {
               step: index,
-              tool: action.name
+              tool: action.name,
+              reason: guard.reason ?? 'repeated_failure'
             })
             observations.push(toolBlocked)
             context.appendToolResult({
@@ -835,7 +836,11 @@ export class AgentOrchestrator {
 
           const before = await this.snapshotBefore(action, sandboxId)
           const result = await this.guardedExecute(executor, action, runId, index, options)
-          loopDetector.afterToolCall(action.name, { ok: result.ok })
+          loopDetector.afterToolCall(
+            action.name,
+            { ok: result.ok, blocked: result.blocked === true || result.code === 'blocked' },
+            action.arguments
+          )
           if (result.ok && progressTools.has(action.name)) loopDetector.markProgress()
           if (result.ok && before !== null) {
             this.onFileWritten?.({
