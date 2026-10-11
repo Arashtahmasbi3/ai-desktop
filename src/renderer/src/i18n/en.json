@@ -167,6 +167,7 @@
     "approvalCannotRemember": "For safety, this operation requires explicit approval each time. It cannot be remembered because it can modify the system.",
     "showMoreFiles": "Show {{count}} more files",
     "reviewIndividually": "Review individually",
+    "toggleDiff": "Toggle diff for {{path}}",
     "applyChangesConfirm": "Apply {{count}} file change(s) to your project?",
     "emptyTitleProject": "What should we work on in {{project}}?",
     "suggestion4": "Fix last commit",

@@ -167,6 +167,7 @@
     "approvalCannotRemember": "برای ایمنی، این عملیات هر بار نیاز به تأیید صریح دارد. قابل به‌خاطرسپاری نیست چون می‌تواند سیستم را تغییر دهد.",
     "showMoreFiles": "نمایش {{count}} فایل بیشتر",
     "reviewIndividually": "بررسی تک‌تک",
+    "toggleDiff": "نمایش/پنهان‌سازی دیف {{path}}",
     "applyChangesConfirm": "{{count}} تغییر فایل در پروژه اعمال شود؟",
     "emptyTitleProject": "روی چه چیزی در {{project}} کار کنیم؟",
     "suggestion4": "آخرین کامیت را درست کن",
