@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.7] — 2026-10-05
+
+Sprint v2.5.7 "Task Planning + Loop Recovery" — a complex goal is now split into
+an explicit, tracked plan instead of one long prompt, and a stuck agent is
+redirected to a concrete alternative rather than stopping outright.
+
+### Added
+
+- **Multi-step task planner** — `TaskPlanner` turns a complex goal into ordered
+  steps (`createPlan`), executes them one by one (`executePlan`), retries a
+  failed step once, and records a failure reason when it gives up
+  (`src/core/agent/task-planner.ts`, `src/shared/task-plan.ts`).
+- **Task tracker panel in chat** — the live plan is rendered above the transcript
+  with per-step status, a progress bar, and pause/resume/stop controls; plans are
+  kept per run in the store (`src/renderer/src/components/TaskTracker.tsx`,
+  `src/renderer/src/store.ts`).
+- **Alternative strategies** — known failures (`pm2: command not found`, blocked
+  paths, common `not found` errors, ...) map to a concrete alternative call
+  (`src/core/agent/strategies.ts`).
+
+### Changed
+
+- **System prompt plans before acting** — remote runs are told to decompose a
+  complex goal into steps and to prefer an alternative from the strategy table
+  instead of repeating a failing call (`src/core/agent-orchestrator.ts`).
+- **Loop guard redirects instead of stopping** — a blocked path/command or a
+  repeatedly-failing tool now returns a `redirect` decision carrying an
+  alternative; the run continues, and only a verbatim repeat of the redirected
+  call is a hard stop (`src/core/agent/loop-detector.ts`). A redirect step no
+  longer counts toward the failure-streak stop, and it lifts the tool block for
+  the single alternative attempt.
+
+### Notes
+
+- The redirect is executed by the orchestrator as a tool observation
+  (`code: 'redirect'`); the blocked call itself is never run.
+
 ## [2.5.6] — 2026-10-05
 
 Sprint v2.5.6 "Crash Diagnosis + Read-Only Shell Relaxation" — the agent can now
