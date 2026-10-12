@@ -40,7 +40,7 @@ export default function CodeSearchModal(): JSX.Element | null {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 pt-24 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 px-4 pb-4 pt-24 backdrop-blur-sm"
       onClick={() => setSearchOpen(false)}
     >
       <div

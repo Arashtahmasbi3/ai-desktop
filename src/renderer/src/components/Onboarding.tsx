@@ -50,9 +50,9 @@ export default function Onboarding(): JSX.Element | null {
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-md">
-      <div className="flex w-[min(34rem,92vw)] flex-col overflow-hidden rounded-2xl border border-border bg-bg-secondary shadow-2xl">
-        <div className="flex items-center gap-2 border-b border-border px-5 py-4">
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
+      <div className="flex max-h-[calc(100vh-2rem)] w-[min(34rem,92vw)] flex-col overflow-hidden rounded-2xl border border-border bg-bg-secondary shadow-2xl">
+        <div className="flex shrink-0 items-center gap-2 border-b border-border px-5 py-4">
           <Sparkle current={current} />
           <h2 className="text-sm font-semibold text-neutral-100">
             {current === 'welcome'
@@ -70,7 +70,7 @@ export default function Onboarding(): JSX.Element | null {
           </span>
         </div>
 
-        <div className="px-5 py-5 text-sm text-neutral-300">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 text-sm text-neutral-300">
           {current === 'welcome' ? (
             <div className="flex flex-col gap-4">
               <p>
@@ -168,7 +168,7 @@ export default function Onboarding(): JSX.Element | null {
           ) : null}
         </div>
 
-        <div className="flex items-center justify-between border-t border-border px-5 py-3">
+        <div className="flex shrink-0 items-center justify-between border-t border-border px-5 py-3">
           <button
             type="button"
             onClick={() => setStep((value) => Math.max(0, value - 1))}

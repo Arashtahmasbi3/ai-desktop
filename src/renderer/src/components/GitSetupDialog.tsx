@@ -59,9 +59,9 @@ export default function GitSetupDialog({
   const rowClass = 'flex items-center gap-2 text-xs text-neutral-300'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-[32rem] overflow-hidden rounded-lg border border-border bg-bg-secondary shadow-xl">
-        <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+      <div className="flex max-h-[calc(100vh-2rem)] w-[min(32rem,92vw)] flex-col overflow-hidden rounded-lg border border-border bg-bg-secondary shadow-xl">
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-2.5">
           <div className="flex items-center gap-2 text-sm text-neutral-200">
             <GitBranch className="h-4 w-4 text-accent" />
             Setup Git for this project?
@@ -75,7 +75,7 @@ export default function GitSetupDialog({
           </button>
         </div>
 
-        <div className="space-y-3 p-4">
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
           <p className="truncate text-[11px] text-neutral-500">{path}</p>
 
           <label className={rowClass}>
