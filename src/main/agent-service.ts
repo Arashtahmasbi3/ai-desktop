@@ -26,6 +26,7 @@ import { MigrateProjectToolExecutor } from '@core/tools/migrate-project-executor
 import { CompositeToolExecutor, type ToolRoute } from '@core/tools/composite-executor'
 import { DIAGNOSE_CRASH_TOOL } from '@core/tools/crash-diagnosis-tool'
 import { CrashDiagnosisToolExecutor } from '@core/tools/crash-diagnosis-tool'
+import { DiagnosticsToolExecutor, NAMED_DIAGNOSTIC_TOOLS } from '@core/tools/diagnostics-tools'
 import { planV24Tools, enabledV24ToolNames } from './v24-tools-wiring'
 import { routeToolCall, remoteWorkspaceHint } from '@core/agent/remote-routing'
 import type { RoutingDecision } from '@core/agent/remote-routing'
@@ -248,6 +249,29 @@ export function planRemoteRuntime(
     ' You can also call "diagnose_crash" to run a fixed set of read-only probes ' +
     '(process managers, logs, resources, network) and get a probable cause with ' +
     'recommendations when the user asks why the project is crashing or failing.'
+
+  // v2.6.2 T2.3: named diagnostics. Fixed, read-only probes with validated
+  // arguments, so production can be investigated without free path-based reads.
+  const diagnosticsExecutor = new DiagnosticsToolExecutor(
+    {
+      connectedServers: () => vps.connectedServers(),
+      exec: (serverId, command) => vps.exec(serverId, command),
+      ...(projectRoot ? { projectRoot } : {})
+    },
+    target
+  )
+  const namedDiagnostics = NAMED_DIAGNOSTIC_TOOLS.map((tool) => ({
+    ...tool,
+    description: `${tool.description} Target server: "${target}".`
+  }))
+  extraTools.push(...namedDiagnostics)
+  routes.push({
+    names: new Set(namedDiagnostics.map((tool) => tool.name)),
+    executor: diagnosticsExecutor
+  })
+  hint +=
+    ' For read-only host introspection use get_service_logs, get_disk_usage, ' +
+    'get_system_health and get_process_list instead of free-form shell commands.'
 
   // Cross-server project migration needs to resolve both saved servers' hosts.
   if (typeof vps.resolveServer === 'function') {
