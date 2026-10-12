@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AlertTriangle, Check, Circle, Loader2, PauseCircle, RotateCcw, Sparkles, Wrench } from 'lucide-react'
+import { AlertTriangle, Brain, Check, Circle, Loader2, PauseCircle, RotateCcw, Sparkles, Wrench } from 'lucide-react'
 import { buildTimeline, type StepKind, type TimelineStep } from '../lib/timeline'
 import { useStore } from '../store'
 import DecisionCard from './DecisionCard'
@@ -12,7 +12,8 @@ const KIND_ICON: Record<StepKind, typeof Check> = {
   error: AlertTriangle,
   done: Check,
   stopped: PauseCircle,
-  recovery: RotateCcw
+  recovery: RotateCcw,
+  decision: Brain
 }
 
 /** Collapsible right-hand vertical timeline of the current agent run (D.6). */
@@ -23,9 +24,10 @@ export default function ProgressTimeline(): JSX.Element {
   const decisions = useStore((state) => state.decisions)
   const steps = useMemo(() => buildTimeline(logs, running), [logs, running])
 
-  const label = (kind: StepKind, tool?: string): string => {
-    if (kind === 'tool' && tool) return t('timeline.tool', { tool })
-    return t(`timeline.${kind}`)
+  const label = (step: TimelineStep): string => {
+    if (step.kind === 'tool' && step.tool) return t('timeline.tool', { tool: step.tool })
+    if (step.kind === 'decision' && step.decision) return step.decision.intent.summary
+    return t(`timeline.${step.kind}`)
   }
 
   /** Secondary line: agent phase and/or the recovery decision (v2.5.2). */
@@ -95,7 +97,7 @@ export default function ProgressTimeline(): JSX.Element {
                       step.status === 'pending' ? 'text-neutral-600' : 'text-neutral-300'
                     }`}
                   >
-                    {label(step.kind, step.tool)}
+                    {label(step)}
                   </span>
                   {detail(step) ? (
                     <span className="mt-0.5 block text-[10px] leading-snug text-neutral-500">

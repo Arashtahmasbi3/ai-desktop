@@ -487,6 +487,7 @@
     "done": "تمام شد",
     "stopped": "توقف برای ورودی",
     "recovery": "بازیابی",
+    "decision": "تصمیم",
     "recoveredAfter": "پس از {{count}} تلاش بازیابی شد",
     "retryFailed": "تلاش مجدد پس از {{count}} بار ناموفق ماند",
     "switchedTo": "تغییر به {{to}}",
@@ -631,7 +632,8 @@
     "decision": "تصمیم",
     "askWhy": "چرا؟",
     "why": "دلیل",
-    "askWhyFailed": "بارگذاری توضیح ممکن نشد."
+    "askWhyFailed": "بارگذاری توضیح ممکن نشد.",
+    "inlineTitle": "ردّ اجرا"
   },
   "shortcuts": {
     "title": "کلیدهای میانبر",

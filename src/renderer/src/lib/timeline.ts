@@ -1,4 +1,5 @@
 import type { AgentLogEntry, AgentPhase } from '@shared/agent'
+import type { TraceDecision } from '@shared/trace'
 
 export type StepStatus = 'done' | 'active' | 'pending'
 
@@ -10,6 +11,7 @@ export type StepKind =
   | 'done'
   | 'stopped'
   | 'recovery'
+  | 'decision'
 
 /** What the run chose to do after a failure (v2.5.2). */
 export interface TimelineRecovery {
@@ -29,9 +31,24 @@ export interface TimelineStep {
   phase?: AgentPhase
   /** Recovery decision attached to a failed/recovered step (v2.5.2). */
   recovery?: TimelineRecovery
+  /** Trace decision carried on a `decision` step (v2.6.3, Fix D). */
+  decision?: TraceDecision
 }
 
 const MAX_STEPS = 40
+
+/** Narrow an unknown log payload to a `TraceDecision` without importing the UI. */
+function asDecision(entry: AgentLogEntry): TraceDecision | undefined {
+  if (entry.event !== 'decision') return undefined
+  const value = entry.decision
+  if (typeof value !== 'object' || value === null) return undefined
+  const decision = value as Partial<TraceDecision>
+  return typeof decision.id === 'string' &&
+    typeof decision.runId === 'string' &&
+    typeof decision.intent === 'object'
+    ? (decision as TraceDecision)
+    : undefined
+}
 
 function asRecovery(entry: AgentLogEntry): TimelineRecovery | undefined {
   const raw = entry.recovery
@@ -103,6 +120,9 @@ export function buildTimeline(logs: AgentLogEntry[], running: boolean): Timeline
       steps.push({ id, kind: 'stopped', status: 'done' })
     } else if (entry.event === 'run.end') {
       steps.push({ id, kind: 'done', status: 'done' })
+    } else if (entry.event === 'decision') {
+      const decision = asDecision(entry)
+      if (decision) steps.push({ id, kind: 'decision', status: 'done', decision })
     }
   }
 

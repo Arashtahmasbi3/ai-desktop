@@ -28,6 +28,7 @@ import PlanCard from './PlanCard'
 import TaskTracker from './TaskTracker'
 import ExecutionBar from './ExecutionBar'
 import ProgressTimeline from './ProgressTimeline'
+import InlineTrace from './InlineTrace'
 import JobsPanel from './JobsPanel'
 import MicButton from './MicButton'
 import { FullAccessBanner, FullAccessToggle } from './FullAccessToggle'
@@ -351,6 +352,8 @@ export default function ChatPanel(): JSX.Element {
             onStop={dismissLoopStop}
           />
         ) : null}
+
+        <InlineTrace />
       </div>
       {timelineOpen ? <ProgressTimeline /> : null}
       </div>

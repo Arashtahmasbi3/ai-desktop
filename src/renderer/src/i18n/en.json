@@ -487,6 +487,7 @@
     "done": "Completed",
     "stopped": "Paused for input",
     "recovery": "Recovery",
+    "decision": "Decision",
     "recoveredAfter": "Recovered after {{count}} attempts",
     "retryFailed": "Retry failed after {{count}} attempts",
     "switchedTo": "Switched to {{to}}",
@@ -631,7 +632,8 @@
     "decision": "Decision",
     "askWhy": "Ask Why",
     "why": "Why",
-    "askWhyFailed": "Could not load the explanation."
+    "askWhyFailed": "Could not load the explanation.",
+    "inlineTitle": "Execution trace"
   },
   "shortcuts": {
     "title": "Keyboard shortcuts",
