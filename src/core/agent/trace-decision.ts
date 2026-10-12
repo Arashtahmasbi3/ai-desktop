@@ -18,6 +18,7 @@ import type {
   TraceOutcome,
   TracePhase
 } from '@shared/trace'
+import { mapAgentPhase } from '@shared/trace'
 import { READ_ONLY_TOOL_NAMES } from '@shared/profile'
 import { redact } from './redact'
 
@@ -117,13 +118,15 @@ export function summarizeDecision(step: AgentStep): string {
  * - otherwise → `executing`
  */
 export function mapStepPhase(step: AgentStep): TracePhase {
-  if (step.actions.length === 0) return step.productive ? 'done' : 'verifying'
-  const results = step.observations
-  if (results.some((result) => !result.ok)) return 'verifying'
-  if (results.length > 0 && results.every((result) => isInspectionTool(result.name))) {
-    return 'inspecting'
+  if (step.actions.length === 0) {
+    return step.productive ? 'done' : mapAgentPhase('reflection')
   }
-  return 'executing'
+  const results = step.observations
+  if (results.some((result) => !result.ok)) return mapAgentPhase('reflection')
+  if (results.length > 0 && results.every((result) => isInspectionTool(result.name))) {
+    return mapAgentPhase('observation')
+  }
+  return mapAgentPhase('execution')
 }
 
 /** Roll the observations up to a single step outcome. */

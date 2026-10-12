@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { AlertTriangle, Check, Circle, Loader2, PauseCircle, RotateCcw, Sparkles, Wrench } from 'lucide-react'
 import { buildTimeline, type StepKind, type TimelineStep } from '../lib/timeline'
 import { useStore } from '../store'
+import DecisionCard from './DecisionCard'
 
 const KIND_ICON: Record<StepKind, typeof Check> = {
   start: Sparkles,
@@ -19,6 +20,7 @@ export default function ProgressTimeline(): JSX.Element {
   const { t } = useTranslation()
   const logs = useStore((state) => state.logs)
   const running = useStore((state) => state.running)
+  const decisions = useStore((state) => state.decisions)
   const steps = useMemo(() => buildTimeline(logs, running), [logs, running])
 
   const label = (kind: StepKind, tool?: string): string => {
@@ -54,8 +56,15 @@ export default function ProgressTimeline(): JSX.Element {
         </span>
         {running ? <Loader2 className="h-3 w-3 animate-spin text-accent" /> : null}
       </div>
-      <ol className="min-h-0 flex-1 overflow-y-auto p-3">
-        {steps.length === 0 ? (
+      {decisions.length > 0 ? (
+        <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
+          {decisions.map((decision) => (
+            <DecisionCard key={decision.id} decision={decision} />
+          ))}
+        </ul>
+      ) : (
+        <ol className="min-h-0 flex-1 overflow-y-auto p-3">
+          {steps.length === 0 ? (
           <p className="text-[11px] text-neutral-600">{t('timeline.empty')}</p>
         ) : (
           steps.map((step, index) => {
@@ -98,7 +107,8 @@ export default function ProgressTimeline(): JSX.Element {
             )
           })
         )}
-      </ol>
+        </ol>
+      )}
     </aside>
   )
 }

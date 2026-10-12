@@ -20,6 +20,7 @@ import {
   mapStepPhase,
   sha256Hex
 } from '@core/agent/trace-decision'
+import { mapAgentPhase } from '@shared/trace'
 import { redact } from '@core/agent/redact'
 import { AgentOrchestrator, type ProviderEntry } from '@core/agent-orchestrator'
 import { MemoryLogger } from '@core/agent/logger'
@@ -205,6 +206,39 @@ describe('evidence classification', () => {
     const obs = observation(act, { command: 'false', ok: false, exitCode: 1 })
     const [evidence] = deriveEvidence(step({ actions: [act], observations: [obs] }))
     expect(evidence.lines).toBe('exit 1')
+  })
+})
+
+describe('mapAgentPhase (v2.6.2 T3.2 phase mapping)', () => {
+  it('maps each runtime phase to its trace phase', () => {
+    expect(mapAgentPhase('planning')).toBe('planning')
+    expect(mapAgentPhase('execution')).toBe('executing')
+    expect(mapAgentPhase('reflection')).toBe('verifying')
+  })
+
+  it('splits observation into inspecting or verifying', () => {
+    expect(mapAgentPhase('observation')).toBe('inspecting')
+    expect(mapAgentPhase('observation', { verifying: true })).toBe('verifying')
+  })
+
+  it('maps a real step through the shared mapping', () => {
+    const inspection = step({
+      actions: [action('read_file', { path: 'a.ts' })],
+      observations: [observation(action('read_file', { path: 'a.ts' }), { path: 'a.ts' })]
+    })
+    expect(mapStepPhase(inspection)).toBe('inspecting')
+
+    const mutation = step({
+      actions: [action('write_file', { path: 'a.ts', content: 'x' })],
+      observations: [observation(action('write_file', { path: 'a.ts', content: 'x' }), { ok: true })]
+    })
+    expect(mapStepPhase(mutation)).toBe('executing')
+
+    const failed = step({
+      actions: [action('run_command', { command: 'false' })],
+      observations: [observation(action('run_command', { command: 'false' }), { ok: false, exitCode: 1 })]
+    })
+    expect(mapStepPhase(failed)).toBe('verifying')
   })
 })
 

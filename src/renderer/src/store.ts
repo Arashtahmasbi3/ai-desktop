@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { TraceDecision } from '@shared/trace'
 import type { AgentLogEntry } from '@shared/agent'
 import type { LoopStopInfo, LoopWarning } from '@shared/agent'
 import type {
@@ -106,6 +107,8 @@ function toolCallFromView(view: ToolResultView): ToolCallView {
 }
 
 const MAX_LOGS = 500
+/** v2.6.2 T3.2: keep the timeline bounded too. */
+const MAX_DECISIONS = 200
 const MAX_TERMINAL_LINES = 500
 const TOKEN_SETTINGS_KEY = 'ai-desktop:show-token-count'
 export const CONTEXT_SETTINGS_KEY = 'ai-desktop:show-context-before-send'
@@ -181,6 +184,8 @@ interface AppState {
   currentRunId: string | null
   sessionId: string
   logs: AgentLogEntry[]
+  /** v2.6.2 T3.2: trace decisions for the active run, oldest first. */
+  decisions: TraceDecision[]
   warnings: LoopWarning[]
   /** Set when the last run stopped early because the agent looked stuck. */
   loopStop: LoopStopInfo | null
@@ -429,6 +434,7 @@ export const useStore = create<AppState>((set, get) => ({
   currentRunId: null,
   sessionId: newId(),
   logs: [],
+  decisions: [],
   warnings: [],
   loopStop: null,
   sessions: [],
@@ -744,7 +750,7 @@ export const useStore = create<AppState>((set, get) => ({
   async deleteChat(id) {
     await window.api.chats.remove(id)
     if (get().activeChatId === id) {
-      set({ activeChatId: null, messages: [], logs: [], warnings: [] })
+      set({ activeChatId: null, messages: [], logs: [], decisions: [], warnings: [] })
     }
     await get().refreshChats()
   },
@@ -859,6 +865,7 @@ export const useStore = create<AppState>((set, get) => ({
           currentRunId: event.runId,
           error: null,
           logs: [],
+          decisions: [],
           pendingApproval: null,
           pendingPlan: null,
           activePlan: null,
@@ -910,7 +917,16 @@ export const useStore = create<AppState>((set, get) => ({
       case 'log': {
         const logs = [...get().logs, event.entry]
         if (logs.length > MAX_LOGS) logs.splice(0, logs.length - MAX_LOGS)
-        set({ logs })
+        // v2.6.2 T3.2: a 'decision' entry is also the live timeline's input.
+        if (event.entry.event === 'decision' && event.entry.decision) {
+          const decisions = [...get().decisions, event.entry.decision as TraceDecision]
+          if (decisions.length > MAX_DECISIONS) {
+            decisions.splice(0, decisions.length - MAX_DECISIONS)
+          }
+          set({ logs, decisions })
+        } else {
+          set({ logs })
+        }
         break
       }
       case 'tool:result': {
@@ -1159,6 +1175,7 @@ export const useStore = create<AppState>((set, get) => ({
       activeChatId: null,
       messages: [],
       logs: [],
+      decisions: [],
       warnings: [],
       loopStop: null,
       memory: null,
@@ -1198,6 +1215,7 @@ export const useStore = create<AppState>((set, get) => ({
           ...(message.usedRemote ? { usedRemote: true } : {})
         })),
       logs: [],
+      decisions: [],
       warnings: [],
       loopStop: null,
       view: 'chat'

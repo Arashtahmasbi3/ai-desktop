@@ -41,6 +41,8 @@ import { resolveVpsForRun, requiresVps } from '@core/agent/vps-resolver'
 import type { ApprovedPlan, Plan, PlanDecision, PlanScopeContext, PlanWarning } from '@shared/plan'
 import { PLAN_REAPPROVE_MESSAGE } from '@shared/plan'
 import type { ResolvedProfile } from '@shared/profile'
+import type { TraceDecision, TraceExplanation } from '@shared/trace'
+import { TraceStore } from '@core/agent/trace-store'
 import { resolveToolExposure, toolPolicyFor, type ToolExposure } from '@core/agent/tool-policy'
 import {
   createApprovedPlan,
@@ -320,10 +322,18 @@ export function planRemoteRuntime(
 
 /** Forwards orchestrator log entries to a sink (the renderer, in the app). */
 class EmittingLogger implements AgentLogger {
-  constructor(private readonly emit: (event: AgentEvent) => void) {}
+  constructor(
+    private readonly emit: (event: AgentEvent) => void,
+    private readonly traces?: TraceStore
+  ) {}
 
   log(entry: AgentLogEntry): void {
     this.emit({ type: 'log', entry })
+    // v2.6.2 T3.2: keep the decision in memory so "Ask Why" can explain it
+    // without re-running the step.
+    if (entry.event === 'decision' && this.traces) {
+      this.traces.record(entry.decision as TraceDecision)
+    }
   }
 }
 
@@ -410,6 +420,8 @@ export class AgentService {
   private readonly sessionStore: SessionStore
   private readonly emit: (event: AgentEvent) => void
   private readonly now: () => number
+  /** v2.6.2 T3.2: recent decisions, keyed by run, for "Ask Why". */
+  private readonly traceStore = new TraceStore()
   private readonly customProviders?: CustomProviderStore
   private readonly vps?: RemoteHost
   private readonly jobs?: RemoteJobRunner
@@ -865,7 +877,7 @@ export class AgentService {
     const orchestrator = new AgentOrchestrator({
       sandbox: this.sandbox,
       providers,
-      logger: new EmittingLogger(this.emit),
+      logger: new EmittingLogger(this.emit, this.traceStore),
       sessionStore: this.sessionStore,
       enforceSuccessVerification: true,
       ...(request.sessionId ? { sessionId: request.sessionId } : {}),
@@ -1082,5 +1094,18 @@ export class AgentService {
     const trustCleared = this.planTrust.clear(id)
     if (trustCleared) this.emit({ type: 'plan:inactive', at: this.now() })
     return removed || trustCleared
+  }
+
+  /**
+   * v2.6.2 T3.2: explain one decision of a run from the in-memory trace store.
+   * Deterministic — no model call, nothing re-executed.
+   */
+  explainStep(runId: string, decisionId: string): TraceExplanation | null {
+    return this.traceStore.explain(runId, decisionId) ?? null
+  }
+
+  /** Decisions recorded for a run, oldest first (used by timeline/tests). */
+  decisionsForRun(runId: string): TraceDecision[] {
+    return this.traceStore.forRun(runId)
   }
 }

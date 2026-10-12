@@ -295,6 +295,11 @@ export function registerIpc(
     ['agent:loadSession', (id: string) => services.agent.loadSession(id)],
     ['agent:memory', (id: string) => services.agent.memory(id)],
     ['agent:clearMemory', (id: string) => services.agent.clearMemory(id)],
+    // v2.6.2 (T3.2): explain one trace decision of a run ("Ask Why"). Deterministic.
+    [
+      'agent:explainStep',
+      (runId: string, decisionId: string) => services.agent.explainStep(runId, decisionId)
+    ],
 
     // v2.6.2 (T4.4): a project's goals are edited from the renderer. The project
     // defaults to the active one; every mutation notifies all windows.

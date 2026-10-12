@@ -484,7 +484,11 @@
     "phaseExecution": "Executing",
     "phaseObservation": "Observing",
     "phaseReflection": "Reflecting",
-    "empty": "No activity yet."
+    "empty": "No activity yet.",
+    "phaseInspecting": "Inspecting",
+    "phaseExecuting": "Executing",
+    "phaseVerifying": "Verifying",
+    "phaseDone": "Completed"
   },
   "plan": {
     "title": "Plan",
@@ -588,5 +592,31 @@
     "statusAchieved": "achieved",
     "statusAbandoned": "abandoned",
     "statusBlocked": "blocked"
+  },
+  "trace": {
+    "phasePlanning": "Planning",
+    "phaseInspecting": "Inspecting",
+    "phaseExecuting": "Executing",
+    "phaseVerifying": "Verifying",
+    "phaseDone": "Done",
+    "outcomeOk": "ok",
+    "outcomeFailed": "failed",
+    "outcomeBlocked": "blocked",
+    "outcomeSkipped": "skipped",
+    "evidenceFile": "file",
+    "evidenceCommand": "command",
+    "evidenceOutput": "output",
+    "evidenceDiff": "diff",
+    "evidenceTest": "test",
+    "evidenceLog": "log",
+    "intent": "Intent",
+    "assessment": "Assessment",
+    "evidence": "Evidence",
+    "noEvidence": "No observation recorded for this step.",
+    "viewOutput": "view output",
+    "decision": "Decision",
+    "askWhy": "Ask Why",
+    "why": "Why",
+    "askWhyFailed": "Could not load the explanation."
   }
 }

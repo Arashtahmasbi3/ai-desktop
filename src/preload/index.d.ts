@@ -27,6 +27,7 @@ import type {
 } from '@shared/workspace-info'
 import type { SystemHealth } from '@shared/system-health'
 import type { Job } from '@shared/jobs'
+import type { TraceExplanation } from '@shared/trace'
 import type {
   GitCommitInput,
   GitOpResult,
@@ -188,6 +189,8 @@ export interface Api {
     loadSession(id: string): Promise<SessionRecordView | null>
     memory(id: string): Promise<SessionMemoryView>
     clearMemory(id: string): Promise<boolean>
+    /** v2.6.2 (T3.2): explain a trace decision deterministically ("Ask Why"). */
+    explainStep(runId: string, decisionId: string): Promise<TraceExplanation | null>
     /** v2.6.2 (T4.4): project goals; `projectId` defaults to the active project. */
     goal: {
       list(projectId?: string): Promise<Goal[]>

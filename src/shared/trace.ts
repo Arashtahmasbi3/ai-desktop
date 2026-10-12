@@ -10,7 +10,7 @@
  * renderer can import them; the derivation lives in `@core/agent/trace-decision`
  * where redaction and hashing are available.
  */
-import type { AgentLogEntry } from './agent'
+import type { AgentLogEntry, AgentPhase } from './agent'
 
 /** The phase of the loop a decision belongs to. */
 export type TracePhase = 'planning' | 'inspecting' | 'executing' | 'verifying' | 'done'
@@ -56,6 +56,84 @@ export interface TraceDecision {
 export interface DecisionLogEntry extends AgentLogEntry {
   event: 'decision'
   decision: TraceDecision
+}
+
+/**
+ * A deterministic explanation of one decision, for "Ask Why".
+ * No model call — every line is read off the decision itself.
+ */
+export interface TraceExplanation {
+  decisionId: string
+  runId: string
+  phase: TracePhase
+  outcome?: TraceOutcome
+  intent: string
+  rationale?: string
+  decision: string
+  evidence: TraceEvidence[]
+  /** The rules that produced this phase/outcome, in order. */
+  reasoning: string[]
+}
+
+/**
+ * Pure mapping from the loop's runtime `AgentPhase` to a trace phase (§4.2).
+ * `observation` is the only ambiguous one: a successful read gathers evidence
+ * (`inspecting`), but when the caller knows the step is reassessing a failure it
+ * is `verifying`. End-of-run is expressed as `done` by the caller.
+ */
+export function mapAgentPhase(
+  phase: AgentPhase,
+  options: { verifying?: boolean } = {}
+): TracePhase {
+  switch (phase) {
+    case 'planning':
+      return 'planning'
+    case 'execution':
+      return 'executing'
+    case 'observation':
+      return options.verifying ? 'verifying' : 'inspecting'
+    case 'reflection':
+      return 'verifying'
+  }
+}
+
+const PHASE_REASON: Record<TracePhase, string> = {
+  planning: 'No action was taken yet; the run is still deciding what to do.',
+  inspecting: 'Only read/inspection tools ran, so the run gathered evidence.',
+  executing: 'A mutating action ran, so the run changed state.',
+  verifying: 'An action failed or was blocked, so the run must reassess.',
+  done: 'No tools were called; the run produced its final answer.'
+}
+
+const OUTCOME_REASON: Record<TraceOutcome, string> = {
+  ok: 'Every observation in this step succeeded.',
+  failed: 'At least one observation failed.',
+  blocked: 'At least one action was refused by policy before it ran.',
+  skipped: 'Actions were planned but produced no observation to confirm them.'
+}
+
+/** Explain a decision using only what it recorded. Deterministic. */
+export function explainDecision(decision: TraceDecision): TraceExplanation {
+  const reasoning: string[] = [PHASE_REASON[decision.phase]]
+  if (decision.outcome) reasoning.push(OUTCOME_REASON[decision.outcome])
+  reasoning.push(
+    decision.evidence.length > 0
+      ? `Backed by ${decision.evidence.length} observation(s): ${decision.evidence
+          .map((item) => item.ref)
+          .join(', ')}.`
+      : 'No observation backs this step; it is intent only, not a confirmed action.'
+  )
+  return {
+    decisionId: decision.id,
+    runId: decision.runId,
+    phase: decision.phase,
+    ...(decision.outcome ? { outcome: decision.outcome } : {}),
+    intent: decision.intent.summary,
+    ...(decision.intent.rationale ? { rationale: decision.intent.rationale } : {}),
+    decision: decision.decision,
+    evidence: decision.evidence,
+    reasoning
+  }
 }
 
 /** Display metadata for a phase; the renderer colours badges from this. */

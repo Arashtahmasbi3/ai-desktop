@@ -484,7 +484,11 @@
     "phaseExecution": "اجرا",
     "phaseObservation": "مشاهده",
     "phaseReflection": "بازنگری",
-    "empty": "هنوز فعالیتی نیست."
+    "empty": "هنوز فعالیتی نیست.",
+    "phaseInspecting": "بازرسی",
+    "phaseExecuting": "اجرا",
+    "phaseVerifying": "راستی‌آزمایی",
+    "phaseDone": "تمام شد"
   },
   "plan": {
     "title": "طرح",
@@ -588,5 +592,31 @@
     "statusAchieved": "انجام‌شده",
     "statusAbandoned": "رها‌شده",
     "statusBlocked": "مسدود"
+  },
+  "trace": {
+    "phasePlanning": "برنامه‌ریزی",
+    "phaseInspecting": "بازرسی",
+    "phaseExecuting": "اجرا",
+    "phaseVerifying": "راستی‌آزمایی",
+    "phaseDone": "پایان",
+    "outcomeOk": "موفق",
+    "outcomeFailed": "ناموفق",
+    "outcomeBlocked": "مسدود",
+    "outcomeSkipped": "رد شد",
+    "evidenceFile": "فایل",
+    "evidenceCommand": "دستور",
+    "evidenceOutput": "خروجی",
+    "evidenceDiff": "تفاوت",
+    "evidenceTest": "آزمون",
+    "evidenceLog": "لاگ",
+    "intent": "قصد",
+    "assessment": "ارزیابی",
+    "evidence": "شواهد",
+    "noEvidence": "برای این گام شاهدی ثبت نشده است.",
+    "viewOutput": "مشاهده خروجی",
+    "decision": "تصمیم",
+    "askWhy": "چرا؟",
+    "why": "دلیل",
+    "askWhyFailed": "بارگذاری توضیح ممکن نشد."
   }
 }
