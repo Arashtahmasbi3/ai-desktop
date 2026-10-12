@@ -4,6 +4,7 @@ import { checkDenyList } from '@core/agent/deny-list'
 import type { AuditEntry } from '@core/agent/audit-log'
 import { backupPathFor } from '@core/remote/backup'
 import { enforceProjectPath } from '@core/remote/path-guard'
+import { findSecretPathsInCommand, inspectSecretPath } from '@shared/secret-paths'
 import type { DiagnosticPolicy } from '@core/remote/diagnostic-policy'
 
 /** POSIX single-quote a value so it can be safely embedded in a shell command. */
@@ -132,6 +133,10 @@ function containPath(
   path: string,
   mode: 'read' | 'write' = 'read'
 ): RemoteFsResult | undefined {
+  // Secret Path Guard first: it applies even without a known project root and
+  // even in Elevated mode (v2.6.2, §5).
+  const secret = inspectSecretPath(path)
+  if (secret.blocked) return fail(`Blocked: ${secret.reason}`, true)
   if (!deps.projectRoot) return undefined
   const guard = enforceProjectPath(path, deps.projectRoot, deps.diagnostic, mode)
   if (!guard.ok) return fail(`Blocked: ${guard.error}`, true)
@@ -140,6 +145,10 @@ function containPath(
 
 /** Guard a shell command we build internally with the same deny list as exec. */
 function guardCommand(command: string): RemoteFsResult | undefined {
+  const secret = findSecretPathsInCommand(command)
+  if (secret.length > 0) {
+    return fail(`Blocked: command references ${secret[0].reason}`, true)
+  }
   const denial = checkDenyList(command)
   if (denial.blocked) return fail(`Blocked by policy: ${denial.reason}`, true)
   return undefined

@@ -163,6 +163,8 @@ export interface LocalShellResult {
   stdout: string
   stderr: string
   exitCode: number
+  /** Set when policy refused the command before it ran (v2.6.2, §5). */
+  blocked?: boolean
 }
 export interface FileChangeView {
   id: string

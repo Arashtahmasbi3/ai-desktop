@@ -2,6 +2,7 @@ import type { ToolDefinition } from '@shared/types'
 import type { VpsExecResult } from '@shared/vps'
 import { checkDenyList } from '@core/agent/deny-list'
 import { enforceCommandPaths } from '@core/remote/path-guard'
+import { findSecretPathsInCommand } from '@shared/secret-paths'
 import type { DiagnosticPolicy } from '@core/remote/diagnostic-policy'
 
 /** Tool the agent can call to run a command on a connected VPS. */
@@ -126,6 +127,17 @@ export async function executeRemoteShell(
     const guard = enforceCommandPaths(command, deps.projectRoot, deps.diagnostic)
     if (!guard.ok) {
       return { ok: false, blocked: true, content: `Blocked: ${guard.error}`, ...target }
+    }
+  }
+  // Secret Path Guard: never let a command reference a credential path, even in
+  // Elevated mode and even inside the project root (v2.6.2, §5).
+  const secret = findSecretPathsInCommand(command)
+  if (secret.length > 0) {
+    return {
+      ok: false,
+      blocked: true,
+      content: `Blocked: command references ${secret[0].reason}`,
+      ...target
     }
   }
   const denial = checkDenyList(command)

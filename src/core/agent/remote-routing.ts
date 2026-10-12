@@ -10,6 +10,7 @@
  * The logic is a pure function so it can be unit-tested without SSH or an LLM.
  */
 import { enforceCommandPaths, enforceProjectPath } from '@core/remote/path-guard'
+import { findSecretPathsInCommand, inspectSecretPath } from '@shared/secret-paths'
 import type { DiagnosticPolicy } from '@core/remote/diagnostic-policy'
 
 /** Local tool name → remote tool name. */
@@ -94,6 +95,10 @@ export function routeToolCall(
   // is refused instead of being forwarded to the executor.
   const guarded = (input: unknown, mode: 'read' | 'write' = 'read'): RoutingDecision | string => {
     const resolved = resolveRemotePath(root, input)
+    // Secret Path Guard applies before routing, with or without a known root
+    // (v2.6.2, §5).
+    const secret = inspectSecretPath(resolved)
+    if (secret.blocked) return { kind: 'error', message: `Blocked: ${secret.reason}` }
     // Without a known remote root there is nothing to contain the path to.
     if (context.remotePath === undefined) return resolved
     const guard = enforceProjectPath(resolved, root, context.diagnostic, mode)
@@ -101,6 +106,10 @@ export function routeToolCall(
   }
 
   const guardedCommand = (command: unknown): RoutingDecision | undefined => {
+    const secret = findSecretPathsInCommand(typeof command === 'string' ? command : '')
+    if (secret.length > 0) {
+      return { kind: 'error', message: `Blocked: command references ${secret[0].reason}` }
+    }
     if (context.remotePath === undefined) return undefined
     const guard = enforceCommandPaths(
       typeof command === 'string' ? command : '',
