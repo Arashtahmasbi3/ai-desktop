@@ -36,7 +36,8 @@ import { buildWorkspaceSystemHint } from '@core/agent/workspace-prompt'
 import type { RemoteWorkspaceInfo } from '@shared/workspace-info'
 import { DEFAULT_APPROVAL_MODE } from '@core/agent/approval'
 import { resolveVpsForRun, requiresVps } from '@core/agent/vps-resolver'
-import type { ApprovedPlan, Plan, PlanDecision, PlanWarning } from '@shared/plan'
+import type { ApprovedPlan, Plan, PlanDecision, PlanScopeContext, PlanWarning } from '@shared/plan'
+import { PLAN_REAPPROVE_MESSAGE } from '@shared/plan'
 import type { ResolvedProfile } from '@shared/profile'
 import { isReadOnlyTool } from '@shared/profile'
 import {
@@ -688,14 +689,33 @@ export class AgentService {
     const requestPlan = this.requestPlan
     const now = (): number => this.now()
 
+    // v2.6.2 T4.2: the identity a trusted plan is bound to. A plan trusted here
+    // can only auto-approve while this project/VPS/branch/environment is live, so
+    // switching project or moving to production invalidates the trust.
+    const planScope: PlanScopeContext = {
+      ...(activeProject ? { projectId: activeProject.id } : {}),
+      ...(activeProject?.vpsId ? { vpsId: activeProject.vpsId } : {}),
+      ...(activeProject?.repository?.branch ? { branch: activeProject.repository.branch } : {}),
+      ...(activeProject?.environment ? { environment: activeProject.environment } : {})
+    }
+
     // v2.6.1 Fix 3: rehydrate any trusted plan persisted with the session (e.g.
     // after a restart) so it keeps auto-approving in this chat.
     if (request.sessionId) {
       try {
         const stored = await this.sessionStore.load(request.sessionId)
         const raw = stored?.metadata?.[PLAN_TRUST_METADATA_KEY]
-        if (this.planTrust.restore(sessionKey, raw)) {
+        const restored = this.planTrust.restore(sessionKey, raw)
+        if (restored === 'restored') {
           this.emit({ type: 'plan:active', plan: this.planTrust.get(sessionKey)!, at: now() })
+        } else if (restored === 'legacy') {
+          // Pre-v2.6.2 trust without a scope: never inherited, ask to re-approve.
+          this.emit({
+            type: 'plan:inactive',
+            at: now(),
+            reason: 'legacy',
+            message: PLAN_REAPPROVE_MESSAGE
+          })
         }
       } catch {
         // A missing/corrupt session must never block the run.
@@ -705,7 +725,9 @@ export class AgentService {
     // v2.5.5: the plan the user chose to trust for this session, or null. Expiry
     // is evaluated lazily; when it lapses we tell the chip to hide.
     const activeTrust = (): ApprovedPlan | null => {
-      if (this.planTrust.prune(sessionKey)) this.emit({ type: 'plan:inactive', at: now() })
+      if (this.planTrust.prune(sessionKey)) {
+        this.emit({ type: 'plan:inactive', at: now(), reason: 'expired' })
+      }
       return this.planTrust.get(sessionKey)
     }
 
@@ -725,10 +747,11 @@ export class AgentService {
         })
       : undefined
 
-    // A trusted plan auto-approves its own steps — never a deny-listed command.
+    // A trusted plan auto-approves its own steps — never a deny-listed command,
+    // and only within the exact scope it was granted for (v2.6.2 T4.2).
     const approvalGate = baseGate
       ? async (action: AgentAction): Promise<boolean> => {
-          if (shouldAutoApprove(activeTrust(), action, now())) return true
+          if (shouldAutoApprove(activeTrust(), action, now(), planScope)) return true
           return baseGate(action)
         }
       : undefined
@@ -736,12 +759,14 @@ export class AgentService {
     const planGate = requestPlan
       ? async (plan: Plan, warnings: PlanWarning[]): Promise<PlanDecision> => {
           const decision = await requestPlan(runId, plan, warnings)
-          const approved = createApprovedPlan(plan, sessionKey, decision, now())
+          const approved = createApprovedPlan(plan, sessionKey, decision, now(), {
+            scope: planScope
+          })
           if (approved) {
             this.planTrust.set(sessionKey, approved)
             this.emit({ type: 'plan:active', plan: approved, at: now() })
           } else if (this.planTrust.clear(sessionKey)) {
-            this.emit({ type: 'plan:inactive', at: now() })
+            this.emit({ type: 'plan:inactive', at: now(), reason: 'cleared' })
           }
           return decision
         }

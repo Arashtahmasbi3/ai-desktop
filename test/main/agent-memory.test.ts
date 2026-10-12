@@ -74,7 +74,8 @@ describe('v2.6.1 Fix 5 - AgentService memory', () => {
       runId: 'plan-1',
       stepIds: ['step-1', 'step-2'],
       approvedAt: 0,
-      expiresAt: Date.now() + 60_000
+      expiresAt: Date.now() + 60_000,
+      scope: { planHash: 'hash-1' }
     })
 
     expect((await agent.memory('chat-1')).trustedPlan).toEqual({
@@ -92,7 +93,8 @@ describe('v2.6.1 Fix 5 - AgentService memory', () => {
       runId: 'plan-1',
       stepIds: ['step-1'],
       approvedAt: 0,
-      expiresAt: Date.now() + 60_000
+      expiresAt: Date.now() + 60_000,
+      scope: { planHash: 'hash-1' }
     })
 
     expect(await agent.clearMemory('chat-1')).toBe(true)

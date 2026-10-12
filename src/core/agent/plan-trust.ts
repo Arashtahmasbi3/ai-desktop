@@ -1,14 +1,23 @@
-import { type ApprovedPlan } from '@shared/plan'
+import type { ApprovedPlan, PlanScope } from '@shared/plan'
+import { isProjectEnvironment } from '@shared/project-metadata'
 import { isPlanActive } from './approved-plan'
 
 /** Key under which a session's trusted plan is stored in its metadata. */
 export const PLAN_TRUST_METADATA_KEY = 'planTrust'
+
+/** Outcome of trying to rehydrate a persisted trust record (v2.6.2, T4.2). */
+export type PlanTrustRestore = 'none' | 'legacy' | 'expired' | 'restored'
 
 /**
  * v2.6.1 Fix 3: tracks trusted plans **per session** rather than per run, so a
  * plan the user trusted keeps auto-approving its steps across the messages of
  * one chat (until {@link ApprovedPlan.expiresAt}) instead of dying with the run.
  * Expiry is evaluated lazily on read, like the rest of the approval TTLs.
+ *
+ * v2.6.2 T4.2: a record is only *restored* when it carries a well-formed
+ * {@link PlanScope}. Records written before scoping existed are reported as
+ * `legacy` so the caller can tell the user to re-approve, rather than silently
+ * inheriting an unbounded trust.
  */
 export class PlanTrustRegistry {
   private readonly bySession = new Map<string, ApprovedPlan>()
@@ -31,12 +40,17 @@ export class PlanTrustRegistry {
     return plan
   }
 
-  /** Seed a session's trust from persisted metadata. True when it was restored. */
-  restore(sessionKey: string, raw: unknown): boolean {
-    const plan = parsePlanTrust(raw)
-    if (!plan || !isPlanActive(plan, this.now())) return false
-    this.bySession.set(sessionKey, plan)
-    return true
+  /**
+   * Seed a session's trust from persisted metadata. Returns why it did or did not
+   * restore, so the caller can surface "re-approve" for a legacy record.
+   */
+  restore(sessionKey: string, raw: unknown): PlanTrustRestore {
+    const parsed = parsePlanTrustDetailed(raw)
+    if (parsed.kind === 'none') return 'none'
+    if (parsed.kind === 'legacy') return 'legacy'
+    if (!isPlanActive(parsed.plan, this.now())) return 'expired'
+    this.bySession.set(sessionKey, parsed.plan)
+    return 'restored'
   }
 
   /** Drop one session's trust, or every session's. True when something changed. */
@@ -67,14 +81,50 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-/** Parse an {@link ApprovedPlan} out of persisted session metadata. */
-export function parsePlanTrust(raw: unknown): ApprovedPlan | null {
+/** Parse a persisted scope; `null` when anything about it is malformed. */
+export function parsePlanScope(raw: unknown): PlanScope | null {
   if (!isRecord(raw)) return null
-  const { id, runId, stepIds, approvedAt, expiresAt } = raw
-  if (typeof id !== 'string' || typeof runId !== 'string') return null
-  if (!Array.isArray(stepIds) || !stepIds.every((step): step is string => typeof step === 'string')) {
-    return null
+  if (typeof raw.planHash !== 'string' || raw.planHash.length === 0) return null
+  const scope: PlanScope = { planHash: raw.planHash }
+  for (const key of ['projectId', 'vpsId', 'branch'] as const) {
+    if (raw[key] !== undefined) {
+      if (typeof raw[key] !== 'string') return null
+      scope[key] = raw[key]
+    }
   }
-  if (typeof approvedAt !== 'number' || typeof expiresAt !== 'number') return null
-  return { id, runId, stepIds, approvedAt, expiresAt }
+  if (raw.environment !== undefined) {
+    if (!isProjectEnvironment(raw.environment)) return null
+    scope.environment = raw.environment
+  }
+  return scope
+}
+
+type ParsedPlanTrust =
+  | { kind: 'none' }
+  | { kind: 'legacy' }
+  | { kind: 'plan'; plan: ApprovedPlan }
+
+/** Parse an {@link ApprovedPlan} out of persisted session metadata. */
+function parsePlanTrustDetailed(raw: unknown): ParsedPlanTrust {
+  if (!isRecord(raw)) return { kind: 'none' }
+  const { id, runId, stepIds, approvedAt, expiresAt } = raw
+  if (typeof id !== 'string' || typeof runId !== 'string') return { kind: 'none' }
+  if (!Array.isArray(stepIds) || !stepIds.every((step): step is string => typeof step === 'string')) {
+    return { kind: 'none' }
+  }
+  if (typeof approvedAt !== 'number' || typeof expiresAt !== 'number') return { kind: 'none' }
+  const scope = parsePlanScope(raw.scope)
+  // A structurally valid record with no usable scope is a pre-v2.6.2 trust.
+  if (!scope) return { kind: 'legacy' }
+  return { kind: 'plan', plan: { id, runId, stepIds, approvedAt, expiresAt, scope } }
+}
+
+/**
+ * Parse an {@link ApprovedPlan} out of persisted session metadata. Returns `null`
+ * for garbage **and** for a legacy (unscoped) record, since neither may be
+ * trusted; use {@link PlanTrustRegistry.restore} to distinguish the two.
+ */
+export function parsePlanTrust(raw: unknown): ApprovedPlan | null {
+  const parsed = parsePlanTrustDetailed(raw)
+  return parsed.kind === 'plan' ? parsed.plan : null
 }

@@ -3,6 +3,8 @@
  * Dependency-free so the renderer can import it directly.
  */
 
+import type { ProjectEnvironment } from './project-metadata'
+
 /** Plans longer than this get a warning — they signal the model is over-scoping. */
 export const MAX_PLAN_STEPS = 5
 
@@ -26,9 +28,47 @@ export interface Plan {
 export const PLAN_TRUST_TTL_MS = 30 * 60 * 1000
 
 /**
+ * Plan-trust TTL per project environment (v2.6.2, T4.2). The more dangerous the
+ * environment, the shorter a trusted plan may keep auto-approving without the
+ * user looking at it again.
+ */
+export const PLAN_TRUST_TTL_BY_ENV: Record<ProjectEnvironment, number> = {
+  development: 30 * 60 * 1000,
+  staging: 15 * 60 * 1000,
+  production: 5 * 60 * 1000
+}
+
+/** The trust TTL for an optional environment (falls back to the legacy 30m). */
+export function planTrustTtlMs(environment?: ProjectEnvironment | null): number {
+  return environment ? PLAN_TRUST_TTL_BY_ENV[environment] : PLAN_TRUST_TTL_MS
+}
+
+/**
+ * The identity a trusted plan is bound to (v2.6.2, T4.2). Approval is only valid
+ * for the exact project/VPS/branch/environment it was granted in, so a plan the
+ * user trusted on `development` cannot silently auto-approve on `production`.
+ *
+ * `planHash` fingerprints the approved steps, so editing the plan invalidates an
+ * older trust record.
+ */
+export interface PlanScope {
+  planHash: string
+  projectId?: string
+  vpsId?: string
+  branch?: string
+  environment?: ProjectEnvironment
+}
+
+/** The live context a {@link PlanScope} is compared against. */
+export type PlanScopeContext = Omit<PlanScope, 'planHash'>
+
+/** Shown when a trust record predating scoping (or an edited plan) is dropped. */
+export const PLAN_REAPPROVE_MESSAGE = 'Old plan trust invalid. Please re-approve.'
+
+/**
  * A plan the user chose to trust: its steps skip the detailed approval prompt
- * until {@link ApprovedPlan.expiresAt}. Scoped to one run so a trusted plan can
- * never leak into a later task.
+ * until {@link ApprovedPlan.expiresAt}, within the {@link ApprovedPlan.scope} it
+ * was granted for. Scoped so a trusted plan can never leak into a later task.
  */
 export interface ApprovedPlan {
   id: string
@@ -36,6 +76,8 @@ export interface ApprovedPlan {
   stepIds: string[]
   approvedAt: number
   expiresAt: number
+  /** Absent only on records written before v2.6.2; those are rejected on read. */
+  scope?: PlanScope
 }
 
 export type PlanDecision =

@@ -262,7 +262,7 @@ export type AgentEvent =
   | { type: 'plan:request'; request: PlanRequest }
   | { type: 'plan:resolved'; id: string; decision: PlanDecision; at: number }
   | { type: 'plan:active'; plan: ApprovedPlan; at: number }
-  | { type: 'plan:inactive'; at: number }
+  | { type: 'plan:inactive'; at: number; reason?: 'expired' | 'cleared' | 'legacy'; message?: string }
   | { type: 'file:change'; change: FileChangeView; at: number }
   | { type: 'file:change:resolved'; id: string; status: FileChangeStatus; at: number }
   | { type: 'task:plan'; plan: TaskPlan; at: number }
