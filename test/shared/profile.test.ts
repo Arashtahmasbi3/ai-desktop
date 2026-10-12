@@ -205,6 +205,57 @@ describe('resolveSessionProfile', () => {
   })
 })
 
+describe('investigate scope (T2.2 — plan-only is a sub-flag of Investigate)', () => {
+  it('an explicit Investigate defaults to read-only (tools allowed)', () => {
+    const state = resolveSessionProfile({ profile: 'investigate' }, null, {}, NOW)
+    expect(state.investigateScope).toBe('read-only')
+    expect(state.planMode).toBe(false)
+    expect(state.exposeWriteTools).toBe(false)
+    expect(state.exposeShellTools).toBe(false)
+  })
+
+  it('plan-only keeps the v2.6.1 zero-tool behaviour', () => {
+    const state = resolveSessionProfile(
+      { profile: 'investigate', investigateScope: 'plan-only' },
+      null,
+      {},
+      NOW
+    )
+    expect(state.investigateScope).toBe('plan-only')
+    expect(state.planMode).toBe(true)
+    expect(state.exposeWriteTools).toBe(false)
+    expect(state.exposeShellTools).toBe(false)
+  })
+
+  it('toggling the scope flips only planMode', () => {
+    const readOnly = resolveSessionProfile(
+      { profile: 'investigate', investigateScope: 'read-only' },
+      null,
+      {},
+      NOW
+    )
+    const planOnly = resolveSessionProfile(
+      { profile: 'investigate', investigateScope: 'plan-only' },
+      null,
+      {},
+      NOW
+    )
+    expect(readOnly.approvalMode).toBe(planOnly.approvalMode)
+    expect(readOnly.profile).toBe(planOnly.profile)
+    expect(readOnly.planMode).not.toBe(planOnly.planMode)
+  })
+
+  it('ignores an unknown persisted scope and falls back to the profile default', () => {
+    const explicit = resolveSessionProfile(
+      { profile: 'investigate', investigateScope: 'nonsense' as never },
+      null,
+      {},
+      NOW
+    )
+    expect(explicit.investigateScope).toBe('read-only')
+  })
+})
+
 describe('isSessionProfile', () => {
   it('accepts only the four known profiles', () => {
     expect(isSessionProfile('investigate')).toBe(true)
