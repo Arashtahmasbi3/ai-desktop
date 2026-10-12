@@ -13,6 +13,7 @@ import { promises as fs } from 'node:fs'
 import { dirname } from 'node:path'
 import { userInfo } from 'node:os'
 import type { AuditVerifyResult, TraceDecision, TracePhase } from '@shared/trace'
+import type { PreflightChoice, PreflightPromptTier } from '@shared/preflight'
 import { auditLogPathFor } from '@shared/project-metadata'
 
 export type AuditApproval = 'auto' | 'approved' | 'denied' | 'not_required' | 'blocked'
@@ -32,6 +33,15 @@ export interface AuditLine {
   approval: AuditApproval
   result: AuditResult
   evidenceHash?: string
+  /**
+   * Interactive preflight override (v2.6.3, T3.2). Present only on a line that
+   * records a block the user answered explicitly. Additive and optional, so
+   * chains written before v2.6.3 still verify against their own stored keys.
+   */
+  tool?: string
+  preflightTier?: PreflightPromptTier
+  preflightReason?: string
+  userChoice?: PreflightChoice
   prevHash: string
   hash: string
 }
@@ -107,6 +117,44 @@ export function auditLineFromDecision(
   }
 }
 
+/**
+ * v2.6.3 T3.2.3 - derive an audit line from an interactive preflight decision.
+ *
+ * `proceed` is the only choice that lets the action run, so it is the only one
+ * recorded as `approved`; `cleanup`, `cancel` and `retry` all leave the action
+ * unexecuted at this point and are recorded as `denied`. The tier, reason and
+ * choice are stored verbatim (redacted like every other line) so an override is
+ * never silent. Pure and deterministic for testing.
+ */
+export function auditLineFromPreflightOverride(input: {
+  projectId: string
+  vpsId?: string
+  runId: string
+  tool: string
+  tier: PreflightPromptTier
+  reason: string
+  choice: PreflightChoice
+  goalId?: string
+  at?: number
+}): Omit<AuditLine, 'seq' | 'prevHash' | 'hash'> {
+  const approved = input.choice === 'proceed'
+  return {
+    userId: '',
+    ts: new Date(input.at ?? Date.now()).toISOString(),
+    projectId: input.projectId,
+    vpsId: input.vpsId ?? '',
+    runId: input.runId,
+    ...(input.goalId ? { goalId: input.goalId } : {}),
+    phase: 'executing',
+    approval: approved ? 'approved' : 'denied',
+    result: approved ? 'ok' : 'blocked',
+    tool: input.tool,
+    preflightTier: input.tier,
+    preflightReason: input.reason,
+    userChoice: input.choice
+  }
+}
+
 /** Absolute or POSIX-ish path of the audit file for a project. */
 export function auditFileFor(
   project: { id: string; path: string; type?: 'local' | 'remote' },
@@ -178,7 +226,11 @@ export class AuditTrail {
       ...(entry.command ? { command: entry.command } : {}),
       approval: entry.approval,
       result: entry.result,
-      ...(entry.evidenceHash ? { evidenceHash: entry.evidenceHash } : {})
+      ...(entry.evidenceHash ? { evidenceHash: entry.evidenceHash } : {}),
+      ...(entry.tool ? { tool: entry.tool } : {}),
+      ...(entry.preflightTier ? { preflightTier: entry.preflightTier } : {}),
+      ...(entry.preflightReason ? { preflightReason: entry.preflightReason } : {}),
+      ...(entry.userChoice ? { userChoice: entry.userChoice } : {})
     })
     const line: AuditLine = {
       seq: this.lastSeq + 1,

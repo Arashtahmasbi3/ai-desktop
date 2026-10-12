@@ -12,6 +12,7 @@ import {
   AuditTrail,
   auditFileFor,
   auditLineFromDecision,
+  auditLineFromPreflightOverride,
   canonicalJson,
   GENESIS_HASH
 } from '@core/agent/audit-trail'
@@ -220,5 +221,90 @@ describe('auditLineFromDecision', () => {
     expect(line.command).toBeUndefined()
     expect(line.path).toBeUndefined()
     expect(line.goalId).toBeUndefined()
+  })
+})
+
+describe('auditLineFromPreflightOverride (v2.6.3 T3.2.3)', () => {
+  it('records an override as approved with the tier, reason and choice', () => {
+    const line = auditLineFromPreflightOverride({
+      projectId: 'p1',
+      vpsId: 'v1',
+      runId: 'run-1',
+      tool: 'remote_write_file',
+      tier: 'block',
+      reason: 'Disk 95% full',
+      choice: 'proceed',
+      at: 5000
+    })
+    expect(line.ts).toBe(new Date(5000).toISOString())
+    expect(line.approval).toBe('approved')
+    expect(line.result).toBe('ok')
+    expect(line.tool).toBe('remote_write_file')
+    expect(line.preflightTier).toBe('block')
+    expect(line.preflightReason).toBe('Disk 95% full')
+    expect(line.userChoice).toBe('proceed')
+  })
+
+  it.each(['cleanup', 'cancel', 'retry'] as const)(
+    'records %s as denied/blocked',
+    (choice) => {
+      const line = auditLineFromPreflightOverride({
+        projectId: 'p1',
+        runId: 'run-1',
+        tool: 'remote_write_file',
+        tier: 'block',
+        reason: 'Disk full',
+        choice
+      })
+      expect(line.approval).toBe('denied')
+      expect(line.result).toBe('blocked')
+    }
+  )
+})
+
+describe('AuditTrail preflight override lines', () => {
+  it('writes an override line and still verifies', async () => {
+    const trail = new AuditTrail({ file, userId: 'tester' })
+    await trail.append(entry())
+    await trail.append(
+      auditLineFromPreflightOverride({
+        projectId: 'p1',
+        runId: 'run-1',
+        tool: 'remote_write_file',
+        tier: 'block',
+        reason: 'Disk 95% full',
+        choice: 'proceed'
+      })
+    )
+
+    expect((await trail.verify())).toEqual({ ok: true, lines: 2 })
+    const stored = await lines()
+    expect(stored[1]).toMatchObject({
+      userChoice: 'proceed',
+      preflightTier: 'block',
+      tool: 'remote_write_file'
+    })
+  })
+
+  it('detects tampering with the recorded user choice', async () => {
+    const trail = new AuditTrail({ file })
+    await trail.append(
+      auditLineFromPreflightOverride({
+        projectId: 'p1',
+        runId: 'run-1',
+        tool: 'remote_write_file',
+        tier: 'block',
+        reason: 'Disk 95% full',
+        choice: 'proceed'
+      })
+    )
+
+    const stored = await lines()
+    stored[0].userChoice = 'cancel'
+    await fs.writeFile(file, `${stored.map((line) => JSON.stringify(line)).join('\n')}\n`, 'utf8')
+
+    const result = await trail.verify()
+    expect(result.ok).toBe(false)
+    expect(result.reason).toBe('hash mismatch')
   })
 })
