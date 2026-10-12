@@ -10,9 +10,11 @@
  * refused everywhere the agent can read, write or reference them.
  *
  * Deliberately conservative: `basename` rules are matched anywhere in a path and
- * directory segments (`.ssh`, `.aws`, …) block everything beneath them. There is
- * **no allowlist**, so `.env.example` is blocked too (explicit v2.6.2 decision);
- * a narrow template allowlist is tracked for v2.7.x in AGENTS.md.
+ * directory segments (`.ssh`, `.aws`, …) block everything beneath them. Env files
+ * are blocked as a class, with one closed exception: the conventional *template*
+ * names (`.env.example`, `.env.sample`, `.env.template`, `.env.dist`) are safe to
+ * read and are the recommended way to document required variables. A real `.env`
+ * (or any other `.env.*`) is still blocked, including in Elevated mode.
  *
  * Pure and dependency-free (POSIX + Windows aware), so it is unit-testable and
  * usable from both the renderer and the main process.
@@ -26,6 +28,20 @@ export interface SecretPathResult {
   /** The (normalized) path/argument that was inspected. */
   path: string
 }
+
+/**
+ * The only env-file names that are readable: the conventional templates that
+ * document required variables. Closed allowlist, exact basename match,
+ * case-sensitive (`.env.Example` is *not* a template). Everything else that is
+ * env-like remains blocked, a real `.env` included, regardless of Approval mode
+ * or Session Profile.
+ */
+export const ENV_TEMPLATE_ALLOWLIST: ReadonlySet<string> = new Set([
+  '.env.example',
+  '.env.sample',
+  '.env.template',
+  '.env.dist'
+])
 
 /** Secrets are matched on the final path segment. */
 const SECRET_BASENAMES: ReadonlySet<string> = new Set([
@@ -77,6 +93,15 @@ function isPrivateKeyFile(basename: string): boolean {
   return !/^public[._-]/i.test(basename)
 }
 
+/**
+ * True for any env-file name: `.env` itself or anything embedding `.env.`
+ * (`config/.env.local`, `app/.env.backup`, and `my.env.example.txt`). The
+ * template allowlist is checked separately, before this, so templates pass.
+ */
+function isEnvFileBasename(basename: string): boolean {
+  return basename === '.env' || basename.includes('.env.')
+}
+
 /** Inspect a single path-like string. */
 export function inspectSecretPath(path: string): SecretPathResult {
   if (typeof path !== 'string' || path.trim() === '') return { blocked: false, path }
@@ -92,8 +117,10 @@ export function inspectSecretPath(path: string): SecretPathResult {
     path
   })
 
-  // `.env` and every `.env.*` (including `.env.example` — no exceptions).
-  if (basename === '.env' || basename.startsWith('.env.')) {
+  // Env templates are the one exception; a real `.env`/`.env.*` is not. The
+  // allowlist is exact-basename and case-sensitive, so `My.env.example.txt`
+  // (which merely *contains* `.env.`) is still refused.
+  if (isEnvFileBasename(basename) && !ENV_TEMPLATE_ALLOWLIST.has(basename)) {
     return hit('env-file', 'environment files can hold secrets')
   }
   if (SECRET_BASENAMES.has(basename.toLowerCase())) {

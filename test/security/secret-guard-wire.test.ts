@@ -129,6 +129,27 @@ describe('remote-fs tools refuse secret paths', () => {
     })
     expect(result.ok).toBe(true)
   })
+
+  it('still blocks the real .env under an active Diagnostic (elevated) policy', async () => {
+    const withDiagnostic = {
+      ...deps(),
+      // Diagnostic Mode only ever *widens* read scope; it must not expose secrets.
+      diagnostic: { enabled: true, expiresAt: Date.now() + 60_000, allowedPaths: ['/srv/app'] }
+    }
+    const blocked = await executeRemoteFs(withDiagnostic, 'remote_read_file', {
+      server_id: 'srv-1',
+      path: '/srv/app/.env'
+    })
+    expect(blocked.ok).toBe(false)
+    expect(blocked.blocked).toBe(true)
+
+    // ...while an env template is readable — the allowlist is elevation-independent.
+    const template = await executeRemoteFs(withDiagnostic, 'remote_read_file', {
+      server_id: 'srv-1',
+      path: '/srv/app/.env.example'
+    })
+    expect(template.ok).toBe(true)
+  })
 })
 
 describe('remote shell refuses secret commands even in Elevated', () => {

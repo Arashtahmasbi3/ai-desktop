@@ -6,19 +6,33 @@ import {
 } from '@shared/secret-paths'
 
 describe('isSecretPath — files that hold secrets', () => {
-  it('blocks .env and every .env.* variant (no template exception)', () => {
+  it('blocks .env and every .env.* variant except templates', () => {
     for (const path of [
       '.env',
       'config/.env',
       '.env.local',
       '.env.production',
       'apps/web/.env.development',
-      // Explicit v2.6.2 decision: templates are blocked too (fail-closed).
-      '.env.example',
-      '.env.sample',
-      '.env.template'
+      // A name that merely *contains* `.env.` is not a template.
+      'my.env.example.txt',
+      '.env.backup',
+      '.env.Example'
     ]) {
       expect(isSecretPath(path), path).toBe(true)
+    }
+  })
+
+  it('allows the closed set of env templates (exact basename)', () => {
+    for (const path of [
+      '.env.example',
+      '.env.sample',
+      '.env.template',
+      '.env.dist',
+      'config/.env.example',
+      'apps/web/.env.template',
+      'C:\\Users\\dev\\app\\.env.sample'
+    ]) {
+      expect(isSecretPath(path), path).toBe(false)
     }
   })
 
@@ -141,5 +155,57 @@ describe('findSecretPathsInCommand', () => {
     const [hit] = findSecretPathsInCommand('cat .env')
     expect(hit.ruleId).toBe('env-file')
     expect(hit.blocked).toBe(true)
+  })
+
+  it('allows command references to an env template but not the real file', () => {
+    expect(findSecretPathsInCommand('cat .env.example')).toEqual([])
+    expect(findSecretPathsInCommand('cp .env.example .env')).not.toEqual([])
+  })
+})
+
+/**
+ * Decision 1 (v2.6.2): the env-template allowlist is a closed, explicit set.
+ * Enumerated case-by-case so a future "helpful" widening fails loudly here.
+ */
+describe('env template allowlist', () => {
+  it('allows .env.example', () => {
+    expect(isSecretPath('.env.example')).toBe(false)
+  })
+
+  it('allows .env.sample', () => {
+    expect(isSecretPath('.env.sample')).toBe(false)
+  })
+
+  it('allows .env.template', () => {
+    expect(isSecretPath('.env.template')).toBe(false)
+  })
+
+  it('allows .env.dist', () => {
+    expect(isSecretPath('.env.dist')).toBe(false)
+  })
+
+  it('blocks .env', () => {
+    expect(isSecretPath('.env')).toBe(true)
+  })
+
+  it('blocks .env.local', () => {
+    expect(isSecretPath('.env.local')).toBe(true)
+  })
+
+  it('blocks .env.production', () => {
+    expect(isSecretPath('.env.production')).toBe(true)
+  })
+
+  it('blocks .env.backup', () => {
+    expect(isSecretPath('.env.backup')).toBe(true)
+  })
+
+  it('blocks My.env.example.txt (the basename is not a template)', () => {
+    expect(isSecretPath('My.env.example.txt')).toBe(true)
+  })
+
+  it('allows the template nested under directories', () => {
+    expect(isSecretPath('path/to/.env.example')).toBe(false)
+    expect(isSecretPath('C:\\proj\\app\\.env.dist')).toBe(false)
   })
 })
