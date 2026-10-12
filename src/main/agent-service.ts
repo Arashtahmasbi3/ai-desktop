@@ -875,6 +875,8 @@ export class AgentService {
       ...remote,
       ...(effectiveSystemHint ? { systemHint: effectiveSystemHint } : {}),
       ...(planMode ? { planMode: true } : {}),
+      // v2.6.2 T3.1: stamp the served goal onto every emitted trace decision.
+      ...(goalContext.goal ? { goalId: goalContext.goal.id } : {}),
       // Investigate: never offer mutating tools to the model; production
       // Investigate goes further and offers only the named diagnostics (T2.4).
       ...(toolPolicy ? { toolPolicy } : {}),
