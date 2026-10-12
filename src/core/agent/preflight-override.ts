@@ -65,3 +65,16 @@ export function extractPreflightReason(checks: PreflightCheck[]): string {
 export function canRetryPreflight(attempt: number): boolean {
   return attempt < MAX_PREFLIGHT_RETRIES
 }
+
+/**
+ * v2.6.3 T3.2.2 - the durable, model-readable note injected when the user picks
+ * "cleanup". The action stays cancelled; this only tells the model how to
+ * recover. Cleanup itself still goes through the normal plan/approval flow, so
+ * nothing is ever deleted automatically.
+ */
+export const PREFLIGHT_CLEANUP_NOTE =
+  'The preflight check failed and the user chose to clean up rather than override ' +
+  'it. Do NOT retry the blocked action as-is. Propose a short, ordered cleanup plan ' +
+  '(inspect what is safe to remove first, then free space) and wait for approval ' +
+  'before deleting or changing anything.'
+

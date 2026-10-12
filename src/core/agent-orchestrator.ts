@@ -59,7 +59,16 @@ import {
 import type { ApprovalMode } from '@shared/approval'
 import type { RoutingDecision } from './agent/remote-routing'
 import type { ToolExecutor, ToolExecOptions } from './agent/tools'
-import { preflightTier, preflightWarnings, type PreflightResult } from './agent/preflight'
+import { preflightTier, preflightWarnings, type PreflightResult, type PreflightTier } from './agent/preflight'
+import {
+  canOverrideTier,
+  canRetryPreflight,
+  extractPreflightReason,
+  preflightNeedsChoice,
+  PREFLIGHT_CLEANUP_NOTE
+} from './agent/preflight-override'
+import type { PreflightChoice } from '@shared/preflight'
+import { PREFLIGHT_RETRY_DELAY_MS } from '@shared/preflight'
 import { verifySuccess, type ToolCallRecord } from './agent/success-verifier'
 import { buildTraceDecision } from './agent/trace-decision'
 
@@ -162,6 +171,20 @@ export interface AgentOrchestratorOptions {
    * with `ok: false` blocks the action and any warn/fail checks are logged.
    */
   preflightGate?: (action: AgentAction) => Promise<PreflightResult | undefined>
+  /**
+   * Interactive preflight override (v2.6.3, T3.2). Consulted only when
+   * {@link preflightGate} returns a `block` (offer an override or a cleanup) or a
+   * `critical` (offer a bounded retry). `attempt` is the number of critical
+   * retries already used. Absent means a non-ok check blocks, as before.
+   */
+  preflightOverride?: (
+    action: AgentAction,
+    result: PreflightResult,
+    tier: PreflightTier,
+    context: { attempt: number }
+  ) => Promise<PreflightChoice>
+  /** Delay before a critical retry re-runs the check (default 5s). */
+  preflightRetryDelayMs?: number
   /**
    * Enforcement (v2.4, A.3). When true, a final answer that claims success is only
    * accepted if a verification-shaped tool call (test/build/health) recently passed.
@@ -520,6 +543,13 @@ export class AgentOrchestrator {
   private readonly onFileWritten?: (change: FileChange) => void
   private readonly onToolResult?: (result: ToolResultView) => void
   private readonly preflightGate?: (action: AgentAction) => Promise<PreflightResult | undefined>
+  private readonly preflightOverride?: (
+    action: AgentAction,
+    result: PreflightResult,
+    tier: PreflightTier,
+    context: { attempt: number }
+  ) => Promise<PreflightChoice>
+  private readonly preflightRetryDelayMs: number
   private readonly enforceSuccessVerification: boolean
   private readonly diagnosticMode?: () => boolean
   private readonly remoteContext?: RemotePromptContext
@@ -568,6 +598,8 @@ export class AgentOrchestrator {
     this.onFileWritten = options.onFileWritten
     this.onToolResult = options.onToolResult
     this.preflightGate = options.preflightGate
+    this.preflightOverride = options.preflightOverride
+    this.preflightRetryDelayMs = options.preflightRetryDelayMs ?? PREFLIGHT_RETRY_DELAY_MS
     this.enforceSuccessVerification = options.enforceSuccessVerification ?? false
     this.diagnosticMode = options.diagnosticMode
     this.remoteContext = options.remoteContext
@@ -837,6 +869,8 @@ export class AgentOrchestrator {
         ])
         let guardStop: LoopCallDecision | null = null
         let planCancelled = false
+        // v2.6.3 T3.2: the user refused a preflight block; stop the step cleanly.
+        let preflightCancelled = false
         // Fix 4: durable system notes for this step, flushed after the tool
         // results so an approval/plan note never splits an assistant/tool pair.
         const stepNotes: string[] = []
@@ -992,58 +1026,18 @@ export class AgentOrchestrator {
 
           // v2.4 A.2: state check before a sensitive action executes.
           if (this.preflightGate) {
-            let check: PreflightResult | undefined
-            try {
-              check = await this.preflightGate(action)
-            } catch {
-              check = undefined
-            }
-            // v2.6.3 T3.1: surface the tiered result to the UI (the structured log
-            // is what AgentService forwards to the renderer's banner).
-            if (check) {
-              const tier = preflightTier(check)
-              if (tier !== 'ok') {
-                this.log(tier === 'warn' ? 'warn' : 'error', 'preflight', runId, {
-                  step: index,
-                  tool: action.name,
-                  tier,
-                  blocked: !check.ok,
-                  checks: check.checks
-                })
-              }
-            }
-            if (check && !check.ok) {
-              const failed = check.checks.filter((entry) => entry.status === 'fail')
-              const blocked: AgentToolResult = {
-                actionId: action.id,
-                name: action.name,
-                ok: false,
-                output: '',
-                error: `Preflight failed: ${failed.map((entry) => entry.message).join('; ')}`,
-                code: 'blocked',
-                attempts: 1,
-                durationMs: 0
-              }
-              this.log('warn', 'preflight.blocked', runId, {
-                step: index,
-                tool: action.name,
-                checks: failed.map((entry) => entry.name)
-              })
-              observations.push(blocked)
-              context.appendToolResult({
-                toolCallId: action.id,
-                name: action.name,
-                content: formatObservation(blocked)
-              })
-              continue
-            }
-            const warnings = check ? preflightWarnings(check) : []
-            if (warnings.length > 0) {
-              this.log('warn', 'preflight.warnings', runId, {
-                step: index,
-                tool: action.name,
-                checks: warnings.map((entry) => entry.name)
-              })
+            const outcome = await this.resolvePreflight(
+              action,
+              runId,
+              index,
+              options,
+              context,
+              observations
+            )
+            if (outcome === 'blocked') continue
+            if (outcome === 'cancelled') {
+              preflightCancelled = true
+              break
             }
           }
 
@@ -1101,6 +1095,15 @@ export class AgentOrchestrator {
         if (planCancelled) {
           status = 'needs_input'
           message = 'Plan cancelled by the user.'
+          finalAnswer = null
+          break
+        }
+
+        // v2.6.3 T3.2: a cancelled preflight block stops the run with a clear reason
+        // instead of silently dropping the action.
+        if (preflightCancelled) {
+          status = 'needs_input'
+          message = 'Preflight block cancelled by the user.'
           finalAnswer = null
           break
         }
@@ -1478,6 +1481,162 @@ export class AgentOrchestrator {
           ? extra.execute(action, options)
           : sandboxExecutor.execute(action, options)
     }
+  }
+
+  /**
+   * v2.6.3 T3.2: run the preflight gate for one action and, when it fails,
+   * resolve it interactively. Returns:
+   * - `ok`        the action may run (passed, warn-only, or a block the user overrode)
+   * - `blocked`   the action was refused and recorded; carry on with the next one
+   * - `cancelled` the user cancelled; the step must stop
+   */
+  private async resolvePreflight(
+    action: AgentAction,
+    runId: string,
+    step: number,
+    options: AgentRunOptions,
+    context: ContextManager,
+    observations: AgentToolResult[]
+  ): Promise<'ok' | 'blocked' | 'cancelled'> {
+    if (!this.preflightGate) return 'ok'
+    let check: PreflightResult | undefined
+    try {
+      check = await this.preflightGate(action)
+    } catch {
+      check = undefined
+    }
+    if (!check) return 'ok'
+
+    // v2.6.3 T3.1: surface the tiered result to the UI (the structured log is
+    // what AgentService forwards to the renderer's banner).
+    let tier = preflightTier(check)
+    if (tier === 'ok') return 'ok'
+    this.log(tier === 'warn' ? 'warn' : 'error', 'preflight', runId, {
+      step,
+      tool: action.name,
+      tier,
+      blocked: !check.ok,
+      checks: check.checks
+    })
+
+    if (check.ok) {
+      const warnings = preflightWarnings(check)
+      if (warnings.length > 0) {
+        this.log('warn', 'preflight.warnings', runId, {
+          step,
+          tool: action.name,
+          checks: warnings.map((entry) => entry.name)
+        })
+      }
+      return 'ok'
+    }
+
+    // Without an interactive override (or for a tier that never prompts) a hard
+    // block fails closed, exactly as before v2.6.3.
+    if (!this.preflightOverride || !preflightNeedsChoice(tier)) {
+      this.rejectPreflight(action, check, runId, step, context, observations)
+      return 'blocked'
+    }
+
+    let attempt = 0
+    for (;;) {
+      const choice = await this.requestPreflightChoice(action, check, tier, attempt)
+      if (choice === 'proceed' && canOverrideTier(tier)) {
+        this.log('warn', 'preflight.override', runId, {
+          step,
+          tool: action.name,
+          tier,
+          reason: extractPreflightReason(check.checks)
+        })
+        return 'ok'
+      }
+      if (choice === 'retry' && tier === 'critical' && canRetryPreflight(attempt)) {
+        attempt += 1
+        await this.delay(this.preflightRetryDelayMs, options.signal)
+        const recheck = await this.preflightGate(action).catch(() => undefined)
+        if (!recheck) return 'ok'
+        tier = preflightTier(recheck)
+        if (tier === 'ok') return 'ok'
+        if (recheck.ok) return 'ok'
+        check = recheck
+        continue
+      }
+      if (choice === 'cleanup') {
+        this.log('warn', 'preflight.cleanup', runId, { step, tool: action.name, tier })
+        context.appendHint(PREFLIGHT_CLEANUP_NOTE)
+        this.rejectPreflight(action, check, runId, step, context, observations)
+        return 'blocked'
+      }
+      // `cancel`, and any choice the tier does not allow, stops the step.
+      this.log('warn', 'preflight.cancelled', runId, {
+        step,
+        tool: action.name,
+        tier,
+        reason: extractPreflightReason(check.checks)
+      })
+      return 'cancelled'
+    }
+  }
+
+  /** Ask the override callback, failing closed on any error. */
+  private async requestPreflightChoice(
+    action: AgentAction,
+    result: PreflightResult,
+    tier: PreflightTier,
+    attempt: number
+  ): Promise<PreflightChoice> {
+    try {
+      return (await this.preflightOverride!(action, result, tier, { attempt })) ?? 'cancel'
+    } catch {
+      return 'cancel'
+    }
+  }
+
+  /** Record a hard block as an observation, so the model sees the refusal. */
+  private rejectPreflight(
+    action: AgentAction,
+    check: PreflightResult,
+    runId: string,
+    step: number,
+    context: ContextManager,
+    observations: AgentToolResult[]
+  ): void {
+    const failed = check.checks.filter((entry) => entry.status === 'fail')
+    const blocked: AgentToolResult = {
+      actionId: action.id,
+      name: action.name,
+      ok: false,
+      output: '',
+      error: `Preflight failed: ${failed.map((entry) => entry.message).join('; ')}`,
+      code: 'blocked',
+      attempts: 1,
+      durationMs: 0
+    }
+    this.log('warn', 'preflight.blocked', runId, {
+      step,
+      tool: action.name,
+      checks: failed.map((entry) => entry.name)
+    })
+    observations.push(blocked)
+    context.appendToolResult({
+      toolCallId: action.id,
+      name: action.name,
+      content: formatObservation(blocked)
+    })
+  }
+
+  /** Sleep, waking early (and never throwing) when the run is aborted. */
+  private delay(ms: number, signal?: AbortSignal): Promise<void> {
+    if (signal?.aborted) return Promise.resolve()
+    return new Promise((resolve) => {
+      const timer = setTimeout(done, ms)
+      function done(): void {
+        clearTimeout(timer)
+        signal?.removeEventListener('abort', done)
+        resolve()
+      }
+      signal?.addEventListener('abort', done, { once: true })
+    })
   }
 
   /** Ask the approval gate (when present), then execute or block the action. */

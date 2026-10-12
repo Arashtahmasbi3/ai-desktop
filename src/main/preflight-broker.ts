@@ -7,7 +7,7 @@ import {
   type PreflightRequestView
 } from '@shared/preflight'
 import type { PreflightCheck } from '@core/agent/preflight'
-import { buildPreflightOptions, extractPreflightReason } from '@core/agent/preflight-override'
+import { buildPreflightOptions, canRetryPreflight, extractPreflightReason } from '@core/agent/preflight-override'
 
 /** Extra context the caller attaches to a preflight prompt. */
 export interface PreflightRequestContext {
@@ -59,7 +59,9 @@ export class PreflightBroker {
       tier: context.tier,
       reason: extractPreflightReason(context.checks),
       checks: context.checks,
-      options: buildPreflightOptions(context.tier),
+      options: buildPreflightOptions(context.tier).filter(
+        (option) => option.id !== 'retry' || canRetryPreflight(context.attempt ?? 0)
+      ),
       timeoutMs: this.timeoutMs,
       ...(command !== undefined ? { command } : {}),
       ...(path !== undefined ? { path } : {}),

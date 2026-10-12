@@ -8,6 +8,7 @@ import { APIError, AuthError } from '@core/llm-adapters'
 import { MemoryLogger } from '@core/agent/logger'
 import { FileSessionStore } from '@core/agent/session-store'
 import { SANDBOX_TOOLS } from '@core/agent/tools'
+import type { PreflightTier } from '@core/agent/preflight'
 import { ScriptedAdapter, toolCall } from '../helpers/fake-adapter'
 import { createLocalManager, createUnavailableManager } from '../helpers/local-sandbox-manager'
 
@@ -709,6 +710,215 @@ describe('preflight gate (v2.4 A.2)', () => {
 
     const result = await orchestrator.run('write a file')
 
+    expect(result.steps[0].observations[0]).toMatchObject({ ok: true })
+    await manager.dispose()
+  })
+})
+
+describe('interactive preflight override (v2.6.3 T3.2)', () => {
+  const blockResult = {
+    ok: false,
+    checks: [
+      { name: 'workspace', status: 'pass' as const, message: 'Workspace exists' },
+      { name: 'disk', status: 'fail' as const, message: 'Disk 95% full' }
+    ]
+  }
+  const criticalResult = {
+    ok: false,
+    checks: [{ name: 'workspace', status: 'fail' as const, message: 'Workspace not found' }]
+  }
+
+  it('runs the action when the user overrides a block', async () => {
+    const manager = createLocalManager(base)
+    const logger = new MemoryLogger()
+    const adapter = new ScriptedAdapter('deepseek', [
+      { toolCalls: [toolCall('write_file', { path: 'over.txt', content: 'x' })] },
+      { content: 'wrote it' }
+    ])
+    const orchestrator = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(adapter)],
+      logger,
+      preflightGate: async () => blockResult,
+      preflightOverride: async () => 'proceed'
+    })
+
+    const result = await orchestrator.run('write a file')
+
+    expect(result.steps[0].observations[0]).toMatchObject({ ok: true })
+    expect(logger.first('preflight.override')).toMatchObject({ tier: 'block' })
+    await manager.dispose()
+  })
+
+  it('refuses the action when the user cancels a block', async () => {
+    const manager = createLocalManager(base)
+    const logger = new MemoryLogger()
+    const adapter = new ScriptedAdapter('deepseek', [
+      { toolCalls: [toolCall('write_file', { path: 'no.txt', content: 'x' })] },
+      { content: 'ok' }
+    ])
+    const orchestrator = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(adapter)],
+      logger,
+      preflightGate: async () => blockResult,
+      preflightOverride: async () => 'cancel'
+    })
+
+    const result = await orchestrator.run('write a file')
+
+    expect(result.status).toBe('needs_input')
+    expect(logger.first('preflight.cancelled')).toMatchObject({ tier: 'block' })
+    await manager.dispose()
+  })
+
+  it('cancels the blocked action but keeps the run alive on cleanup', async () => {
+    const manager = createLocalManager(base)
+    const logger = new MemoryLogger()
+    const adapter = new ScriptedAdapter('deepseek', [
+      { toolCalls: [toolCall('write_file', { path: 'clean.txt', content: 'x' })] },
+      { content: 'I will plan a cleanup instead.' }
+    ])
+    const orchestrator = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(adapter)],
+      logger,
+      preflightGate: async () => blockResult,
+      preflightOverride: async () => 'cleanup'
+    })
+
+    const result = await orchestrator.run('write a file')
+
+    expect(result.steps[0].observations[0]).toMatchObject({ ok: false, code: 'blocked' })
+    expect(logger.first('preflight.cleanup')).toMatchObject({ tier: 'block' })
+    await manager.dispose()
+  })
+
+  it('never offers an override for a critical failure', async () => {
+    const manager = createLocalManager(base)
+    const seen: PreflightTier[] = []
+    const adapter = new ScriptedAdapter('deepseek', [
+      { toolCalls: [toolCall('write_file', { path: 'crit.txt', content: 'x' })] },
+      { content: 'ok' }
+    ])
+    const orchestrator = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(adapter)],
+      preflightGate: async () => criticalResult,
+      preflightOverride: async (_action, _result, tier) => {
+        seen.push(tier)
+        return 'cancel'
+      }
+    })
+
+    const result = await orchestrator.run('write a file')
+
+    expect(seen).toEqual(['critical'])
+    expect(result.status).toBe('needs_input')
+    await manager.dispose()
+  })
+
+  it('treats a critical tier as retryable but cancels before the attempt cap', async () => {
+    const manager = createLocalManager(base)
+    let checked = 0
+    const choices: number[] = []
+    const adapter = new ScriptedAdapter('deepseek', [
+      { toolCalls: [toolCall('write_file', { path: 'retry.txt', content: 'x' })] },
+      { content: 'ok' }
+    ])
+    const orchestrator = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(adapter)],
+      preflightRetryDelayMs: 0,
+      preflightGate: async () => {
+        checked += 1
+        return criticalResult
+      },
+      preflightOverride: async (_action, _result, _tier, context) => {
+        choices.push(context.attempt)
+        return 'retry'
+      }
+    })
+
+    const result = await orchestrator.run('write a file')
+
+    // Attempts exposed to the callback: 0, 1, 2. A `retry` past the cap is
+    // ignored (the renderer never offers it), so the run cancels instead.
+    expect(choices).toEqual([0, 1, 2])
+    expect(result.status).toBe('needs_input')
+    await manager.dispose()
+  })
+
+  it('runs the action when a critical retry then passes', async () => {
+    const manager = createLocalManager(base)
+    let checked = 0
+    const adapter = new ScriptedAdapter('deepseek', [
+      { toolCalls: [toolCall('write_file', { path: 'recovered.txt', content: 'x' })] },
+      { content: 'done' }
+    ])
+    const orchestrator = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(adapter)],
+      preflightRetryDelayMs: 0,
+      preflightGate: async () => {
+        checked += 1
+        if (checked === 1) return criticalResult
+        return { ok: true, checks: [{ name: 'workspace', status: 'pass' as const, message: 'ok' }] }
+      },
+      preflightOverride: async () => 'retry'
+    })
+
+    const result = await orchestrator.run('write a file')
+
+    expect(checked).toBe(2)
+    expect(result.steps[0].observations[0]).toMatchObject({ ok: true })
+    await manager.dispose()
+  })
+
+  it('still fails closed when no override callback is wired', async () => {
+    const manager = createLocalManager(base)
+    const adapter = new ScriptedAdapter('deepseek', [
+      { toolCalls: [toolCall('write_file', { path: 'x.txt', content: 'x' })] },
+      { content: 'ok' }
+    ])
+    const orchestrator = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(adapter)],
+      preflightGate: async () => blockResult
+    })
+
+    const result = await orchestrator.run('write a file')
+
+    expect(result.steps[0].observations[0]).toMatchObject({ ok: false, code: 'blocked' })
+    await manager.dispose()
+  })
+
+  it('does not prompt for warn-only results', async () => {
+    const manager = createLocalManager(base)
+    let prompted = false
+    const adapter = new ScriptedAdapter('deepseek', [
+      { toolCalls: [toolCall('write_file', { path: 'warn.txt', content: 'x' })] },
+      { content: 'ok' }
+    ])
+    const orchestrator = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(adapter)],
+      preflightGate: async () => ({
+        ok: true,
+        checks: [
+          { name: 'workspace', status: 'pass' as const, message: 'ok' },
+          { name: 'git-clean', status: 'warn' as const, message: '3 uncommitted' }
+        ]
+      }),
+      preflightOverride: async () => {
+        prompted = true
+        return 'cancel'
+      }
+    })
+
+    const result = await orchestrator.run('write a file')
+
+    expect(prompted).toBe(false)
     expect(result.steps[0].observations[0]).toMatchObject({ ok: true })
     await manager.dispose()
   })

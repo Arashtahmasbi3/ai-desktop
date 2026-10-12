@@ -107,6 +107,19 @@ describe('PreflightBroker', () => {
     await expect(first).resolves.toBe('cancel')
   })
 
+  it('hides the retry option once critical retries are exhausted', () => {
+    const events: AgentEvent[] = []
+    const broker = new PreflightBroker({ emit: (event) => events.push(event) })
+    void broker.request('run-1', action('remote_write_file', {}), {
+      tier: 'critical',
+      checks: [{ name: 'workspace', status: 'fail', message: 'missing' }],
+      attempt: 2
+    })
+    const request = events[0]
+    if (request.type !== 'preflight:request') throw new Error('unreachable')
+    expect(request.request.options.map((option) => option.id)).toEqual(['cancel'])
+  })
+
   it('ignores an answer for an unknown id', () => {
     const broker = new PreflightBroker({ emit: () => undefined })
     expect(broker.resolve('nope', 'proceed')).toBe(false)
