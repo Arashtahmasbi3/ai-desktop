@@ -13,6 +13,7 @@ import type { Plan, ApprovedPlan, PlanDecision, PlanWarning } from './plan'
 import type { ProjectMetadata } from './project-metadata'
 import type { ResolvedProfile } from './profile'
 import type { TaskPlan, TaskStep } from './task-plan'
+import type { PreflightChoice, PreflightRequestView } from './preflight'
 
 /** A project (folder) the user has added to the app. */
 export interface ProjectRecord extends ProjectMetadata {
@@ -281,6 +282,8 @@ export type AgentEvent =
   | { type: 'approval:suggestion'; tool: string; count: number }
   | { type: 'plan:request'; request: PlanRequest }
   | { type: 'plan:resolved'; id: string; decision: PlanDecision; at: number }
+  | { type: 'preflight:request'; request: PreflightRequestView }
+  | { type: 'preflight:resolved'; id: string; choice: PreflightChoice; at: number }
   | { type: 'plan:active'; plan: ApprovedPlan; at: number }
   | { type: 'plan:inactive'; at: number; reason?: 'expired' | 'cleared' | 'legacy'; message?: string }
   | { type: 'file:change'; change: FileChangeView; at: number }
