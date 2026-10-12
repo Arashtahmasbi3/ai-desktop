@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.2] — 2026-10-05
+
+Release v2.6.2 "Collaborative Design" adds session profiles, the Secret Path
+Guard, Explore Mode, project goals, a tamper-evident execution trace, and a
+round of UI polish.
+
+### Session Profile (P0-5)
+
+- **Elevation grants live in main.** The `full` approval grant, its environment
+  TTL (development 60m / staging 30m / production 15m) and its (project, VPS,
+  environment) scope are owned by `SessionProfileService`. A renderer reload can
+  no longer silently restore `full`; a persisted `full` without a matching grant
+  clamps to at most `auto-write` (harder on production). `AgentService` reads the
+  effective mode from the profile, never from the renderer.
+
+### Secret Path Guard
+
+- Canonical guard blocks credential files (`.env`, keys, tokens) across the local
+  and remote file/shell tools; `.env.example`-style templates stay allowed.
+
+### Explore Mode
+
+- Investigate exposes a read-only tool set, plan-only runs as the zero-tool
+  sub-flag, and named diagnostics; Deploy is environment-aware and never reaches
+  `full` on production.
+
+### Goal / Plan / Run
+
+- Per-project Goal schema + store, runs attach to the active goal, plan trust is
+  scoped by project, branch and environment, and goals are managed from the UI.
+
+### Execution Trace
+
+- Agent steps derive auditable decisions; the Progress timeline and DecisionCard
+  explain them on demand, and Settings → Advanced → Audit writes a per-project
+  hash-chained JSONL with on-demand verification.
+
+### UI Polish
+
+- **Composer:** the always-on token counter is replaced by a near-limit context
+  warning with a one-click Compact action; token accounting moved to Settings → Usage.
+- **Jobs:** the background jobs panel is collapsed by default behind a sidebar
+  badge, with completion toasts and a "show always" preference.
+- **Shortcuts:** Ctrl+K now opens the command palette alone (chat search moved to
+  Ctrl+Shift+K), Ctrl+= / Ctrl+- / Ctrl+0 zoom (persisted), Shift+Esc is an
+  emergency stop, and `?` opens a shortcut cheat sheet.
+- **Persian rendering:** Vazirmatn leads the font stack in Farsi, chat markdown is
+  bidi-isolated, and Latin-only controls stay LTR inside RTL chrome.
+- **Modals:** Git setup, migration, onboarding and code search are now
+  viewport-capped so their content scrolls and actions stay reachable.
+
 ## [2.6.1] — 2026-10-05
 
 Release v2.6.1 bundles the v2.6.0 "UI/UX Major Overhaul" with the v2.6.1
@@ -646,6 +697,8 @@ First stable release. Ships as a Windows x64 NSIS installer and a portable execu
   `node_modules` are shipped inside the app package.
 - Optional code signing via `CSC_LINK` / `CSC_KEY_PASSWORD` (skipped safely when absent).
 
-[Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.6.2...HEAD
+[2.6.2]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.6.1...v2.6.2
+[2.6.1]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.6.0...v2.6.1
 [2.3.2]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.3.1...v2.3.2
 [1.0.0]: https://github.com/Arashtahmasbi3/ai-desktop/releases/tag/v1.0.0
