@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import {
   createDiagnosticPolicy,
+  createReadScopePolicy,
   diagnosticRemainingMs,
   isDiagnosticActive,
   isDiagnosticAllowed,
+  mergeReadPolicies,
   DIAGNOSTIC_TTL_MS,
   type DiagnosticPolicy
 } from '@core/remote/diagnostic-policy'
@@ -133,5 +135,48 @@ describe('Diagnostic Mode — always-allowed commands (Fix 2)', () => {
   it('does not allow a pipe, redirect or newline around a safe command', () => {
     expect(isCommandAlwaysAllowed('ps aux\ncat /etc/passwd')).toBe(false)
     expect(isCommandAlwaysAllowed('id > /tmp/x')).toBe(false)
+  })
+})
+
+/**
+ * v2.6.2 T2.4 — environment read scope. The Investigate read reach is expressed
+ * as a DiagnosticPolicy built from environment roots, so the two policies must
+ * compose without ever widening a *write* (writes ignore diagnostic entirely).
+ */
+describe('read scope policies (T2.4)', () => {
+  it('treats a root entry as "any absolute path"', () => {
+    const policy = createReadScopePolicy(['/'])
+    expect(isDiagnosticAllowed('/etc/passwd', policy)).toBe(true)
+    expect(isDiagnosticAllowed('/var/log/syslog', policy)).toBe(true)
+    expect(isDiagnosticAllowed('relative/path', policy)).toBe(false)
+  })
+
+  it('returns null when there is nothing to widen', () => {
+    expect(createReadScopePolicy([])).toBeNull()
+    expect(mergeReadPolicies(null, null)).toBeNull()
+    expect(mergeReadPolicies(null, undefined)).toBeNull()
+  })
+
+  it('unions two widenings and keeps the later expiry', () => {
+    const now = Date.now()
+    const a: DiagnosticPolicy = { enabled: true, expiresAt: now + 10_000, allowedPaths: ['/var/log'] }
+    const b: DiagnosticPolicy = { enabled: true, expiresAt: now + 20_000, allowedPaths: ['/tmp'] }
+    const merged = mergeReadPolicies(a, b)!
+    expect(merged.allowedPaths.sort()).toEqual(['/tmp', '/var/log'])
+    expect(merged.expiresAt).toBe(b.expiresAt)
+    expect(isDiagnosticAllowed('/var/log/x', merged)).toBe(true)
+    expect(isDiagnosticAllowed('/tmp/x', merged)).toBe(true)
+  })
+
+  it('still refuses a write to a path the read scope exposes', () => {
+    const policy = createReadScopePolicy(['/'])
+    expect(enforceProjectPath('/etc/passwd', ROOT, policy, 'read').ok).toBe(true)
+    expect(enforceProjectPath('/etc/passwd', ROOT, policy, 'write').ok).toBe(false)
+  })
+
+  it('a read scope never widens a non-read-only command', () => {
+    const policy = createReadScopePolicy(['/'])
+    expect(enforceCommandPaths('cat /etc/passwd', ROOT, policy).ok).toBe(true)
+    expect(enforceCommandPaths('rm /etc/passwd', ROOT, policy).ok).toBe(false)
   })
 })

@@ -32,6 +32,7 @@ import { routeToolCall, remoteWorkspaceHint } from '@core/agent/remote-routing'
 import type { RoutingDecision } from '@core/agent/remote-routing'
 import { detectWorkspace } from '@core/remote/workspace-detect'
 import type { DiagnosticPolicy } from '@core/remote/diagnostic-policy'
+import { createReadScopePolicy, mergeReadPolicies } from '@core/remote/diagnostic-policy'
 import { preflight, preflightActionFor, type PreflightResult } from '@core/agent/preflight'
 import { buildWorkspaceSystemHint } from '@core/agent/workspace-prompt'
 import type { RemoteWorkspaceInfo } from '@shared/workspace-info'
@@ -40,7 +41,7 @@ import { resolveVpsForRun, requiresVps } from '@core/agent/vps-resolver'
 import type { ApprovedPlan, Plan, PlanDecision, PlanScopeContext, PlanWarning } from '@shared/plan'
 import { PLAN_REAPPROVE_MESSAGE } from '@shared/plan'
 import type { ResolvedProfile } from '@shared/profile'
-import { isReadOnlyTool } from '@shared/profile'
+import { resolveToolExposure, toolPolicyFor, type ToolExposure } from '@core/agent/tool-policy'
 import {
   createApprovedPlan,
   shouldAutoApprove
@@ -478,7 +479,8 @@ export class AgentService {
   private async buildRemoteRuntime(
     task: string,
     vpsServerId?: string,
-    enabledTools?: string[]
+    enabledTools?: string[],
+    exposure?: ToolExposure
   ): Promise<RemoteRuntime> {
     const settings = await this.persistence.load()
     const active = settings.projects.find((project) => project.id === settings.activeProjectId)
@@ -487,8 +489,13 @@ export class AgentService {
     const serverId = active?.vpsId
     const connected = Boolean(serverId && connectedServers.includes(serverId))
     // Read the diagnostic policy once per run so a toggle mid-run does not change
-    // the containment rules under the agent's feet (v2.5.3).
-    const diagnostic = this.getDiagnosticPolicy?.() ?? null
+    // the containment rules under the agent's feet (v2.5.3). T2.4 unions it with
+    // the environment's Investigate read roots: a dev box may be read anywhere,
+    // staging only in logs/proc/tmp, production not at all (named tools only).
+    const diagnostic = mergeReadPolicies(
+      this.getDiagnosticPolicy?.() ?? null,
+      createReadScopePolicy(exposure?.readRoots ?? [])
+    )
 
     // A1: for a remote project, always install routing so a stray local tool call
     // is rewritten (when the VPS is connected) or answered with a clear error.
@@ -673,7 +680,22 @@ export class AgentService {
       ...(request.model ? { model: request.model } : {}),
       ...(request.customProviderId ? { customProviderId: request.customProviderId } : {})
     })
-    const remote = await this.buildRemoteRuntime(request.task, request.vpsServerId, request.enabledTools)
+    const settings = await this.persistence.load()
+    // Snapshot the project this run belongs to. Patches captured during the run
+    // are bound to it and can never be applied to another project (P0-1).
+    const activeProject = this.persistence.getActiveProject()
+    // P0-5 (v2.6.2): the effective posture is resolved in main before the remote
+    // runtime is built, so this run's tool exposure and read reach (T2.4) match
+    // the profile the user is actually in. The renderer is never consulted.
+    const profileState = this.sessionProfile ? await this.sessionProfile.state() : undefined
+    const exposure = profileState ? resolveToolExposure(profileState) : undefined
+    const toolPolicy = exposure ? toolPolicyFor(exposure) : undefined
+    const remote = await this.buildRemoteRuntime(
+      request.task,
+      request.vpsServerId,
+      request.enabledTools,
+      exposure
+    )
     const memory = await this.projectMemoryHint()
     const systemHint = [remote.systemHint, memory].filter(Boolean).join('\n\n')
 
@@ -681,10 +703,6 @@ export class AgentService {
     // v2.6.1 Fix 3: trust (and memory) are scoped to the chat/session, not the
     // run, so a plan stays trusted across the messages of one conversation.
     const sessionKey = request.sessionId ?? runId
-    const settings = await this.persistence.load()
-    // Snapshot the project this run belongs to. Patches captured during the run
-    // are bound to it and can never be applied to another project (P0-1).
-    const activeProject = this.persistence.getActiveProject()
     // v2.6.2 T4.3: resolve the project goal this run serves and describe it to the
     // model. Competing active goals are never guessed between — the run asks.
     let goalContext: RunGoalContext = { ambiguousGoalIds: [], needsInput: false }
@@ -749,11 +767,9 @@ export class AgentService {
           ...(activeProject.environment ? { environment: activeProject.environment } : {})
         }
       : undefined
-    // P0-5 (v2.6.2): the effective approval mode comes from main's Session
-    // Profile, never from the renderer or a stale persisted `full`. The legacy
-    // `settings.approvalMode` remains only as a fallback for callers that did
-    // not inject a Session Profile service (older tests).
-    const profileState = this.sessionProfile ? await this.sessionProfile.state() : undefined
+    // P0-5 (v2.6.2): approval comes from the Session Profile resolved at the top
+    // of this run; the legacy `settings.approvalMode` remains only as a fallback
+    // for callers that did not inject a Session Profile service (older tests).
     const approvalMode =
       profileState?.approvalMode ?? settings.approvalMode ?? DEFAULT_APPROVAL_MODE
     const planMode = request.planMode ?? profileState?.planMode ?? settings.planModeDefault ?? false
@@ -859,8 +875,9 @@ export class AgentService {
       ...remote,
       ...(effectiveSystemHint ? { systemHint: effectiveSystemHint } : {}),
       ...(planMode ? { planMode: true } : {}),
-      // Investigate/read-only: never offer mutating tools to the model (v2.6.2).
-      ...(profileState && !profileState.exposeWriteTools ? { toolPolicy: isReadOnlyTool } : {}),
+      // Investigate: never offer mutating tools to the model; production
+      // Investigate goes further and offers only the named diagnostics (T2.4).
+      ...(toolPolicy ? { toolPolicy } : {}),
       ...(approvalGate ? { approvalGate } : {}),
       ...(planGate ? { planGate, planApproval: approvalMode } : {}),
       ...(preflightGate ? { preflightGate } : {}),
