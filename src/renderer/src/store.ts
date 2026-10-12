@@ -117,6 +117,7 @@ const MAX_DECISIONS = 200
 const MAX_TERMINAL_LINES = 500
 export const CONTEXT_SETTINGS_KEY = 'ai-desktop:show-context-before-send'
 const CHAT_TREE_KEY = 'ai-desktop:chat-tree-open'
+const RAW_TOOL_ROWS_KEY = 'ai-desktop:show-raw-tool-rows'
 const JOBS_PANEL_KEY = 'ai-desktop:show-jobs-panel'
 const ZOOM_KEY = 'ai-desktop:zoom-level'
 /** Electron zoom-level step per keyboard press (v2.6.2 T5.3). */
@@ -154,6 +155,19 @@ function readChatTreeOpen(): boolean {
 export function readShowJobsPanelAlways(): boolean {
   try {
     return globalThis.localStorage?.getItem(JOBS_PANEL_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Read the persisted "show raw tool rows" preference (v2.6.3, default off).
+ * Tool rows already grouped inside the inline trace are hidden unless this is on,
+ * which keeps the chat readable but leaves a debugging escape hatch.
+ */
+export function readShowRawToolRows(): boolean {
+  try {
+    return globalThis.localStorage?.getItem(RAW_TOOL_ROWS_KEY) === '1'
   } catch {
     return false
   }
@@ -328,6 +342,8 @@ interface AppState {
   jobsPanelOpen: boolean
   /** Pin the jobs panel open even with nothing running (T5.2). */
   showJobsPanelAlways: boolean
+  /** v2.6.3: show raw tool rows instead of hiding those grouped in the trace. */
+  showRawToolRows: boolean
   /** Electron zoom level, 0 == 100% (T5.3). */
   zoomLevel: number
   /** Keyboard-shortcut cheat sheet visibility (T5.3). */
@@ -384,6 +400,8 @@ interface AppState {
   refreshJobs: () => Promise<void>
   setJobsPanelOpen: (open: boolean) => void
   setShowJobsPanelAlways: (value: boolean) => void
+  /** v2.6.3: toggle raw tool rows (persisted). */
+  setShowRawToolRows: (value: boolean) => void
   /** Apply (and persist) an Electron zoom level, clamped to a safe range (T5.3). */
   applyZoom: (level: number) => void
   zoomIn: () => void
@@ -551,6 +569,7 @@ export const useStore = create<AppState>((set, get) => ({
   jobs: [],
   jobsPanelOpen: false,
   showJobsPanelAlways: readShowJobsPanelAlways(),
+  showRawToolRows: readShowRawToolRows(),
   zoomLevel: readZoomLevel(),
   shortcutsOpen: false,
 
@@ -792,6 +811,14 @@ export const useStore = create<AppState>((set, get) => ({
     set({ showJobsPanelAlways: value, ...(value ? { jobsPanelOpen: true } : {}) })
     try {
       globalThis.localStorage?.setItem(JOBS_PANEL_KEY, value ? '1' : '0')
+    } catch {
+      // Persisting the preference is best-effort.
+    }
+  },
+  setShowRawToolRows(value) {
+    set({ showRawToolRows: value })
+    try {
+      globalThis.localStorage?.setItem(RAW_TOOL_ROWS_KEY, value ? '1' : '0')
     } catch {
       // Persisting the preference is best-effort.
     }

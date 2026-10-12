@@ -259,6 +259,8 @@
     "languageHint": "زبان رابط کاربری و جهت متن.",
     "showContextBeforeSend": "نمایش پیش‌نمایش کانتکست قبل از ارسال",
     "showJobsPanelAlways": "همیشه پنل کارهای پس‌زمینه را نشان بده",
+    "showRawToolRows": "نمایش ردیف‌های خام ابزار (برای اشکال‌زدایی)",
+    "showRawToolRowsHint": "فراخوانی‌های ابزاری که در «ردّ اجرا» نمایش داده شده‌اند، به‌صورت پیش‌فرض پنهان می‌شوند.",
     "projectName": "نام",
     "projectPath": "مسیر (مثلاً C:\\Users\\me\\project)",
     "noProjects": "هنوز پروژه‌ای نداری.",

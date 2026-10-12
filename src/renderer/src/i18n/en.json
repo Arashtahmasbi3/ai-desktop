@@ -259,6 +259,8 @@
     "languageHint": "Interface language and text direction.",
     "showContextBeforeSend": "Show context preview before sending",
     "showJobsPanelAlways": "Always show the background jobs panel",
+    "showRawToolRows": "Show raw tool rows (for debugging)",
+    "showRawToolRowsHint": "Tool calls already shown inside the execution trace are hidden by default.",
     "projectName": "Name",
     "projectPath": "Path (e.g. C:\\Users\\me\\project)",
     "noProjects": "No projects yet.",

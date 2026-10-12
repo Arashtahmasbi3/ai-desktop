@@ -38,6 +38,7 @@ import { filterSlashCommands, resolveSlashCommand } from '../lib/slash'
 import { decideSend } from '../lib/context-gate'
 import { workspaceStatus, shouldShowWorkspaceBanner } from '../lib/project-status'
 import { CHAT_MAX_WIDTH } from '../lib/layout'
+import { visibleChatMessages } from '../lib/tool-rows'
 import { contextBudget } from '@shared/memory'
 
 const SUGGESTION_KEYS = [
@@ -58,6 +59,8 @@ interface SlashCommand {
 export default function ChatPanel(): JSX.Element {
   const { t, i18n } = useTranslation()
   const messages = useStore((state) => state.messages)
+  const decisions = useStore((state) => state.decisions)
+  const showRawToolRows = useStore((state) => state.showRawToolRows)
   const running = useStore((state) => state.running)
   const warnings = useStore((state) => state.warnings)
   const send = useStore((state) => state.send)
@@ -160,6 +163,10 @@ export default function ChatPanel(): JSX.Element {
 
   const matches = useMemo(() => filterSlashCommands(commands, input), [commands, input])
   const budget = useMemo(() => contextBudget(messages, input), [messages, input])
+  const chatMessages = useMemo(
+    () => visibleChatMessages(messages, decisions, showRawToolRows),
+    [messages, decisions, showRawToolRows]
+  )
   const contextPercent = Math.min(100, Math.round(budget.ratio * 100))
 
   useEffect(() => {
@@ -338,7 +345,7 @@ export default function ChatPanel(): JSX.Element {
             <TemplateMenu currentInput={input} onPick={(text) => setInput(text)} />
           </div>
         ) : (
-          messages.map((message) => <MessageBubble key={message.id} message={message} />)
+          chatMessages.map((message) => <MessageBubble key={message.id} message={message} />)
         )}
 
         <LiveStatus />
