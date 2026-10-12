@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { BarChart3, Download, RotateCcw } from 'lucide-react'
-import { estimateTokens } from '@shared/memory'
+import { estimateTokens, contextBudget, DEFAULT_CONTEXT_TOKEN_BUDGET } from '@shared/memory'
 import { useStore } from '../store'
 import {
   aggregateUsage,
@@ -107,6 +107,8 @@ export default function SettingsUsage(): JSX.Element {
     () => aggregateUsage(usageRecords.filter((record) => record.timestamp >= sessionStartedAt)),
     [usageRecords, sessionStartedAt]
   )
+  const context = useMemo(() => contextBudget(messages), [messages])
+  const contextPercent = Math.min(100, Math.round(context.ratio * 100))
   const maxDaily = Math.max(1, ...summary.last7Days.map((day) => day.inputTokens + day.outputTokens))
 
   const exportCsv = (): void => {
@@ -141,6 +143,27 @@ export default function SettingsUsage(): JSX.Element {
           </div>
         ))}
       </dl>
+
+      <div
+        data-testid="usage-context-window"
+        className="rounded-xl border border-border bg-bg-primary px-3 py-2"
+      >
+        <div className="flex items-center justify-between text-xs text-neutral-300">
+          <span>{t('settings.contextUsage')}</span>
+          <span className={`font-mono ${context.overBudget ? 'text-amber-400' : 'text-neutral-400'}`}>
+            {context.tokens.toLocaleString()} / {DEFAULT_CONTEXT_TOKEN_BUDGET.toLocaleString()} ·{' '}
+            {contextPercent}%
+          </span>
+        </div>
+        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-bg-tertiary">
+          <div
+            className={`h-full rounded-full transition-all ${
+              context.overBudget ? 'bg-amber-400' : 'bg-accent'
+            }`}
+            style={{ width: `${contextPercent}%` }}
+          />
+        </div>
+      </div>
 
       <div className="flex items-center justify-between border-t border-border pt-2">
         <span className="text-[11px] font-medium text-neutral-400">

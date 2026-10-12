@@ -95,8 +95,6 @@ export default function SettingsPanel(): JSX.Element | null {
   const close = useStore((state) => state.closeSettings)
   const locale = useStore((state) => state.locale)
   const setLocale = useStore((state) => state.setLocale)
-  const showTokenCount = useStore((state) => state.showTokenCount)
-  const setShowTokenCount = useStore((state) => state.setShowTokenCount)
   const showContextBeforeSend = useStore((state) => state.showContextBeforeSend)
   const setShowContextBeforeSend = useStore((state) => state.setShowContextBeforeSend)
 
@@ -192,15 +190,6 @@ export default function SettingsPanel(): JSX.Element | null {
                       ))}
                     </select>
                   </div>
-                  <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs text-neutral-300">
-                    <input
-                      type="checkbox"
-                      checked={showTokenCount}
-                      onChange={(event) => setShowTokenCount(event.target.checked)}
-                      className="accent-accent"
-                    />
-                    {t('settings.showTokenCount')}
-                  </label>
                   <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs text-neutral-300">
                     <input
                       type="checkbox"

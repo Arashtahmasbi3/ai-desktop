@@ -110,7 +110,6 @@ const MAX_LOGS = 500
 /** v2.6.2 T3.2: keep the timeline bounded too. */
 const MAX_DECISIONS = 200
 const MAX_TERMINAL_LINES = 500
-const TOKEN_SETTINGS_KEY = 'ai-desktop:show-token-count'
 export const CONTEXT_SETTINGS_KEY = 'ai-desktop:show-context-before-send'
 const CHAT_TREE_KEY = 'ai-desktop:chat-tree-open'
 const LAST_CHAT_KEY = 'ai-desktop:last-chat'
@@ -121,14 +120,6 @@ let fullAccessTimer: ReturnType<typeof setTimeout> | null = null
 
 function newId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `id-${Math.random().toString(36).slice(2)}`
-}
-
-function readShowTokenCount(): boolean {
-  try {
-    return globalThis.localStorage?.getItem(TOKEN_SETTINGS_KEY) !== '0'
-  } catch {
-    return true
-  }
 }
 
 /** Read the persisted "preview context before send" preference (default on). */
@@ -219,8 +210,6 @@ interface AppState {
   locale: Locale
   /** Collapsed state of the left sidebar. */
   sidebarCollapsed: boolean
-  /** Whether the token estimate is shown under the chat input. */
-  showTokenCount: boolean
   /** Whether the context preview is shown before each send (v2.3.2, B.4). */
   showContextBeforeSend: boolean
   /** Every recorded LLM call's token usage, oldest first (v2.5.4). */
@@ -294,7 +283,6 @@ interface AppState {
 
   setLocale: (locale: Locale) => void
   toggleSidebar: () => void
-  setShowTokenCount: (value: boolean) => void
   /** Toggle the pre-send context preview. */
   setShowContextBeforeSend: (value: boolean) => void
   /** Record one LLM call's usage and persist it (v2.5.4). */
@@ -379,6 +367,8 @@ interface AppState {
   send: (text: string) => Promise<void>
   abort: () => void
   newSession: () => void
+  /** v2.6.2 T5.1: archive the current chat and start a fresh context. */
+  compactContext: () => Promise<void>
   loadSession: (id: string) => Promise<void>
   refreshSessions: () => Promise<void>
   /** v2.6.1 Fix 5: load the active chat's memory summary. */
@@ -458,7 +448,6 @@ export const useStore = create<AppState>((set, get) => ({
 
   locale: detectLocale(),
   sidebarCollapsed: false,
-  showTokenCount: readShowTokenCount(),
   showContextBeforeSend: readShowContextBeforeSend(),
   usageRecords: loadUsage(),
   sessionStartedAt: Date.now(),
@@ -497,14 +486,6 @@ export const useStore = create<AppState>((set, get) => ({
     void i18nChangeLanguage(locale)
   },
   toggleSidebar: () => set({ sidebarCollapsed: !get().sidebarCollapsed }),
-  setShowTokenCount(value) {
-    set({ showTokenCount: value })
-    try {
-      globalThis.localStorage?.setItem(TOKEN_SETTINGS_KEY, value ? '1' : '0')
-    } catch {
-      // Persisting the preference is best-effort.
-    }
-  },
   setShowContextBeforeSend(value) {
     set({ showContextBeforeSend: value })
     try {
@@ -1194,6 +1175,21 @@ export const useStore = create<AppState>((set, get) => ({
     if (settings?.approvalMode === 'full' && !settings.rememberApprovalMode) {
       void get().setApprovalMode('ask')
     }
+  },
+
+  async compactContext() {
+    if (get().running) return
+    const count = get().messages.length
+    if (count === 0) return
+    // Persist first so the archived chat stays retrievable from the sidebar,
+    // then start a fresh session. Waiting on the save matters: it assigns
+    // `activeChatId` to the archived chat, and `newSession` must run *after*
+    // that so the next run resumes no history and the context is really freed.
+    await get().persistChat()
+    get().newSession()
+    // Point resume-at-startup at the (empty) new session, not the archive.
+    rememberChatId(get().sessionId)
+    get().pushToast('success', i18n.t('chat.compacted', { count }))
   },
 
   async loadSession(id) {
