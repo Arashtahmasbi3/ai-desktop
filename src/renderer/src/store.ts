@@ -17,7 +17,7 @@ import type { ResolvedGoal } from '@core/agent/goal-store'
 import type { ProjectMetadataPatch } from '@shared/project-metadata'
 import type { OnboardingStatus } from '@shared/onboarding'
 import type { VpsConnectionState, VpsServerView } from '@shared/vps'
-import type { DiagnosticStatus } from '@shared/ui'
+import type { DiagnosticStatus, PreflightNotice } from '@shared/ui'
 import type { ChatSummary, StoredMessage } from '@shared/chat'
 import type { Job } from '@shared/jobs'
 import type { Locale } from './i18n/locale'
@@ -215,6 +215,8 @@ interface AppState {
   /** v2.6.2 T3.2: trace decisions for the active run, oldest first. */
   decisions: TraceDecision[]
   warnings: LoopWarning[]
+  /** v2.6.3 T3.1: the latest non-ok preflight result, shown as a tiered banner. */
+  preflightNotice: PreflightNotice | null
   /** Set when the last run stopped early because the agent looked stuck. */
   loopStop: LoopStopInfo | null
   sessions: SessionInfo[]
@@ -330,6 +332,8 @@ interface AppState {
 
   setLocale: (locale: Locale) => void
   toggleSidebar: () => void
+  /** v2.6.3 T3.1: hide the preflight banner until the next non-ok result. */
+  dismissPreflight: () => void
   /** Toggle the pre-send context preview. */
   setShowContextBeforeSend: (value: boolean) => void
   /** Record one LLM call's usage and persist it (v2.5.4). */
@@ -483,6 +487,7 @@ export const useStore = create<AppState>((set, get) => ({
   logs: [],
   decisions: [],
   warnings: [],
+  preflightNotice: null,
   loopStop: null,
   sessions: [],
   memory: null,
@@ -548,6 +553,7 @@ export const useStore = create<AppState>((set, get) => ({
     void i18nChangeLanguage(locale)
   },
   toggleSidebar: () => set({ sidebarCollapsed: !get().sidebarCollapsed }),
+  dismissPreflight: () => set({ preflightNotice: null }),
   setShowContextBeforeSend(value) {
     set({ showContextBeforeSend: value })
     try {
@@ -960,7 +966,8 @@ export const useStore = create<AppState>((set, get) => ({
           activePlan: null,
           taskPlan: null,
           taskPaused: false,
-          loopStop: null
+          loopStop: null,
+          preflightNotice: null
         })
         break
       case 'approval:request':
@@ -1013,6 +1020,19 @@ export const useStore = create<AppState>((set, get) => ({
             decisions.splice(0, decisions.length - MAX_DECISIONS)
           }
           set({ logs, decisions })
+        } else if (event.entry.event === 'preflight' && Array.isArray(event.entry.checks)) {
+          // v2.6.3 T3.1: the orchestrator emits one tiered entry per non-ok check.
+          set({
+            logs,
+            preflightNotice: {
+              tool: String(event.entry.tool ?? ''),
+              ...(typeof event.entry.step === 'number' ? { step: event.entry.step } : {}),
+              tier: (event.entry.tier as PreflightNotice['tier']) ?? 'warn',
+              checks: event.entry.checks as PreflightNotice['checks'],
+              blocked: Boolean(event.entry.blocked),
+              at: Date.now()
+            }
+          })
         } else {
           set({ logs })
         }
@@ -1268,6 +1288,7 @@ export const useStore = create<AppState>((set, get) => ({
       logs: [],
       decisions: [],
       warnings: [],
+      preflightNotice: null,
       loopStop: null,
       memory: null,
       running: false,

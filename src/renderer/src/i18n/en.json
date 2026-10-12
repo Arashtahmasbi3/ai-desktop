@@ -540,6 +540,8 @@
   },
   "preflight": {
     "title": "Preflight warnings:",
+    "blockTitle": "Preflight blocked this action:",
+    "criticalTitle": "Preflight could not reach the workspace:",
     "proceed": "Proceed anyway"
   },
   "successWarning": {

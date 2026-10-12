@@ -3,6 +3,7 @@ import {
   parseDiskPercent,
   preflight,
   preflightActionFor,
+  preflightTier,
   preflightWarnings,
   type PreflightExec,
   type PreflightExecResult
@@ -110,5 +111,46 @@ describe('preflight helpers', () => {
     )
     const result = await preflight(exec, { path: '/srv/missing' }, 'read')
     expect(preflightWarnings(result).map((c) => c.name)).toEqual(['workspace'])
+  })
+})
+
+describe('preflightTier (v2.6.3 T3.1)', () => {
+  it('is ok when every check passes', () => {
+    expect(
+      preflightTier({ ok: true, checks: [{ name: 'workspace', status: 'pass', message: 'ok' }] })
+    ).toBe('ok')
+  })
+
+  it('is warn for non-fatal advisories only', () => {
+    expect(
+      preflightTier({
+        ok: true,
+        checks: [
+          { name: 'workspace', status: 'pass', message: 'ok' },
+          { name: 'git-clean', status: 'warn', message: '3 uncommitted' }
+        ]
+      })
+    ).toBe('warn')
+  })
+
+  it('is critical when the workspace itself is unreachable', () => {
+    expect(
+      preflightTier({
+        ok: false,
+        checks: [{ name: 'workspace', status: 'fail', message: 'missing' }]
+      })
+    ).toBe('critical')
+  })
+
+  it('is block for a hard failure outside the workspace', () => {
+    expect(
+      preflightTier({
+        ok: false,
+        checks: [
+          { name: 'workspace', status: 'pass', message: 'ok' },
+          { name: 'disk', status: 'fail', message: 'Disk 95% full' }
+        ]
+      })
+    ).toBe('block')
   })
 })

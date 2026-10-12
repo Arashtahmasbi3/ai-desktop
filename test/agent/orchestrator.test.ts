@@ -634,6 +634,7 @@ describe('preflight gate (v2.4 A.2)', () => {
   it('blocks an action whose preflight fails', async () => {
     const manager = createLocalManager(base)
     let gateCalls = 0
+    const logger = new MemoryLogger()
     const adapter = new ScriptedAdapter('deepseek', [
       { toolCalls: [toolCall('write_file', { path: 'blocked.txt', content: 'x' })] },
       { content: 'finished' }
@@ -641,6 +642,7 @@ describe('preflight gate (v2.4 A.2)', () => {
     const orchestrator = new AgentOrchestrator({
       sandbox: manager,
       providers: [entry(adapter)],
+      logger,
       preflightGate: async () => {
         gateCalls++
         return {
@@ -654,6 +656,39 @@ describe('preflight gate (v2.4 A.2)', () => {
 
     expect(gateCalls).toBe(1)
     expect(result.steps[0].observations[0]).toMatchObject({ ok: false, code: 'blocked' })
+    // v2.6.3 T3.1: the renderer's banner is fed by this tiered log entry.
+    expect(logger.first('preflight')).toMatchObject({
+      tier: 'critical',
+      blocked: true,
+      tool: 'write_file'
+    })
+    await manager.dispose()
+  })
+
+  it('emits a warn-tier preflight log while letting the action run', async () => {
+    const manager = createLocalManager(base)
+    const logger = new MemoryLogger()
+    const adapter = new ScriptedAdapter('deepseek', [
+      { toolCalls: [toolCall('write_file', { path: 'warned.txt', content: 'x' })] },
+      { content: 'wrote it' }
+    ])
+    const orchestrator = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(adapter)],
+      logger,
+      preflightGate: async () => ({
+        ok: true,
+        checks: [
+          { name: 'workspace', status: 'pass' as const, message: 'ok' },
+          { name: 'git-clean', status: 'warn' as const, message: '3 uncommitted' }
+        ]
+      })
+    })
+
+    const result = await orchestrator.run('write a file')
+
+    expect(result.steps[0].observations[0]).toMatchObject({ ok: true })
+    expect(logger.first('preflight')).toMatchObject({ tier: 'warn', blocked: false })
     await manager.dispose()
   })
 

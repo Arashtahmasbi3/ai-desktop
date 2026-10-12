@@ -59,7 +59,7 @@ import {
 import type { ApprovalMode } from '@shared/approval'
 import type { RoutingDecision } from './agent/remote-routing'
 import type { ToolExecutor, ToolExecOptions } from './agent/tools'
-import { preflightWarnings, type PreflightResult } from './agent/preflight'
+import { preflightTier, preflightWarnings, type PreflightResult } from './agent/preflight'
 import { verifySuccess, type ToolCallRecord } from './agent/success-verifier'
 import { buildTraceDecision } from './agent/trace-decision'
 
@@ -997,6 +997,20 @@ export class AgentOrchestrator {
               check = await this.preflightGate(action)
             } catch {
               check = undefined
+            }
+            // v2.6.3 T3.1: surface the tiered result to the UI (the structured log
+            // is what AgentService forwards to the renderer's banner).
+            if (check) {
+              const tier = preflightTier(check)
+              if (tier !== 'ok') {
+                this.log(tier === 'warn' ? 'warn' : 'error', 'preflight', runId, {
+                  step: index,
+                  tool: action.name,
+                  tier,
+                  blocked: !check.ok,
+                  checks: check.checks
+                })
+              }
             }
             if (check && !check.ok) {
               const failed = check.checks.filter((entry) => entry.status === 'fail')

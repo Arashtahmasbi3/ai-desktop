@@ -21,6 +21,7 @@ import TemplateMenu from './TemplateMenu'
 import TerminalPanel from './TerminalPanel'
 import ModelSwitcher from './ModelSwitcher'
 import ProviderWarning from './ProviderWarning'
+import PreflightBanner from './PreflightBanner'
 import LoopStopCard from './LoopStopCard'
 import ApprovalDialog from './ApprovalDialog'
 import PlanCard from './PlanCard'
@@ -76,6 +77,8 @@ export default function ChatPanel(): JSX.Element {
   const dismissApprovalSuggestion = useStore((state) => state.dismissApprovalSuggestion)
   const loopStop = useStore((state) => state.loopStop)
   const dismissLoopStop = useStore((state) => state.dismissLoopStop)
+  const preflightNotice = useStore((state) => state.preflightNotice)
+  const dismissPreflight = useStore((state) => state.dismissPreflight)
   const fileChanges = useStore((state) => state.fileChanges)
   const terminalOpen = useStore((state) => state.terminalOpen)
 
@@ -373,6 +376,16 @@ export default function ChatPanel(): JSX.Element {
       ) : null}
 
       <ProviderWarning />
+
+      {preflightNotice ? (
+        <div className="mx-3 mb-2">
+          <PreflightBanner
+            checks={preflightNotice.checks}
+            tier={preflightNotice.tier}
+            onDismiss={dismissPreflight}
+          />
+        </div>
+      ) : null}
 
       {warnings.length > 0 ? (
         <div className="mx-3 mb-2 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-300">

@@ -1,38 +1,69 @@
 import { useTranslation } from 'react-i18next'
-import { AlertTriangle, ArrowRight } from 'lucide-react'
-import type { PreflightCheck } from '@core/agent/preflight'
+import { AlertTriangle, ArrowRight, ShieldAlert } from 'lucide-react'
+import type { PreflightCheck, PreflightTier } from '@core/agent/preflight'
+
+const TONE: Record<Exclude<PreflightTier, 'ok'>, { box: string; text: string; icon: typeof AlertTriangle; key: string }> = {
+  warn: {
+    box: 'border-amber-500/40 bg-amber-500/10 text-amber-100',
+    text: 'text-amber-200/90',
+    icon: AlertTriangle,
+    key: 'preflight.title'
+  },
+  block: {
+    box: 'border-red-500/40 bg-red-500/10 text-red-100',
+    text: 'text-red-200/90',
+    icon: ShieldAlert,
+    key: 'preflight.blockTitle'
+  },
+  critical: {
+    box: 'border-red-500/50 bg-red-500/15 text-red-100',
+    text: 'text-red-200/90',
+    icon: ShieldAlert,
+    key: 'preflight.criticalTitle'
+  }
+}
 
 /**
- * Yellow preflight banner (v2.4, A.2). Presented before a sensitive action when the
- * state check reported warnings, with a "Proceed anyway" escape hatch. The parent owns
- * the decision — this component only reports it.
+ * Preflight banner (v2.4 A.2, tiered in v2.6.3 T3.1). Reports the non-pass state
+ * checks before a sensitive action. An override is only offered for `warn` results:
+ * `block`/`critical` mean the action was already stopped, so there is nothing to
+ * proceed with. The parent owns the decision — this component only reports it.
  */
 export default function PreflightBanner({
   checks,
+  tier = 'warn',
   onProceed,
   onDismiss
 }: {
   checks: PreflightCheck[]
+  tier?: PreflightTier
   onProceed?: () => void
   onDismiss?: () => void
 }): JSX.Element | null {
   const { t } = useTranslation()
   const warnings = checks.filter((check) => check.status !== 'pass')
-  if (warnings.length === 0) return null
+  if (warnings.length === 0 || tier === 'ok') return null
+
+  const tone = TONE[tier]
+  const Icon = tone.icon
 
   return (
-    <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-amber-100">
+    <div
+      data-testid="preflight-banner"
+      data-tier={tier}
+      className={`rounded-lg border p-3 ${tone.box}`}
+    >
       <div className="flex items-center gap-2 text-xs font-medium">
-        <AlertTriangle size={14} />
-        {t('preflight.title')}
+        <Icon size={14} />
+        {t(tone.key)}
       </div>
-      <ul className="mt-1 list-inside list-disc text-[11px] text-amber-200/90">
+      <ul className={`mt-1 list-inside list-disc text-[11px] ${tone.text}`}>
         {warnings.map((check) => (
           <li key={check.name}>{check.message}</li>
         ))}
       </ul>
       <div className="mt-2 flex gap-2">
-        {onProceed && (
+        {onProceed && tier === 'warn' && (
           <button
             type="button"
             onClick={onProceed}

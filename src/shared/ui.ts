@@ -243,6 +243,20 @@ export interface ToolCallView {
   recovery?: ToolRecoveryInfo
 }
 
+/**
+ * v2.6.3 T3.1 - a preflight state check surfaced to the chat. The orchestrator
+ * emits it as a structured log entry; the renderer turns it into a tiered banner.
+ */
+export interface PreflightNotice {
+  tool: string
+  step?: number
+  tier: 'ok' | 'warn' | 'block' | 'critical'
+  checks: Array<{ name: string; status: 'pass' | 'warn' | 'fail'; message: string }>
+  /** True when the action was actually prevented from running. */
+  blocked: boolean
+  at: number
+}
+
 export type AgentEvent =
   | { type: 'run:start'; runId: string; task: string; at: number }
   | { type: 'tool:result'; runId: string; result: ToolResultView; at: number }

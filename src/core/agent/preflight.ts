@@ -10,6 +10,13 @@
 
 export type PreflightStatus = 'pass' | 'fail' | 'warn'
 
+/**
+ * v2.6.3 T3.1 - UI severity tier derived from the raw checks. Kept separate from
+ * {@link PreflightStatus} so the core stays minimal while the banner can colour
+ * itself and decide whether an override is even conceivable.
+ */
+export type PreflightTier = 'ok' | 'warn' | 'block' | 'critical'
+
 export interface PreflightCheck {
   name: string
   status: PreflightStatus
@@ -19,6 +26,22 @@ export interface PreflightCheck {
 export interface PreflightResult {
   ok: boolean
   checks: PreflightCheck[]
+}
+
+/**
+ * Classify a result into a tier the UI can render:
+ * - `critical`: the workspace itself is unreachable — nothing can proceed safely.
+ * - `block`: a hard failure elsewhere (e.g. disk full) that blocked the action.
+ * - `warn`: non-fatal advisories only.
+ * - `ok`: every check passed.
+ */
+export function preflightTier(result: PreflightResult): PreflightTier {
+  const failed = result.checks.filter((check) => check.status === 'fail')
+  if (failed.length === 0) {
+    return result.checks.some((check) => check.status === 'warn') ? 'warn' : 'ok'
+  }
+  if (failed.some((check) => check.name === 'workspace')) return 'critical'
+  return 'block'
 }
 
 export interface PreflightWorkspace {
