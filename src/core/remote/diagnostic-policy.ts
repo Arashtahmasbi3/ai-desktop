@@ -65,7 +65,8 @@ export function diagnosticRemainingMs(
 /**
  * True when `path` is inside one of the allowed system locations. Directory
  * entries match their whole subtree (`/var/log` matches `/var/log/syslog`); file
- * entries must match exactly. Only absolute paths are considered.
+ * entries must match exactly; the root entry `/` matches everything. Only
+ * absolute paths are considered.
  */
 export function isDiagnosticAllowed(
   path: string,
@@ -76,9 +77,42 @@ export function isDiagnosticAllowed(
   if (typeof path !== 'string' || !path.startsWith('/')) return false
 
   for (const allowed of policy.allowedPaths) {
+    if (allowed === '/') return true
     const entry = allowed.replace(/\/+$/, '')
     if (!entry) continue
     if (path === entry || path.startsWith(entry + '/')) return true
   }
   return false
+}
+
+/**
+ * Build a read-only widening policy from environment-derived read roots
+ * (v2.6.2 T2.4). Returns `null` when there is nothing to widen, so callers can
+ * fall back to the project-root-only default. The policy never expires on its
+ * own — its *lifetime* is the run that created it.
+ */
+export function createReadScopePolicy(
+  allowedPaths: readonly string[]
+): DiagnosticPolicy | null {
+  const roots = allowedPaths.filter((path) => typeof path === 'string' && path.startsWith('/'))
+  if (roots.length === 0) return null
+  return { enabled: true, expiresAt: Number.MAX_SAFE_INTEGER, allowedPaths: [...roots] }
+}
+
+/**
+ * Union two read-only widenings. Either may be null; the result is null when
+ * both are, so a run with no widening keeps the plain project-root containment.
+ */
+export function mergeReadPolicies(
+  a: DiagnosticPolicy | null | undefined,
+  b: DiagnosticPolicy | null | undefined
+): DiagnosticPolicy | null {
+  if (!a) return b ?? null
+  if (!b) return a
+  const allowedPaths = [...new Set([...a.allowedPaths, ...b.allowedPaths])]
+  return {
+    enabled: a.enabled || b.enabled,
+    expiresAt: Math.max(a.expiresAt, b.expiresAt),
+    allowedPaths
+  }
 }

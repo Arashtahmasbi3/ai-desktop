@@ -7,8 +7,6 @@ import { useStore } from '../store'
 export default function SettingsMemory(): JSX.Element {
   const { t } = useTranslation()
   const messages = useStore((state) => state.messages)
-  const showTokenCount = useStore((state) => state.showTokenCount)
-  const setShowTokenCount = useStore((state) => state.setShowTokenCount)
 
   const { tokens, overBudget } = contextBudget(messages)
   const percent = Math.min(100, Math.round((tokens / DEFAULT_CONTEXT_TOKEN_BUDGET) * 100))
@@ -41,16 +39,6 @@ export default function SettingsMemory(): JSX.Element {
           <p className="mt-2 text-[11px] text-amber-400">{t('settings.contextOverBudget')}</p>
         ) : null}
       </div>
-
-      <label className="flex cursor-pointer items-center gap-2 text-xs text-neutral-300">
-        <input
-          type="checkbox"
-          checked={showTokenCount}
-          onChange={(event) => setShowTokenCount(event.target.checked)}
-          className="accent-accent"
-        />
-        {t('settings.showTokenCount')}
-      </label>
     </section>
   )
 }

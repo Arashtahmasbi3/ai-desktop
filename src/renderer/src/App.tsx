@@ -9,10 +9,12 @@ import CommandPalette from './components/CommandPalette'
 import ErrorBoundary from './components/ErrorBoundary'
 import FileExplorer from './components/FileExplorer'
 import GitHubPanel from './components/GitHubPanel'
+import GoalPanel from './components/GoalPanel'
 import VpsPanel from './components/Vps/VpsPanel'
 import Onboarding from './components/Onboarding'
 import MigrationDialog from './components/MigrationDialog'
 import SettingsPanel from './components/SettingsPanel'
+import ShortcutsOverlay from './components/ShortcutsOverlay'
 import Sidebar from './components/Sidebar'
 import StatusBar from './components/StatusBar'
 import TaskPanel from './components/TaskPanel'
@@ -24,6 +26,8 @@ import { readLastVpsId, resolveReconnectId } from './lib/vps-state'
 
 /** Retry interval for a selected-but-dropped VPS connection. */
 const VPS_KEEPALIVE_MS = 30_000
+/** How often the global background-job poll runs (v2.6.2 T5.2). */
+const JOBS_POLL_MS = 10_000
 
 export default function App(): JSX.Element {
   const { t } = useTranslation()
@@ -78,6 +82,25 @@ export default function App(): JSX.Element {
     }
   }, [ready])
 
+  // v2.6.2 T5.2: poll detached jobs globally so the sidebar badge and the panel
+  // stay in sync even while the panel is collapsed.
+  useEffect(() => {
+    if (!ready) return
+    const poll = (): void => {
+      void useStore.getState().refreshJobs().catch(() => undefined)
+    }
+    poll()
+    const timer = setInterval(poll, JOBS_POLL_MS)
+    return () => clearInterval(timer)
+  }, [ready])
+
+  // v2.6.2 T5.3: re-apply the persisted zoom level once the app boots.
+  useEffect(() => {
+    if (!ready) return
+    const { zoomLevel, applyZoom } = useStore.getState()
+    applyZoom(zoomLevel)
+  }, [ready])
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
       const target = event.target as HTMLElement | null
@@ -115,6 +138,35 @@ export default function App(): JSX.Element {
         state.toggleTerminal()
         return
       }
+      if (event.ctrlKey && (event.key === '=' || event.key === '+')) {
+        event.preventDefault()
+        state.zoomIn()
+        return
+      }
+      if (event.ctrlKey && event.key === '-') {
+        event.preventDefault()
+        state.zoomOut()
+        return
+      }
+      if (event.ctrlKey && event.key === '0') {
+        event.preventDefault()
+        state.resetZoom()
+        return
+      }
+      // Emergency stop (v2.6.2 T5.3): Shift+Esc halts the running agent.
+      if (event.shiftKey && event.key === 'Escape' && !event.ctrlKey && !event.altKey) {
+        if (state.running) {
+          event.preventDefault()
+          state.abort()
+          return
+        }
+      }
+      // Shortcut cheat sheet (v2.6.2 T5.3): `?` or Ctrl+/.
+      if (!typing && ((event.key === '?' && !event.ctrlKey && !event.metaKey) || (event.ctrlKey && event.key === '/'))) {
+        event.preventDefault()
+        state.setShortcutsOpen(!state.shortcutsOpen)
+        return
+      }
       if (event.ctrlKey && (event.key === 'k' || event.key === 'K' || event.key === 'p' || event.key === 'P')) {
         event.preventDefault()
         state.setPaletteOpen(!state.paletteOpen)
@@ -130,16 +182,23 @@ export default function App(): JSX.Element {
       } else if (event.ctrlKey && event.key === ',') {
         event.preventDefault()
         state.openSettings()
-      } else if (event.ctrlKey && ['1', '2', '3', '4', '5', '6'].includes(event.key)) {
+      } else if (event.ctrlKey && ['1', '2', '3', '4', '5', '6', '7'].includes(event.key)) {
         event.preventDefault()
         state.setView(
-          ({ '1': 'chat', '2': 'tasks', '3': 'files', '4': 'browser', '5': 'github', '6': 'vps' } as const)[
-            event.key as '1' | '2' | '3' | '4' | '5' | '6'
-          ]
+          ({
+            '1': 'chat',
+            '2': 'tasks',
+            '3': 'files',
+            '4': 'browser',
+            '5': 'github',
+            '6': 'vps',
+            '7': 'goals'
+          } as const)[event.key as '1' | '2' | '3' | '4' | '5' | '6' | '7']
         )
       } else if (event.key === 'Escape') {
         if (state.searchOpen) state.setSearchOpen(false)
         else if (state.paletteOpen) state.setPaletteOpen(false)
+        else if (state.shortcutsOpen) state.setShortcutsOpen(false)
         else if (state.settingsOpen) state.closeSettings()
         else clearError()
       }
@@ -197,6 +256,7 @@ export default function App(): JSX.Element {
               {view === 'browser' ? <BrowserPanel /> : null}
               {view === 'github' ? <GitHubPanel /> : null}
               {view === 'vps' ? <VpsPanel /> : null}
+              {view === 'goals' ? <GoalPanel /> : null}
             </ErrorBoundary>
           )}
 
@@ -225,6 +285,8 @@ export default function App(): JSX.Element {
       <Onboarding />
 
       <SettingsPanel />
+
+      <ShortcutsOverlay />
 
       <MigrationDialog />
 

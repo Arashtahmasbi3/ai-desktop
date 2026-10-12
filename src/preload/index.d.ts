@@ -27,6 +27,7 @@ import type {
 } from '@shared/workspace-info'
 import type { SystemHealth } from '@shared/system-health'
 import type { Job } from '@shared/jobs'
+import type { AuditVerifyResult, TraceExplanation } from '@shared/trace'
 import type {
   GitCommitInput,
   GitOpResult,
@@ -56,6 +57,9 @@ import type {
   WorkerStatus
 } from '@shared/ui'
 import type { ProjectMetadataPatch } from '@shared/project-metadata'
+import type { Goal, GoalUpdate, NewGoalInput } from '@shared/goal'
+import type { ResolvedGoal } from '@core/agent/goal-store'
+
 
 /** Shape of the object exposed on `window.api` by the preload script. */
 export interface Api {
@@ -68,6 +72,8 @@ export interface Api {
     close(): Promise<void>
     isMaximized(): Promise<boolean>
     newWindow(): Promise<boolean>
+    /** v2.6.2 T5.3: set the Electron zoom level (0 = 100%). */
+    setZoom(level: number): Promise<number>
   }
   settings: {
     get(): Promise<SettingsView>
@@ -185,6 +191,30 @@ export interface Api {
     loadSession(id: string): Promise<SessionRecordView | null>
     memory(id: string): Promise<SessionMemoryView>
     clearMemory(id: string): Promise<boolean>
+    /** v2.6.2 (T3.2): explain a trace decision deterministically ("Ask Why"). */
+    explainStep(runId: string, decisionId: string): Promise<TraceExplanation | null>
+    /** v2.6.2 (T3.3): audit mode for the active project. */
+    audit: {
+      path(): Promise<string | null>
+      verify(): Promise<AuditVerifyResult | null>
+    }
+    /** v2.6.2 (T4.4): project goals; `projectId` defaults to the active project. */
+    goal: {
+      list(projectId?: string): Promise<Goal[]>
+      resolve(projectId?: string): Promise<ResolvedGoal>
+      create(input: NewGoalInput, projectId?: string): Promise<Goal>
+      update(goalId: string, patch: GoalUpdate, projectId?: string): Promise<Goal | undefined>
+      setCriterion(
+        goalId: string,
+        criterionId: string,
+        met: boolean,
+        projectId?: string
+      ): Promise<Goal | undefined>
+      setActive(goalId: string | null, projectId?: string): Promise<boolean>
+      achieve(goalId: string, projectId?: string): Promise<Goal | undefined>
+      abandon(goalId: string, note?: string, projectId?: string): Promise<Goal | undefined>
+      remove(goalId: string, projectId?: string): Promise<boolean>
+    }
   }
   shell: {
     exec(command: string): Promise<LocalShellResult>

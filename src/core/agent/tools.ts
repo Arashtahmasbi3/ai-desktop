@@ -2,6 +2,7 @@ import type { SandboxManager } from '@shared/sandbox'
 import type { ToolCall, ToolDefinition } from '@shared/types'
 import type { AgentAction, AgentToolResult, ToolErrorCode } from '@shared/agent'
 import { SandboxError, normalizeSandboxPath } from '@core/sandbox'
+import { findSecretPathsInCommand, inspectSecretPath } from '@shared/secret-paths'
 
 export interface ToolExecOptions {
   signal?: AbortSignal
@@ -140,6 +141,22 @@ function failure(
   }
 }
 
+/** Secret Path Guard for a local sandbox action, or undefined when it is safe. */
+function secretGuardForAction(action: AgentAction): string | undefined {
+  const path = typeof action.arguments.path === 'string' ? action.arguments.path : undefined
+  if (path) {
+    const result = inspectSecretPath(path)
+    if (result.blocked) return `Blocked: ${result.reason}`
+  }
+  const command =
+    typeof action.arguments.command === 'string' ? action.arguments.command : undefined
+  if (command) {
+    const hits = findSecretPathsInCommand(command)
+    if (hits.length > 0) return `Blocked: command references ${hits[0].reason}`
+  }
+  return undefined
+}
+
 /**
  * Bridges agent actions to a live sandbox: file writes/reads and shell
  * execution, all through {@link SandboxManager} (never the host directly).
@@ -165,6 +182,11 @@ export class SandboxToolExecutor implements ToolExecutor {
         startedAt
       )
     }
+
+    // Secret Path Guard (v2.6.2, §5): the local sandbox never reads, writes or
+    // lists credential paths, regardless of Approval mode or Session Profile.
+    const secret = secretGuardForAction(action)
+    if (secret) return failure(action, 'blocked', secret, startedAt)
 
     try {
       switch (action.name) {

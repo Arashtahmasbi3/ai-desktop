@@ -26,22 +26,34 @@ import { MigrateProjectToolExecutor } from '@core/tools/migrate-project-executor
 import { CompositeToolExecutor, type ToolRoute } from '@core/tools/composite-executor'
 import { DIAGNOSE_CRASH_TOOL } from '@core/tools/crash-diagnosis-tool'
 import { CrashDiagnosisToolExecutor } from '@core/tools/crash-diagnosis-tool'
+import { DiagnosticsToolExecutor, NAMED_DIAGNOSTIC_TOOLS } from '@core/tools/diagnostics-tools'
 import { planV24Tools, enabledV24ToolNames } from './v24-tools-wiring'
 import { routeToolCall, remoteWorkspaceHint } from '@core/agent/remote-routing'
 import type { RoutingDecision } from '@core/agent/remote-routing'
 import { detectWorkspace } from '@core/remote/workspace-detect'
 import type { DiagnosticPolicy } from '@core/remote/diagnostic-policy'
+import { createReadScopePolicy, mergeReadPolicies } from '@core/remote/diagnostic-policy'
 import { preflight, preflightActionFor, type PreflightResult } from '@core/agent/preflight'
 import { buildWorkspaceSystemHint } from '@core/agent/workspace-prompt'
 import type { RemoteWorkspaceInfo } from '@shared/workspace-info'
 import { DEFAULT_APPROVAL_MODE } from '@core/agent/approval'
 import { resolveVpsForRun, requiresVps } from '@core/agent/vps-resolver'
-import type { ApprovedPlan, Plan, PlanDecision, PlanWarning } from '@shared/plan'
+import type { ApprovedPlan, Plan, PlanDecision, PlanScopeContext, PlanWarning } from '@shared/plan'
+import { PLAN_REAPPROVE_MESSAGE } from '@shared/plan'
+import type { ResolvedProfile } from '@shared/profile'
+import type { TraceDecision, TraceExplanation } from '@shared/trace'
+import { TraceStore } from '@core/agent/trace-store'
+import { AuditTrail, auditFileFor, auditLineFromDecision, type AuditVerifyResult } from '@core/agent/audit-trail'
+import { resolveUserDataDir } from '@core/agent/persistence'
+import { redactValue } from '@core/agent/redact'
+import { resolveToolExposure, toolPolicyFor, type ToolExposure } from '@core/agent/tool-policy'
 import {
   createApprovedPlan,
   shouldAutoApprove
 } from '@core/agent/approved-plan'
 import { PlanTrustRegistry, PLAN_TRUST_METADATA_KEY } from '@core/agent/plan-trust'
+import { resolveRunGoal, type RunGoalContext } from '@core/agent/goal-context'
+import type { GoalStore } from '@core/agent/goal-store'
 import { createApprovalGate, describeApprovalReason } from './approval-gate'
 import type { ApprovalOutcome, ApprovalReason } from '@shared/approval'
 import type { ApprovedCommands } from '@core/agent/approved-commands'
@@ -244,6 +256,29 @@ export function planRemoteRuntime(
     '(process managers, logs, resources, network) and get a probable cause with ' +
     'recommendations when the user asks why the project is crashing or failing.'
 
+  // v2.6.2 T2.3: named diagnostics. Fixed, read-only probes with validated
+  // arguments, so production can be investigated without free path-based reads.
+  const diagnosticsExecutor = new DiagnosticsToolExecutor(
+    {
+      connectedServers: () => vps.connectedServers(),
+      exec: (serverId, command) => vps.exec(serverId, command),
+      ...(projectRoot ? { projectRoot } : {})
+    },
+    target
+  )
+  const namedDiagnostics = NAMED_DIAGNOSTIC_TOOLS.map((tool) => ({
+    ...tool,
+    description: `${tool.description} Target server: "${target}".`
+  }))
+  extraTools.push(...namedDiagnostics)
+  routes.push({
+    names: new Set(namedDiagnostics.map((tool) => tool.name)),
+    executor: diagnosticsExecutor
+  })
+  hint +=
+    ' For read-only host introspection use get_service_logs, get_disk_usage, ' +
+    'get_system_health and get_process_list instead of free-form shell commands.'
+
   // Cross-server project migration needs to resolve both saved servers' hosts.
   if (typeof vps.resolveServer === 'function') {
     const migrateDeps: MigrateProjectDeps = {
@@ -290,10 +325,21 @@ export function planRemoteRuntime(
 
 /** Forwards orchestrator log entries to a sink (the renderer, in the app). */
 class EmittingLogger implements AgentLogger {
-  constructor(private readonly emit: (event: AgentEvent) => void) {}
+  constructor(
+    private readonly emit: (event: AgentEvent) => void,
+    private readonly traces?: TraceStore,
+    private readonly onDecision?: (decision: TraceDecision) => void
+  ) {}
 
   log(entry: AgentLogEntry): void {
     this.emit({ type: 'log', entry })
+    // v2.6.2 T3.2/T3.3: keep the decision in memory for "Ask Why" and append it
+    // to the project's tamper-evident audit trail.
+    if (entry.event === 'decision') {
+      const decision = entry.decision as TraceDecision
+      this.traces?.record(decision)
+      this.onDecision?.(decision)
+    }
   }
 }
 
@@ -303,6 +349,11 @@ export interface AgentServiceOptions {
   sessionStore: SessionStore
   emit: (event: AgentEvent) => void
   now?: () => number
+  /**
+   * v2.6.2 T3.3: app-data dir, used to place the audit file of a remote project
+   * (a local project's audit lives under its own root instead).
+   */
+  userDataDir?: string
   /** Optional: enables user-defined OpenAI-compatible providers. */
   customProviders?: CustomProviderStore
   /** Optional: enables the `remote_shell` / remote-fs tools against connected VPS servers. */
@@ -337,6 +388,18 @@ export interface AgentServiceOptions {
    * host the run is on. Optional; the id is used when absent.
    */
   resolveVpsName?: (id: string) => Promise<string | undefined>
+  /**
+   * v2.6.2 (P0-5): main-authoritative Session Profile. When present its resolved
+   * `approvalMode`/`planMode` win over the persisted `approvalMode`, so a stale
+   * or renderer-supplied `full` can never be honored without a valid grant.
+   */
+  sessionProfile?: { state(): Promise<ResolvedProfile> }
+  /**
+   * v2.6.2 (T4.3): project goals. When present, each run attaches to the project's
+   * active goal (or the requested one), the model is told what "done" means and
+   * the run is linked back to the goal.
+   */
+  goalStore?: GoalStore
 }
 
 /** Which provider/model to put first for an agent run. */
@@ -368,6 +431,11 @@ export class AgentService {
   private readonly sessionStore: SessionStore
   private readonly emit: (event: AgentEvent) => void
   private readonly now: () => number
+  /** v2.6.2 T3.2: recent decisions, keyed by run, for "Ask Why". */
+  private readonly traceStore = new TraceStore()
+  /** v2.6.2 T3.3: audit trails, one per project file. */
+  private readonly audits = new Map<string, AuditTrail>()
+  private readonly userDataDir?: string
   private readonly customProviders?: CustomProviderStore
   private readonly vps?: RemoteHost
   private readonly jobs?: RemoteJobRunner
@@ -388,6 +456,8 @@ export class AgentService {
   private readonly runStore: RunStore
   private readonly getDiagnosticPolicy?: () => DiagnosticPolicy | null
   private readonly resolveVpsName?: (id: string) => Promise<string | undefined>
+  private readonly sessionProfile?: { state(): Promise<ResolvedProfile> }
+  private readonly goalStore?: GoalStore
   private readonly controllers = new Set<AbortController>()
   private readonly changes = new Map<string, FileChangeView>()
   /**
@@ -407,6 +477,7 @@ export class AgentService {
     this.sessionStore = options.sessionStore
     this.emit = options.emit
     this.now = options.now ?? (() => Date.now())
+    if (options.userDataDir) this.userDataDir = options.userDataDir
     this.planTrust = new PlanTrustRegistry(() => this.now())
     if (options.customProviders) this.customProviders = options.customProviders
     if (options.vps) this.vps = options.vps
@@ -420,6 +491,8 @@ export class AgentService {
     this.runStore = options.runStore ?? new RunStore()
     this.getDiagnosticPolicy = options.getDiagnosticPolicy
     this.resolveVpsName = options.resolveVpsName
+    this.sessionProfile = options.sessionProfile
+    if (options.goalStore) this.goalStore = options.goalStore
   }
 
   isRunning(): boolean {
@@ -433,7 +506,8 @@ export class AgentService {
   private async buildRemoteRuntime(
     task: string,
     vpsServerId?: string,
-    enabledTools?: string[]
+    enabledTools?: string[],
+    exposure?: ToolExposure
   ): Promise<RemoteRuntime> {
     const settings = await this.persistence.load()
     const active = settings.projects.find((project) => project.id === settings.activeProjectId)
@@ -442,8 +516,13 @@ export class AgentService {
     const serverId = active?.vpsId
     const connected = Boolean(serverId && connectedServers.includes(serverId))
     // Read the diagnostic policy once per run so a toggle mid-run does not change
-    // the containment rules under the agent's feet (v2.5.3).
-    const diagnostic = this.getDiagnosticPolicy?.() ?? null
+    // the containment rules under the agent's feet (v2.5.3). T2.4 unions it with
+    // the environment's Investigate read roots: a dev box may be read anywhere,
+    // staging only in logs/proc/tmp, production not at all (named tools only).
+    const diagnostic = mergeReadPolicies(
+      this.getDiagnosticPolicy?.() ?? null,
+      createReadScopePolicy(exposure?.readRoots ?? [])
+    )
 
     // A1: for a remote project, always install routing so a stray local tool call
     // is rewritten (when the VPS is connected) or answered with a clear error.
@@ -628,7 +707,22 @@ export class AgentService {
       ...(request.model ? { model: request.model } : {}),
       ...(request.customProviderId ? { customProviderId: request.customProviderId } : {})
     })
-    const remote = await this.buildRemoteRuntime(request.task, request.vpsServerId, request.enabledTools)
+    const settings = await this.persistence.load()
+    // Snapshot the project this run belongs to. Patches captured during the run
+    // are bound to it and can never be applied to another project (P0-1).
+    const activeProject = this.persistence.getActiveProject()
+    // P0-5 (v2.6.2): the effective posture is resolved in main before the remote
+    // runtime is built, so this run's tool exposure and read reach (T2.4) match
+    // the profile the user is actually in. The renderer is never consulted.
+    const profileState = this.sessionProfile ? await this.sessionProfile.state() : undefined
+    const exposure = profileState ? resolveToolExposure(profileState) : undefined
+    const toolPolicy = exposure ? toolPolicyFor(exposure) : undefined
+    const remote = await this.buildRemoteRuntime(
+      request.task,
+      request.vpsServerId,
+      request.enabledTools,
+      exposure
+    )
     const memory = await this.projectMemoryHint()
     const systemHint = [remote.systemHint, memory].filter(Boolean).join('\n\n')
 
@@ -636,17 +730,51 @@ export class AgentService {
     // v2.6.1 Fix 3: trust (and memory) are scoped to the chat/session, not the
     // run, so a plan stays trusted across the messages of one conversation.
     const sessionKey = request.sessionId ?? runId
-    const settings = await this.persistence.load()
-    // Snapshot the project this run belongs to. Patches captured during the run
-    // are bound to it and can never be applied to another project (P0-1).
-    const activeProject = this.persistence.getActiveProject()
+    // v2.6.2 T4.3: resolve the project goal this run serves and describe it to the
+    // model. Competing active goals are never guessed between — the run asks.
+    let goalContext: RunGoalContext = { ambiguousGoalIds: [], needsInput: false }
+    if (this.goalStore && activeProject) {
+      try {
+        goalContext = await resolveRunGoal(this.goalStore, activeProject.id, request.goalId)
+      } catch {
+        goalContext = { ambiguousGoalIds: [], needsInput: false }
+      }
+      if (goalContext.needsInput) {
+        this.emit({
+          type: 'log',
+          entry: {
+            ts: new Date(this.now()).toISOString(),
+            level: 'warn',
+            event: 'goal:ambiguous',
+            runId,
+            message: `Project has ${goalContext.ambiguousGoalIds.length} active goals; asking the user which one this run serves.`,
+            goalIds: goalContext.ambiguousGoalIds
+          }
+        })
+      }
+    }
     if (activeProject) {
       this.runStore.createRun({
         id: runId,
         projectId: activeProject.id,
-        projectRoot: activeProject.path
+        projectRoot: activeProject.path,
+        ...(goalContext.goal ? { goalId: goalContext.goal.id } : {})
       })
+      if (this.goalStore && goalContext.goal) {
+        try {
+          await this.goalStore.linkRun(activeProject.id, goalContext.goal.id, {
+            runId,
+            ...(request.sessionId ? { sessionId: request.sessionId } : {}),
+            createdAt: this.now()
+          })
+        } catch {
+          // Losing the goal audit link must never block the run.
+        }
+      }
     }
+    // The goal hint joins the project/VPS hint so "what does done mean?" is
+    // answered without a tool call.
+    const effectiveSystemHint = [systemHint, goalContext.hint].filter(Boolean).join('\n\n')
     // v2.5.3 Smarter Prompt: bake the run's project/VPS/environment into the
     // prompt so "which project am I on?" is answered without tool calls.
     let vpsName: string | undefined
@@ -666,11 +794,25 @@ export class AgentService {
           ...(activeProject.environment ? { environment: activeProject.environment } : {})
         }
       : undefined
-    const approvalMode = settings.approvalMode ?? DEFAULT_APPROVAL_MODE
-    const planMode = request.planMode ?? settings.planModeDefault ?? false
+    // P0-5 (v2.6.2): approval comes from the Session Profile resolved at the top
+    // of this run; the legacy `settings.approvalMode` remains only as a fallback
+    // for callers that did not inject a Session Profile service (older tests).
+    const approvalMode =
+      profileState?.approvalMode ?? settings.approvalMode ?? DEFAULT_APPROVAL_MODE
+    const planMode = request.planMode ?? profileState?.planMode ?? settings.planModeDefault ?? false
     const requestApproval = this.requestApproval
     const requestPlan = this.requestPlan
     const now = (): number => this.now()
+
+    // v2.6.2 T4.2: the identity a trusted plan is bound to. A plan trusted here
+    // can only auto-approve while this project/VPS/branch/environment is live, so
+    // switching project or moving to production invalidates the trust.
+    const planScope: PlanScopeContext = {
+      ...(activeProject ? { projectId: activeProject.id } : {}),
+      ...(activeProject?.vpsId ? { vpsId: activeProject.vpsId } : {}),
+      ...(activeProject?.repository?.branch ? { branch: activeProject.repository.branch } : {}),
+      ...(activeProject?.environment ? { environment: activeProject.environment } : {})
+    }
 
     // v2.6.1 Fix 3: rehydrate any trusted plan persisted with the session (e.g.
     // after a restart) so it keeps auto-approving in this chat.
@@ -678,8 +820,17 @@ export class AgentService {
       try {
         const stored = await this.sessionStore.load(request.sessionId)
         const raw = stored?.metadata?.[PLAN_TRUST_METADATA_KEY]
-        if (this.planTrust.restore(sessionKey, raw)) {
+        const restored = this.planTrust.restore(sessionKey, raw)
+        if (restored === 'restored') {
           this.emit({ type: 'plan:active', plan: this.planTrust.get(sessionKey)!, at: now() })
+        } else if (restored === 'legacy') {
+          // Pre-v2.6.2 trust without a scope: never inherited, ask to re-approve.
+          this.emit({
+            type: 'plan:inactive',
+            at: now(),
+            reason: 'legacy',
+            message: PLAN_REAPPROVE_MESSAGE
+          })
         }
       } catch {
         // A missing/corrupt session must never block the run.
@@ -689,7 +840,9 @@ export class AgentService {
     // v2.5.5: the plan the user chose to trust for this session, or null. Expiry
     // is evaluated lazily; when it lapses we tell the chip to hide.
     const activeTrust = (): ApprovedPlan | null => {
-      if (this.planTrust.prune(sessionKey)) this.emit({ type: 'plan:inactive', at: now() })
+      if (this.planTrust.prune(sessionKey)) {
+        this.emit({ type: 'plan:inactive', at: now(), reason: 'expired' })
+      }
       return this.planTrust.get(sessionKey)
     }
 
@@ -709,10 +862,11 @@ export class AgentService {
         })
       : undefined
 
-    // A trusted plan auto-approves its own steps — never a deny-listed command.
+    // A trusted plan auto-approves its own steps — never a deny-listed command,
+    // and only within the exact scope it was granted for (v2.6.2 T4.2).
     const approvalGate = baseGate
       ? async (action: AgentAction): Promise<boolean> => {
-          if (shouldAutoApprove(activeTrust(), action, now())) return true
+          if (shouldAutoApprove(activeTrust(), action, now(), planScope)) return true
           return baseGate(action)
         }
       : undefined
@@ -720,12 +874,14 @@ export class AgentService {
     const planGate = requestPlan
       ? async (plan: Plan, warnings: PlanWarning[]): Promise<PlanDecision> => {
           const decision = await requestPlan(runId, plan, warnings)
-          const approved = createApprovedPlan(plan, sessionKey, decision, now())
+          const approved = createApprovedPlan(plan, sessionKey, decision, now(), {
+            scope: planScope
+          })
           if (approved) {
             this.planTrust.set(sessionKey, approved)
             this.emit({ type: 'plan:active', plan: approved, at: now() })
           } else if (this.planTrust.clear(sessionKey)) {
-            this.emit({ type: 'plan:inactive', at: now() })
+            this.emit({ type: 'plan:inactive', at: now(), reason: 'cleared' })
           }
           return decision
         }
@@ -733,10 +889,27 @@ export class AgentService {
 
     const preflightGate = await this.buildPreflightGate()
 
+    // v2.6.2 T3.3: every decision this run emits is also appended to the active
+    // project's tamper-evident audit trail (redacted, never blocking the run).
+    const audit = activeProject ? this.auditTrailFor(activeProject) : undefined
+    const onDecision =
+      audit && activeProject
+        ? (decision: TraceDecision) => {
+            void audit
+              .append(
+                auditLineFromDecision(decision, {
+                  projectId: activeProject.id,
+                  ...(activeProject.vpsId ? { vpsId: activeProject.vpsId } : {})
+                })
+              )
+              .catch(() => undefined)
+          }
+        : undefined
+
     const orchestrator = new AgentOrchestrator({
       sandbox: this.sandbox,
       providers,
-      logger: new EmittingLogger(this.emit),
+      logger: new EmittingLogger(this.emit, this.traceStore, onDecision),
       sessionStore: this.sessionStore,
       enforceSuccessVerification: true,
       ...(request.sessionId ? { sessionId: request.sessionId } : {}),
@@ -744,8 +917,13 @@ export class AgentService {
       // survives a restart and resumes auto-approving in the same chat.
       sessionMetadata: () => this.planTrust.metadataFor(sessionKey),
       ...remote,
-      ...(systemHint ? { systemHint } : {}),
+      ...(effectiveSystemHint ? { systemHint: effectiveSystemHint } : {}),
       ...(planMode ? { planMode: true } : {}),
+      // v2.6.2 T3.1: stamp the served goal onto every emitted trace decision.
+      ...(goalContext.goal ? { goalId: goalContext.goal.id } : {}),
+      // Investigate: never offer mutating tools to the model; production
+      // Investigate goes further and offers only the named diagnostics (T2.4).
+      ...(toolPolicy ? { toolPolicy } : {}),
       ...(approvalGate ? { approvalGate } : {}),
       ...(planGate ? { planGate, planApproval: approvalMode } : {}),
       ...(preflightGate ? { preflightGate } : {}),
@@ -948,5 +1126,44 @@ export class AgentService {
     const trustCleared = this.planTrust.clear(id)
     if (trustCleared) this.emit({ type: 'plan:inactive', at: this.now() })
     return removed || trustCleared
+  }
+
+  /**
+   * v2.6.2 T3.2: explain one decision of a run from the in-memory trace store.
+   * Deterministic — no model call, nothing re-executed.
+   */
+  explainStep(runId: string, decisionId: string): TraceExplanation | null {
+    return this.traceStore.explain(runId, decisionId) ?? null
+  }
+
+  /** Decisions recorded for a run, oldest first (used by timeline/tests). */
+  decisionsForRun(runId: string): TraceDecision[] {
+    return this.traceStore.forRun(runId)
+  }
+
+  /** Absolute path of the active project's audit file, when there is one. */
+  auditPath(): string | null {
+    const project = this.persistence.getActiveProject()
+    return project ? this.auditTrailFor(project).path : null
+  }
+
+  /**
+   * v2.6.2 T3.3: recompute the active project's audit hash chain. Reported to
+   * Settings → Verify audit; also the hook tamper detection will use.
+   */
+  async verifyAudit(): Promise<AuditVerifyResult | null> {
+    const project = this.persistence.getActiveProject()
+    if (!project) return null
+    return this.auditTrailFor(project).verify()
+  }
+
+  /** One trail per project file, reused so appends continue the same chain. */
+  private auditTrailFor(project: ProjectRecord): AuditTrail {
+    const file = auditFileFor(project, this.userDataDir ?? resolveUserDataDir({ appName: 'AI Desktop' }))
+    const cached = this.audits.get(file)
+    if (cached) return cached
+    const trail = new AuditTrail({ file, redact: (line) => redactValue(line) })
+    this.audits.set(file, trail)
+    return trail
   }
 }

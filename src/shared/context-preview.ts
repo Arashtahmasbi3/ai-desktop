@@ -4,6 +4,8 @@
  * main process can build it from the same inputs.
  */
 
+import { isSecretPath as isSecretPathImpl } from './secret-paths'
+
 export interface ContextPreviewInput {
   provider?: string
   model: string
@@ -40,21 +42,15 @@ export const EXCLUDED_ALWAYS = [
   'Files outside the workspace'
 ]
 
-const SECRET_PATTERNS = [
-  /(^|\/)\.env(\.|$)/i,
-  /(^|\/)\.env$/i,
-  /\.(pem|key|p12|pfx|keystore)$/i,
-  /(^|\/)id_(rsa|ed25519|ecdsa)$/i,
-  /(^|\/)\.npmrc$/i,
-  /(^|\/)\.pypirc$/i,
-  /(^|\/)credentials(\.json)?$/i,
-  /(^|\/)secrets?\./i
-]
 
-/** True when a path looks like it holds secret material and must not be sent. */
+/**
+ * True when a path looks like it holds secret material and must not be sent.
+ *
+ * v2.6.2: delegates to `@shared/secret-paths`, the canonical Secret Path Guard,
+ * so the preview can never disagree with what the sandbox/remote tools block.
+ */
 export function isSecretPath(path: string): boolean {
-  const normalized = path.trim().replace(/\\/g, '/')
-  return SECRET_PATTERNS.some((pattern) => pattern.test(normalized))
+  return isSecretPathImpl(path)
 }
 
 /** Rough token estimate: ~4 characters per token, rounded up. */

@@ -17,6 +17,7 @@ import { buildContextPreview, type ContextPreview } from '@shared/context-previe
 import MessageBubble from './MessageBubble'
 import ContextPreviewCard from './ContextPreviewCard'
 import FileChangesPanel from './FileChangesPanel'
+import ContextWarning from './ContextWarning'
 import TemplateMenu from './TemplateMenu'
 import TerminalPanel from './TerminalPanel'
 import ModelSwitcher from './ModelSwitcher'
@@ -33,7 +34,7 @@ import { FullAccessBanner, FullAccessToggle } from './FullAccessToggle'
 import { filterSlashCommands, resolveSlashCommand } from '../lib/slash'
 import { decideSend } from '../lib/context-gate'
 import { workspaceStatus, shouldShowWorkspaceBanner } from '../lib/project-status'
-import { contextBudget, estimateTokens } from '@shared/memory'
+import { contextBudget } from '@shared/memory'
 
 const SUGGESTION_KEYS = [
   'chat.suggestion1',
@@ -63,8 +64,8 @@ export default function ChatPanel(): JSX.Element {
   const vpsStatus = useStore((state) => state.vpsStatus)
   const connectVps = useStore((state) => state.connectVps)
   const addProject = useStore((state) => state.addProject)
-  const showTokenCount = useStore((state) => state.showTokenCount)
   const showContextBeforeSend = useStore((state) => state.showContextBeforeSend)
+  const compactContext = useStore((state) => state.compactContext)
   const selection = useStore((state) => state.selection)
   const openSettings = useStore((state) => state.openSettings)
   const setView = useStore((state) => state.setView)
@@ -153,6 +154,7 @@ export default function ChatPanel(): JSX.Element {
 
   const matches = useMemo(() => filterSlashCommands(commands, input), [commands, input])
   const budget = useMemo(() => contextBudget(messages, input), [messages, input])
+  const contextPercent = Math.min(100, Math.round(budget.ratio * 100))
 
   useEffect(() => {
     const node = scrollRef.current
@@ -485,8 +487,8 @@ export default function ChatPanel(): JSX.Element {
               <button
                 type="button"
                 onClick={abort}
-                title={t('chat.stop')}
-                aria-label={t('chat.stop')}
+                title={`${t('chat.stop')} (Shift+Esc)`}
+                aria-label={`${t('chat.stop')} (Shift+Esc)`}
                 className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30"
               >
                 <Square className="h-4 w-4" />
@@ -526,22 +528,19 @@ export default function ChatPanel(): JSX.Element {
                 {t('chat.viewContext')}
               </button>
             </div>
-            {showTokenCount ? (
-              <span className="font-mono text-[10px] text-neutral-600">
-                {t('chat.tokens', { count: estimateTokens(input) })}
-                {input.length > 0 ? ` · ${input.length}` : ''}
-              </span>
+            {budget.nearLimit ? (
+              <ContextWarning
+                percent={contextPercent}
+                overBudget={budget.overBudget}
+                running={running}
+                onCompact={compactContext}
+              />
             ) : null}
           </div>
         </div>
         <div className="mt-1.5 flex items-center justify-between px-1 text-[10px] text-neutral-600">
           <span>Enter = {t('chat.send')} · Shift+Enter = ↵ · Ctrl+Enter = {t('chat.send')}</span>
         </div>
-        {budget.overBudget ? (
-          <p className="mt-1 px-1 text-[10px] text-amber-400">
-            {t('chat.overBudget', { count: budget.tokens })}
-          </p>
-        ) : null}
       </div>
 
       <TaskTracker />

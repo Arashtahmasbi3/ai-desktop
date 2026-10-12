@@ -6,6 +6,14 @@ import type { ProviderId } from '@shared/types'
 import { isWindowsAbsolutePath } from '@shared/paths'
 import { coerceApprovalMode, type ApprovalMode } from '@shared/approval'
 import {
+  coerceInvestigateScope,
+  coerceSessionProfile,
+  parseElevationGrant,
+  type ElevationGrant,
+  type InvestigateScope,
+  type SessionProfile
+} from '@shared/profile'
+import {
   applyProjectMetadataDefaults,
   isProjectEnvironment,
   type ProjectMetadata,
@@ -14,7 +22,7 @@ import {
 import type { HealthCheckConfig, HostPolicy } from '@shared/vps'
 
 /** Current on-disk settings schema version. */
-export const SETTINGS_SCHEMA_VERSION = 3
+export const SETTINGS_SCHEMA_VERSION = 4
 
 /** Symmetric secret cipher. In the app it is backed by Electron `safeStorage`. */
 export interface SecretCipher {
@@ -53,6 +61,15 @@ export interface AppSettings {
   planModeDefault?: boolean
   /** Keep the chosen approval mode across restarts instead of resetting to Ask (v2.3). */
   rememberApprovalMode?: boolean
+  /** Active Session Profile (v2.6.2, Topic 1). */
+  profile?: SessionProfile
+  /** Read-only vs plan-only when `profile === 'investigate'` (v2.6.2). */
+  investigateScope?: InvestigateScope
+  /**
+   * Main-side elevation grant (v2.6.2, P0-5). Persisted so an app restart no
+   * longer silently *extends* `full`; main re-checks `expiresAt` on every read.
+   */
+  elevationGrant?: ElevationGrant
   updatedAt: number
 }
 
@@ -272,6 +289,14 @@ export async function migrateSettings(
     if (typeof raw.rememberApprovalMode === 'boolean') {
       settings.rememberApprovalMode = raw.rememberApprovalMode
     }
+    // v2.6.2 (Topic 1): Session Profile + main-side elevation grant.
+    const profile = coerceSessionProfile(raw.profile)
+    if (profile) settings.profile = profile
+    const scope = coerceInvestigateScope(raw.investigateScope)
+    if (scope) settings.investigateScope = scope
+    // A malformed grant is dropped rather than trusted (fail-closed).
+    const grant = parseElevationGrant(raw.elevationGrant)
+    if (grant) settings.elevationGrant = grant
   }
 
   if (version < 1) {
@@ -335,6 +360,8 @@ export interface RedactedSettings {
   approvalMode?: ApprovalMode
   planModeDefault?: boolean
   rememberApprovalMode?: boolean
+  profile?: SessionProfile
+  investigateScope?: InvestigateScope
 }
 
 /**
@@ -417,6 +444,10 @@ export class Persistence {
         : {}),
       ...(this.settings.rememberApprovalMode !== undefined
         ? { rememberApprovalMode: this.settings.rememberApprovalMode }
+        : {}),
+      ...(this.settings.profile ? { profile: this.settings.profile } : {}),
+      ...(this.settings.investigateScope
+        ? { investigateScope: this.settings.investigateScope }
         : {})
     }
   }
@@ -484,6 +515,39 @@ export class Persistence {
     await this.load()
     this.settings.rememberApprovalMode = enabled
     await this.persist()
+  }
+
+  /** Persist the active Session Profile (v2.6.2, Topic 1). */
+  async setSessionProfile(profile: SessionProfile): Promise<void> {
+    await this.load()
+    this.settings.profile = profile
+    await this.persist()
+  }
+
+  /** Persist the Investigate scope (`read-only` | `plan-only`). */
+  async setInvestigateScope(scope: InvestigateScope): Promise<void> {
+    await this.load()
+    this.settings.investigateScope = scope
+    await this.persist()
+  }
+
+  /**
+   * Store (or clear, with `null`) the main-side elevation grant. Expiry is not
+   * enforced here — {@link getElevationGrant} always re-checks `expiresAt`.
+   */
+  async setElevationGrant(grant: ElevationGrant | null): Promise<void> {
+    await this.load()
+    if (grant === null) {
+      delete this.settings.elevationGrant
+    } else {
+      this.settings.elevationGrant = grant
+    }
+    await this.persist()
+  }
+
+  /** The stored grant, or undefined. Never extends or refreshes a grant. */
+  getElevationGrant(): ElevationGrant | undefined {
+    return this.settings.elevationGrant
   }
 
   getActiveProject(): ProjectRecord | undefined {

@@ -9,6 +9,13 @@ export const MEMORY_CHAR_BUDGET = 12_000
 /** Conservative default context budget (~4 chars per token). */
 export const DEFAULT_CONTEXT_TOKEN_BUDGET = 32_000
 
+/**
+ * Fraction of the budget at which the composer shows its subtle "getting full"
+ * hint (v2.6.2 T5.1). Below this the UI stays quiet; at or above it the user is
+ * nudged to compact before the context window actually overflows.
+ */
+export const CONTEXT_NEAR_LIMIT_RATIO = 0.8
+
 export interface MemorySource {
   file: string
   content: string
@@ -64,15 +71,18 @@ export function estimateTokens(text: string): number {
 
 /**
  * Total tokens for the conversation plus the pending draft, and a warning when
- * it crosses the budget. Returns `undefined` while comfortably under budget.
+ * it crosses the budget. `ratio` is the fraction of the budget in use and
+ * `nearLimit` is true once it reaches {@link CONTEXT_NEAR_LIMIT_RATIO}, which
+ * drives the composer's subtle hint.
  */
 export function contextBudget(
   messages: Array<{ content: string }>,
   draft = '',
   budget = DEFAULT_CONTEXT_TOKEN_BUDGET
-): { tokens: number; overBudget: boolean } {
+): { tokens: number; ratio: number; nearLimit: boolean; overBudget: boolean } {
   const tokens =
     messages.reduce((sum, message) => sum + estimateTokens(message.content), 0) +
     (draft ? estimateTokens(draft) : 0)
-  return { tokens, overBudget: tokens >= budget }
+  const ratio = budget > 0 ? tokens / budget : 0
+  return { tokens, ratio, nearLimit: ratio >= CONTEXT_NEAR_LIMIT_RATIO, overBudget: tokens >= budget }
 }

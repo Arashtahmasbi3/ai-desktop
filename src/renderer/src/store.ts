@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { TraceDecision } from '@shared/trace'
 import type { AgentLogEntry } from '@shared/agent'
 import type { LoopStopInfo, LoopWarning } from '@shared/agent'
 import type {
@@ -11,11 +12,14 @@ import { DEFAULT_SELECTION, resolveSelection } from '@shared/selection'
 import type { ApprovalMode, ApprovalOutcome } from '@shared/approval'
 import type { ApprovedPlan, PlanDecision } from '@shared/plan'
 import type { TaskPlan } from '@shared/task-plan'
+import type { Goal } from '@shared/goal'
+import type { ResolvedGoal } from '@core/agent/goal-store'
 import type { ProjectMetadataPatch } from '@shared/project-metadata'
 import type { OnboardingStatus } from '@shared/onboarding'
 import type { VpsConnectionState, VpsServerView } from '@shared/vps'
 import type { DiagnosticStatus } from '@shared/ui'
 import type { ChatSummary, StoredMessage } from '@shared/chat'
+import type { Job } from '@shared/jobs'
 import type { Locale } from './i18n/locale'
 import { detectLocale } from './i18n/locale'
 import { VPS_RECONNECT_KEY } from './lib/vps-state'
@@ -46,7 +50,7 @@ import type {
   WorkerStatus
 } from '@shared/ui'
 
-export type ViewId = 'chat' | 'tasks' | 'files' | 'browser' | 'github' | 'vps'
+export type ViewId = 'chat' | 'tasks' | 'files' | 'browser' | 'github' | 'vps' | 'goals'
 
 /** Tabs of the right-hand workspace column (v2.6.0, B.4). */
 export type WorkspacePanelTab = 'output' | 'sources'
@@ -104,10 +108,17 @@ function toolCallFromView(view: ToolResultView): ToolCallView {
 }
 
 const MAX_LOGS = 500
+/** v2.6.2 T3.2: keep the timeline bounded too. */
+const MAX_DECISIONS = 200
 const MAX_TERMINAL_LINES = 500
-const TOKEN_SETTINGS_KEY = 'ai-desktop:show-token-count'
 export const CONTEXT_SETTINGS_KEY = 'ai-desktop:show-context-before-send'
 const CHAT_TREE_KEY = 'ai-desktop:chat-tree-open'
+const JOBS_PANEL_KEY = 'ai-desktop:show-jobs-panel'
+const ZOOM_KEY = 'ai-desktop:zoom-level'
+/** Electron zoom-level step per keyboard press (v2.6.2 T5.3). */
+const ZOOM_STEP = 0.5
+const ZOOM_MIN = -3
+const ZOOM_MAX = 3
 const LAST_CHAT_KEY = 'ai-desktop:last-chat'
 const AUTOSAVE_INTERVAL_MS = 30_000
 /** Full access auto-reverts to Ask after this much idle time (v2.3, B.2). */
@@ -116,14 +127,6 @@ let fullAccessTimer: ReturnType<typeof setTimeout> | null = null
 
 function newId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `id-${Math.random().toString(36).slice(2)}`
-}
-
-function readShowTokenCount(): boolean {
-  try {
-    return globalThis.localStorage?.getItem(TOKEN_SETTINGS_KEY) !== '0'
-  } catch {
-    return true
-  }
 }
 
 /** Read the persisted "preview context before send" preference (default on). */
@@ -140,6 +143,33 @@ function readChatTreeOpen(): boolean {
     return globalThis.localStorage?.getItem(CHAT_TREE_KEY) === '1'
   } catch {
     return false
+  }
+}
+
+/** Read the persisted "keep the jobs panel open" preference (default off). */
+export function readShowJobsPanelAlways(): boolean {
+  try {
+    return globalThis.localStorage?.getItem(JOBS_PANEL_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+/** Last seen status per job id, so `refreshJobs` can toast a completion once. */
+const jobStatuses = new Map<string, Job['status']>()
+
+/** Clamp + read the persisted zoom level (Electron units; 0 == 100%). */
+function clampZoom(level: number): number {
+  return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, level))
+}
+
+export function readZoomLevel(): number {
+  try {
+    const raw = globalThis.localStorage?.getItem(ZOOM_KEY)
+    const level = raw ? Number(raw) : 0
+    return Number.isFinite(level) ? clampZoom(level) : 0
+  } catch {
+    return 0
   }
 }
 
@@ -179,6 +209,8 @@ interface AppState {
   currentRunId: string | null
   sessionId: string
   logs: AgentLogEntry[]
+  /** v2.6.2 T3.2: trace decisions for the active run, oldest first. */
+  decisions: TraceDecision[]
   warnings: LoopWarning[]
   /** Set when the last run stopped early because the agent looked stuck. */
   loopStop: LoopStopInfo | null
@@ -212,8 +244,6 @@ interface AppState {
   locale: Locale
   /** Collapsed state of the left sidebar. */
   sidebarCollapsed: boolean
-  /** Whether the token estimate is shown under the chat input. */
-  showTokenCount: boolean
   /** Whether the context preview is shown before each send (v2.3.2, B.4). */
   showContextBeforeSend: boolean
   /** Every recorded LLM call's token usage, oldest first (v2.5.4). */
@@ -254,6 +284,12 @@ interface AppState {
   taskPlans: Record<string, TaskPlan>
   /** Whether the user paused the running task plan (v2.5.7). */
   taskPaused: boolean
+  /** The active project's goals (v2.6.2 T4.4). */
+  goals: Goal[]
+  /** How the next run will pick a goal; `ambiguous` asks the user to choose. */
+  goalResolution: ResolvedGoal | null
+  /** A goal mutation is in flight; disables the panel's controls. */
+  goalsBusy: boolean
   /** A tool approved 3+ times; the UI suggests remembering it (v2.3, B.3). */
   approvalSuggestion: { tool: string; count: number } | null
   /** A "Deny & Explain" prompt to send once the current run settles. */
@@ -278,10 +314,19 @@ interface AppState {
   terminalLines: TerminalLine[]
   /** Command palette visibility. */
   paletteOpen: boolean
+  /** Detached background jobs, polled globally so the sidebar badge stays fresh (T5.2). */
+  jobs: Job[]
+  /** Whether the full jobs panel is currently open (T5.2). */
+  jobsPanelOpen: boolean
+  /** Pin the jobs panel open even with nothing running (T5.2). */
+  showJobsPanelAlways: boolean
+  /** Electron zoom level, 0 == 100% (T5.3). */
+  zoomLevel: number
+  /** Keyboard-shortcut cheat sheet visibility (T5.3). */
+  shortcutsOpen: boolean
 
   setLocale: (locale: Locale) => void
   toggleSidebar: () => void
-  setShowTokenCount: (value: boolean) => void
   /** Toggle the pre-send context preview. */
   setShowContextBeforeSend: (value: boolean) => void
   /** Record one LLM call's usage and persist it (v2.5.4). */
@@ -323,6 +368,16 @@ interface AppState {
   pushToast: (kind: ToastKind, message: string) => void
   dismissToast: (id: string) => void
   setPaletteOpen: (open: boolean) => void
+  /** Poll the main process for detached jobs (T5.2). */
+  refreshJobs: () => Promise<void>
+  setJobsPanelOpen: (open: boolean) => void
+  setShowJobsPanelAlways: (value: boolean) => void
+  /** Apply (and persist) an Electron zoom level, clamped to a safe range (T5.3). */
+  applyZoom: (level: number) => void
+  zoomIn: () => void
+  zoomOut: () => void
+  resetZoom: () => void
+  setShortcutsOpen: (open: boolean) => void
   toggleChatTree: () => void
   toggleWorkspacePanel: () => void
   setWorkspacePanelTab: (tab: WorkspacePanelTab) => void
@@ -351,9 +406,23 @@ interface AppState {
   resumeTaskPlan: () => void
   /** Stop the running task plan and mark it failed. */
   stopTaskPlan: () => void
+  /** v2.6.2 T4.4: reload the active project's goals + goal resolution. */
+  refreshGoals: () => Promise<void>
+  /** Create a goal for the active project; the first one becomes active. */
+  createGoal: (title: string, criteria?: string[]) => Promise<void>
+  updateGoalTitle: (goalId: string, title: string) => Promise<void>
+  /** Tick/untick one success criterion. */
+  toggleGoalCriterion: (goalId: string, criterionId: string, met: boolean) => Promise<void>
+  /** Pin (or unpin, with null) the goal the next run attaches to. */
+  setActiveGoal: (goalId: string | null) => Promise<void>
+  achieveGoal: (goalId: string) => Promise<void>
+  abandonGoal: (goalId: string, note?: string) => Promise<void>
+  removeGoal: (goalId: string) => Promise<void>
   send: (text: string) => Promise<void>
   abort: () => void
   newSession: () => void
+  /** v2.6.2 T5.1: archive the current chat and start a fresh context. */
+  compactContext: () => Promise<void>
   loadSession: (id: string) => Promise<void>
   refreshSessions: () => Promise<void>
   /** v2.6.1 Fix 5: load the active chat's memory summary. */
@@ -409,6 +478,7 @@ export const useStore = create<AppState>((set, get) => ({
   currentRunId: null,
   sessionId: newId(),
   logs: [],
+  decisions: [],
   warnings: [],
   loopStop: null,
   sessions: [],
@@ -432,7 +502,6 @@ export const useStore = create<AppState>((set, get) => ({
 
   locale: detectLocale(),
   sidebarCollapsed: false,
-  showTokenCount: readShowTokenCount(),
   showContextBeforeSend: readShowContextBeforeSend(),
   usageRecords: loadUsage(),
   sessionStartedAt: Date.now(),
@@ -450,6 +519,9 @@ export const useStore = create<AppState>((set, get) => ({
   taskPlan: null,
   taskPlans: {},
   taskPaused: false,
+  goals: [],
+  goalResolution: null,
+  goalsBusy: false,
   approvalSuggestion: null,
   queuedExplain: null,
   fileChanges: [],
@@ -462,20 +534,17 @@ export const useStore = create<AppState>((set, get) => ({
   searchOpen: false,
   searchResults: [],
   paletteOpen: false,
+  jobs: [],
+  jobsPanelOpen: false,
+  showJobsPanelAlways: readShowJobsPanelAlways(),
+  zoomLevel: readZoomLevel(),
+  shortcutsOpen: false,
 
   setLocale(locale) {
     set({ locale })
     void i18nChangeLanguage(locale)
   },
   toggleSidebar: () => set({ sidebarCollapsed: !get().sidebarCollapsed }),
-  setShowTokenCount(value) {
-    set({ showTokenCount: value })
-    try {
-      globalThis.localStorage?.setItem(TOKEN_SETTINGS_KEY, value ? '1' : '0')
-    } catch {
-      // Persisting the preference is best-effort.
-    }
-  },
   setShowContextBeforeSend(value) {
     set({ showContextBeforeSend: value })
     try {
@@ -675,6 +744,52 @@ export const useStore = create<AppState>((set, get) => ({
   },
   setPaletteOpen: (open) => set({ paletteOpen: open }),
 
+  async refreshJobs() {
+    const api = window.api?.jobs
+    if (!api) return
+    let next: Job[]
+    try {
+      next = await api.refresh()
+    } catch {
+      return
+    }
+    for (const job of next) {
+      const last = jobStatuses.get(job.id)
+      if (last && last !== job.status && (job.status === 'completed' || job.status === 'failed')) {
+        get().pushToast(
+          job.status === 'completed' ? 'success' : 'error',
+          i18n.t('jobs.finishedToast', { id: job.id.slice(0, 8), status: job.status })
+        )
+      }
+    }
+    jobStatuses.clear()
+    for (const job of next) jobStatuses.set(job.id, job.status)
+    set({ jobs: next })
+  },
+  setJobsPanelOpen: (open) => set({ jobsPanelOpen: open }),
+  setShowJobsPanelAlways(value) {
+    set({ showJobsPanelAlways: value, ...(value ? { jobsPanelOpen: true } : {}) })
+    try {
+      globalThis.localStorage?.setItem(JOBS_PANEL_KEY, value ? '1' : '0')
+    } catch {
+      // Persisting the preference is best-effort.
+    }
+  },
+  applyZoom(level) {
+    const clamped = clampZoom(level)
+    set({ zoomLevel: clamped })
+    try {
+      globalThis.localStorage?.setItem(ZOOM_KEY, String(clamped))
+    } catch {
+      // Persisting the zoom is best-effort.
+    }
+    void window.api?.window?.setZoom(clamped).catch(() => undefined)
+  },
+  zoomIn: () => get().applyZoom(get().zoomLevel + ZOOM_STEP),
+  zoomOut: () => get().applyZoom(get().zoomLevel - ZOOM_STEP),
+  resetZoom: () => get().applyZoom(0),
+  setShortcutsOpen: (open) => set({ shortcutsOpen: open }),
+
   async refreshChats() {
     try {
       set({ chats: await window.api.chats.list() })
@@ -721,7 +836,7 @@ export const useStore = create<AppState>((set, get) => ({
   async deleteChat(id) {
     await window.api.chats.remove(id)
     if (get().activeChatId === id) {
-      set({ activeChatId: null, messages: [], logs: [], warnings: [] })
+      set({ activeChatId: null, messages: [], logs: [], decisions: [], warnings: [] })
     }
     await get().refreshChats()
   },
@@ -782,6 +897,7 @@ export const useStore = create<AppState>((set, get) => ({
       })
       await get().refreshFiles()
       await get().refreshSessions()
+      await get().refreshGoals()
 
       // Offer to fix projects whose folder is missing (e.g. a path from another OS).
       if (
@@ -835,6 +951,7 @@ export const useStore = create<AppState>((set, get) => ({
           currentRunId: event.runId,
           error: null,
           logs: [],
+          decisions: [],
           pendingApproval: null,
           pendingPlan: null,
           activePlan: null,
@@ -886,7 +1003,16 @@ export const useStore = create<AppState>((set, get) => ({
       case 'log': {
         const logs = [...get().logs, event.entry]
         if (logs.length > MAX_LOGS) logs.splice(0, logs.length - MAX_LOGS)
-        set({ logs })
+        // v2.6.2 T3.2: a 'decision' entry is also the live timeline's input.
+        if (event.entry.event === 'decision' && event.entry.decision) {
+          const decisions = [...get().decisions, event.entry.decision as TraceDecision]
+          if (decisions.length > MAX_DECISIONS) {
+            decisions.splice(0, decisions.length - MAX_DECISIONS)
+          }
+          set({ logs, decisions })
+        } else {
+          set({ logs })
+        }
         break
       }
       case 'tool:result': {
@@ -996,6 +1122,95 @@ export const useStore = create<AppState>((set, get) => ({
     })
   },
 
+  /** v2.6.2 T4.4: the goal list is main-owned; the store only mirrors it. */
+  async refreshGoals() {
+    const hasProject = get().goals.length > 0 || get().settings?.projects.length
+    if (!hasProject) {
+      set({ goals: [], goalResolution: null })
+      return
+    }
+    try {
+      const [goals, goalResolution] = await Promise.all([
+        window.api.agent.goal.list(),
+        window.api.agent.goal.resolve()
+      ])
+      set({ goals, goalResolution })
+    } catch {
+      // No active project (or a transient failure): show the empty state.
+      set({ goals: [], goalResolution: null })
+    }
+  },
+  async createGoal(title, criteria) {
+    const trimmed = title.trim()
+    if (!trimmed || get().goalsBusy) return
+    set({ goalsBusy: true })
+    try {
+      await window.api.agent.goal.create({
+        title: trimmed,
+        ...(criteria && criteria.length > 0 ? { criteria } : {})
+      })
+    } finally {
+      set({ goalsBusy: false })
+      await get().refreshGoals()
+    }
+  },
+  async updateGoalTitle(goalId, title) {
+    const trimmed = title.trim()
+    if (!trimmed || get().goalsBusy) return
+    set({ goalsBusy: true })
+    try {
+      await window.api.agent.goal.update(goalId, { title: trimmed })
+    } finally {
+      set({ goalsBusy: false })
+      await get().refreshGoals()
+    }
+  },
+  async toggleGoalCriterion(goalId, criterionId, met) {
+    set({ goalsBusy: true })
+    try {
+      await window.api.agent.goal.setCriterion(goalId, criterionId, met)
+    } finally {
+      set({ goalsBusy: false })
+      await get().refreshGoals()
+    }
+  },
+  async setActiveGoal(goalId) {
+    set({ goalsBusy: true })
+    try {
+      await window.api.agent.goal.setActive(goalId)
+    } finally {
+      set({ goalsBusy: false })
+      await get().refreshGoals()
+    }
+  },
+  async achieveGoal(goalId) {
+    set({ goalsBusy: true })
+    try {
+      await window.api.agent.goal.achieve(goalId)
+    } finally {
+      set({ goalsBusy: false })
+      await get().refreshGoals()
+    }
+  },
+  async abandonGoal(goalId, note) {
+    set({ goalsBusy: true })
+    try {
+      await window.api.agent.goal.abandon(goalId, note)
+    } finally {
+      set({ goalsBusy: false })
+      await get().refreshGoals()
+    }
+  },
+  async removeGoal(goalId) {
+    set({ goalsBusy: true })
+    try {
+      await window.api.agent.goal.remove(goalId)
+    } finally {
+      set({ goalsBusy: false })
+      await get().refreshGoals()
+    }
+  },
+
   async send(text) {
     const trimmed = text.trim()
     if (!trimmed || get().running) return
@@ -1046,6 +1261,7 @@ export const useStore = create<AppState>((set, get) => ({
       activeChatId: null,
       messages: [],
       logs: [],
+      decisions: [],
       warnings: [],
       loopStop: null,
       memory: null,
@@ -1064,6 +1280,21 @@ export const useStore = create<AppState>((set, get) => ({
     if (settings?.approvalMode === 'full' && !settings.rememberApprovalMode) {
       void get().setApprovalMode('ask')
     }
+  },
+
+  async compactContext() {
+    if (get().running) return
+    const count = get().messages.length
+    if (count === 0) return
+    // Persist first so the archived chat stays retrievable from the sidebar,
+    // then start a fresh session. Waiting on the save matters: it assigns
+    // `activeChatId` to the archived chat, and `newSession` must run *after*
+    // that so the next run resumes no history and the context is really freed.
+    await get().persistChat()
+    get().newSession()
+    // Point resume-at-startup at the (empty) new session, not the archive.
+    rememberChatId(get().sessionId)
+    get().pushToast('success', i18n.t('chat.compacted', { count }))
   },
 
   async loadSession(id) {
@@ -1085,6 +1316,7 @@ export const useStore = create<AppState>((set, get) => ({
           ...(message.usedRemote ? { usedRemote: true } : {})
         })),
       logs: [],
+      decisions: [],
       warnings: [],
       loopStop: null,
       view: 'chat'
@@ -1218,6 +1450,7 @@ export const useStore = create<AppState>((set, get) => ({
   async openProject(id) {
     set({ settings: await window.api.projects.open(id) })
     await get().refreshFiles('.')
+    await get().refreshGoals()
   },
 
   async updateProjectPath(id, path) {
@@ -1269,6 +1502,9 @@ export function subscribeToEvents(): void {
   const offDiagnostic = window.api.events.on('diagnostic:status', (diagnostic) =>
     useStore.setState({ diagnostic })
   )
+  const offGoals = window.api.events.on('goal:changed', () => {
+    void useStore.getState().refreshGoals()
+  })
   unsubscribe = () => {
     offAgent()
     offWorker()
@@ -1277,6 +1513,7 @@ export function subscribeToEvents(): void {
     offFiles()
     offVps()
     offDiagnostic()
+    offGoals()
     unsubscribe = null
   }
 }

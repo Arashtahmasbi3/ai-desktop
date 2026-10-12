@@ -4,12 +4,14 @@ import {
   FolderTree,
   GitFork,
   Globe,
+  Keyboard,
   ListChecks,
   MessageSquare,
   PanelLeft,
   Plus,
   Server,
-  Settings2
+  Settings2,
+  Target
 } from 'lucide-react'
 import { useStore, type ViewId } from '../store'
 
@@ -29,6 +31,7 @@ export default function CommandPalette(): JSX.Element | null {
   const openSettings = useStore((state) => state.openSettings)
   const toggleSidebar = useStore((state) => state.toggleSidebar)
   const setView = useStore((state) => state.setView)
+  const setShortcutsOpen = useStore((state) => state.setShortcutsOpen)
   const [query, setQuery] = useState('')
   const [index, setIndex] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -40,11 +43,18 @@ export default function CommandPalette(): JSX.Element | null {
       { id: 'files', labelKey: 'palette.viewWorkspace', icon: FolderTree },
       { id: 'browser', labelKey: 'palette.viewBrowser', icon: Globe },
       { id: 'github', labelKey: 'palette.viewGitHub', icon: GitFork },
-      { id: 'vps', labelKey: 'palette.viewVps', icon: Server }
+      { id: 'vps', labelKey: 'palette.viewVps', icon: Server },
+      { id: 'goals', labelKey: 'palette.viewGoals', icon: Target }
     ]
     return [
       { id: 'new', label: t('palette.newChat'), icon: Plus, run: newSession },
       { id: 'settings', label: t('palette.openSettings'), icon: Settings2, run: openSettings },
+      {
+        id: 'shortcuts',
+        label: t('palette.shortcuts'),
+        icon: Keyboard,
+        run: () => setShortcutsOpen(true)
+      },
       { id: 'sidebar', label: t('palette.toggleSidebar'), icon: PanelLeft, run: toggleSidebar },
       ...views.map((view) => ({
         id: view.id,
@@ -53,7 +63,7 @@ export default function CommandPalette(): JSX.Element | null {
         run: () => setView(view.id)
       }))
     ]
-  }, [t, newSession, openSettings, toggleSidebar, setView])
+  }, [t, newSession, openSettings, toggleSidebar, setView, setShortcutsOpen])
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase()

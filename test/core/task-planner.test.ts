@@ -69,6 +69,16 @@ describe('Task 4.1 - task planner', () => {
     expect(prompts).toHaveLength(0)
   })
 
+  it('2b. stamps the run context goal id on the plan (v2.6.2 T4.3)', async () => {
+    const { planner } = makePlanner([])
+    const withGoal = await planner.createPlan('سلام', { ...CONTEXT, goalId: 'goal-7' })
+    expect(withGoal.goalId).toBe('goal-7')
+
+    // A run without a goal leaves the field absent, not empty.
+    const withoutGoal = await planner.createPlan('سلام', CONTEXT)
+    expect(withoutGoal.goalId).toBeUndefined()
+  })
+
   it('3. an approved plan executes every step in order', async () => {
     const executed: string[] = []
     const { planner } = makePlanner(

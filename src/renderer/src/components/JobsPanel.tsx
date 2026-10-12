@@ -1,66 +1,60 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { Job } from '@shared/jobs'
+import { ChevronUp, Loader2 } from 'lucide-react'
 import { useStore } from '../store'
 import JobCard from './JobCard'
 
-const POLL_MS = 10_000
-
 /**
- * Background job panel (v2.4, A.1). Self-contained: it polls the main process for
- * detached jobs, surfaces a toast when one finishes, and lets the user kill a job.
- * Renders nothing while there are no jobs, so it stays out of the way.
+ * Background job panel (v2.4, A.1; collapsed by default in v2.6.2 T5.2).
+ *
+ * Jobs are polled globally in the store so the sidebar badge stays fresh even
+ * while this panel is hidden. The panel only renders when the user opened it
+ * (via the badge) or pinned it with "show always"; it collapses again on demand.
  */
 export default function JobsPanel(): JSX.Element | null {
   const { t } = useTranslation()
-  const pushToast = useStore((state) => state.pushToast)
-  const [jobs, setJobs] = useState<Job[]>([])
-  const previous = useRef<Map<string, Job['status']>>(new Map())
-
-  const refresh = useCallback(async () => {
-    const api = window.api?.jobs
-    if (!api) return
-    const next = await api.refresh()
-    const before = previous.current
-    for (const job of next) {
-      const last = before.get(job.id)
-      if (last && last !== job.status && (job.status === 'completed' || job.status === 'failed')) {
-        pushToast(
-          job.status === 'completed' ? 'success' : 'error',
-          t('jobs.finishedToast', { id: job.id.slice(0, 8), status: job.status })
-        )
-      }
-    }
-    previous.current = new Map(next.map((job) => [job.id, job.status]))
-    setJobs(next)
-  }, [pushToast, t])
-
-  useEffect(() => {
-    void refresh().catch(() => undefined)
-    const timer = setInterval(() => {
-      void refresh().catch(() => undefined)
-    }, POLL_MS)
-    return () => clearInterval(timer)
-  }, [refresh])
+  const jobs = useStore((state) => state.jobs)
+  const open = useStore((state) => state.jobsPanelOpen)
+  const always = useStore((state) => state.showJobsPanelAlways)
+  const setOpen = useStore((state) => state.setJobsPanelOpen)
+  const refreshJobs = useStore((state) => state.refreshJobs)
 
   const kill = useCallback(
     async (id: string) => {
       await window.api?.jobs.kill(id)
-      await refresh().catch(() => undefined)
+      await refreshJobs().catch(() => undefined)
     },
-    [refresh]
+    [refreshJobs]
   )
 
-  if (jobs.length === 0) return null
+  if (!open && !always) return null
 
   return (
-    <div className="flex flex-col gap-2 border-b border-border bg-bg-secondary/60 px-3 py-2">
-      <div className="text-[11px] font-medium uppercase tracking-wide text-text-tertiary">
-        {t('jobs.panelTitle', { count: jobs.length })}
+    <div
+      data-testid="jobs-panel"
+      className="flex flex-col gap-2 border-b border-border bg-bg-secondary/60 px-3 py-2"
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-text-tertiary">
+          {jobs.length > 0 ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+          {t('jobs.panelTitle', { count: jobs.length })}
+        </div>
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          title={t('jobs.collapse')}
+          aria-label={t('jobs.collapse')}
+          className="rounded p-0.5 text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-200"
+        >
+          <ChevronUp className="h-3.5 w-3.5" />
+        </button>
       </div>
-      {jobs.map((job) => (
-        <JobCard key={job.id} job={job} onKill={kill} />
-      ))}
+      {jobs.length === 0 ? (
+        <p className="text-[11px] text-neutral-600">{t('jobs.empty')}</p>
+      ) : (
+        jobs.map((job) => <JobCard key={job.id} job={job} onKill={kill} />)
+      )}
     </div>
   )
 }
+

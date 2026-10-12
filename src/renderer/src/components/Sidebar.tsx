@@ -18,6 +18,7 @@ import {
   Search,
   Server,
   Settings2,
+  Target,
   Trash2,
   User
 } from 'lucide-react'
@@ -35,7 +36,8 @@ const NAV: Array<{ id: ViewId; labelKey: string; icon: typeof MessageSquare }> =
   { id: 'files', labelKey: 'sidebar.navWorkspace', icon: FolderTree },
   { id: 'browser', labelKey: 'sidebar.navBrowser', icon: Globe },
   { id: 'github', labelKey: 'sidebar.navGitHub', icon: GitFork },
-  { id: 'vps', labelKey: 'sidebar.navVps', icon: Server }
+  { id: 'vps', labelKey: 'sidebar.navVps', icon: Server },
+  { id: 'goals', labelKey: 'sidebar.navGoals', icon: Target }
 ]
 
 /** Short relative time such as "3m", "2h", "5d" for the chat rows. */
@@ -92,6 +94,10 @@ export default function Sidebar(): JSX.Element {
   const updateProjectPath = useStore((state) => state.updateProjectPath)
   const addRemoteProject = useStore((state) => state.addRemoteProject)
   const pushToast = useStore((state) => state.pushToast)
+  const runningJobs = useStore(
+    (state) => state.jobs.filter((job) => job.status === 'running' || job.status === 'pending').length
+  )
+  const setJobsPanelOpen = useStore((state) => state.setJobsPanelOpen)
 
   const [query, setQuery] = useState('')
   const [chatMenuFor, setChatMenuFor] = useState<string | null>(null)
@@ -117,7 +123,9 @@ export default function Sidebar(): JSX.Element {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+      // Ctrl+K is owned by the command palette (v2.6.2 T5.3); search focus moved
+      // to Ctrl+Shift+K so the two shortcuts no longer fight over the same keys.
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'k') {
         event.preventDefault()
         searchRef.current?.focus()
       }
@@ -227,7 +235,14 @@ export default function Sidebar(): JSX.Element {
               }`}
             >
               <Icon className="h-4 w-4" />
-              {item.id === 'tasks' && (worker?.active ?? 0) > 0 ? (
+              {item.id === 'tasks' && runningJobs > 0 ? (
+                <span
+                  data-testid="sidebar-jobs-badge-collapsed"
+                  className="absolute -right-1 -top-1 min-w-[14px] rounded-full bg-accent px-1 text-center text-[9px] font-semibold leading-[14px] text-bg-primary"
+                >
+                  {runningJobs}
+                </span>
+              ) : item.id === 'tasks' && (worker?.active ?? 0) > 0 ? (
                 <span className="absolute right-1 top-1 h-1.5 w-1.5 animate-pulse rounded-full bg-sky-400" />
               ) : null}
             </button>
@@ -304,12 +319,28 @@ export default function Sidebar(): JSX.Element {
           </button>
           <button
             type="button"
-            title={t('sidebar.navTasks')}
-            onClick={() => setView('tasks')}
+            title={runningJobs > 0 ? t('jobs.badgeTitle', { count: runningJobs }) : t('sidebar.navTasks')}
+            aria-label={runningJobs > 0 ? t('jobs.badgeTitle', { count: runningJobs }) : t('sidebar.navTasks')}
+            data-testid="sidebar-jobs-button"
+            onClick={() => {
+              if (runningJobs > 0) {
+                setJobsPanelOpen(true)
+                setView('chat')
+              } else {
+                setView('tasks')
+              }
+            }}
             className="relative flex h-7 w-7 items-center justify-center rounded-lg text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300"
           >
             <Bell className="h-3.5 w-3.5" />
-            {(worker?.active ?? 0) > 0 ? (
+            {runningJobs > 0 ? (
+              <span
+                data-testid="sidebar-jobs-badge"
+                className="absolute -right-1 -top-1 min-w-[14px] rounded-full bg-accent px-1 text-center text-[9px] font-semibold leading-[14px] text-bg-primary"
+              >
+                {runningJobs}
+              </span>
+            ) : (worker?.active ?? 0) > 0 ? (
               <span className="absolute right-1 top-1 h-1.5 w-1.5 animate-pulse rounded-full bg-sky-400" />
             ) : null}
           </button>
@@ -326,7 +357,7 @@ export default function Sidebar(): JSX.Element {
             className="w-full bg-transparent text-xs text-neutral-200 outline-none placeholder:text-neutral-600"
           />
           <kbd className="shrink-0 rounded border border-border px-1 text-[9px] text-neutral-600">
-            Ctrl K
+            Ctrl ⇧ K
           </kbd>
         </label>
       </div>

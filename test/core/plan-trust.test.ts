@@ -16,7 +16,9 @@ const plan: Plan = {
 }
 
 function approved(now: number, ttl = PLAN_TRUST_TTL_MS): ApprovedPlan {
-  const trust = createApprovedPlan(plan, 'session-1', { type: 'approve', trust: true }, now, ttl)
+  const trust = createApprovedPlan(plan, 'session-1', { type: 'approve', trust: true }, now, {
+    ttlMs: ttl
+  })
   if (!trust) throw new Error('expected a trusted plan')
   return trust
 }
@@ -77,16 +79,37 @@ describe('v2.6.1 Fix 3 - plan trust per session', () => {
 
     // A restart: fresh registry, same metadata.
     const restored = new PlanTrustRegistry(() => now)
-    expect(restored.restore('chat-1', metadata?.[PLAN_TRUST_METADATA_KEY])).toBe(true)
+    expect(restored.restore('chat-1', metadata?.[PLAN_TRUST_METADATA_KEY])).toBe('restored')
     expect(restored.get('chat-1')?.id).toBe('plan-1')
 
     // Expired payloads are not restored.
     const later = new PlanTrustRegistry(() => T0 + PLAN_TRUST_TTL_MS)
-    expect(later.restore('chat-1', metadata?.[PLAN_TRUST_METADATA_KEY])).toBe(false)
+    expect(later.restore('chat-1', metadata?.[PLAN_TRUST_METADATA_KEY])).toBe('expired')
+
+    // A structurally valid but unscoped (pre-v2.6.2) record is reported as legacy.
+    expect(
+      later.restore('chat-1', {
+        id: 'plan-1',
+        runId: 'session-1',
+        stepIds: ['a1'],
+        approvedAt: T0,
+        expiresAt: T0 + 60_000
+      })
+    ).toBe('legacy')
 
     // Garbage is rejected rather than trusted.
-    expect(later.restore('chat-1', { id: 5 })).toBe(false)
+    expect(later.restore('chat-1', { id: 5 })).toBe('none')
     expect(parsePlanTrust(null)).toBeNull()
     expect(parsePlanTrust({ id: 'x', runId: 'r', stepIds: [1], approvedAt: 0, expiresAt: 1 })).toBeNull()
+    // ...and an unscoped record never parses into a usable trust.
+    expect(
+      parsePlanTrust({
+        id: 'x',
+        runId: 'r',
+        stepIds: ['a'],
+        approvedAt: 0,
+        expiresAt: 1
+      })
+    ).toBeNull()
   })
 })

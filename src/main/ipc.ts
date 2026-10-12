@@ -1,10 +1,13 @@
 import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import type { CustomProviderInput, ProviderId } from '@shared/types'
 import type { ApprovalMode, ApprovalOutcome } from '@shared/approval'
+import type { InvestigateScope, SessionProfile } from '@shared/profile'
 import type { PlanDecision } from '@shared/plan'
 import type { ProjectMetadataPatch } from '@shared/project-metadata'
 import type { GitCommitInput } from '@shared/github'
 import type { AgentRunRequest, WorkerJobRequest } from '@shared/ui'
+import type { GoalUpdate, NewGoalInput } from '@shared/goal'
+
 import type { AppServices } from './app-services'
 import { registerVpsIpc } from './vps-ipc'
 import { runLocalCommand } from './local-shell'
@@ -37,6 +40,12 @@ export function registerIpc(
   const filesChanged = (): void => {
     const root = services.files.getRoot()
     if (root) send('files:changed', { root })
+  }
+  /** The project a goal operation applies to, defaulting to the active one. */
+  const goalProject = (projectId?: string): string => {
+    const id = projectId ?? services.persistence.getActiveProject()?.id
+    if (!id) throw new Error('No active project. Add or select a project first.')
+    return id
   }
 
   const handlers: Array<[string, (...args: never[]) => unknown]> = [
@@ -83,7 +92,17 @@ export function registerIpc(
     [
       'settings:setApprovalMode',
       async (mode: ApprovalMode) => {
-        await services.persistence.setApprovalMode(mode)
+        if (mode === 'full') {
+          // v2.6.2 (P0-5): `full` is a scoped, TTL-bounded elevation grant owned
+          // by main — never merely a persisted preference the renderer can set.
+          await services.grantElevation()
+        } else {
+          // v2.6.1 compat: `ask`/`auto-write` stay Develop profile; the persisted
+          // approval preference still drives the effective mode.
+          await services.persistence.setApprovalMode(mode)
+          await services.sessionProfile.setProfile('develop')
+          await services.sessionProfile.revokeElevation()
+        }
         return changed()
       }
     ],
@@ -276,6 +295,85 @@ export function registerIpc(
     ['agent:loadSession', (id: string) => services.agent.loadSession(id)],
     ['agent:memory', (id: string) => services.agent.memory(id)],
     ['agent:clearMemory', (id: string) => services.agent.clearMemory(id)],
+    // v2.6.2 (T3.2): explain one trace decision of a run ("Ask Why"). Deterministic.
+    [
+      'agent:explainStep',
+      (runId: string, decisionId: string) => services.agent.explainStep(runId, decisionId)
+    ],
+
+    // v2.6.2 (T3.3): audit mode. The path is shown in Settings → Advanced, and
+    // Verify recomputes the hash chain to surface tampering.
+    ['audit:path', () => services.agent.auditPath()],
+    ['audit:verify', () => services.agent.verifyAudit()],
+
+    // v2.6.2 (T4.4): a project's goals are edited from the renderer. The project
+    // defaults to the active one; every mutation notifies all windows.
+    ['agent:goal:list', (projectId?: string) => services.goals.list(goalProject(projectId))],
+    ['agent:goal:resolve', (projectId?: string) =>
+      services.goals.resolveGoalId(goalProject(projectId))],
+    [
+      'agent:goal:create',
+      async (input: NewGoalInput, projectId?: string) => {
+        const id = goalProject(projectId)
+        const goal = await services.goals.create(id, input)
+        services.emitGoalChanged(id, goal.id)
+        return goal
+      }
+    ],
+    [
+      'agent:goal:update',
+      async (goalId: string, patch: GoalUpdate, projectId?: string) => {
+        const id = goalProject(projectId)
+        const goal = await services.goals.update(id, goalId, patch)
+        services.emitGoalChanged(id, goalId)
+        return goal
+      }
+    ],
+    [
+      'agent:goal:setCriterion',
+      async (goalId: string, criterionId: string, met: boolean, projectId?: string) => {
+        const id = goalProject(projectId)
+        const goal = await services.goals.setCriterion(id, goalId, criterionId, met)
+        services.emitGoalChanged(id, goalId)
+        return goal
+      }
+    ],
+    [
+      'agent:goal:setActive',
+      async (goalId: string | null, projectId?: string) => {
+        const id = goalProject(projectId)
+        await services.goals.setActive(id, goalId)
+        services.emitGoalChanged(id, goalId ?? undefined)
+        return true
+      }
+    ],
+    [
+      'agent:goal:achieve',
+      async (goalId: string, projectId?: string) => {
+        const id = goalProject(projectId)
+        const goal = await services.goals.achieve(id, goalId)
+        services.emitGoalChanged(id, goalId)
+        return goal
+      }
+    ],
+    [
+      'agent:goal:abandon',
+      async (goalId: string, note?: string, projectId?: string) => {
+        const id = goalProject(projectId)
+        const goal = await services.goals.abandon(id, goalId, note)
+        services.emitGoalChanged(id, goalId)
+        return goal
+      }
+    ],
+    [
+      'agent:goal:delete',
+      async (goalId: string, projectId?: string) => {
+        const id = goalProject(projectId)
+        const removed = await services.goals.delete(id, goalId)
+        services.emitGoalChanged(id, goalId)
+        return removed
+      }
+    ],
 
     ['jobs:list', () => services.jobs.listJobs()],
     ['jobs:refresh', () => services.jobs.refreshAll()],
@@ -303,7 +401,38 @@ export function registerIpc(
     // v2.5.3: user-controlled, in-memory read-only widening of P0-2.
     ['diagnostic:status', () => services.diagnosticStatus()],
     ['diagnostic:enable', () => services.enableDiagnosticMode()],
-    ['diagnostic:disable', () => services.disableDiagnosticMode()]
+    ['diagnostic:disable', () => services.disableDiagnosticMode()],
+
+    // v2.6.2 (Topic 1): Session Profile + main-side elevation grant (P0-5).
+    ['session:get', () => services.sessionProfile.state()],
+    [
+      'session:setProfile',
+      async (profile: SessionProfile) => {
+        await services.setSessionProfile(profile)
+        return changed()
+      }
+    ],
+    [
+      'session:setInvestigateScope',
+      async (scope: InvestigateScope) => {
+        await services.setInvestigateScope(scope)
+        return changed()
+      }
+    ],
+    [
+      'session:grantElevation',
+      async () => {
+        await services.grantElevation()
+        return changed()
+      }
+    ],
+    [
+      'session:revokeElevation',
+      async () => {
+        await services.revokeElevation()
+        return changed()
+      }
+    ]
   ]
 
   for (const [channel, handler] of handlers) {
@@ -313,7 +442,9 @@ export function registerIpc(
   const windowOf = (event: Electron.IpcMainInvokeEvent): BrowserWindow | null =>
     BrowserWindow.fromWebContents(event.sender) ?? getWindow()
 
-  const windowChannels: Array<[string, (event: Electron.IpcMainInvokeEvent) => unknown]> = [
+  const windowChannels: Array<
+    [string, (event: Electron.IpcMainInvokeEvent, ...args: unknown[]) => unknown]
+  > = [
     ['window:minimize', (event) => windowOf(event)?.minimize()],
     [
       'window:toggleMaximize',
@@ -327,6 +458,18 @@ export function registerIpc(
     ],
     ['window:close', (event) => windowOf(event)?.close()],
     ['window:isMaximized', (event) => windowOf(event)?.isMaximized() ?? false],
+    [
+      'window:zoom',
+      (event, level) => {
+        const window = windowOf(event)
+        if (!window) return 0
+        // v2.6.2 T5.3: Electron zoom level; 0 is 100%. Clamp so the UI stays usable.
+        const value = typeof level === 'number' && Number.isFinite(level) ? level : 0
+        const clamped = Math.min(3, Math.max(-3, value))
+        window.webContents.setZoomLevel(clamped)
+        return clamped
+      }
+    ],
     ['window:new', () => {
       openWindow()
       return true
@@ -334,7 +477,7 @@ export function registerIpc(
   ]
 
   for (const [channel, handler] of windowChannels) {
-    ipcMain.handle(channel, (event) => handler(event))
+    ipcMain.handle(channel, (event, ...args) => handler(event, ...args))
   }
 
   const disposeVps = registerVpsIpc(services)

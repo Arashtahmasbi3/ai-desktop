@@ -61,6 +61,7 @@ import type { RoutingDecision } from './agent/remote-routing'
 import type { ToolExecutor, ToolExecOptions } from './agent/tools'
 import { preflightWarnings, type PreflightResult } from './agent/preflight'
 import { verifySuccess, type ToolCallRecord } from './agent/success-verifier'
+import { buildTraceDecision } from './agent/trace-decision'
 
 /** A file that an agent `write_file` action changed during a run. */
 export interface FileChange {
@@ -79,6 +80,11 @@ export interface AgentOrchestratorOptions {
   extraTools?: ToolDefinition[]
   /** Executor for {@link extraTools}; sandbox tools keep using the sandbox. */
   extraExecutor?: ToolExecutor
+  /**
+   * v2.6.2: allowlist applied to the exposed tool set. Investigate/read-only
+   * passes `isReadOnlyTool` so mutating tools are never offered to the model.
+   */
+  toolPolicy?: (toolName: string) => boolean
   /** Extra environment/instructions appended to the system prompt. */
   systemHint?: string
   /** Maximum number of plan/execute cycles before stopping. Default 12. */
@@ -116,6 +122,11 @@ export interface AgentOrchestratorOptions {
   sessionMetadata?: () => Record<string, unknown> | undefined
   /** Plan Mode: expose no tools and only produce a plan. */
   planMode?: boolean
+  /**
+   * v2.6.2 T3.1: the project goal this run serves, stamped onto every emitted
+   * `TraceDecision` so the timeline/audit can group decisions by goal.
+   */
+  goalId?: string
   /**
    * Consulted before every action executes. Return false to block the action
    * (recorded as a `blocked` observation) without running it.
@@ -498,6 +509,7 @@ export class AgentOrchestrator {
   private readonly sessionId?: string
   private readonly sessionMetadata?: () => Record<string, unknown> | undefined
   private readonly planMode: boolean
+  private readonly goalId?: string
   private readonly approvalGate?: (action: AgentAction) => Promise<boolean>
   private readonly planGate?: (plan: Plan, warnings: PlanWarning[]) => Promise<PlanDecision>
   private readonly planApproval?: ApprovalMode
@@ -523,8 +535,13 @@ export class AgentOrchestrator {
     this.providers = [...options.providers]
     this.logger = options.logger ?? silentLogger
     this.tools = [...(options.tools ?? SANDBOX_TOOLS), ...(options.extraTools ?? [])]
+    if (options.toolPolicy) this.tools = this.tools.filter((tool) => options.toolPolicy!(tool.name))
     this.extraExecutor = options.extraExecutor
-    this.extraToolNames = new Set((options.extraTools ?? []).map((tool) => tool.name))
+    this.extraToolNames = new Set(
+      (options.extraTools ?? [])
+        .map((tool) => tool.name)
+        .filter((name) => (options.toolPolicy ? options.toolPolicy(name) : true))
+    )
     this.systemHint = options.systemHint
     this.maxSteps = options.maxSteps ?? DEFAULT_MAX_STEPS
     this.contextMaxChars = options.contextMaxChars
@@ -543,6 +560,7 @@ export class AgentOrchestrator {
     this.sessionId = options.sessionId
     this.sessionMetadata = options.sessionMetadata
     this.planMode = options.planMode ?? false
+    this.goalId = options.goalId
     this.approvalGate = options.approvalGate
     this.planGate = options.planGate
     this.planApproval = options.planApproval
@@ -565,6 +583,19 @@ export class AgentOrchestrator {
     extra: Omit<Partial<AgentLogEntry>, 'ts' | 'level' | 'event' | 'runId'> = {}
   ): void {
     this.logger.log({ ts: new Date(this.now()).toISOString(), level, event, runId, ...extra })
+  }
+
+  /**
+   * v2.6.2 T3.1: derive one trace decision from a finished step and emit it on the
+   * structured log stream as `event: 'decision'`. Deterministic — it reads what the
+   * step already recorded, so no extra model call is made.
+   */
+  private emitDecision(runId: string, step: AgentStep): void {
+    const decision = buildTraceDecision(step, {
+      runId,
+      ...(this.goalId ? { goalId: this.goalId } : {})
+    })
+    this.log('info', 'decision', runId, { step: step.index, decision })
   }
 
   async run(task: string, options: AgentRunOptions = {}): Promise<AgentRunResult> {
@@ -755,6 +786,7 @@ export class AgentOrchestrator {
                 reflection: 'Blocked a success claim without recent verification.',
                 productive: false
               })
+              this.emitDecision(runId, steps[steps.length - 1])
               break
             }
           }
@@ -772,6 +804,7 @@ export class AgentOrchestrator {
             reflection: 'Model produced a final answer with no tool calls.',
             productive: true
           })
+          this.emitDecision(runId, steps[steps.length - 1])
           this.log('debug', 'step.reflection', runId, {
             step: index,
             phase: 'reflection',
@@ -1101,6 +1134,7 @@ export class AgentOrchestrator {
           reflection,
           productive
         })
+        this.emitDecision(runId, steps[steps.length - 1])
 
         // ---- Loop detection ----
         const loop = loopDetector.observe({

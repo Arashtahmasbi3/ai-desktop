@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { CustomProviderInput, CustomProviderTestResult, CustomProviderView, ProviderId } from '@shared/types'
 import type { OnboardingStatus } from '@shared/onboarding'
 import type { ApprovalMode, ApprovalHistoryEntry, ApprovalOutcome, ApprovedCommandView } from '@shared/approval'
+import type { InvestigateScope, ResolvedProfile, SessionProfile } from '@shared/profile'
 import type { PlanDecision } from '@shared/plan'
 import type { ChatSaveInput, ChatSummary, StoredChat } from '@shared/chat'
 import type {
@@ -42,7 +43,11 @@ import type {
   WorkerJobView,
   WorkerStatus
 } from '@shared/ui'
+import type { AuditVerifyResult, TraceExplanation } from '@shared/trace'
 import type { ProjectMetadataPatch } from '@shared/project-metadata'
+import type { Goal, GoalUpdate, NewGoalInput } from '@shared/goal'
+import type { ResolvedGoal } from '@core/agent/goal-store'
+
 import type {
   GitSetupOptions,
   RemoteCommandRun,
@@ -65,7 +70,9 @@ export const api = {
     toggleMaximize: (): Promise<boolean> => invoke('window:toggleMaximize'),
     close: (): Promise<void> => invoke('window:close'),
     isMaximized: (): Promise<boolean> => invoke('window:isMaximized'),
-    newWindow: (): Promise<boolean> => invoke('window:new')
+    newWindow: (): Promise<boolean> => invoke('window:new'),
+    /** v2.6.2 T5.3: set the Electron zoom level (0 = 100%). */
+    setZoom: (level: number): Promise<number> => invoke('window:zoom', level)
   },
 
   settings: {
@@ -235,7 +242,54 @@ export const api = {
     sessions: (): Promise<SessionInfo[]> => invoke('agent:sessions'),
     loadSession: (id: string): Promise<SessionRecordView | null> => invoke('agent:loadSession', id),
     memory: (id: string): Promise<SessionMemoryView> => invoke('agent:memory', id),
-    clearMemory: (id: string): Promise<boolean> => invoke('agent:clearMemory', id)
+    clearMemory: (id: string): Promise<boolean> => invoke('agent:clearMemory', id),
+    // v2.6.2 (T3.2): explain a trace decision deterministically ("Ask Why").
+    explainStep: (runId: string, decisionId: string): Promise<TraceExplanation | null> =>
+      invoke('agent:explainStep', runId, decisionId),
+
+    // v2.6.2 (T3.3): audit mode. Verify recomputes the hash chain of the active
+    // project's audit file; `path` exposes it in Settings → Advanced.
+    audit: {
+      path: (): Promise<string | null> => invoke('audit:path'),
+      verify: (): Promise<AuditVerifyResult | null> => invoke('audit:verify')
+    },
+
+    // v2.6.2 (T4.4): project goals. `projectId` defaults to the active project.
+    goal: {
+      list: (projectId?: string): Promise<Goal[]> => invoke('agent:goal:list', projectId),
+      resolve: (projectId?: string): Promise<ResolvedGoal> =>
+        invoke('agent:goal:resolve', projectId),
+      create: (input: NewGoalInput, projectId?: string): Promise<Goal> =>
+        invoke('agent:goal:create', input, projectId),
+      update: (goalId: string, patch: GoalUpdate, projectId?: string): Promise<Goal | undefined> =>
+        invoke('agent:goal:update', goalId, patch, projectId),
+      setCriterion: (
+        goalId: string,
+        criterionId: string,
+        met: boolean,
+        projectId?: string
+      ): Promise<Goal | undefined> =>
+        invoke('agent:goal:setCriterion', goalId, criterionId, met, projectId),
+      setActive: (goalId: string | null, projectId?: string): Promise<boolean> =>
+        invoke('agent:goal:setActive', goalId, projectId),
+      achieve: (goalId: string, projectId?: string): Promise<Goal | undefined> =>
+        invoke('agent:goal:achieve', goalId, projectId),
+      abandon: (goalId: string, note?: string, projectId?: string): Promise<Goal | undefined> =>
+        invoke('agent:goal:abandon', goalId, note, projectId),
+      remove: (goalId: string, projectId?: string): Promise<boolean> =>
+        invoke('agent:goal:delete', goalId, projectId)
+    }
+  },
+
+  // v2.6.2 (Topic 1): Session Profile + main-side elevation grant (P0-5).
+  session: {
+    get: (): Promise<ResolvedProfile> => invoke('session:get'),
+    setProfile: (profile: SessionProfile): Promise<SettingsView> =>
+      invoke('session:setProfile', profile),
+    setInvestigateScope: (scope: InvestigateScope): Promise<SettingsView> =>
+      invoke('session:setInvestigateScope', scope),
+    grantElevation: (): Promise<SettingsView> => invoke('session:grantElevation'),
+    revokeElevation: (): Promise<SettingsView> => invoke('session:revokeElevation')
   },
 
   shell: {

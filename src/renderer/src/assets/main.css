@@ -20,6 +20,23 @@
     overflow: hidden;
   }
 
+  /*
+   * v2.6.2 T5.4 - Persian-first rendering. When the app is in Farsi, Vazirmatn
+   * leads the stack (Latin glyphs fall through to Inter) and we relax the
+   * leading, which Persian's taller ascenders/descenders need to stay legible.
+   */
+  :root[lang='fa'] body,
+  :root[lang='fa'] input,
+  :root[lang='fa'] textarea,
+  :root[lang='fa'] button,
+  :root[lang='fa'] select {
+    font-family: 'Vazirmatn', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  }
+
+  :root[lang='fa'] body {
+    line-height: 1.7;
+  }
+
   /* Slim, dark scrollbars that match the app instead of the OS default. */
   * {
     scrollbar-width: thin;
@@ -56,11 +73,36 @@
   .no-drag {
     -webkit-app-region: no-drag;
   }
+
+  /* v2.6.2 T5.4: keep a run of Latin text (paths, URLs, keys) LTR inside RTL chrome. */
+  .bidi-ltr {
+    direction: ltr;
+    text-align: left;
+    unicode-bidi: isolate;
+  }
+
+  /* v2.6.2 T5.4: fence a mixed-direction run so it cannot reorder its neighbours. */
+  .bidi-isolate {
+    unicode-bidi: isolate;
+  }
+}
+
+/*
+ * v2.6.2 T5.4 - RTL chrome never reverses Latin-only controls. Password, URL
+ * and email inputs are always LTR regardless of the surrounding direction.
+ */
+:root[dir='rtl'] input[type='password'],
+:root[dir='rtl'] input[type='url'],
+:root[dir='rtl'] input[type='email'] {
+  direction: ltr;
+  text-align: left;
 }
 
 /* Minimal markdown styling for chat bubbles (no typography plugin). */
 .chat-markdown {
   overflow-wrap: anywhere;
+  /* v2.6.2 T5.4: `dir=auto` resolves the paragraph, isolation stops it leaking. */
+  unicode-bidi: isolate;
 }
 
 .chat-markdown > *:first-child {

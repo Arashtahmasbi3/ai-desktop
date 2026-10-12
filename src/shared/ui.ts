@@ -11,6 +11,7 @@ import type { VpsConnectionState } from './vps'
 import type { ApprovalMode, ApprovalReason } from './approval'
 import type { Plan, ApprovedPlan, PlanDecision, PlanWarning } from './plan'
 import type { ProjectMetadata } from './project-metadata'
+import type { ResolvedProfile } from './profile'
 import type { TaskPlan, TaskStep } from './task-plan'
 
 /** A project (folder) the user has added to the app. */
@@ -58,6 +59,8 @@ export interface SettingsView {
   rememberApprovalMode?: boolean
   /** Whether new chats start in Plan Mode. */
   planModeDefault?: boolean
+  /** Effective Session Profile + elevation state (v2.6.2, Topic 1). */
+  session?: ResolvedProfile
 }
 
 /** A single entry in the workspace file explorer. */
@@ -89,6 +92,8 @@ export interface AgentRunRequest {
   enabledTools?: string[]
   /** Plan Mode: no tools are exposed; the model only drafts a plan. */
   planMode?: boolean
+  /** Serve this specific project Goal, overriding the project's active goal (T4.3). */
+  goalId?: string
 }
 
 /** A tool call awaiting the user's approval (Approval Modes). */
@@ -163,6 +168,8 @@ export interface LocalShellResult {
   stdout: string
   stderr: string
   exitCode: number
+  /** Set when policy refused the command before it ran (v2.6.2, §5). */
+  blocked?: boolean
 }
 export interface FileChangeView {
   id: string
@@ -257,7 +264,7 @@ export type AgentEvent =
   | { type: 'plan:request'; request: PlanRequest }
   | { type: 'plan:resolved'; id: string; decision: PlanDecision; at: number }
   | { type: 'plan:active'; plan: ApprovedPlan; at: number }
-  | { type: 'plan:inactive'; at: number }
+  | { type: 'plan:inactive'; at: number; reason?: 'expired' | 'cleared' | 'legacy'; message?: string }
   | { type: 'file:change'; change: FileChangeView; at: number }
   | { type: 'file:change:resolved'; id: string; status: FileChangeStatus; at: number }
   | { type: 'task:plan'; plan: TaskPlan; at: number }
@@ -332,6 +339,10 @@ export interface AppEventMap {
   'remote:status': RemoteStatus
   'diagnostic:status': DiagnosticStatus
   'settings:changed': SettingsView
+  /** Effective Session Profile changed (incl. an elevation grant expiring). */
+  'session:changed': ResolvedProfile
+  /** A project's goals changed; carries the goal id when a single one changed. */
+  'goal:changed': { projectId: string; goalId?: string }
   'files:changed': { root: string }
   'window:maximized': boolean
   'vps:status': VpsConnectionState
