@@ -7,7 +7,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import i18n from '../../src/renderer/src/i18n'
 import LiveStatus from '../../src/renderer/src/components/LiveStatus'
-import { useStore } from '../../src/renderer/src/store'
+import { useStore, type ChatMessage } from '../../src/renderer/src/store'
 import type { TraceDecision, TracePhase } from '../../src/shared/trace'
 
 beforeAll(async () => {
@@ -15,14 +15,14 @@ beforeAll(async () => {
 })
 
 beforeEach(() => {
-  useStore.setState({ decisions: [], running: false })
+  useStore.setState({ decisions: [], messages: [], running: false })
 })
 
 afterEach(cleanup)
 
-function decision(phase: TracePhase): TraceDecision {
+function decision(phase: TracePhase, step = 3): TraceDecision {
   return {
-    id: 'run-1:3',
+    id: `run-1:${step}`,
     runId: 'run-1',
     phase,
     intent: { summary: 'inspect the file' },
@@ -30,6 +30,17 @@ function decision(phase: TracePhase): TraceDecision {
     decision: 'read_file(a.ts)',
     outcome: 'ok',
     at: 3
+  }
+}
+
+function toolMessage(step: number, name: string): ChatMessage {
+  return {
+    id: `t-${name}`,
+    role: 'tool',
+    content: name,
+    at: 3,
+    runId: 'run-1',
+    toolCall: { name, ok: true, step }
   }
 }
 
@@ -62,5 +73,60 @@ describe('LiveStatus', () => {
     useStore.setState({ decisions: [decision('planning'), decision('verifying')], running: true })
     render(<LiveStatus />)
     expect(screen.getByTestId('live-status').textContent).toContain('Verifying')
+  })
+
+  it.each([
+    ['read_file', 'Reading read_file'],
+    ['remote_read_file', 'Reading remote_read_file'],
+    ['list_dir', 'Reading list_dir']
+  ])('5. an inspecting step names a read tool: %s', (tool, label) => {
+    useStore.setState({
+      decisions: [decision('inspecting')],
+      messages: [toolMessage(3, tool)],
+      running: true
+    })
+    render(<LiveStatus />)
+    expect(screen.getByTestId('live-status').textContent).toContain(label)
+  })
+
+  it('6. an inspecting step names a search tool', () => {
+    useStore.setState({
+      decisions: [decision('inspecting')],
+      messages: [toolMessage(3, 'remote_grep')],
+      running: true
+    })
+    render(<LiveStatus />)
+    expect(screen.getByTestId('live-status').textContent).toContain('Searching')
+  })
+
+  it('7. an inspecting step with no tool falls back to the phase label', () => {
+    useStore.setState({ decisions: [decision('inspecting')], running: true })
+    render(<LiveStatus />)
+    expect(screen.getByTestId('live-status').textContent).toContain('Inspecting')
+  })
+
+  it('8. an executing step distinguishes writing from running', () => {
+    useStore.setState({
+      decisions: [decision('executing')],
+      messages: [toolMessage(3, 'write_file')],
+      running: true
+    })
+    const { unmount } = render(<LiveStatus />)
+    expect(screen.getByTestId('live-status').textContent).toContain('Writing write_file')
+    unmount()
+
+    useStore.setState({ messages: [toolMessage(3, 'run_command')] })
+    render(<LiveStatus />)
+    expect(screen.getByTestId('live-status').textContent).toContain('Running run_command')
+  })
+
+  it('9. ignores a matching tool from a different step', () => {
+    useStore.setState({
+      decisions: [decision('inspecting', 5)],
+      messages: [toolMessage(4, 'read_file')],
+      running: true
+    })
+    render(<LiveStatus />)
+    expect(screen.getByTestId('live-status').textContent).toContain('Inspecting')
   })
 })

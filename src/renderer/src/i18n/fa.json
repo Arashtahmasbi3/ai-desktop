@@ -74,6 +74,10 @@
     "liveExecuting": "در حال اجرا…",
     "liveVerifying": "در حال بررسی نتیجه…",
     "liveDone": "در حال جمع‌بندی…",
+    "liveReading": "در حال خواندن {{tool}}…",
+    "liveSearching": "در حال جست‌وجو…",
+    "liveWriting": "در حال نوشتن {{tool}}…",
+    "liveRunning": "در حال اجرای {{tool}}…",
     "emptyTitle": "AI Desktop",
     "emptyBody": "دستیار رومیزی شما برای چت، کدنویسی، اجرای دستور در سندباکس و کار با فایل‌های پروژه.",
     "send": "ارسال",
@@ -647,7 +651,9 @@
     "askWhy": "چرا؟",
     "why": "دلیل",
     "askWhyFailed": "بارگذاری توضیح ممکن نشد.",
-    "inlineTitle": "ردّ اجرا"
+    "inlineTitle": "ردّ اجرا",
+    "showAll": "نمایش همه ({{count}} مورد دیگر)",
+    "showLess": "نمایش کمتر"
   },
   "shortcuts": {
     "title": "کلیدهای میانبر",

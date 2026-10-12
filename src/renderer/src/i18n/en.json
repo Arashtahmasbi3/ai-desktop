@@ -74,6 +74,10 @@
     "liveExecuting": "Working…",
     "liveVerifying": "Verifying…",
     "liveDone": "Finishing…",
+    "liveReading": "Reading {{tool}}…",
+    "liveSearching": "Searching…",
+    "liveWriting": "Writing {{tool}}…",
+    "liveRunning": "Running {{tool}}…",
     "emptyTitle": "AI Desktop",
     "emptyBody": "Your desktop assistant for chat, coding, sandboxed commands and project files.",
     "send": "Send",
@@ -647,7 +651,9 @@
     "askWhy": "Ask Why",
     "why": "Why",
     "askWhyFailed": "Could not load the explanation.",
-    "inlineTitle": "Execution trace"
+    "inlineTitle": "Execution trace",
+    "showAll": "Show all ({{count}} more)",
+    "showLess": "Show less"
   },
   "shortcuts": {
     "title": "Keyboard shortcuts",

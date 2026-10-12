@@ -8,6 +8,9 @@ import type { TraceDecision } from '@shared/trace'
 /** Keep the inline list light; the full run is still in the Progress panel. */
 const INLINE_TRACE_LIMIT = 30
 
+/** Collapsed view shows only the newest few steps; the rest load on demand. */
+const INLINE_TRACE_PREVIEW = 3
+
 /** Step index encoded in a decision id (`${runId}:${step}`). */
 function stepOf(decision: TraceDecision): number | undefined {
   const index = decision.id.lastIndexOf(':')
@@ -31,10 +34,13 @@ export default function InlineTrace(): JSX.Element | null {
   const decisions = useStore((state) => state.decisions)
   const messages = useStore((state) => state.messages)
   const [open, setOpen] = useState(true)
+  const [expanded, setExpanded] = useState(false)
 
   if (decisions.length === 0) return null
 
-  const visible = decisions.slice(-INLINE_TRACE_LIMIT)
+  const bounded = decisions.slice(-INLINE_TRACE_LIMIT)
+  const visible = expanded ? bounded : bounded.slice(-INLINE_TRACE_PREVIEW)
+  const hiddenCount = bounded.length - visible.length
   const latest = decisions[decisions.length - 1].intent.summary
 
   const toolsFor = (decision: TraceDecision): ChatMessage[] => {
@@ -115,6 +121,28 @@ export default function InlineTrace(): JSX.Element | null {
             )
           })}
         </ul>
+      ) : null}
+
+      {open && hiddenCount > 0 ? (
+        <button
+          type="button"
+          data-testid="inline-trace-show-all"
+          onClick={() => setExpanded(true)}
+          className="self-start rounded border border-border px-2 py-0.5 text-[10px] text-neutral-400 hover:border-accent/50 hover:text-accent"
+        >
+          {t('trace.showAll', { count: hiddenCount })}
+        </button>
+      ) : null}
+
+      {open && expanded && bounded.length > INLINE_TRACE_PREVIEW ? (
+        <button
+          type="button"
+          data-testid="inline-trace-show-less"
+          onClick={() => setExpanded(false)}
+          className="self-start rounded border border-border px-2 py-0.5 text-[10px] text-neutral-400 hover:border-accent/50 hover:text-accent"
+        >
+          {t('trace.showLess')}
+        </button>
       ) : null}
     </section>
   )

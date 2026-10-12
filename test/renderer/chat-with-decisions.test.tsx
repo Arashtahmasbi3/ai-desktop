@@ -114,12 +114,29 @@ describe('InlineTrace', () => {
     expect(screen.getAllByTestId('decision-card')).toHaveLength(1)
   })
 
-  it('5. bounds a long run to the most recent decisions but keeps the true count', () => {
+  it('5. shows only the newest 3 by default and expands to the bounded set', () => {
     useStore.setState({ decisions: Array.from({ length: 45 }, (_, index) => decision(index)) })
     render(<InlineTrace />)
 
-    expect(screen.getAllByTestId('decision-card')).toHaveLength(30)
+    // Collapsed preview: newest three only.
+    expect(screen.getAllByTestId('decision-card')).toHaveLength(3)
     expect(screen.getByTestId('inline-trace-count').textContent).toBe('45')
+    expect(screen.getByTestId('inline-trace-show-all').textContent).toContain('27 more')
+
+    fireEvent.click(screen.getByTestId('inline-trace-show-all'))
+    // Expanded: the full bounded window (limit 30), not all 45.
+    expect(screen.getAllByTestId('decision-card')).toHaveLength(30)
+    expect(screen.queryByTestId('inline-trace-show-all')).toBeNull()
+
+    fireEvent.click(screen.getByTestId('inline-trace-show-less'))
+    expect(screen.getAllByTestId('decision-card')).toHaveLength(3)
+  })
+
+  it('6. hides the Show all control when everything already fits', () => {
+    useStore.setState({ decisions: [decision(1), decision(2)] })
+    render(<InlineTrace />)
+    expect(screen.getAllByTestId('decision-card')).toHaveLength(2)
+    expect(screen.queryByTestId('inline-trace-show-all')).toBeNull()
   })
 
   it('7. groups the step tool calls as compact chips under their decision', () => {
