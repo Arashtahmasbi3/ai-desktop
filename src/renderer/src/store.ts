@@ -11,6 +11,7 @@ import type {
 import { DEFAULT_SELECTION, resolveSelection } from '@shared/selection'
 import type { ApprovalMode, ApprovalOutcome } from '@shared/approval'
 import type { ApprovedPlan, PlanDecision } from '@shared/plan'
+import type { PreflightChoice, PreflightRequestView } from '@shared/preflight'
 import type { TaskPlan } from '@shared/task-plan'
 import type { Goal } from '@shared/goal'
 import type { ResolvedGoal } from '@core/agent/goal-store'
@@ -278,6 +279,8 @@ interface AppState {
   pendingApproval: ApprovalRequest | null
   /** Plan awaiting the user's approval before it executes (v2.3.2, A.5). */
   pendingPlan: PlanRequest | null
+  /** Preflight block awaiting an explicit, per-action answer (v2.6.3, T3.2). */
+  pendingPreflight: PreflightRequestView | null
   /** A plan the user trusted for 30 minutes; its steps skip approval (v2.5.5). */
   activePlan: ApprovedPlan | null
   /**
@@ -366,6 +369,8 @@ interface AppState {
   setPlanModeDefault: (value: boolean) => Promise<void>
   respondApproval: (answer: boolean | ApprovalOutcome) => void
   respondPlan: (decision: PlanDecision) => void
+  /** Answer a preflight block; the drawer closes and main resolves the run. */
+  respondPreflight: (choice: PreflightChoice) => void
   stopPlan: () => void
   rememberApprovalTool: (tool: string) => Promise<void>
   dismissApprovalSuggestion: () => void
@@ -523,6 +528,7 @@ export const useStore = create<AppState>((set, get) => ({
   planMode: false,
   pendingApproval: null,
   pendingPlan: null,
+  pendingPreflight: null,
   activePlan: null,
   taskPlan: null,
   taskPlans: {},
@@ -718,6 +724,12 @@ export const useStore = create<AppState>((set, get) => ({
     if (!pending) return
     set({ pendingPlan: null })
     void window.api.agent.respondPlan(pending.id, decision)
+  },
+  respondPreflight(choice) {
+    const pending = get().pendingPreflight
+    if (!pending) return
+    set({ pendingPreflight: null })
+    void window.api.agent.respondPreflight(pending.id, choice)
   },
   stopPlan() {
     set({ activePlan: null })
@@ -963,6 +975,7 @@ export const useStore = create<AppState>((set, get) => ({
           decisions: [],
           pendingApproval: null,
           pendingPlan: null,
+          pendingPreflight: null,
           activePlan: null,
           taskPlan: null,
           taskPaused: false,
@@ -975,6 +988,12 @@ export const useStore = create<AppState>((set, get) => ({
         break
       case 'plan:request':
         set({ pendingPlan: event.request })
+        break
+      case 'preflight:request':
+        set({ pendingPreflight: event.request })
+        break
+      case 'preflight:resolved':
+        if (get().pendingPreflight?.id === event.id) set({ pendingPreflight: null })
         break
       case 'plan:resolved':
         if (get().pendingPlan?.id === event.id) set({ pendingPlan: null })
@@ -1080,6 +1099,7 @@ export const useStore = create<AppState>((set, get) => ({
           loopStop: event.stop ?? null,
           pendingApproval: null,
           pendingPlan: null,
+          pendingPreflight: null,
           activePlan: null,
           messages
         })
@@ -1108,6 +1128,7 @@ export const useStore = create<AppState>((set, get) => ({
           currentRunId: null,
           pendingApproval: null,
           pendingPlan: null,
+          pendingPreflight: null,
           activePlan: null,
           error: redact(event.message),
           loopStop: null,
@@ -1296,6 +1317,7 @@ export const useStore = create<AppState>((set, get) => ({
       error: null,
       pendingApproval: null,
       pendingPlan: null,
+      pendingPreflight: null,
       activePlan: null,
       approvalSuggestion: null,
       queuedExplain: null,

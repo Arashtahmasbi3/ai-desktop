@@ -4,6 +4,7 @@ import type { OnboardingStatus } from '@shared/onboarding'
 import type { ApprovalMode, ApprovalHistoryEntry, ApprovalOutcome, ApprovedCommandView } from '@shared/approval'
 import type { InvestigateScope, ResolvedProfile, SessionProfile } from '@shared/profile'
 import type { PlanDecision } from '@shared/plan'
+import type { PreflightChoice } from '@shared/preflight'
 import type { ChatSaveInput, ChatSummary, StoredChat } from '@shared/chat'
 import type {
   AuditEntryView,
@@ -230,6 +231,8 @@ export const api = {
       invoke('agent:respondApproval', id, answer),
     respondPlan: (id: string, decision: PlanDecision): Promise<boolean> =>
       invoke('agent:respondPlan', id, decision),
+    respondPreflight: (id: string, choice: PreflightChoice): Promise<boolean> =>
+      invoke('agent:respondPreflight', id, choice),
     stopPlan: (runId?: string): Promise<boolean> => invoke('agent:stopPlan', runId),
     approvalHistory: (): Promise<ApprovalHistoryEntry[]> => invoke('agent:approvalHistory'),
     approvedCommands: (): Promise<ApprovedCommandView[]> => invoke('agent:approvedCommands'),

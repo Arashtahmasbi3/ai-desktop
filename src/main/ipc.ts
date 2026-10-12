@@ -3,6 +3,7 @@ import type { CustomProviderInput, ProviderId } from '@shared/types'
 import type { ApprovalMode, ApprovalOutcome } from '@shared/approval'
 import type { InvestigateScope, SessionProfile } from '@shared/profile'
 import type { PlanDecision } from '@shared/plan'
+import type { PreflightChoice } from '@shared/preflight'
 import type { ProjectMetadataPatch } from '@shared/project-metadata'
 import type { GitCommitInput } from '@shared/github'
 import type { AgentRunRequest, WorkerJobRequest } from '@shared/ui'
@@ -264,6 +265,7 @@ export function registerIpc(
     ['agent:abort', () => services.agent.abort()],
     ['agent:respondApproval', (id: string, answer: boolean | ApprovalOutcome) => services.approvals.resolve(id, answer)],
     ['agent:respondPlan', (id: string, decision: PlanDecision) => services.plans.resolve(id, decision)],
+    ['agent:respondPreflight', (id: string, choice: PreflightChoice) => services.preflights.resolve(id, choice)],
     ['agent:stopPlan', (runId?: string) => services.agent.stopPlan(runId)],
     ['agent:approvalHistory', () => services.approvals.history()],
     ['agent:approvedCommands', () => services.approvedCommands.list()],

@@ -24,6 +24,7 @@ import ProviderWarning from './ProviderWarning'
 import PreflightBanner from './PreflightBanner'
 import LoopStopCard from './LoopStopCard'
 import ApprovalDialog from './ApprovalDialog'
+import PreflightOverrideDialog from './PreflightOverrideDialog'
 import PlanCard from './PlanCard'
 import TaskTracker from './TaskTracker'
 import ExecutionBar from './ExecutionBar'
@@ -566,6 +567,7 @@ export default function ChatPanel(): JSX.Element {
       <TaskTracker />
       <PlanCard />
       <ApprovalDialog />
+      <PreflightOverrideDialog />
       {contextCard ? (
         <ContextPreviewCard
           preview={contextCard.preview}

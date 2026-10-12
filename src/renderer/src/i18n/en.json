@@ -542,7 +542,14 @@
     "title": "Preflight warnings:",
     "blockTitle": "Preflight blocked this action:",
     "criticalTitle": "Preflight could not reach the workspace:",
-    "proceed": "Proceed anyway"
+    "proceed": "Proceed anyway",
+    "overrideTitle": "Preflight blocked this action",
+    "override": "Override anyway",
+    "cleanup": "Cleanup and proceed",
+    "retry": "Retry check",
+    "overrideWarning": "This override is recorded in the audit trail and applies to this action only.",
+    "criticalLocked": "The workspace is unreachable, so there is nothing safe to run. Only cancel or retry is allowed.",
+    "timeoutHint": "Auto-cancels in {{seconds}}s"
   },
   "successWarning": {
     "title": "AI claims success without verification.",
