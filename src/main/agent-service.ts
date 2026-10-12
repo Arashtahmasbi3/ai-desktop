@@ -43,6 +43,9 @@ import { PLAN_REAPPROVE_MESSAGE } from '@shared/plan'
 import type { ResolvedProfile } from '@shared/profile'
 import type { TraceDecision, TraceExplanation } from '@shared/trace'
 import { TraceStore } from '@core/agent/trace-store'
+import { AuditTrail, auditFileFor, auditLineFromDecision, type AuditVerifyResult } from '@core/agent/audit-trail'
+import { resolveUserDataDir } from '@core/agent/persistence'
+import { redactValue } from '@core/agent/redact'
 import { resolveToolExposure, toolPolicyFor, type ToolExposure } from '@core/agent/tool-policy'
 import {
   createApprovedPlan,
@@ -324,15 +327,18 @@ export function planRemoteRuntime(
 class EmittingLogger implements AgentLogger {
   constructor(
     private readonly emit: (event: AgentEvent) => void,
-    private readonly traces?: TraceStore
+    private readonly traces?: TraceStore,
+    private readonly onDecision?: (decision: TraceDecision) => void
   ) {}
 
   log(entry: AgentLogEntry): void {
     this.emit({ type: 'log', entry })
-    // v2.6.2 T3.2: keep the decision in memory so "Ask Why" can explain it
-    // without re-running the step.
-    if (entry.event === 'decision' && this.traces) {
-      this.traces.record(entry.decision as TraceDecision)
+    // v2.6.2 T3.2/T3.3: keep the decision in memory for "Ask Why" and append it
+    // to the project's tamper-evident audit trail.
+    if (entry.event === 'decision') {
+      const decision = entry.decision as TraceDecision
+      this.traces?.record(decision)
+      this.onDecision?.(decision)
     }
   }
 }
@@ -343,6 +349,11 @@ export interface AgentServiceOptions {
   sessionStore: SessionStore
   emit: (event: AgentEvent) => void
   now?: () => number
+  /**
+   * v2.6.2 T3.3: app-data dir, used to place the audit file of a remote project
+   * (a local project's audit lives under its own root instead).
+   */
+  userDataDir?: string
   /** Optional: enables user-defined OpenAI-compatible providers. */
   customProviders?: CustomProviderStore
   /** Optional: enables the `remote_shell` / remote-fs tools against connected VPS servers. */
@@ -422,6 +433,9 @@ export class AgentService {
   private readonly now: () => number
   /** v2.6.2 T3.2: recent decisions, keyed by run, for "Ask Why". */
   private readonly traceStore = new TraceStore()
+  /** v2.6.2 T3.3: audit trails, one per project file. */
+  private readonly audits = new Map<string, AuditTrail>()
+  private readonly userDataDir?: string
   private readonly customProviders?: CustomProviderStore
   private readonly vps?: RemoteHost
   private readonly jobs?: RemoteJobRunner
@@ -463,6 +477,7 @@ export class AgentService {
     this.sessionStore = options.sessionStore
     this.emit = options.emit
     this.now = options.now ?? (() => Date.now())
+    if (options.userDataDir) this.userDataDir = options.userDataDir
     this.planTrust = new PlanTrustRegistry(() => this.now())
     if (options.customProviders) this.customProviders = options.customProviders
     if (options.vps) this.vps = options.vps
@@ -874,10 +889,27 @@ export class AgentService {
 
     const preflightGate = await this.buildPreflightGate()
 
+    // v2.6.2 T3.3: every decision this run emits is also appended to the active
+    // project's tamper-evident audit trail (redacted, never blocking the run).
+    const audit = activeProject ? this.auditTrailFor(activeProject) : undefined
+    const onDecision =
+      audit && activeProject
+        ? (decision: TraceDecision) => {
+            void audit
+              .append(
+                auditLineFromDecision(decision, {
+                  projectId: activeProject.id,
+                  ...(activeProject.vpsId ? { vpsId: activeProject.vpsId } : {})
+                })
+              )
+              .catch(() => undefined)
+          }
+        : undefined
+
     const orchestrator = new AgentOrchestrator({
       sandbox: this.sandbox,
       providers,
-      logger: new EmittingLogger(this.emit, this.traceStore),
+      logger: new EmittingLogger(this.emit, this.traceStore, onDecision),
       sessionStore: this.sessionStore,
       enforceSuccessVerification: true,
       ...(request.sessionId ? { sessionId: request.sessionId } : {}),
@@ -1107,5 +1139,31 @@ export class AgentService {
   /** Decisions recorded for a run, oldest first (used by timeline/tests). */
   decisionsForRun(runId: string): TraceDecision[] {
     return this.traceStore.forRun(runId)
+  }
+
+  /** Absolute path of the active project's audit file, when there is one. */
+  auditPath(): string | null {
+    const project = this.persistence.getActiveProject()
+    return project ? this.auditTrailFor(project).path : null
+  }
+
+  /**
+   * v2.6.2 T3.3: recompute the active project's audit hash chain. Reported to
+   * Settings → Verify audit; also the hook tamper detection will use.
+   */
+  async verifyAudit(): Promise<AuditVerifyResult | null> {
+    const project = this.persistence.getActiveProject()
+    if (!project) return null
+    return this.auditTrailFor(project).verify()
+  }
+
+  /** One trail per project file, reused so appends continue the same chain. */
+  private auditTrailFor(project: ProjectRecord): AuditTrail {
+    const file = auditFileFor(project, this.userDataDir ?? resolveUserDataDir({ appName: 'AI Desktop' }))
+    const cached = this.audits.get(file)
+    if (cached) return cached
+    const trail = new AuditTrail({ file, redact: (line) => redactValue(line) })
+    this.audits.set(file, trail)
+    return trail
   }
 }

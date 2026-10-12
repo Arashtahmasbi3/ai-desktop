@@ -399,7 +399,16 @@
     "projectErrorInvalidPolicy": "Unknown policy mode",
     "projectErrorInvalidPort": "Port must be between 1 and 65535",
     "tools": "Tools",
-    "toolsHint": "Enable or disable the agent tool groups below."
+    "toolsHint": "Enable or disable the agent tool groups below.",
+    "audit": "Audit",
+    "auditHint": "Every agent decision is appended to a tamper-evident log. Verify recomputes the hash chain and reports the first broken line.",
+    "auditPath": "Audit file",
+    "auditNoProject": "Select a project to see its audit file.",
+    "auditVerify": "Verify audit",
+    "auditVerifying": "Verifying…",
+    "auditOk": "Audit chain intact ({{count}} lines).",
+    "auditBroken": "Tampering detected at line {{line}}: {{reason}}",
+    "auditError": "Could not verify the audit file."
   },
   "toast": {
     "dismiss": "Dismiss",

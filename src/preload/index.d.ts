@@ -27,7 +27,7 @@ import type {
 } from '@shared/workspace-info'
 import type { SystemHealth } from '@shared/system-health'
 import type { Job } from '@shared/jobs'
-import type { TraceExplanation } from '@shared/trace'
+import type { AuditVerifyResult, TraceExplanation } from '@shared/trace'
 import type {
   GitCommitInput,
   GitOpResult,
@@ -191,6 +191,11 @@ export interface Api {
     clearMemory(id: string): Promise<boolean>
     /** v2.6.2 (T3.2): explain a trace decision deterministically ("Ask Why"). */
     explainStep(runId: string, decisionId: string): Promise<TraceExplanation | null>
+    /** v2.6.2 (T3.3): audit mode for the active project. */
+    audit: {
+      path(): Promise<string | null>
+      verify(): Promise<AuditVerifyResult | null>
+    }
     /** v2.6.2 (T4.4): project goals; `projectId` defaults to the active project. */
     goal: {
       list(projectId?: string): Promise<Goal[]>

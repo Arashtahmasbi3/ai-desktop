@@ -301,6 +301,11 @@ export function registerIpc(
       (runId: string, decisionId: string) => services.agent.explainStep(runId, decisionId)
     ],
 
+    // v2.6.2 (T3.3): audit mode. The path is shown in Settings → Advanced, and
+    // Verify recomputes the hash chain to surface tampering.
+    ['audit:path', () => services.agent.auditPath()],
+    ['audit:verify', () => services.agent.verifyAudit()],
+
     // v2.6.2 (T4.4): a project's goals are edited from the renderer. The project
     // defaults to the active one; every mutation notifies all windows.
     ['agent:goal:list', (projectId?: string) => services.goals.list(goalProject(projectId))],

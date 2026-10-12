@@ -156,6 +156,7 @@ export class AppServices {
       sandbox: this.sandbox,
       persistence: this.persistence,
       sessionStore: this.sessions,
+      userDataDir: this.dir,
       customProviders: this.customProviders,
       vps: this.vps,
       jobs: this.jobs,

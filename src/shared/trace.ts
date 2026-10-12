@@ -58,6 +58,15 @@ export interface DecisionLogEntry extends AgentLogEntry {
   decision: TraceDecision
 }
 
+/** Outcome of verifying an audit file's hash chain (v2.6.2 T3.3). */
+export interface AuditVerifyResult {
+  ok: boolean
+  /** 0-based index of the first line that fails the chain, when broken. */
+  brokenAt?: number
+  lines: number
+  reason?: string
+}
+
 /**
  * A deterministic explanation of one decision, for "Ask Why".
  * No model call — every line is read off the decision itself.
