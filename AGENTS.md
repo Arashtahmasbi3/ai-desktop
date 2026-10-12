@@ -787,3 +787,4 @@ Autonomous decisions logged per the sprint's golden rule (`[AUTO-DECISION]`, no 
 - Tests: `test/shared/profile.test.ts`, `test/agent/session-profile-service.test.ts`, `test/agent/tool-policy.test.ts`, `test/security/secret-paths.test.ts`, `test/security/secret-guard-wire.test.ts` (**59 new**; real code paths, no mocks). Full suite **1381 passed | 1 skipped**; `typecheck` + `build` green.
 - Commits: `68e9dbf` (§5 Secret Path Guard), `423672f` (Topic 1 Session Profile / P0-5). Branch `feature/v2.6.2-session-profile`.
 - Note: the repo is maintained via `npm run typecheck` + `npm test` + `npm run build`; `npm run dev` (Electron GUI) is not runnable in the headless dev container.
+- `[NOTE]` Legacy JS spec (`Chat.jsx`, `Settings.jsx`, `agent.js`) is obsolete. Equivalent TSX/TS files already exist (`ChatPanel.tsx`, `SettingsPanel.tsx`, `agent-orchestrator.ts` + `core/agent/*`). Do not create duplicates.
