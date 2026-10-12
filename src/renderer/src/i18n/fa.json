@@ -249,6 +249,7 @@
     "testConnection": "تست اتصال",
     "languageHint": "زبان رابط کاربری و جهت متن.",
     "showContextBeforeSend": "نمایش پیش‌نمایش کانتکست قبل از ارسال",
+    "showJobsPanelAlways": "همیشه پنل کارهای پس‌زمینه را نشان بده",
     "projectName": "نام",
     "projectPath": "مسیر (مثلاً C:\\Users\\me\\project)",
     "noProjects": "هنوز پروژه‌ای نداری.",
@@ -525,7 +526,10 @@
     "hideLog": "بستن لاگ",
     "kill": "کشتن",
     "noOutput": "(هنوز خروجیای نیست)",
-    "finishedToast": "کار #{{id}} {{status}}"
+    "finishedToast": "کار #{{id}} {{status}}",
+    "collapse": "بستن پنل کارها",
+    "empty": "در حال حاضر کار پس‌زمینه‌ای وجود ندارد.",
+    "badgeTitle": "{{count}} کار پس‌زمینه در حال اجرا — باز کردن پنل"
   },
   "preflight": {
     "title": "هشدارهای پیشپرواز:",

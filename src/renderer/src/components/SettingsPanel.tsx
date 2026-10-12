@@ -97,6 +97,8 @@ export default function SettingsPanel(): JSX.Element | null {
   const setLocale = useStore((state) => state.setLocale)
   const showContextBeforeSend = useStore((state) => state.showContextBeforeSend)
   const setShowContextBeforeSend = useStore((state) => state.setShowContextBeforeSend)
+  const showJobsPanelAlways = useStore((state) => state.showJobsPanelAlways)
+  const setShowJobsPanelAlways = useStore((state) => state.setShowJobsPanelAlways)
 
   const [tab, setTab] = useState<TabId>('general')
   const refreshVps = useStore((state) => state.refreshVps)
@@ -198,6 +200,15 @@ export default function SettingsPanel(): JSX.Element | null {
                       className="accent-accent"
                     />
                     {t('settings.showContextBeforeSend')}
+                  </label>
+                  <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs text-neutral-300">
+                    <input
+                      type="checkbox"
+                      checked={showJobsPanelAlways}
+                      onChange={(event) => setShowJobsPanelAlways(event.target.checked)}
+                      className="accent-accent"
+                    />
+                    {t('settings.showJobsPanelAlways')}
                   </label>
                 </div>
               </section>

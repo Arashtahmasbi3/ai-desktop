@@ -25,6 +25,8 @@ import { readLastVpsId, resolveReconnectId } from './lib/vps-state'
 
 /** Retry interval for a selected-but-dropped VPS connection. */
 const VPS_KEEPALIVE_MS = 30_000
+/** How often the global background-job poll runs (v2.6.2 T5.2). */
+const JOBS_POLL_MS = 10_000
 
 export default function App(): JSX.Element {
   const { t } = useTranslation()
@@ -77,6 +79,18 @@ export default function App(): JSX.Element {
       cancelled = true
       if (timer) clearInterval(timer)
     }
+  }, [ready])
+
+  // v2.6.2 T5.2: poll detached jobs globally so the sidebar badge and the panel
+  // stay in sync even while the panel is collapsed.
+  useEffect(() => {
+    if (!ready) return
+    const poll = (): void => {
+      void useStore.getState().refreshJobs().catch(() => undefined)
+    }
+    poll()
+    const timer = setInterval(poll, JOBS_POLL_MS)
+    return () => clearInterval(timer)
   }, [ready])
 
   useEffect(() => {

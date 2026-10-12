@@ -249,6 +249,7 @@
     "testConnection": "Test connection",
     "languageHint": "Interface language and text direction.",
     "showContextBeforeSend": "Show context preview before sending",
+    "showJobsPanelAlways": "Always show the background jobs panel",
     "projectName": "Name",
     "projectPath": "Path (e.g. C:\\Users\\me\\project)",
     "noProjects": "No projects yet.",
@@ -525,7 +526,10 @@
     "hideLog": "Hide log",
     "kill": "Kill",
     "noOutput": "(no output yet)",
-    "finishedToast": "Job #{{id}} {{status}}"
+    "finishedToast": "Job #{{id}} {{status}}",
+    "collapse": "Collapse jobs panel",
+    "empty": "No background jobs right now.",
+    "badgeTitle": "{{count}} background job(s) running — open panel"
   },
   "preflight": {
     "title": "Preflight warnings:",

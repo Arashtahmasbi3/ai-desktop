@@ -19,6 +19,7 @@ import type { OnboardingStatus } from '@shared/onboarding'
 import type { VpsConnectionState, VpsServerView } from '@shared/vps'
 import type { DiagnosticStatus } from '@shared/ui'
 import type { ChatSummary, StoredMessage } from '@shared/chat'
+import type { Job } from '@shared/jobs'
 import type { Locale } from './i18n/locale'
 import { detectLocale } from './i18n/locale'
 import { VPS_RECONNECT_KEY } from './lib/vps-state'
@@ -112,6 +113,7 @@ const MAX_DECISIONS = 200
 const MAX_TERMINAL_LINES = 500
 export const CONTEXT_SETTINGS_KEY = 'ai-desktop:show-context-before-send'
 const CHAT_TREE_KEY = 'ai-desktop:chat-tree-open'
+const JOBS_PANEL_KEY = 'ai-desktop:show-jobs-panel'
 const LAST_CHAT_KEY = 'ai-desktop:last-chat'
 const AUTOSAVE_INTERVAL_MS = 30_000
 /** Full access auto-reverts to Ask after this much idle time (v2.3, B.2). */
@@ -138,6 +140,18 @@ function readChatTreeOpen(): boolean {
     return false
   }
 }
+
+/** Read the persisted "keep the jobs panel open" preference (default off). */
+export function readShowJobsPanelAlways(): boolean {
+  try {
+    return globalThis.localStorage?.getItem(JOBS_PANEL_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+/** Last seen status per job id, so `refreshJobs` can toast a completion once. */
+const jobStatuses = new Map<string, Job['status']>()
 
 function readLastChatId(): string | null {
   try {
@@ -280,6 +294,12 @@ interface AppState {
   terminalLines: TerminalLine[]
   /** Command palette visibility. */
   paletteOpen: boolean
+  /** Detached background jobs, polled globally so the sidebar badge stays fresh (T5.2). */
+  jobs: Job[]
+  /** Whether the full jobs panel is currently open (T5.2). */
+  jobsPanelOpen: boolean
+  /** Pin the jobs panel open even with nothing running (T5.2). */
+  showJobsPanelAlways: boolean
 
   setLocale: (locale: Locale) => void
   toggleSidebar: () => void
@@ -324,6 +344,10 @@ interface AppState {
   pushToast: (kind: ToastKind, message: string) => void
   dismissToast: (id: string) => void
   setPaletteOpen: (open: boolean) => void
+  /** Poll the main process for detached jobs (T5.2). */
+  refreshJobs: () => Promise<void>
+  setJobsPanelOpen: (open: boolean) => void
+  setShowJobsPanelAlways: (value: boolean) => void
   toggleChatTree: () => void
   toggleWorkspacePanel: () => void
   setWorkspacePanelTab: (tab: WorkspacePanelTab) => void
@@ -480,6 +504,9 @@ export const useStore = create<AppState>((set, get) => ({
   searchOpen: false,
   searchResults: [],
   paletteOpen: false,
+  jobs: [],
+  jobsPanelOpen: false,
+  showJobsPanelAlways: readShowJobsPanelAlways(),
 
   setLocale(locale) {
     set({ locale })
@@ -684,6 +711,38 @@ export const useStore = create<AppState>((set, get) => ({
     set({ toasts: get().toasts.filter((toast) => toast.id !== id) })
   },
   setPaletteOpen: (open) => set({ paletteOpen: open }),
+
+  async refreshJobs() {
+    const api = window.api?.jobs
+    if (!api) return
+    let next: Job[]
+    try {
+      next = await api.refresh()
+    } catch {
+      return
+    }
+    for (const job of next) {
+      const last = jobStatuses.get(job.id)
+      if (last && last !== job.status && (job.status === 'completed' || job.status === 'failed')) {
+        get().pushToast(
+          job.status === 'completed' ? 'success' : 'error',
+          i18n.t('jobs.finishedToast', { id: job.id.slice(0, 8), status: job.status })
+        )
+      }
+    }
+    jobStatuses.clear()
+    for (const job of next) jobStatuses.set(job.id, job.status)
+    set({ jobs: next })
+  },
+  setJobsPanelOpen: (open) => set({ jobsPanelOpen: open }),
+  setShowJobsPanelAlways(value) {
+    set({ showJobsPanelAlways: value, ...(value ? { jobsPanelOpen: true } : {}) })
+    try {
+      globalThis.localStorage?.setItem(JOBS_PANEL_KEY, value ? '1' : '0')
+    } catch {
+      // Persisting the preference is best-effort.
+    }
+  },
 
   async refreshChats() {
     try {
