@@ -17,6 +17,8 @@ export interface RunContext {
   project?: { name: string; path?: string }
   vpsName?: string
   tools?: string[]
+  /** The project Goal this run serves, when one was selected (v2.6.2 T4.3). */
+  goalId?: string
 }
 
 export type PlanComplexity = 'simple' | 'complex'
@@ -135,6 +137,7 @@ export class TaskPlanner {
       id: this.newId('plan'),
       runId: context.runId,
       goal,
+      ...(context.goalId ? { goalId: context.goalId } : {}),
       steps: [],
       status: 'planning',
       createdAt: this.now()

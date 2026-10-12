@@ -8,6 +8,7 @@ import type { Persistence } from '@core/agent/persistence'
 import type { SessionStore } from '@core/agent/session-store'
 import { ApprovedCommands } from '@core/agent/approved-commands'
 import { RunStore } from '@core/agent/run-store'
+import { GoalStore } from '@core/agent/goal-store'
 import { classifyLocalProject } from '@shared/paths'
 import { SandboxManagerImpl } from '@core/sandbox/manager'
 import { WorkerManager } from '@core/worker/worker-manager'
@@ -92,6 +93,8 @@ export class AppServices {
   readonly approvedCommands: ApprovedCommands
   /** Run -> project binding for patch isolation (v2.5, P0-1). */
   readonly runs = new RunStore()
+  /** Project goals that outlive chats (v2.6.2, T4.1). */
+  readonly goals: GoalStore
   readonly worker: WorkerManager
   readonly remote: RemoteServer
 
@@ -145,6 +148,7 @@ export class AppServices {
     this.sessionProfile = new SessionProfileService(this.persistence, {
       onChanged: (state) => this.emit('session:changed', state)
     })
+    this.goals = new GoalStore({ dir: this.dir })
     this.approvedCommands = new ApprovedCommands({
       file: join(this.dir, 'approved-commands.json')
     })
@@ -167,6 +171,7 @@ export class AppServices {
       files: this.files,
       runStore: this.runs,
       sessionProfile: this.sessionProfile,
+      goalStore: this.goals,
       getDiagnosticPolicy: () => this.getDiagnosticPolicy(),
       resolveVpsName: async (id) => (await this.vpsServers.list()).find((s) => s.id === id)?.name,
       emit: (event: AgentEvent) => this.emit('agent:event', event)

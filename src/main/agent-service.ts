@@ -45,6 +45,8 @@ import {
   shouldAutoApprove
 } from '@core/agent/approved-plan'
 import { PlanTrustRegistry, PLAN_TRUST_METADATA_KEY } from '@core/agent/plan-trust'
+import { resolveRunGoal, type RunGoalContext } from '@core/agent/goal-context'
+import type { GoalStore } from '@core/agent/goal-store'
 import { createApprovalGate, describeApprovalReason } from './approval-gate'
 import type { ApprovalOutcome, ApprovalReason } from '@shared/approval'
 import type { ApprovedCommands } from '@core/agent/approved-commands'
@@ -346,6 +348,12 @@ export interface AgentServiceOptions {
    * or renderer-supplied `full` can never be honored without a valid grant.
    */
   sessionProfile?: { state(): Promise<ResolvedProfile> }
+  /**
+   * v2.6.2 (T4.3): project goals. When present, each run attaches to the project's
+   * active goal (or the requested one), the model is told what "done" means and
+   * the run is linked back to the goal.
+   */
+  goalStore?: GoalStore
 }
 
 /** Which provider/model to put first for an agent run. */
@@ -398,6 +406,7 @@ export class AgentService {
   private readonly getDiagnosticPolicy?: () => DiagnosticPolicy | null
   private readonly resolveVpsName?: (id: string) => Promise<string | undefined>
   private readonly sessionProfile?: { state(): Promise<ResolvedProfile> }
+  private readonly goalStore?: GoalStore
   private readonly controllers = new Set<AbortController>()
   private readonly changes = new Map<string, FileChangeView>()
   /**
@@ -431,6 +440,7 @@ export class AgentService {
     this.getDiagnosticPolicy = options.getDiagnosticPolicy
     this.resolveVpsName = options.resolveVpsName
     this.sessionProfile = options.sessionProfile
+    if (options.goalStore) this.goalStore = options.goalStore
   }
 
   isRunning(): boolean {
@@ -651,13 +661,51 @@ export class AgentService {
     // Snapshot the project this run belongs to. Patches captured during the run
     // are bound to it and can never be applied to another project (P0-1).
     const activeProject = this.persistence.getActiveProject()
+    // v2.6.2 T4.3: resolve the project goal this run serves and describe it to the
+    // model. Competing active goals are never guessed between — the run asks.
+    let goalContext: RunGoalContext = { ambiguousGoalIds: [], needsInput: false }
+    if (this.goalStore && activeProject) {
+      try {
+        goalContext = await resolveRunGoal(this.goalStore, activeProject.id, request.goalId)
+      } catch {
+        goalContext = { ambiguousGoalIds: [], needsInput: false }
+      }
+      if (goalContext.needsInput) {
+        this.emit({
+          type: 'log',
+          entry: {
+            ts: new Date(this.now()).toISOString(),
+            level: 'warn',
+            event: 'goal:ambiguous',
+            runId,
+            message: `Project has ${goalContext.ambiguousGoalIds.length} active goals; asking the user which one this run serves.`,
+            goalIds: goalContext.ambiguousGoalIds
+          }
+        })
+      }
+    }
     if (activeProject) {
       this.runStore.createRun({
         id: runId,
         projectId: activeProject.id,
-        projectRoot: activeProject.path
+        projectRoot: activeProject.path,
+        ...(goalContext.goal ? { goalId: goalContext.goal.id } : {})
       })
+      if (this.goalStore && goalContext.goal) {
+        try {
+          await this.goalStore.linkRun(activeProject.id, goalContext.goal.id, {
+            runId,
+            ...(request.sessionId ? { sessionId: request.sessionId } : {}),
+            createdAt: this.now()
+          })
+        } catch {
+          // Losing the goal audit link must never block the run.
+        }
+      }
     }
+    // The goal hint joins the project/VPS hint so "what does done mean?" is
+    // answered without a tool call.
+    const effectiveSystemHint = [systemHint, goalContext.hint].filter(Boolean).join('\n\n')
     // v2.5.3 Smarter Prompt: bake the run's project/VPS/environment into the
     // prompt so "which project am I on?" is answered without tool calls.
     let vpsName: string | undefined
@@ -785,7 +833,7 @@ export class AgentService {
       // survives a restart and resumes auto-approving in the same chat.
       sessionMetadata: () => this.planTrust.metadataFor(sessionKey),
       ...remote,
-      ...(systemHint ? { systemHint } : {}),
+      ...(effectiveSystemHint ? { systemHint: effectiveSystemHint } : {}),
       ...(planMode ? { planMode: true } : {}),
       // Investigate/read-only: never offer mutating tools to the model (v2.6.2).
       ...(profileState && !profileState.exposeWriteTools ? { toolPolicy: isReadOnlyTool } : {}),

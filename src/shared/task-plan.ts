@@ -27,6 +27,8 @@ export interface TaskPlan {
   id: string
   runId: string
   goal: string
+  /** The project Goal this plan was built for, when the run served one (T4.3). */
+  goalId?: string
   steps: TaskStep[]
   status: TaskPlanStatus
   createdAt: number

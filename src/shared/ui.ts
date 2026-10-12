@@ -92,6 +92,8 @@ export interface AgentRunRequest {
   enabledTools?: string[]
   /** Plan Mode: no tools are exposed; the model only drafts a plan. */
   planMode?: boolean
+  /** Serve this specific project Goal, overriding the project's active goal (T4.3). */
+  goalId?: string
 }
 
 /** A tool call awaiting the user's approval (Approval Modes). */

@@ -14,6 +14,8 @@ export interface AgentRun {
   readonly id: string
   readonly projectId: string
   readonly projectRoot: string
+  /** The project Goal this run serves, when one was selected (v2.6.2 T4.3). */
+  readonly goalId?: string
   /** path -> hash of the file content the (next) patch is based on. */
   readonly baseRevisions: Map<string, string>
   readonly startedAt: number
@@ -50,6 +52,8 @@ export interface CreateRunInput {
   /** Reuse the run id the orchestrator already emitted; generated otherwise. */
   id?: string
   startedAt?: number
+  /** The project Goal this run serves, when one was selected. */
+  goalId?: string
 }
 
 export interface CapturePatchInput {
@@ -92,6 +96,7 @@ export class RunStore {
       id: input.id ?? randomUUID(),
       projectId: input.projectId,
       projectRoot: input.projectRoot,
+      ...(input.goalId ? { goalId: input.goalId } : {}),
       baseRevisions: new Map(),
       startedAt: input.startedAt ?? this.now(),
       status: 'running'
