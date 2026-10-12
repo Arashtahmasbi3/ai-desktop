@@ -124,22 +124,79 @@ export function isInvestigateScope(value: unknown): value is InvestigateScope {
  * Tools that can only read. Investigate/read-only exposes exactly this set — an
  * allowlist, not a denylist, so a newly added read tool is hidden until it is
  * reviewed rather than a newly added *mutating* tool leaking through (v2.6.2 §5).
+ *
+ * v2.6.2 T2.1: the named diagnostics join the set. They are read-only by
+ * construction and are the *only* path-based access production Investigate
+ * grants, so they must survive the allowlist in every environment.
  */
 export const READ_ONLY_TOOL_NAMES: ReadonlySet<string> = new Set([
+  // Local sandbox reads.
   'read_file',
   'list_dir',
+  // Remote project reads (P0-2 contained; secret guard always applied).
   'remote_read_file',
   'remote_list_dir',
   'remote_exists',
   'remote_grep',
   'remote_git_status',
+  // Read-only git/worktree inspection.
+  'worktree_list',
+  // Named diagnostics (fixed probes, no model-chosen paths on production).
   'diagnose_crash',
-  'worktree_list'
+  'get_service_logs',
+  'get_disk_usage',
+  'get_system_health',
+  'get_process_list'
+])
+
+/**
+ * The named diagnostics (v2.6.2 T2.3). Fixed, read-only probes that take a
+ * *semantic* target (a service, a directory) rather than an arbitrary command,
+ * so production Investigate exposes these instead of free path-based reads.
+ */
+export const NAMED_DIAGNOSTIC_TOOL_NAMES: ReadonlySet<string> = new Set([
+  'diagnose_crash',
+  'get_service_logs',
+  'get_disk_usage',
+  'get_system_health',
+  'get_process_list'
+])
+
+/**
+ * Tools that can mutate the workspace, the host or the project. Kept explicit so
+ * the "never expose these in Investigate" rule is auditable in one place (T2.1).
+ */
+export const WRITE_TOOL_NAMES: ReadonlySet<string> = new Set([
+  // Local sandbox.
+  'write_file',
+  'run_command',
+  // Remote host.
+  'remote_write_file',
+  'remote_shell',
+  // Migration / scaffolding / per-project users / worktrees.
+  'migrate_project',
+  'migrate_database',
+  'migrate_docker',
+  'scaffold_project',
+  'project_user_create',
+  'project_user_remove',
+  'worktree_create',
+  'worktree_remove'
 ])
 
 /** True when a tool is known to be read-only. */
 export function isReadOnlyTool(name: string): boolean {
   return READ_ONLY_TOOL_NAMES.has(name)
+}
+
+/** True when a tool is a fixed read-only named diagnostic. */
+export function isNamedDiagnosticTool(name: string): boolean {
+  return NAMED_DIAGNOSTIC_TOOL_NAMES.has(name)
+}
+
+/** True when a tool can mutate state and must never be offered in Investigate. */
+export function isWriteTool(name: string): boolean {
+  return WRITE_TOOL_NAMES.has(name)
 }
 
 /** Coerce an untrusted persisted profile, or undefined when it is not one. */

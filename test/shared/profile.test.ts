@@ -1,11 +1,15 @@
 import { describe, it, expect } from 'vitest'
 import {
   ELEVATION_TTL_MS,
+  NAMED_DIAGNOSTIC_TOOL_NAMES,
+  WRITE_TOOL_NAMES,
   createElevationGrant,
   grantRevokedReason,
   isGrantValid,
+  isNamedDiagnosticTool,
   isReadOnlyTool,
   isSessionProfile,
+  isWriteTool,
   parseElevationGrant,
   resolveSessionProfile,
   type ElevationGrant,
@@ -219,6 +223,43 @@ describe('read-only tool allowlist', () => {
     }
     for (const name of ['write_file', 'run_command', 'remote_shell', 'remote_write_file', 'migrate_project']) {
       expect(isReadOnlyTool(name), name).toBe(false)
+    }
+  })
+
+  it('includes every named diagnostic in the read-only set (T2.1)', () => {
+    for (const name of NAMED_DIAGNOSTIC_TOOL_NAMES) {
+      expect(isReadOnlyTool(name), name).toBe(true)
+      expect(isNamedDiagnosticTool(name), name).toBe(true)
+      expect(isWriteTool(name), name).toBe(false)
+    }
+    expect([...NAMED_DIAGNOSTIC_TOOL_NAMES].sort()).toEqual([
+      'diagnose_crash',
+      'get_disk_usage',
+      'get_process_list',
+      'get_service_logs',
+      'get_system_health'
+    ])
+  })
+
+  it('classifies every mutating tool as a write and never as read-only', () => {
+    expect([...WRITE_TOOL_NAMES].sort()).toEqual([
+      'migrate_database',
+      'migrate_docker',
+      'migrate_project',
+      'project_user_create',
+      'project_user_remove',
+      'remote_shell',
+      'remote_write_file',
+      'run_command',
+      'scaffold_project',
+      'worktree_create',
+      'worktree_remove',
+      'write_file'
+    ])
+    for (const name of WRITE_TOOL_NAMES) {
+      expect(isWriteTool(name), name).toBe(true)
+      expect(isReadOnlyTool(name), name).toBe(false)
+      expect(isNamedDiagnosticTool(name), name).toBe(false)
     }
   })
 })
