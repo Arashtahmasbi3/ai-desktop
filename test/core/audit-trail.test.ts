@@ -70,6 +70,19 @@ describe('AuditTrail', () => {
     expect((await lines())).toHaveLength(2)
   })
 
+  it('serializes concurrent appends so sequence numbers never collide', async () => {
+    const trail = new AuditTrail({ file })
+    const appended = await Promise.all([
+      trail.append(entry()),
+      trail.append(entry()),
+      trail.append(entry()),
+      trail.append(entry())
+    ])
+
+    expect(appended.map((line) => line.seq)).toEqual([1, 2, 3, 4])
+    expect((await trail.verify())).toEqual({ ok: true, lines: 4 })
+  })
+
   it('continues an existing chain after a restart', async () => {
     const first = new AuditTrail({ file })
     await first.append(entry())

@@ -219,4 +219,27 @@ describe('v2.6.2 T3 - execution trace end to end', () => {
     await service.run({ task: 'just talk', sessionId: 'chat-1' })
     expect(service.auditPath()).toBeNull()
   })
+
+  it('6. the audit file is append-only and the chain continues across runs', async () => {
+    const service = makeService()
+    queue.push(
+      callTool('call-1', 'write_file', { path: 'a.txt', content: 'one' }),
+      reply('done'),
+      callTool('call-2', 'write_file', { path: 'b.txt', content: 'two' }),
+      reply('done')
+    )
+    await service.run({ task: 'write a.txt', sessionId: 'chat-1' })
+    await service.run({ task: 'write b.txt', sessionId: 'chat-2' })
+
+    const verified = await waitFor(async () => {
+      const result = await service.verifyAudit()
+      return result?.ok && result.lines >= 2 ? result : undefined
+    }, 'a valid audit chain with at least two lines')
+
+    const raw = await fs.readFile(auditFile(), 'utf8')
+    const rows = raw.split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l) as { seq: number })
+    // Append-only: sequence numbers are contiguous and strictly increasing.
+    expect(rows.map((row) => row.seq)).toEqual(rows.map((_, index) => index + 1))
+    expect(rows.length).toBeGreaterThanOrEqual(verified.lines)
+  })
 })

@@ -126,6 +126,12 @@ export class AuditTrail {
   private loaded = false
   private lastSeq = 0
   private lastHash = GENESIS_HASH
+  /**
+   * Serializes appends. Decision sinks fire-and-forget, so without this the
+   * concurrent calls would all read the same `lastSeq` and duplicate sequence
+   * numbers, breaking the chain.
+   */
+  private tail: Promise<void> = Promise.resolve()
 
   constructor(options: AuditTrailOptions) {
     this.file = options.file
@@ -140,6 +146,20 @@ export class AuditTrail {
 
   /** Append one line, returning it with its assigned seq and hash. */
   async append(
+    entry: Omit<AuditLine, 'seq' | 'prevHash' | 'hash' | 'userId' | 'ts'> & {
+      userId?: string
+      ts?: string
+    }
+  ): Promise<AuditLine> {
+    const run = this.tail.then(() => this.appendNow(entry))
+    this.tail = run.then(
+      () => undefined,
+      () => undefined
+    )
+    return run
+  }
+
+  private async appendNow(
     entry: Omit<AuditLine, 'seq' | 'prevHash' | 'hash' | 'userId' | 'ts'> & {
       userId?: string
       ts?: string
