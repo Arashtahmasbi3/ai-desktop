@@ -11,6 +11,7 @@ import type { VpsConnectionState } from './vps'
 import type { ApprovalMode, ApprovalReason } from './approval'
 import type { Plan, ApprovedPlan, PlanDecision, PlanWarning } from './plan'
 import type { ProjectMetadata } from './project-metadata'
+import type { ResolvedProfile } from './profile'
 import type { TaskPlan, TaskStep } from './task-plan'
 
 /** A project (folder) the user has added to the app. */
@@ -58,6 +59,8 @@ export interface SettingsView {
   rememberApprovalMode?: boolean
   /** Whether new chats start in Plan Mode. */
   planModeDefault?: boolean
+  /** Effective Session Profile + elevation state (v2.6.2, Topic 1). */
+  session?: ResolvedProfile
 }
 
 /** A single entry in the workspace file explorer. */
@@ -334,6 +337,8 @@ export interface AppEventMap {
   'remote:status': RemoteStatus
   'diagnostic:status': DiagnosticStatus
   'settings:changed': SettingsView
+  /** Effective Session Profile changed (incl. an elevation grant expiring). */
+  'session:changed': ResolvedProfile
   'files:changed': { root: string }
   'window:maximized': boolean
   'vps:status': VpsConnectionState

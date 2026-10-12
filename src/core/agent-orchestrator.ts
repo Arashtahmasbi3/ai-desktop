@@ -79,6 +79,11 @@ export interface AgentOrchestratorOptions {
   extraTools?: ToolDefinition[]
   /** Executor for {@link extraTools}; sandbox tools keep using the sandbox. */
   extraExecutor?: ToolExecutor
+  /**
+   * v2.6.2: allowlist applied to the exposed tool set. Investigate/read-only
+   * passes `isReadOnlyTool` so mutating tools are never offered to the model.
+   */
+  toolPolicy?: (toolName: string) => boolean
   /** Extra environment/instructions appended to the system prompt. */
   systemHint?: string
   /** Maximum number of plan/execute cycles before stopping. Default 12. */
@@ -523,8 +528,13 @@ export class AgentOrchestrator {
     this.providers = [...options.providers]
     this.logger = options.logger ?? silentLogger
     this.tools = [...(options.tools ?? SANDBOX_TOOLS), ...(options.extraTools ?? [])]
+    if (options.toolPolicy) this.tools = this.tools.filter((tool) => options.toolPolicy!(tool.name))
     this.extraExecutor = options.extraExecutor
-    this.extraToolNames = new Set((options.extraTools ?? []).map((tool) => tool.name))
+    this.extraToolNames = new Set(
+      (options.extraTools ?? [])
+        .map((tool) => tool.name)
+        .filter((name) => (options.toolPolicy ? options.toolPolicy(name) : true))
+    )
     this.systemHint = options.systemHint
     this.maxSteps = options.maxSteps ?? DEFAULT_MAX_STEPS
     this.contextMaxChars = options.contextMaxChars

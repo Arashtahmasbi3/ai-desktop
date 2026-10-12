@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { CustomProviderInput, CustomProviderTestResult, CustomProviderView, ProviderId } from '@shared/types'
 import type { OnboardingStatus } from '@shared/onboarding'
 import type { ApprovalMode, ApprovalHistoryEntry, ApprovalOutcome, ApprovedCommandView } from '@shared/approval'
+import type { InvestigateScope, ResolvedProfile, SessionProfile } from '@shared/profile'
 import type { PlanDecision } from '@shared/plan'
 import type { ChatSaveInput, ChatSummary, StoredChat } from '@shared/chat'
 import type {
@@ -236,6 +237,17 @@ export const api = {
     loadSession: (id: string): Promise<SessionRecordView | null> => invoke('agent:loadSession', id),
     memory: (id: string): Promise<SessionMemoryView> => invoke('agent:memory', id),
     clearMemory: (id: string): Promise<boolean> => invoke('agent:clearMemory', id)
+  },
+
+  // v2.6.2 (Topic 1): Session Profile + main-side elevation grant (P0-5).
+  session: {
+    get: (): Promise<ResolvedProfile> => invoke('session:get'),
+    setProfile: (profile: SessionProfile): Promise<SettingsView> =>
+      invoke('session:setProfile', profile),
+    setInvestigateScope: (scope: InvestigateScope): Promise<SettingsView> =>
+      invoke('session:setInvestigateScope', scope),
+    grantElevation: (): Promise<SettingsView> => invoke('session:grantElevation'),
+    revokeElevation: (): Promise<SettingsView> => invoke('session:revokeElevation')
   },
 
   shell: {

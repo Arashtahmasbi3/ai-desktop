@@ -1,6 +1,7 @@
 import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import type { CustomProviderInput, ProviderId } from '@shared/types'
 import type { ApprovalMode, ApprovalOutcome } from '@shared/approval'
+import type { InvestigateScope, SessionProfile } from '@shared/profile'
 import type { PlanDecision } from '@shared/plan'
 import type { ProjectMetadataPatch } from '@shared/project-metadata'
 import type { GitCommitInput } from '@shared/github'
@@ -83,7 +84,17 @@ export function registerIpc(
     [
       'settings:setApprovalMode',
       async (mode: ApprovalMode) => {
-        await services.persistence.setApprovalMode(mode)
+        if (mode === 'full') {
+          // v2.6.2 (P0-5): `full` is a scoped, TTL-bounded elevation grant owned
+          // by main — never merely a persisted preference the renderer can set.
+          await services.grantElevation()
+        } else {
+          // v2.6.1 compat: `ask`/`auto-write` stay Develop profile; the persisted
+          // approval preference still drives the effective mode.
+          await services.persistence.setApprovalMode(mode)
+          await services.sessionProfile.setProfile('develop')
+          await services.sessionProfile.revokeElevation()
+        }
         return changed()
       }
     ],
@@ -303,7 +314,38 @@ export function registerIpc(
     // v2.5.3: user-controlled, in-memory read-only widening of P0-2.
     ['diagnostic:status', () => services.diagnosticStatus()],
     ['diagnostic:enable', () => services.enableDiagnosticMode()],
-    ['diagnostic:disable', () => services.disableDiagnosticMode()]
+    ['diagnostic:disable', () => services.disableDiagnosticMode()],
+
+    // v2.6.2 (Topic 1): Session Profile + main-side elevation grant (P0-5).
+    ['session:get', () => services.sessionProfile.state()],
+    [
+      'session:setProfile',
+      async (profile: SessionProfile) => {
+        await services.setSessionProfile(profile)
+        return changed()
+      }
+    ],
+    [
+      'session:setInvestigateScope',
+      async (scope: InvestigateScope) => {
+        await services.setInvestigateScope(scope)
+        return changed()
+      }
+    ],
+    [
+      'session:grantElevation',
+      async () => {
+        await services.grantElevation()
+        return changed()
+      }
+    ],
+    [
+      'session:revokeElevation',
+      async () => {
+        await services.revokeElevation()
+        return changed()
+      }
+    ]
   ]
 
   for (const [channel, handler] of handlers) {

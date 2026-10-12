@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import type { SandboxManager } from '@shared/sandbox'
 import type { AgentEvent, DiagnosticStatus, RemoteStatus, SettingsView, WorkerStatus } from '@shared/ui'
 import type { ProjectRecord } from '@shared/ui'
+import type { InvestigateScope, SessionProfile } from '@shared/profile'
 import type { Persistence } from '@core/agent/persistence'
 import type { SessionStore } from '@core/agent/session-store'
 import { ApprovedCommands } from '@core/agent/approved-commands'
@@ -14,6 +15,7 @@ import { RemoteServer } from '@core/remote/remote-server'
 import { AgentService } from './agent-service'
 import { ApprovalBroker } from './approval-broker'
 import { PlanBroker } from './plan-broker'
+import { SessionProfileService } from './session-profile-service'
 import { FileService } from './file-service'
 import { ChatStore } from './chat-store'
 import {
@@ -82,6 +84,8 @@ export class AppServices {
   readonly files = new FileService()
   readonly chats: ChatStore
   readonly sandbox: SandboxManager
+  /** Main-side Session Profile + elevation grant authority (v2.6.2, P0-5). */
+  readonly sessionProfile: SessionProfileService
   readonly agent: AgentService
   readonly approvals: ApprovalBroker
   readonly plans: PlanBroker
@@ -138,6 +142,9 @@ export class AppServices {
     this.plans = new PlanBroker({
       emit: (event: AgentEvent) => this.emit('agent:event', event)
     })
+    this.sessionProfile = new SessionProfileService(this.persistence, {
+      onChanged: (state) => this.emit('session:changed', state)
+    })
     this.approvedCommands = new ApprovedCommands({
       file: join(this.dir, 'approved-commands.json')
     })
@@ -159,6 +166,7 @@ export class AppServices {
       approvedCommands: this.approvedCommands,
       files: this.files,
       runStore: this.runs,
+      sessionProfile: this.sessionProfile,
       getDiagnosticPolicy: () => this.getDiagnosticPolicy(),
       resolveVpsName: async (id) => (await this.vpsServers.list()).find((s) => s.id === id)?.name,
       emit: (event: AgentEvent) => this.emit('agent:event', event)
@@ -221,6 +229,30 @@ export class AppServices {
     return status
   }
 
+  /** Switch the Session Profile (v2.6.2, Topic 1). */
+  async setSessionProfile(profile: SessionProfile): Promise<SettingsView> {
+    await this.sessionProfile.setProfile(profile)
+    return this.settingsView()
+  }
+
+  /** Choose Investigate's scope (`read-only` | `plan-only`). */
+  async setInvestigateScope(scope: InvestigateScope): Promise<SettingsView> {
+    await this.sessionProfile.setInvestigateScope(scope)
+    return this.settingsView()
+  }
+
+  /** Explicit elevation consent: scoped + TTL-bounded, enforced in main. */
+  async grantElevation(): Promise<SettingsView> {
+    await this.sessionProfile.grantElevation()
+    return this.settingsView()
+  }
+
+  /** Drop the elevation grant immediately. */
+  async revokeElevation(): Promise<SettingsView> {
+    await this.sessionProfile.revokeElevation()
+    return this.settingsView()
+  }
+
   /** Working directory / server shown in the approval dialog. */
   private async approvalContext(): Promise<{ workingDirectory?: string; server?: string }> {
     const context: { workingDirectory?: string; server?: string } = {}
@@ -249,10 +281,13 @@ export class AppServices {
     this.jobs.load(await this.jobStore.load())
     const project = this.persistence.getActiveProject()
     this.files.setRoot(project?.path)
+    // Re-arm the elevation TTL for a grant persisted before this launch (P0-5).
+    await this.sessionProfile.init()
     this.worker.start()
   }
 
   async dispose(): Promise<void> {
+    this.sessionProfile.dispose()
     await this.vps.disconnectAll().catch(() => undefined)
     await this.remote.stop().catch(() => undefined)
     await this.worker.stop().catch(() => undefined)
@@ -288,6 +323,9 @@ export class AppServices {
     if (settings.rememberApprovalMode !== undefined) {
       view.rememberApprovalMode = settings.rememberApprovalMode
     }
+    // The effective Session Profile (profile + grant-validated mode) travels with
+    // the settings snapshot so the renderer never derives it on its own (P0-5).
+    view.session = await this.sessionProfile.state()
     for (const [provider, value] of Object.entries(settings.providers)) {
       if (!value) continue
       view.providers[provider as keyof SettingsView['providers']] = {

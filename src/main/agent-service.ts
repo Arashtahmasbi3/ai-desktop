@@ -37,6 +37,8 @@ import type { RemoteWorkspaceInfo } from '@shared/workspace-info'
 import { DEFAULT_APPROVAL_MODE } from '@core/agent/approval'
 import { resolveVpsForRun, requiresVps } from '@core/agent/vps-resolver'
 import type { ApprovedPlan, Plan, PlanDecision, PlanWarning } from '@shared/plan'
+import type { ResolvedProfile } from '@shared/profile'
+import { isReadOnlyTool } from '@shared/profile'
 import {
   createApprovedPlan,
   shouldAutoApprove
@@ -337,6 +339,12 @@ export interface AgentServiceOptions {
    * host the run is on. Optional; the id is used when absent.
    */
   resolveVpsName?: (id: string) => Promise<string | undefined>
+  /**
+   * v2.6.2 (P0-5): main-authoritative Session Profile. When present its resolved
+   * `approvalMode`/`planMode` win over the persisted `approvalMode`, so a stale
+   * or renderer-supplied `full` can never be honored without a valid grant.
+   */
+  sessionProfile?: { state(): Promise<ResolvedProfile> }
 }
 
 /** Which provider/model to put first for an agent run. */
@@ -388,6 +396,7 @@ export class AgentService {
   private readonly runStore: RunStore
   private readonly getDiagnosticPolicy?: () => DiagnosticPolicy | null
   private readonly resolveVpsName?: (id: string) => Promise<string | undefined>
+  private readonly sessionProfile?: { state(): Promise<ResolvedProfile> }
   private readonly controllers = new Set<AbortController>()
   private readonly changes = new Map<string, FileChangeView>()
   /**
@@ -420,6 +429,7 @@ export class AgentService {
     this.runStore = options.runStore ?? new RunStore()
     this.getDiagnosticPolicy = options.getDiagnosticPolicy
     this.resolveVpsName = options.resolveVpsName
+    this.sessionProfile = options.sessionProfile
   }
 
   isRunning(): boolean {
@@ -666,8 +676,14 @@ export class AgentService {
           ...(activeProject.environment ? { environment: activeProject.environment } : {})
         }
       : undefined
-    const approvalMode = settings.approvalMode ?? DEFAULT_APPROVAL_MODE
-    const planMode = request.planMode ?? settings.planModeDefault ?? false
+    // P0-5 (v2.6.2): the effective approval mode comes from main's Session
+    // Profile, never from the renderer or a stale persisted `full`. The legacy
+    // `settings.approvalMode` remains only as a fallback for callers that did
+    // not inject a Session Profile service (older tests).
+    const profileState = this.sessionProfile ? await this.sessionProfile.state() : undefined
+    const approvalMode =
+      profileState?.approvalMode ?? settings.approvalMode ?? DEFAULT_APPROVAL_MODE
+    const planMode = request.planMode ?? profileState?.planMode ?? settings.planModeDefault ?? false
     const requestApproval = this.requestApproval
     const requestPlan = this.requestPlan
     const now = (): number => this.now()
@@ -746,6 +762,8 @@ export class AgentService {
       ...remote,
       ...(systemHint ? { systemHint } : {}),
       ...(planMode ? { planMode: true } : {}),
+      // Investigate/read-only: never offer mutating tools to the model (v2.6.2).
+      ...(profileState && !profileState.exposeWriteTools ? { toolPolicy: isReadOnlyTool } : {}),
       ...(approvalGate ? { approvalGate } : {}),
       ...(planGate ? { planGate, planApproval: approvalMode } : {}),
       ...(preflightGate ? { preflightGate } : {}),
