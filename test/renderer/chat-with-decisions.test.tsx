@@ -13,7 +13,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import i18n from '../../src/renderer/src/i18n'
 import InlineTrace from '../../src/renderer/src/components/InlineTrace'
 import ChatPanel from '../../src/renderer/src/components/ChatPanel'
-import { useStore } from '../../src/renderer/src/store'
+import { useStore, type ChatMessage } from '../../src/renderer/src/store'
 import type { TraceDecision } from '../../src/shared/trace'
 
 beforeAll(async () => {
@@ -50,6 +50,23 @@ function decision(index: number, overrides: Partial<TraceDecision> = {}): TraceD
     outcome: 'ok',
     at: index,
     ...overrides
+  }
+}
+
+function toolMessage(
+  id: string,
+  runId: string,
+  step: number | undefined,
+  name: string,
+  ok: boolean
+): ChatMessage {
+  return {
+    id,
+    role: 'tool',
+    content: name,
+    at: 1,
+    runId,
+    toolCall: { name, ok, ...(step === undefined ? {} : { step }) }
   }
 }
 
@@ -103,6 +120,34 @@ describe('InlineTrace', () => {
 
     expect(screen.getAllByTestId('decision-card')).toHaveLength(30)
     expect(screen.getByTestId('inline-trace-count').textContent).toBe('45')
+  })
+
+  it('7. groups the step tool calls as compact chips under their decision', () => {
+    const messages: ChatMessage[] = [
+      toolMessage('m1', 'run-1', 1, 'write_file', true),
+      toolMessage('m2', 'run-1', 2, 'read_file', false),
+      toolMessage('m3', 'run-other', 1, 'bash', true)
+    ]
+    useStore.setState({ decisions: [decision(1), decision(2)], messages })
+    render(<InlineTrace />)
+
+    const groups = screen.getAllByTestId('trace-step-tools')
+    expect(groups).toHaveLength(2)
+    const chips = screen.getAllByTestId('trace-tool-chip').map((chip) => chip.textContent)
+    expect(chips).toEqual(['write_file', 'read_file'])
+    // A tool from a different run is never pulled into this trace.
+    expect(screen.queryByText('bash')).toBeNull()
+  })
+
+  it('8. does not render tool chips when no tool result carries a step', () => {
+    useStore.setState({
+      decisions: [decision(1)],
+      messages: [toolMessage('m1', 'run-1', undefined, 'write_file', true)]
+    })
+    render(<InlineTrace />)
+
+    expect(screen.getAllByTestId('decision-card')).toHaveLength(1)
+    expect(screen.queryByTestId('trace-step-tools')).toBeNull()
   })
 
   it('6. asks main for the deterministic explanation through the real trace IPC', async () => {

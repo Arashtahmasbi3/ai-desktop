@@ -5,7 +5,6 @@ import {
   ArrowDown,
   Bot,
   Eye,
-  Loader2,
   Paperclip,
   Send,
   Square,
@@ -29,6 +28,7 @@ import TaskTracker from './TaskTracker'
 import ExecutionBar from './ExecutionBar'
 import ProgressTimeline from './ProgressTimeline'
 import InlineTrace from './InlineTrace'
+import LiveStatus from './LiveStatus'
 import JobsPanel from './JobsPanel'
 import MicButton from './MicButton'
 import { FullAccessBanner, FullAccessToggle } from './FullAccessToggle'
@@ -331,12 +331,7 @@ export default function ChatPanel(): JSX.Element {
           messages.map((message) => <MessageBubble key={message.id} message={message} />)
         )}
 
-        {running ? (
-          <div className="flex items-center gap-2 px-4 text-xs text-neutral-400">
-            <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" />
-            {t('chat.typing')}
-          </div>
-        ) : null}
+        <LiveStatus />
 
         {loopStop && !running ? (
           <LoopStopCard

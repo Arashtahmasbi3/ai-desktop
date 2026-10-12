@@ -85,6 +85,8 @@ export interface ChatMessage {
    * with the structured detail (command, target, streams, exit code) when known.
    */
   toolCall?: ToolCallView
+  /** v2.6.3: the run this message belongs to, for per-step trace grouping. */
+  runId?: string
 }
 
 /** Project a `tool:result` event into the compact shape stored on a message. */
@@ -103,6 +105,7 @@ function toolCallFromView(view: ToolResultView): ToolCallView {
     ...(view.exitCode !== undefined ? { exitCode: view.exitCode } : {}),
     ...(view.durationMs !== undefined ? { durationMs: view.durationMs } : {}),
     ...(view.attempts !== undefined ? { attempts: view.attempts } : {}),
+    ...(view.step !== undefined ? { step: view.step } : {}),
     ...(view.recovery ? { recovery: view.recovery } : {})
   }
 }
@@ -1026,6 +1029,7 @@ export const useStore = create<AppState>((set, get) => ({
               role: 'tool',
               content: `${toolCall.name}${code}`,
               at: event.at,
+              runId: event.runId,
               toolCall
             }
           ]
@@ -1044,6 +1048,7 @@ export const useStore = create<AppState>((set, get) => ({
             role: 'assistant',
             content: text,
             at: event.at,
+            runId: event.runId,
             ...(event.model ? { model: event.model } : {}),
             ...(usedRemote ? { usedRemote: true } : {})
           })

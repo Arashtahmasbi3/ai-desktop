@@ -205,6 +205,8 @@ export interface ToolResultView {
   error?: string
   durationMs: number
   attempts: number
+  /** Agent loop step the call belonged to (v2.6.3, for per-step grouping). */
+  step?: number
   command?: string
   serverId?: string
   cwd?: string
@@ -236,6 +238,8 @@ export interface ToolCallView {
   exitCode?: number
   durationMs?: number
   attempts?: number
+  /** Agent loop step the call belonged to, so the chat can group it (v2.6.3). */
+  step?: number
   recovery?: ToolRecoveryInfo
 }
 

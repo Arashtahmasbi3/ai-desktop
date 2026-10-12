@@ -1,11 +1,20 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Activity, ChevronDown, ChevronRight } from 'lucide-react'
+import { Activity, AlertCircle, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react'
 import DecisionCard from './DecisionCard'
-import { useStore } from '../store'
+import { useStore, type ChatMessage } from '../store'
+import type { TraceDecision } from '@shared/trace'
 
 /** Keep the inline list light; the full run is still in the Progress panel. */
 const INLINE_TRACE_LIMIT = 30
+
+/** Step index encoded in a decision id (`${runId}:${step}`). */
+function stepOf(decision: TraceDecision): number | undefined {
+  const index = decision.id.lastIndexOf(':')
+  if (index < 0) return undefined
+  const step = Number(decision.id.slice(index + 1))
+  return Number.isFinite(step) ? step : undefined
+}
 
 /**
  * Inline execution trace for the active run (v2.6.3, Fix C). Decisions used to
@@ -13,16 +22,31 @@ const INLINE_TRACE_LIMIT = 30
  * chat showed nothing but `✓ tool ok` rows. This renders the same `DecisionCard`s
  * directly in the message flow so the agent's intent/evidence is visible without
  * opening a panel.
+ *
+ * v2.6.3 Layer 2: each decision groups the tool calls that ran in its step, as
+ * compact chips, so intent, evidence and result read together.
  */
 export default function InlineTrace(): JSX.Element | null {
   const { t } = useTranslation()
   const decisions = useStore((state) => state.decisions)
+  const messages = useStore((state) => state.messages)
   const [open, setOpen] = useState(true)
 
   if (decisions.length === 0) return null
 
   const visible = decisions.slice(-INLINE_TRACE_LIMIT)
   const latest = decisions[decisions.length - 1].intent.summary
+
+  const toolsFor = (decision: TraceDecision): ChatMessage[] => {
+    const step = stepOf(decision)
+    if (step === undefined) return []
+    return messages.filter(
+      (message) =>
+        message.role === 'tool' &&
+        message.runId === decision.runId &&
+        message.toolCall?.step === step
+    )
+  }
 
   return (
     <section
@@ -54,10 +78,42 @@ export default function InlineTrace(): JSX.Element | null {
       </button>
 
       {open ? (
-        <ul className="flex flex-col gap-1">
-          {visible.map((decision) => (
-            <DecisionCard key={decision.id} compact decision={decision} />
-          ))}
+        <ul data-testid="trace-steps" className="flex flex-col gap-1">
+          {visible.map((decision) => {
+            const tools = toolsFor(decision)
+            return (
+              <Fragment key={decision.id}>
+                <DecisionCard compact decision={decision} />
+                {tools.length > 0 ? (
+                  <li
+                    data-testid="trace-step-tools"
+                    className="ml-5 flex flex-wrap gap-1 list-none"
+                  >
+                    {tools.map((message) => {
+                      const ok = message.toolCall?.ok ?? false
+                      const Icon = ok ? CheckCircle2 : AlertCircle
+                      return (
+                        <span
+                          key={message.id}
+                          data-testid="trace-tool-chip"
+                          className={`flex items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-[10px] ${
+                            ok ? 'border-border text-neutral-400' : 'border-red-500/40 text-red-300'
+                          }`}
+                        >
+                          <Icon
+                            className={`h-2.5 w-2.5 shrink-0 ${
+                              ok ? 'text-emerald-400' : 'text-red-400'
+                            }`}
+                          />
+                          {message.toolCall?.name}
+                        </span>
+                      )
+                    })}
+                  </li>
+                ) : null}
+              </Fragment>
+            )
+          })}
         </ul>
       ) : null}
     </section>

@@ -134,4 +134,21 @@ describe('v2.6.3 - trace reaches the chat data end to end', () => {
     expect(decisionSteps.length).toBe(decisions.length)
     expect(decisionSteps[0].decision?.intent.summary).toBe(decisions[0].intent.summary)
   })
+
+  it('3. tool results carry the step so the chat can group them under a decision', async () => {
+    queue.push(
+      callTool('call-1', 'write_file', { path: 'a.txt', content: 'hello' }),
+      reply('done')
+    )
+    const events = await runAgent()
+    const results = events.flatMap((event) =>
+      event.type === 'tool:result' ? [event.result] : []
+    )
+    const decisions = decisionEvents(events)
+
+    expect(results.length).toBeGreaterThan(0)
+    expect(results[0].step).toBeDefined()
+    // The grouping key the renderer uses: decision id suffix === tool step.
+    expect(String(decisions[0].id)).toBe(`${decisions[0].runId}:${results[0].step}`)
+  })
 })

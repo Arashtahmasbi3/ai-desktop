@@ -1576,7 +1576,7 @@ export class AgentOrchestrator {
       ...(detail.error !== undefined ? { message: detail.error } : {}),
       ...toolDetailLogFields(detail)
     })
-    this.onToolResult?.(detail)
+    this.onToolResult?.({ ...detail, step })
     return result
   }
 

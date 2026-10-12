@@ -69,6 +69,11 @@
   "chat": {
     "placeholder": "هر کاری انجام بده",
     "typing": "در حال تایپ…",
+    "livePlanning": "در حال فکر کردن…",
+    "liveInspecting": "در حال بررسی…",
+    "liveExecuting": "در حال اجرا…",
+    "liveVerifying": "در حال بررسی نتیجه…",
+    "liveDone": "در حال جمع‌بندی…",
     "emptyTitle": "AI Desktop",
     "emptyBody": "دستیار رومیزی شما برای چت، کدنویسی، اجرای دستور در سندباکس و کار با فایل‌های پروژه.",
     "send": "ارسال",

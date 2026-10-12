@@ -69,6 +69,11 @@
   "chat": {
     "placeholder": "Do anything",
     "typing": "Typing…",
+    "livePlanning": "Thinking…",
+    "liveInspecting": "Inspecting…",
+    "liveExecuting": "Working…",
+    "liveVerifying": "Verifying…",
+    "liveDone": "Finishing…",
     "emptyTitle": "AI Desktop",
     "emptyBody": "Your desktop assistant for chat, coding, sandboxed commands and project files.",
     "send": "Send",
