@@ -18,6 +18,7 @@ import {
   Search,
   Server,
   Settings2,
+  Target,
   Trash2,
   User
 } from 'lucide-react'
@@ -35,7 +36,8 @@ const NAV: Array<{ id: ViewId; labelKey: string; icon: typeof MessageSquare }> =
   { id: 'files', labelKey: 'sidebar.navWorkspace', icon: FolderTree },
   { id: 'browser', labelKey: 'sidebar.navBrowser', icon: Globe },
   { id: 'github', labelKey: 'sidebar.navGitHub', icon: GitFork },
-  { id: 'vps', labelKey: 'sidebar.navVps', icon: Server }
+  { id: 'vps', labelKey: 'sidebar.navVps', icon: Server },
+  { id: 'goals', labelKey: 'sidebar.navGoals', icon: Target }
 ]
 
 /** Short relative time such as "3m", "2h", "5d" for the chat rows. */

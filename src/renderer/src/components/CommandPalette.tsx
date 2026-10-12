@@ -9,7 +9,8 @@ import {
   PanelLeft,
   Plus,
   Server,
-  Settings2
+  Settings2,
+  Target
 } from 'lucide-react'
 import { useStore, type ViewId } from '../store'
 
@@ -40,7 +41,8 @@ export default function CommandPalette(): JSX.Element | null {
       { id: 'files', labelKey: 'palette.viewWorkspace', icon: FolderTree },
       { id: 'browser', labelKey: 'palette.viewBrowser', icon: Globe },
       { id: 'github', labelKey: 'palette.viewGitHub', icon: GitFork },
-      { id: 'vps', labelKey: 'palette.viewVps', icon: Server }
+      { id: 'vps', labelKey: 'palette.viewVps', icon: Server },
+      { id: 'goals', labelKey: 'palette.viewGoals', icon: Target }
     ]
     return [
       { id: 'new', label: t('palette.newChat'), icon: Plus, run: newSession },

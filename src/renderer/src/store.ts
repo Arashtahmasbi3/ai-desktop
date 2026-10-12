@@ -11,6 +11,8 @@ import { DEFAULT_SELECTION, resolveSelection } from '@shared/selection'
 import type { ApprovalMode, ApprovalOutcome } from '@shared/approval'
 import type { ApprovedPlan, PlanDecision } from '@shared/plan'
 import type { TaskPlan } from '@shared/task-plan'
+import type { Goal } from '@shared/goal'
+import type { ResolvedGoal } from '@core/agent/goal-store'
 import type { ProjectMetadataPatch } from '@shared/project-metadata'
 import type { OnboardingStatus } from '@shared/onboarding'
 import type { VpsConnectionState, VpsServerView } from '@shared/vps'
@@ -46,7 +48,7 @@ import type {
   WorkerStatus
 } from '@shared/ui'
 
-export type ViewId = 'chat' | 'tasks' | 'files' | 'browser' | 'github' | 'vps'
+export type ViewId = 'chat' | 'tasks' | 'files' | 'browser' | 'github' | 'vps' | 'goals'
 
 /** Tabs of the right-hand workspace column (v2.6.0, B.4). */
 export type WorkspacePanelTab = 'output' | 'sources'
@@ -254,6 +256,12 @@ interface AppState {
   taskPlans: Record<string, TaskPlan>
   /** Whether the user paused the running task plan (v2.5.7). */
   taskPaused: boolean
+  /** The active project's goals (v2.6.2 T4.4). */
+  goals: Goal[]
+  /** How the next run will pick a goal; `ambiguous` asks the user to choose. */
+  goalResolution: ResolvedGoal | null
+  /** A goal mutation is in flight; disables the panel's controls. */
+  goalsBusy: boolean
   /** A tool approved 3+ times; the UI suggests remembering it (v2.3, B.3). */
   approvalSuggestion: { tool: string; count: number } | null
   /** A "Deny & Explain" prompt to send once the current run settles. */
@@ -351,6 +359,18 @@ interface AppState {
   resumeTaskPlan: () => void
   /** Stop the running task plan and mark it failed. */
   stopTaskPlan: () => void
+  /** v2.6.2 T4.4: reload the active project's goals + goal resolution. */
+  refreshGoals: () => Promise<void>
+  /** Create a goal for the active project; the first one becomes active. */
+  createGoal: (title: string, criteria?: string[]) => Promise<void>
+  updateGoalTitle: (goalId: string, title: string) => Promise<void>
+  /** Tick/untick one success criterion. */
+  toggleGoalCriterion: (goalId: string, criterionId: string, met: boolean) => Promise<void>
+  /** Pin (or unpin, with null) the goal the next run attaches to. */
+  setActiveGoal: (goalId: string | null) => Promise<void>
+  achieveGoal: (goalId: string) => Promise<void>
+  abandonGoal: (goalId: string, note?: string) => Promise<void>
+  removeGoal: (goalId: string) => Promise<void>
   send: (text: string) => Promise<void>
   abort: () => void
   newSession: () => void
@@ -450,6 +470,9 @@ export const useStore = create<AppState>((set, get) => ({
   taskPlan: null,
   taskPlans: {},
   taskPaused: false,
+  goals: [],
+  goalResolution: null,
+  goalsBusy: false,
   approvalSuggestion: null,
   queuedExplain: null,
   fileChanges: [],
@@ -782,6 +805,7 @@ export const useStore = create<AppState>((set, get) => ({
       })
       await get().refreshFiles()
       await get().refreshSessions()
+      await get().refreshGoals()
 
       // Offer to fix projects whose folder is missing (e.g. a path from another OS).
       if (
@@ -994,6 +1018,95 @@ export const useStore = create<AppState>((set, get) => ({
       taskPlans: { ...get().taskPlans, [stopped.id]: stopped },
       taskPaused: false
     })
+  },
+
+  /** v2.6.2 T4.4: the goal list is main-owned; the store only mirrors it. */
+  async refreshGoals() {
+    const hasProject = get().goals.length > 0 || get().settings?.projects.length
+    if (!hasProject) {
+      set({ goals: [], goalResolution: null })
+      return
+    }
+    try {
+      const [goals, goalResolution] = await Promise.all([
+        window.api.agent.goal.list(),
+        window.api.agent.goal.resolve()
+      ])
+      set({ goals, goalResolution })
+    } catch {
+      // No active project (or a transient failure): show the empty state.
+      set({ goals: [], goalResolution: null })
+    }
+  },
+  async createGoal(title, criteria) {
+    const trimmed = title.trim()
+    if (!trimmed || get().goalsBusy) return
+    set({ goalsBusy: true })
+    try {
+      await window.api.agent.goal.create({
+        title: trimmed,
+        ...(criteria && criteria.length > 0 ? { criteria } : {})
+      })
+    } finally {
+      set({ goalsBusy: false })
+      await get().refreshGoals()
+    }
+  },
+  async updateGoalTitle(goalId, title) {
+    const trimmed = title.trim()
+    if (!trimmed || get().goalsBusy) return
+    set({ goalsBusy: true })
+    try {
+      await window.api.agent.goal.update(goalId, { title: trimmed })
+    } finally {
+      set({ goalsBusy: false })
+      await get().refreshGoals()
+    }
+  },
+  async toggleGoalCriterion(goalId, criterionId, met) {
+    set({ goalsBusy: true })
+    try {
+      await window.api.agent.goal.setCriterion(goalId, criterionId, met)
+    } finally {
+      set({ goalsBusy: false })
+      await get().refreshGoals()
+    }
+  },
+  async setActiveGoal(goalId) {
+    set({ goalsBusy: true })
+    try {
+      await window.api.agent.goal.setActive(goalId)
+    } finally {
+      set({ goalsBusy: false })
+      await get().refreshGoals()
+    }
+  },
+  async achieveGoal(goalId) {
+    set({ goalsBusy: true })
+    try {
+      await window.api.agent.goal.achieve(goalId)
+    } finally {
+      set({ goalsBusy: false })
+      await get().refreshGoals()
+    }
+  },
+  async abandonGoal(goalId, note) {
+    set({ goalsBusy: true })
+    try {
+      await window.api.agent.goal.abandon(goalId, note)
+    } finally {
+      set({ goalsBusy: false })
+      await get().refreshGoals()
+    }
+  },
+  async removeGoal(goalId) {
+    set({ goalsBusy: true })
+    try {
+      await window.api.agent.goal.remove(goalId)
+    } finally {
+      set({ goalsBusy: false })
+      await get().refreshGoals()
+    }
   },
 
   async send(text) {
@@ -1218,6 +1331,7 @@ export const useStore = create<AppState>((set, get) => ({
   async openProject(id) {
     set({ settings: await window.api.projects.open(id) })
     await get().refreshFiles('.')
+    await get().refreshGoals()
   },
 
   async updateProjectPath(id, path) {
@@ -1269,6 +1383,9 @@ export function subscribeToEvents(): void {
   const offDiagnostic = window.api.events.on('diagnostic:status', (diagnostic) =>
     useStore.setState({ diagnostic })
   )
+  const offGoals = window.api.events.on('goal:changed', () => {
+    void useStore.getState().refreshGoals()
+  })
   unsubscribe = () => {
     offAgent()
     offWorker()
@@ -1277,6 +1394,7 @@ export function subscribeToEvents(): void {
     offFiles()
     offVps()
     offDiagnostic()
+    offGoals()
     unsubscribe = null
   }
 }

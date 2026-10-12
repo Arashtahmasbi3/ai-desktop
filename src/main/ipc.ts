@@ -6,6 +6,8 @@ import type { PlanDecision } from '@shared/plan'
 import type { ProjectMetadataPatch } from '@shared/project-metadata'
 import type { GitCommitInput } from '@shared/github'
 import type { AgentRunRequest, WorkerJobRequest } from '@shared/ui'
+import type { GoalUpdate, NewGoalInput } from '@shared/goal'
+
 import type { AppServices } from './app-services'
 import { registerVpsIpc } from './vps-ipc'
 import { runLocalCommand } from './local-shell'
@@ -38,6 +40,12 @@ export function registerIpc(
   const filesChanged = (): void => {
     const root = services.files.getRoot()
     if (root) send('files:changed', { root })
+  }
+  /** The project a goal operation applies to, defaulting to the active one. */
+  const goalProject = (projectId?: string): string => {
+    const id = projectId ?? services.persistence.getActiveProject()?.id
+    if (!id) throw new Error('No active project. Add or select a project first.')
+    return id
   }
 
   const handlers: Array<[string, (...args: never[]) => unknown]> = [
@@ -287,6 +295,75 @@ export function registerIpc(
     ['agent:loadSession', (id: string) => services.agent.loadSession(id)],
     ['agent:memory', (id: string) => services.agent.memory(id)],
     ['agent:clearMemory', (id: string) => services.agent.clearMemory(id)],
+
+    // v2.6.2 (T4.4): a project's goals are edited from the renderer. The project
+    // defaults to the active one; every mutation notifies all windows.
+    ['agent:goal:list', (projectId?: string) => services.goals.list(goalProject(projectId))],
+    ['agent:goal:resolve', (projectId?: string) =>
+      services.goals.resolveGoalId(goalProject(projectId))],
+    [
+      'agent:goal:create',
+      async (input: NewGoalInput, projectId?: string) => {
+        const id = goalProject(projectId)
+        const goal = await services.goals.create(id, input)
+        services.emitGoalChanged(id, goal.id)
+        return goal
+      }
+    ],
+    [
+      'agent:goal:update',
+      async (goalId: string, patch: GoalUpdate, projectId?: string) => {
+        const id = goalProject(projectId)
+        const goal = await services.goals.update(id, goalId, patch)
+        services.emitGoalChanged(id, goalId)
+        return goal
+      }
+    ],
+    [
+      'agent:goal:setCriterion',
+      async (goalId: string, criterionId: string, met: boolean, projectId?: string) => {
+        const id = goalProject(projectId)
+        const goal = await services.goals.setCriterion(id, goalId, criterionId, met)
+        services.emitGoalChanged(id, goalId)
+        return goal
+      }
+    ],
+    [
+      'agent:goal:setActive',
+      async (goalId: string | null, projectId?: string) => {
+        const id = goalProject(projectId)
+        await services.goals.setActive(id, goalId)
+        services.emitGoalChanged(id, goalId ?? undefined)
+        return true
+      }
+    ],
+    [
+      'agent:goal:achieve',
+      async (goalId: string, projectId?: string) => {
+        const id = goalProject(projectId)
+        const goal = await services.goals.achieve(id, goalId)
+        services.emitGoalChanged(id, goalId)
+        return goal
+      }
+    ],
+    [
+      'agent:goal:abandon',
+      async (goalId: string, note?: string, projectId?: string) => {
+        const id = goalProject(projectId)
+        const goal = await services.goals.abandon(id, goalId, note)
+        services.emitGoalChanged(id, goalId)
+        return goal
+      }
+    ],
+    [
+      'agent:goal:delete',
+      async (goalId: string, projectId?: string) => {
+        const id = goalProject(projectId)
+        const removed = await services.goals.delete(id, goalId)
+        services.emitGoalChanged(id, goalId)
+        return removed
+      }
+    ],
 
     ['jobs:list', () => services.jobs.listJobs()],
     ['jobs:refresh', () => services.jobs.refreshAll()],

@@ -63,7 +63,8 @@
     "osMismatch": "Path from another OS",
     "recents": "Recents",
     "local": "local",
-    "policyMismatch": "Project policy differs from the host policy"
+    "policyMismatch": "Project policy differs from the host policy",
+    "navGoals": "Goals"
   },
   "chat": {
     "placeholder": "Do anything",
@@ -418,7 +419,8 @@
     "viewWorkspace": "Go to Workspace",
     "viewBrowser": "Go to Browser",
     "viewGitHub": "Go to GitHub",
-    "viewVps": "Go to VPS"
+    "viewVps": "Go to VPS",
+    "viewGoals": "Go to Goals"
   },
   "onboarding": {
     "next": "Next",
@@ -562,5 +564,29 @@
     "modeAuto": "Ask before write",
     "modeFull": "Full access",
     "fullAccessBanner": "Full access enabled. Auto-disable in {{time}}."
+  },
+  "goals": {
+    "title": "Goals",
+    "subtitle": "What {{project}} is working towards",
+    "noProject": "No active project",
+    "titlePlaceholder": "Goal title",
+    "criteriaPlaceholder": "Success criteria — one per line",
+    "create": "Add goal",
+    "empty": "No goals yet",
+    "emptyHint": "A goal is the outcome you want. Every agent run attaches itself to it, so progress is measured against the same statement of intent.",
+    "ambiguous": "More than one goal is active. Pin the one the next run should serve.",
+    "pinned": "next run",
+    "pin": "Use for next run",
+    "unpin": "Stop using",
+    "achieve": "Mark achieved",
+    "abandon": "Abandon",
+    "remove": "Delete goal",
+    "progress": "{{met}}/{{total}}",
+    "linkedRuns": "{{count}} linked runs",
+    "footerHint": "Goals persist across chats and restarts.",
+    "statusActive": "active",
+    "statusAchieved": "achieved",
+    "statusAbandoned": "abandoned",
+    "statusBlocked": "blocked"
   }
 }

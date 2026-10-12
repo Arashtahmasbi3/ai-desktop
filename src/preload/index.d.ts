@@ -56,6 +56,9 @@ import type {
   WorkerStatus
 } from '@shared/ui'
 import type { ProjectMetadataPatch } from '@shared/project-metadata'
+import type { Goal, GoalUpdate, NewGoalInput } from '@shared/goal'
+import type { ResolvedGoal } from '@core/agent/goal-store'
+
 
 /** Shape of the object exposed on `window.api` by the preload script. */
 export interface Api {
@@ -185,6 +188,23 @@ export interface Api {
     loadSession(id: string): Promise<SessionRecordView | null>
     memory(id: string): Promise<SessionMemoryView>
     clearMemory(id: string): Promise<boolean>
+    /** v2.6.2 (T4.4): project goals; `projectId` defaults to the active project. */
+    goal: {
+      list(projectId?: string): Promise<Goal[]>
+      resolve(projectId?: string): Promise<ResolvedGoal>
+      create(input: NewGoalInput, projectId?: string): Promise<Goal>
+      update(goalId: string, patch: GoalUpdate, projectId?: string): Promise<Goal | undefined>
+      setCriterion(
+        goalId: string,
+        criterionId: string,
+        met: boolean,
+        projectId?: string
+      ): Promise<Goal | undefined>
+      setActive(goalId: string | null, projectId?: string): Promise<boolean>
+      achieve(goalId: string, projectId?: string): Promise<Goal | undefined>
+      abandon(goalId: string, note?: string, projectId?: string): Promise<Goal | undefined>
+      remove(goalId: string, projectId?: string): Promise<boolean>
+    }
   }
   shell: {
     exec(command: string): Promise<LocalShellResult>

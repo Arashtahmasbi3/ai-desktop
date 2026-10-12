@@ -151,3 +151,9 @@ export interface NewGoalInput {
   title: string
   criteria?: string[]
 }
+
+/** Fields the user can edit on an existing goal. */
+export interface GoalUpdate {
+  title?: string
+  criteria?: GoalCriterion[]
+}

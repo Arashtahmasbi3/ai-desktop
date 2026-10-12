@@ -44,6 +44,9 @@ import type {
   WorkerStatus
 } from '@shared/ui'
 import type { ProjectMetadataPatch } from '@shared/project-metadata'
+import type { Goal, GoalUpdate, NewGoalInput } from '@shared/goal'
+import type { ResolvedGoal } from '@core/agent/goal-store'
+
 import type {
   GitSetupOptions,
   RemoteCommandRun,
@@ -236,7 +239,33 @@ export const api = {
     sessions: (): Promise<SessionInfo[]> => invoke('agent:sessions'),
     loadSession: (id: string): Promise<SessionRecordView | null> => invoke('agent:loadSession', id),
     memory: (id: string): Promise<SessionMemoryView> => invoke('agent:memory', id),
-    clearMemory: (id: string): Promise<boolean> => invoke('agent:clearMemory', id)
+    clearMemory: (id: string): Promise<boolean> => invoke('agent:clearMemory', id),
+
+    // v2.6.2 (T4.4): project goals. `projectId` defaults to the active project.
+    goal: {
+      list: (projectId?: string): Promise<Goal[]> => invoke('agent:goal:list', projectId),
+      resolve: (projectId?: string): Promise<ResolvedGoal> =>
+        invoke('agent:goal:resolve', projectId),
+      create: (input: NewGoalInput, projectId?: string): Promise<Goal> =>
+        invoke('agent:goal:create', input, projectId),
+      update: (goalId: string, patch: GoalUpdate, projectId?: string): Promise<Goal | undefined> =>
+        invoke('agent:goal:update', goalId, patch, projectId),
+      setCriterion: (
+        goalId: string,
+        criterionId: string,
+        met: boolean,
+        projectId?: string
+      ): Promise<Goal | undefined> =>
+        invoke('agent:goal:setCriterion', goalId, criterionId, met, projectId),
+      setActive: (goalId: string | null, projectId?: string): Promise<boolean> =>
+        invoke('agent:goal:setActive', goalId, projectId),
+      achieve: (goalId: string, projectId?: string): Promise<Goal | undefined> =>
+        invoke('agent:goal:achieve', goalId, projectId),
+      abandon: (goalId: string, note?: string, projectId?: string): Promise<Goal | undefined> =>
+        invoke('agent:goal:abandon', goalId, note, projectId),
+      remove: (goalId: string, projectId?: string): Promise<boolean> =>
+        invoke('agent:goal:delete', goalId, projectId)
+    }
   },
 
   // v2.6.2 (Topic 1): Session Profile + main-side elevation grant (P0-5).

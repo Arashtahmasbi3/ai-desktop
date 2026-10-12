@@ -63,7 +63,8 @@
     "osMismatch": "مسیر از سیستم‌عامل دیگر",
     "recents": "اخیر",
     "local": "محلی",
-    "policyMismatch": "سیاست پروژه با سیاست میزبان تفاوت دارد"
+    "policyMismatch": "سیاست پروژه با سیاست میزبان تفاوت دارد",
+    "navGoals": "اهداف"
   },
   "chat": {
     "placeholder": "هر کاری انجام بده",
@@ -418,7 +419,8 @@
     "viewWorkspace": "رفتن به Workspace",
     "viewBrowser": "رفتن به مرورگر",
     "viewGitHub": "رفتن به گیت‌هاب",
-    "viewVps": "رفتن به VPS"
+    "viewVps": "رفتن به VPS",
+    "viewGoals": "رفتن به اهداف"
   },
   "onboarding": {
     "next": "بعدی",
@@ -562,5 +564,29 @@
     "modeAuto": "پرسش قبل از نوشتن",
     "modeFull": "دسترسی کامل",
     "fullAccessBanner": "دسترسی کامل فعال است. غیرفعال‌سازی خودکار در {{time}}."
+  },
+  "goals": {
+    "title": "اهداف",
+    "subtitle": "آنچه {{project}} به سمتش پیش می‌رود",
+    "noProject": "پروژه فعالی وجود ندارد",
+    "titlePlaceholder": "عنوان هدف",
+    "criteriaPlaceholder": "معیارهای موفقیت — هر کدام در یک خط",
+    "create": "افزودن هدف",
+    "empty": "هنوز هدفی ثبت نشده",
+    "emptyHint": "هدف همان نتیجه‌ای است که می‌خواهید؛ هر اجرای عامل به آن متصل می‌شود تا پیشرفت با همان معیار سنجیده شود.",
+    "ambiguous": "بیش از یک هدف فعال است. هدفی را که اجرای بعدی باید دنبال کند پین کنید.",
+    "pinned": "اجرای بعدی",
+    "pin": "استفاده در اجرای بعدی",
+    "unpin": "لغو انتخاب",
+    "achieve": "ثبت به‌عنوان انجام‌شده",
+    "abandon": "رها کردن",
+    "remove": "حذف هدف",
+    "progress": "{{met}}/{{total}}",
+    "linkedRuns": "{{count}} اجرای مرتبط",
+    "footerHint": "اهداف میان چت‌ها و راه‌اندازی‌های مجدد باقی می‌مانند.",
+    "statusActive": "فعال",
+    "statusAchieved": "انجام‌شده",
+    "statusAbandoned": "رها‌شده",
+    "statusBlocked": "مسدود"
   }
 }

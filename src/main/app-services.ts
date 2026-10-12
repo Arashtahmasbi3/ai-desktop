@@ -272,6 +272,11 @@ export class AppServices {
     return context
   }
 
+  /** Notify the renderer that a project's goals changed (v2.6.2 T4.4). */
+  emitGoalChanged(projectId: string, goalId?: string): void {
+    this.emit('goal:changed', { projectId, ...(goalId ? { goalId } : {}) })
+  }
+
   private emit(channel: string, payload: unknown): void {
     this.sender?.(channel, payload)
   }

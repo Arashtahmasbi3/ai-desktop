@@ -341,6 +341,8 @@ export interface AppEventMap {
   'settings:changed': SettingsView
   /** Effective Session Profile changed (incl. an elevation grant expiring). */
   'session:changed': ResolvedProfile
+  /** A project's goals changed; carries the goal id when a single one changed. */
+  'goal:changed': { projectId: string; goalId?: string }
   'files:changed': { root: string }
   'window:maximized': boolean
   'vps:status': VpsConnectionState

@@ -16,9 +16,9 @@ import {
   goalProgress,
   parseGoal,
   type Goal,
-  type GoalCriterion,
   type GoalFile,
   type GoalLink,
+  type GoalUpdate,
   type NewGoalInput
 } from '@shared/goal'
 
@@ -37,10 +37,7 @@ export interface GoalStoreOptions {
   generateId?: () => string
 }
 
-export interface GoalUpdate {
-  title?: string
-  criteria?: GoalCriterion[]
-}
+export type { GoalUpdate } from '@shared/goal'
 
 export class GoalStore {
   private readonly dir: string
