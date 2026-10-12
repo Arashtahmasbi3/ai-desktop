@@ -35,6 +35,7 @@ import { FullAccessBanner, FullAccessToggle } from './FullAccessToggle'
 import { filterSlashCommands, resolveSlashCommand } from '../lib/slash'
 import { decideSend } from '../lib/context-gate'
 import { workspaceStatus, shouldShowWorkspaceBanner } from '../lib/project-status'
+import { CHAT_MAX_WIDTH } from '../lib/layout'
 import { contextBudget } from '@shared/memory'
 
 const SUGGESTION_KEYS = [
@@ -300,6 +301,11 @@ export default function ChatPanel(): JSX.Element {
         dir={dir}
         className="relative flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto py-4"
       >
+        <div
+          data-testid="chat-measure"
+          style={{ maxWidth: CHAT_MAX_WIDTH }}
+          className="mx-auto flex min-h-0 w-full flex-1 flex-col gap-3"
+        >
         {messages.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent/15">
@@ -349,6 +355,7 @@ export default function ChatPanel(): JSX.Element {
         ) : null}
 
         <InlineTrace />
+        </div>
       </div>
       {timelineOpen ? <ProgressTimeline /> : null}
       </div>
@@ -381,6 +388,7 @@ export default function ChatPanel(): JSX.Element {
       {terminalOpen ? <TerminalPanel /> : null}
 
       <div className="shrink-0 border-t border-border bg-bg-secondary p-3">
+        <div style={{ maxWidth: CHAT_MAX_WIDTH }} className="mx-auto w-full">
         {approvalSuggestion ? (
           <div className="mx-3 mb-1 flex items-center justify-between gap-2 rounded-lg border border-accent/40 bg-accent/10 px-2 py-1.5 text-[11px] text-neutral-200">
             <span>
@@ -538,6 +546,7 @@ export default function ChatPanel(): JSX.Element {
         </div>
         <div className="mt-1.5 flex items-center justify-between px-1 text-[10px] text-neutral-600">
           <span>Enter = {t('chat.send')} · Shift+Enter = ↵ · Ctrl+Enter = {t('chat.send')}</span>
+        </div>
         </div>
       </div>
 

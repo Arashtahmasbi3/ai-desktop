@@ -163,6 +163,11 @@ describe('InlineTrace', () => {
 })
 
 describe('ChatPanel wiring (Fix C)', () => {
+  it('keeps the conversation within a readable measure (v2.6.3 T1)', () => {
+    render(<ChatPanel />)
+    expect(screen.getByTestId('chat-measure').style.maxWidth).toBe('820px')
+  })
+
   it('mounts the inline trace inside the message flow once decisions exist', () => {
     useStore.setState({ decisions: [decision(1)] })
     render(<ChatPanel />)

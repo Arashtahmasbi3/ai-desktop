@@ -74,9 +74,17 @@ function dotClass(state: DotState): string {
   return 'bg-red-500'
 }
 
-export default function Sidebar(): JSX.Element {
+export interface SidebarProps {
+  /**
+   * v2.6.3 T1: force the icon rail when the viewport is too narrow to keep the
+   * sidebar expanded alongside a readable chat. The user's own collapse still wins.
+   */
+  rail?: boolean
+}
+
+export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
   const { t } = useTranslation()
-  const collapsed = useStore((state) => state.sidebarCollapsed)
+  const collapsed = useStore((state) => state.sidebarCollapsed) || Boolean(rail)
   const view = useStore((state) => state.view)
   const setView = useStore((state) => state.setView)
   const openSettings = useStore((state) => state.openSettings)

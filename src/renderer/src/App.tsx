@@ -23,6 +23,7 @@ import WorkspacePanel from './components/WorkspacePanel'
 import ToastHost from './components/ToastHost'
 import { basename, subscribeToEvents, useStore } from './store'
 import { readLastVpsId, resolveReconnectId } from './lib/vps-state'
+import { resolveLayout } from './lib/layout'
 
 /** Retry interval for a selected-but-dropped VPS connection. */
 const VPS_KEEPALIVE_MS = 30_000
@@ -40,12 +41,29 @@ export default function App(): JSX.Element {
   const addProject = useStore((state) => state.addProject)
   const chatTreeOpen = useStore((state) => state.chatTreeOpen)
   const workspacePanelOpen = useStore((state) => state.workspacePanelOpen)
+  const sidebarCollapsed = useStore((state) => state.sidebarCollapsed)
   const [dragging, setDragging] = useState(false)
+  const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth)
 
   useEffect(() => {
     subscribeToEvents()
     void init()
   }, [init])
+
+  useEffect(() => {
+    const onResize = (): void => setViewportWidth(window.innerWidth)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  // v2.6.3 T1: keep the conversation readable; auxiliary columns overlay when
+  // docking them would squeeze the chat below its comfortable width.
+  const layout = resolveLayout({
+    width: viewportWidth,
+    sidebarPinned: !sidebarCollapsed,
+    treeOpen: chatTreeOpen,
+    workspaceOpen: workspacePanelOpen
+  })
 
   // Keep the shared VPS state fresh: load on startup, auto-reconnect the last
   // active server, and retry if it ever drops while still selected.
@@ -230,7 +248,7 @@ export default function App(): JSX.Element {
       <Titlebar />
 
       <div className="flex min-h-0 flex-1">
-        <Sidebar />
+        <Sidebar rail={layout.sidebar === 'rail'} />
 
         <div className="flex min-h-0 min-w-0 flex-1">
           {!ready ? (
@@ -243,12 +261,20 @@ export default function App(): JSX.Element {
               {view === 'chat' ? (
                 <div className="relative flex min-h-0 min-w-0 flex-1">
                   {chatTreeOpen ? (
-                    <aside className="hidden w-64 shrink-0 border-r border-border md:flex">
+                    <aside
+                      className={
+                        layout.tree === 'static'
+                          ? 'hidden w-64 shrink-0 border-r border-border md:flex'
+                          : 'absolute inset-y-0 left-0 z-40 flex w-64 max-w-[90vw] flex-col border-r border-border bg-bg-secondary shadow-2xl'
+                      }
+                    >
                       <FileExplorer />
                     </aside>
                   ) : null}
                   <ChatPanel />
-                  {workspacePanelOpen ? <WorkspacePanel /> : null}
+                  {workspacePanelOpen ? (
+                    <WorkspacePanel overlay={layout.workspace === 'overlay'} />
+                  ) : null}
                 </div>
               ) : null}
               {view === 'tasks' ? <TaskPanel /> : null}
