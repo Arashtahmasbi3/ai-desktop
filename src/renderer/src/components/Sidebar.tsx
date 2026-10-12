@@ -123,7 +123,9 @@ export default function Sidebar(): JSX.Element {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+      // Ctrl+K is owned by the command palette (v2.6.2 T5.3); search focus moved
+      // to Ctrl+Shift+K so the two shortcuts no longer fight over the same keys.
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'k') {
         event.preventDefault()
         searchRef.current?.focus()
       }
@@ -355,7 +357,7 @@ export default function Sidebar(): JSX.Element {
             className="w-full bg-transparent text-xs text-neutral-200 outline-none placeholder:text-neutral-600"
           />
           <kbd className="shrink-0 rounded border border-border px-1 text-[9px] text-neutral-600">
-            Ctrl K
+            Ctrl ⇧ K
           </kbd>
         </label>
       </div>

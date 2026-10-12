@@ -487,8 +487,8 @@ export default function ChatPanel(): JSX.Element {
               <button
                 type="button"
                 onClick={abort}
-                title={t('chat.stop')}
-                aria-label={t('chat.stop')}
+                title={`${t('chat.stop')} (Shift+Esc)`}
+                aria-label={`${t('chat.stop')} (Shift+Esc)`}
                 className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30"
               >
                 <Square className="h-4 w-4" />

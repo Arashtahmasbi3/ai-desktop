@@ -70,7 +70,9 @@ export const api = {
     toggleMaximize: (): Promise<boolean> => invoke('window:toggleMaximize'),
     close: (): Promise<void> => invoke('window:close'),
     isMaximized: (): Promise<boolean> => invoke('window:isMaximized'),
-    newWindow: (): Promise<boolean> => invoke('window:new')
+    newWindow: (): Promise<boolean> => invoke('window:new'),
+    /** v2.6.2 T5.3: set the Electron zoom level (0 = 100%). */
+    setZoom: (level: number): Promise<number> => invoke('window:zoom', level)
   },
 
   settings: {

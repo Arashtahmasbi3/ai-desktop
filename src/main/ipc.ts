@@ -442,7 +442,9 @@ export function registerIpc(
   const windowOf = (event: Electron.IpcMainInvokeEvent): BrowserWindow | null =>
     BrowserWindow.fromWebContents(event.sender) ?? getWindow()
 
-  const windowChannels: Array<[string, (event: Electron.IpcMainInvokeEvent) => unknown]> = [
+  const windowChannels: Array<
+    [string, (event: Electron.IpcMainInvokeEvent, ...args: unknown[]) => unknown]
+  > = [
     ['window:minimize', (event) => windowOf(event)?.minimize()],
     [
       'window:toggleMaximize',
@@ -456,6 +458,18 @@ export function registerIpc(
     ],
     ['window:close', (event) => windowOf(event)?.close()],
     ['window:isMaximized', (event) => windowOf(event)?.isMaximized() ?? false],
+    [
+      'window:zoom',
+      (event, level) => {
+        const window = windowOf(event)
+        if (!window) return 0
+        // v2.6.2 T5.3: Electron zoom level; 0 is 100%. Clamp so the UI stays usable.
+        const value = typeof level === 'number' && Number.isFinite(level) ? level : 0
+        const clamped = Math.min(3, Math.max(-3, value))
+        window.webContents.setZoomLevel(clamped)
+        return clamped
+      }
+    ],
     ['window:new', () => {
       openWindow()
       return true
@@ -463,7 +477,7 @@ export function registerIpc(
   ]
 
   for (const [channel, handler] of windowChannels) {
-    ipcMain.handle(channel, (event) => handler(event))
+    ipcMain.handle(channel, (event, ...args) => handler(event, ...args))
   }
 
   const disposeVps = registerVpsIpc(services)

@@ -14,6 +14,7 @@ import VpsPanel from './components/Vps/VpsPanel'
 import Onboarding from './components/Onboarding'
 import MigrationDialog from './components/MigrationDialog'
 import SettingsPanel from './components/SettingsPanel'
+import ShortcutsOverlay from './components/ShortcutsOverlay'
 import Sidebar from './components/Sidebar'
 import StatusBar from './components/StatusBar'
 import TaskPanel from './components/TaskPanel'
@@ -93,6 +94,13 @@ export default function App(): JSX.Element {
     return () => clearInterval(timer)
   }, [ready])
 
+  // v2.6.2 T5.3: re-apply the persisted zoom level once the app boots.
+  useEffect(() => {
+    if (!ready) return
+    const { zoomLevel, applyZoom } = useStore.getState()
+    applyZoom(zoomLevel)
+  }, [ready])
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
       const target = event.target as HTMLElement | null
@@ -130,6 +138,35 @@ export default function App(): JSX.Element {
         state.toggleTerminal()
         return
       }
+      if (event.ctrlKey && (event.key === '=' || event.key === '+')) {
+        event.preventDefault()
+        state.zoomIn()
+        return
+      }
+      if (event.ctrlKey && event.key === '-') {
+        event.preventDefault()
+        state.zoomOut()
+        return
+      }
+      if (event.ctrlKey && event.key === '0') {
+        event.preventDefault()
+        state.resetZoom()
+        return
+      }
+      // Emergency stop (v2.6.2 T5.3): Shift+Esc halts the running agent.
+      if (event.shiftKey && event.key === 'Escape' && !event.ctrlKey && !event.altKey) {
+        if (state.running) {
+          event.preventDefault()
+          state.abort()
+          return
+        }
+      }
+      // Shortcut cheat sheet (v2.6.2 T5.3): `?` or Ctrl+/.
+      if (!typing && ((event.key === '?' && !event.ctrlKey && !event.metaKey) || (event.ctrlKey && event.key === '/'))) {
+        event.preventDefault()
+        state.setShortcutsOpen(!state.shortcutsOpen)
+        return
+      }
       if (event.ctrlKey && (event.key === 'k' || event.key === 'K' || event.key === 'p' || event.key === 'P')) {
         event.preventDefault()
         state.setPaletteOpen(!state.paletteOpen)
@@ -161,6 +198,7 @@ export default function App(): JSX.Element {
       } else if (event.key === 'Escape') {
         if (state.searchOpen) state.setSearchOpen(false)
         else if (state.paletteOpen) state.setPaletteOpen(false)
+        else if (state.shortcutsOpen) state.setShortcutsOpen(false)
         else if (state.settingsOpen) state.closeSettings()
         else clearError()
       }
@@ -247,6 +285,8 @@ export default function App(): JSX.Element {
       <Onboarding />
 
       <SettingsPanel />
+
+      <ShortcutsOverlay />
 
       <MigrationDialog />
 

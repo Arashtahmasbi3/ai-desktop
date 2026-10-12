@@ -114,6 +114,11 @@ const MAX_TERMINAL_LINES = 500
 export const CONTEXT_SETTINGS_KEY = 'ai-desktop:show-context-before-send'
 const CHAT_TREE_KEY = 'ai-desktop:chat-tree-open'
 const JOBS_PANEL_KEY = 'ai-desktop:show-jobs-panel'
+const ZOOM_KEY = 'ai-desktop:zoom-level'
+/** Electron zoom-level step per keyboard press (v2.6.2 T5.3). */
+const ZOOM_STEP = 0.5
+const ZOOM_MIN = -3
+const ZOOM_MAX = 3
 const LAST_CHAT_KEY = 'ai-desktop:last-chat'
 const AUTOSAVE_INTERVAL_MS = 30_000
 /** Full access auto-reverts to Ask after this much idle time (v2.3, B.2). */
@@ -152,6 +157,21 @@ export function readShowJobsPanelAlways(): boolean {
 
 /** Last seen status per job id, so `refreshJobs` can toast a completion once. */
 const jobStatuses = new Map<string, Job['status']>()
+
+/** Clamp + read the persisted zoom level (Electron units; 0 == 100%). */
+function clampZoom(level: number): number {
+  return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, level))
+}
+
+export function readZoomLevel(): number {
+  try {
+    const raw = globalThis.localStorage?.getItem(ZOOM_KEY)
+    const level = raw ? Number(raw) : 0
+    return Number.isFinite(level) ? clampZoom(level) : 0
+  } catch {
+    return 0
+  }
+}
 
 function readLastChatId(): string | null {
   try {
@@ -300,6 +320,10 @@ interface AppState {
   jobsPanelOpen: boolean
   /** Pin the jobs panel open even with nothing running (T5.2). */
   showJobsPanelAlways: boolean
+  /** Electron zoom level, 0 == 100% (T5.3). */
+  zoomLevel: number
+  /** Keyboard-shortcut cheat sheet visibility (T5.3). */
+  shortcutsOpen: boolean
 
   setLocale: (locale: Locale) => void
   toggleSidebar: () => void
@@ -348,6 +372,12 @@ interface AppState {
   refreshJobs: () => Promise<void>
   setJobsPanelOpen: (open: boolean) => void
   setShowJobsPanelAlways: (value: boolean) => void
+  /** Apply (and persist) an Electron zoom level, clamped to a safe range (T5.3). */
+  applyZoom: (level: number) => void
+  zoomIn: () => void
+  zoomOut: () => void
+  resetZoom: () => void
+  setShortcutsOpen: (open: boolean) => void
   toggleChatTree: () => void
   toggleWorkspacePanel: () => void
   setWorkspacePanelTab: (tab: WorkspacePanelTab) => void
@@ -507,6 +537,8 @@ export const useStore = create<AppState>((set, get) => ({
   jobs: [],
   jobsPanelOpen: false,
   showJobsPanelAlways: readShowJobsPanelAlways(),
+  zoomLevel: readZoomLevel(),
+  shortcutsOpen: false,
 
   setLocale(locale) {
     set({ locale })
@@ -743,6 +775,20 @@ export const useStore = create<AppState>((set, get) => ({
       // Persisting the preference is best-effort.
     }
   },
+  applyZoom(level) {
+    const clamped = clampZoom(level)
+    set({ zoomLevel: clamped })
+    try {
+      globalThis.localStorage?.setItem(ZOOM_KEY, String(clamped))
+    } catch {
+      // Persisting the zoom is best-effort.
+    }
+    void window.api?.window?.setZoom(clamped).catch(() => undefined)
+  },
+  zoomIn: () => get().applyZoom(get().zoomLevel + ZOOM_STEP),
+  zoomOut: () => get().applyZoom(get().zoomLevel - ZOOM_STEP),
+  resetZoom: () => get().applyZoom(0),
+  setShortcutsOpen: (open) => set({ shortcutsOpen: open }),
 
   async refreshChats() {
     try {

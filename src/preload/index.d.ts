@@ -72,6 +72,8 @@ export interface Api {
     close(): Promise<void>
     isMaximized(): Promise<boolean>
     newWindow(): Promise<boolean>
+    /** v2.6.2 T5.3: set the Electron zoom level (0 = 100%). */
+    setZoom(level: number): Promise<number>
   }
   settings: {
     get(): Promise<SettingsView>

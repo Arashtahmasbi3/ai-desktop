@@ -423,6 +423,7 @@
     "noResults": "No matching commands",
     "newChat": "New chat",
     "openSettings": "Open settings",
+    "shortcuts": "Keyboard shortcuts",
     "toggleSidebar": "Toggle sidebar",
     "viewChat": "Go to Chat",
     "viewTasks": "Go to Tasks",
@@ -631,5 +632,27 @@
     "askWhy": "Ask Why",
     "why": "Why",
     "askWhyFailed": "Could not load the explanation."
+  },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "groupGeneral": "General",
+    "groupWorkspace": "Workspace",
+    "groupView": "View & control",
+    "palette": "Open the command palette",
+    "focusSearch": "Focus chat search",
+    "newChat": "New chat",
+    "newWindow": "New window",
+    "toggleSidebar": "Toggle the sidebar",
+    "settings": "Open settings",
+    "switchView": "Switch view (Chat, Tasks, Files, Browser, GitHub, VPS, Goals)",
+    "help": "Show this shortcut list",
+    "codeSearch": "Search code in the workspace",
+    "toggleTree": "Toggle the file tree",
+    "terminal": "Toggle the terminal",
+    "saveFile": "Save the open file",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "zoomReset": "Reset zoom",
+    "emergencyStop": "Emergency stop (halt the running agent)"
   }
 }
