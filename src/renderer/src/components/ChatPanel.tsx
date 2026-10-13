@@ -315,7 +315,7 @@ export default function ChatPanel(): JSX.Element {
         <div
           data-testid="chat-measure"
           style={{ maxWidth: CHAT_MAX_WIDTH }}
-          className="mx-auto flex min-h-0 w-full flex-1 flex-col gap-3"
+          className="mx-auto flex min-h-0 w-full flex-1 flex-col gap-3 px-4"
         >
         {messages.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
@@ -408,8 +408,12 @@ export default function ChatPanel(): JSX.Element {
 
       {terminalOpen ? <TerminalPanel /> : null}
 
-      <div className="shrink-0 border-t border-border bg-bg-secondary p-3">
-        <div style={{ maxWidth: CHAT_MAX_WIDTH }} className="mx-auto w-full">
+      <div className="shrink-0 border-t border-border bg-bg-secondary py-3">
+        <div
+          data-testid="chat-composer"
+          style={{ maxWidth: CHAT_MAX_WIDTH }}
+          className="mx-auto w-full px-4"
+        >
         {approvalSuggestion ? (
           <div className="mx-3 mb-1 flex items-center justify-between gap-2 rounded-lg border border-accent/40 bg-accent/10 px-2 py-1.5 text-[11px] text-neutral-200">
             <span>

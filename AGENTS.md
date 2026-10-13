@@ -816,3 +816,7 @@ Autonomous decisions logged per the sprint's golden rule (`[AUTO-DECISION]`, no 
 - Files (Topic 2 conformance): `src/renderer/src/components/{InlineTrace,LiveStatus,ChatPanel,SettingsPanel}.tsx`, `src/renderer/src/{store.ts,lib/tool-rows.ts}`, `src/renderer/src/i18n/{en,fa}.json`.
 - Tests: `test/renderer/{chat-with-decisions,live-status,hide-raw-tools}.test.tsx`. Full suite **214 files, 1664 passed | 1 skipped**; `typecheck` + `build` green.
 - Commits: `f6deda3` (InlineTrace + tool-aware status) and the hide-raw-tool-rows commit. Branch `feature/v2.6.3-trace-ui`.
+
+### v2.6.3 Topic 1 - Chat Layout (T1.1)
+- `[DECISION v2.6.3]` **T1.1 - one measure for messages and composer.** Both cap at `CHAT_MAX_WIDTH` (820) with `mx-auto px-4`. The composer's outer bar was `p-3`; it is now `py-3` so its sole horizontal inset is the inner `px-4`, matching the message gutter exactly (leaving `p-3` would inset the composer 12px further than the messages and break the shared left/right edge). `data-testid="chat-composer"` added for structural tests.
+- Files (T1.1): `src/renderer/src/components/ChatPanel.tsx`. Tests: `test/renderer/chat-layout.test.tsx` (3 structural cases).
