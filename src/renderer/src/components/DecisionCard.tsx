@@ -25,6 +25,11 @@ const PHASE_STYLE: Record<TracePhase, { icon: typeof Eye; className: string }> =
 
 export interface DecisionCardProps {
   decision: TraceDecision
+  /**
+   * Tighter row padding for the inline chat trace (v2.6.3). The expanded body is
+   * unchanged — only the collapsed header is compacted.
+   */
+  compact?: boolean
   /** Overridable for tests; defaults to the real `Ask Why` IPC. */
   onExplain?: (decision: TraceDecision) => Promise<TraceExplanation | null>
 }
@@ -38,7 +43,7 @@ async function defaultExplain(decision: TraceDecision): Promise<TraceExplanation
  * the evidence it collected, and the decision it took, plus an `Ask Why` button
  * that asks main to explain the decision (deterministic, no extra model call).
  */
-export default function DecisionCard({ decision, onExplain }: DecisionCardProps): JSX.Element {
+export default function DecisionCard({ decision, compact, onExplain }: DecisionCardProps): JSX.Element {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [explanation, setExplanation] = useState<TraceExplanation | null>(null)
@@ -64,11 +69,16 @@ export default function DecisionCard({ decision, onExplain }: DecisionCardProps)
   const evidenceLabel = (item: TraceEvidence): string => t(`trace.evidence${item.kind[0].toUpperCase()}${item.kind.slice(1)}`)
 
   return (
-    <li className="rounded-md border border-border bg-bg-secondary/60">
+    <li
+      data-testid="decision-card"
+      className={`rounded-md border border-border bg-bg-secondary/60 ${
+        compact ? 'text-[11px]' : ''
+      }`}
+    >
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="flex w-full items-center gap-2 px-2.5 py-2 text-left"
+        className={`flex w-full items-center gap-2 text-left ${compact ? 'px-2 py-1' : 'px-2.5 py-2'}`}
       >
         {open ? (
           <ChevronDown className="h-3.5 w-3.5 shrink-0 text-neutral-500" />

@@ -11,7 +11,15 @@ import SourcesList from './SourcesList'
  * becomes a right-side overlay drawer that the chat header can toggle. The
  * header stays fixed while the body scrolls.
  */
-export default function WorkspacePanel(): JSX.Element {
+export interface WorkspacePanelProps {
+  /**
+   * v2.6.3 T1: force the overlay drawer when docking the panel would squeeze the
+   * chat below its comfortable width, regardless of the viewport breakpoint.
+   */
+  overlay?: boolean
+}
+
+export default function WorkspacePanel({ overlay }: WorkspacePanelProps = {}): JSX.Element {
   const { t } = useTranslation()
   const tab = useStore((state) => state.workspacePanelTab)
   const setTab = useStore((state) => state.setWorkspacePanelTab)
@@ -25,7 +33,11 @@ export default function WorkspacePanel(): JSX.Element {
   return (
     <aside
       aria-label={t('workspace.title')}
-      className="absolute inset-y-0 right-0 z-40 flex w-[22rem] max-w-[90vw] shrink-0 flex-col border-l border-border bg-bg-secondary shadow-2xl xl:static xl:z-auto xl:shadow-none"
+      className={
+        overlay
+          ? 'absolute inset-y-0 right-0 z-40 flex w-[22rem] max-w-[90vw] shrink-0 flex-col border-l border-border bg-bg-secondary shadow-2xl'
+          : 'absolute inset-y-0 right-0 z-40 flex w-[22rem] max-w-[90vw] shrink-0 flex-col border-l border-border bg-bg-secondary shadow-2xl xl:static xl:z-auto xl:shadow-none'
+      }
     >
       <header className="flex h-10 shrink-0 items-center gap-1 border-b border-border px-2">
         {tabs.map(({ id, label, icon: Icon }) => (

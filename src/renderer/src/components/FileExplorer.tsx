@@ -6,7 +6,8 @@ import {
   Folder,
   FolderOpen,
   RefreshCw,
-  Search
+  Search,
+  X
 } from 'lucide-react'
 import { useState } from 'react'
 import type { FileEntry } from '@shared/ui'
@@ -19,7 +20,15 @@ function iconFor(entry: FileEntry): JSX.Element {
   return <FileText className="h-4 w-4 text-neutral-500" />
 }
 
-export default function FileExplorer(): JSX.Element {
+export interface FileExplorerProps {
+  /**
+   * v2.6.3 T1.2: when the tree is an overlay drawer, show a close button in the
+   * header so it can be dismissed without the keyboard shortcut.
+   */
+  onClose?: () => void
+}
+
+export default function FileExplorer({ onClose }: FileExplorerProps = {}): JSX.Element {
   const entries = useStore((state) => state.entries)
   const cwd = useStore((state) => state.cwd)
   const selectedFile = useStore((state) => state.selectedFile)
@@ -51,14 +60,28 @@ export default function FileExplorer(): JSX.Element {
           <FolderOpen className="h-3.5 w-3.5" />
           Workspace
         </span>
-        <button
-          type="button"
-          onClick={() => void refreshFiles()}
-          title="Refresh"
-          className="rounded p-0.5 hover:bg-bg-tertiary hover:text-neutral-300"
-        >
-          <RefreshCw className="h-3 w-3" />
-        </button>
+        <span className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => void refreshFiles()}
+            title="Refresh"
+            className="rounded p-0.5 hover:bg-bg-tertiary hover:text-neutral-300"
+          >
+            <RefreshCw className="h-3 w-3" />
+          </button>
+          {onClose ? (
+            <button
+              type="button"
+              data-testid="tree-close"
+              onClick={onClose}
+              title="Close"
+              aria-label="Close"
+              className="rounded p-0.5 hover:bg-bg-tertiary hover:text-neutral-300"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          ) : null}
+        </span>
       </div>
 
       {projects.length === 0 ? (

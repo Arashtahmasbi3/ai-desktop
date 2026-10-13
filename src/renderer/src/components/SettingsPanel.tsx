@@ -99,6 +99,8 @@ export default function SettingsPanel(): JSX.Element | null {
   const setShowContextBeforeSend = useStore((state) => state.setShowContextBeforeSend)
   const showJobsPanelAlways = useStore((state) => state.showJobsPanelAlways)
   const setShowJobsPanelAlways = useStore((state) => state.setShowJobsPanelAlways)
+  const showRawToolRows = useStore((state) => state.showRawToolRows)
+  const setShowRawToolRows = useStore((state) => state.setShowRawToolRows)
 
   const [tab, setTab] = useState<TabId>('general')
   const refreshVps = useStore((state) => state.refreshVps)
@@ -209,6 +211,20 @@ export default function SettingsPanel(): JSX.Element | null {
                       className="accent-accent"
                     />
                     {t('settings.showJobsPanelAlways')}
+                  </label>
+                  <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs text-neutral-300">
+                    <input
+                      type="checkbox"
+                      checked={showRawToolRows}
+                      onChange={(event) => setShowRawToolRows(event.target.checked)}
+                      className="accent-accent"
+                    />
+                    <span>
+                      {t('settings.showRawToolRows')}
+                      <span className="mt-0.5 block text-[10px] text-neutral-500">
+                        {t('settings.showRawToolRowsHint')}
+                      </span>
+                    </span>
                   </label>
                 </div>
               </section>

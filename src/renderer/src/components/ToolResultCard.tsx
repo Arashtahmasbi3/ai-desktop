@@ -15,7 +15,9 @@ import type { ToolCallView } from '@shared/ui'
 /** Inline card in the chat for a tool call (v2.4.1; rich detail in v2.5.2). */
 export default function ToolResultCard(props: ToolCallView): JSX.Element {
   const { t } = useTranslation()
-  const [open, setOpen] = useState(false)
+  // v2.6.3 T1.3: failed cards open by default so the error is visible at a glance,
+  // while successes stay a single compact line.
+  const [open, setOpen] = useState(!props.ok)
 
   const {
     name,
@@ -60,20 +62,20 @@ export default function ToolResultCard(props: ToolCallView): JSX.Element {
         type="button"
         onClick={toggle}
         data-testid="tool-card-header"
-        className="flex w-full items-center gap-2 px-3 py-1.5 text-left"
+        className="flex w-full items-center gap-2 px-2.5 py-1 text-left"
         aria-expanded={open}
         aria-label={`${name} ${ok ? 'ok' : 'error'}`}
       >
         <StatusIcon
           className={`h-3.5 w-3.5 shrink-0 ${ok ? 'text-emerald-400' : 'text-red-400'}`}
         />
-        <span className="shrink-0 font-mono text-[11px] text-neutral-200">{name}</span>
+        <span className="shrink-0 font-mono text-[13px] text-neutral-200">{name}</span>
         <span className={`shrink-0 text-[10px] ${ok ? 'text-emerald-400' : 'text-red-400'}`}>
           {ok ? t('chat.toolOk') : t('chat.toolError')}
         </span>
         {primary ? (
           <span
-            className="min-w-0 flex-1 truncate font-mono text-[11px] text-neutral-500"
+            className="min-w-0 flex-1 truncate font-mono text-[13px] text-neutral-500"
             title={primary}
           >
             {primary}
@@ -104,7 +106,7 @@ export default function ToolResultCard(props: ToolCallView): JSX.Element {
         ) : null}
       </button>
 
-      {open ? (
+      {open && hasBody ? (
         <div className="flex flex-col gap-2 border-t border-border px-3 py-2">
           {error ? (
             <div>

@@ -33,7 +33,9 @@ import type { RoutingDecision } from '@core/agent/remote-routing'
 import { detectWorkspace } from '@core/remote/workspace-detect'
 import type { DiagnosticPolicy } from '@core/remote/diagnostic-policy'
 import { createReadScopePolicy, mergeReadPolicies } from '@core/remote/diagnostic-policy'
-import { preflight, preflightActionFor, type PreflightResult } from '@core/agent/preflight'
+import { preflight, preflightActionFor, type PreflightResult, type PreflightTier } from '@core/agent/preflight'
+import { extractPreflightReason } from '@core/agent/preflight-override'
+import type { PreflightChoice, PreflightPromptTier } from '@shared/preflight'
 import { buildWorkspaceSystemHint } from '@core/agent/workspace-prompt'
 import type { RemoteWorkspaceInfo } from '@shared/workspace-info'
 import { DEFAULT_APPROVAL_MODE } from '@core/agent/approval'
@@ -43,7 +45,7 @@ import { PLAN_REAPPROVE_MESSAGE } from '@shared/plan'
 import type { ResolvedProfile } from '@shared/profile'
 import type { TraceDecision, TraceExplanation } from '@shared/trace'
 import { TraceStore } from '@core/agent/trace-store'
-import { AuditTrail, auditFileFor, auditLineFromDecision, type AuditVerifyResult } from '@core/agent/audit-trail'
+import { AuditTrail, auditFileFor, auditLineFromDecision, auditLineFromPreflightOverride, type AuditVerifyResult } from '@core/agent/audit-trail'
 import { resolveUserDataDir } from '@core/agent/persistence'
 import { redactValue } from '@core/agent/redact'
 import { resolveToolExposure, toolPolicyFor, type ToolExposure } from '@core/agent/tool-policy'
@@ -372,6 +374,19 @@ export interface AgentServiceOptions {
   requestPlan?: (runId: string, plan: Plan, warnings: PlanWarning[]) => Promise<PlanDecision>
   /** Cancel any outstanding plan requests (e.g. the user aborted). */
   cancelPlans?: () => void
+  /**
+   * Ask the user how to handle a preflight block (v2.6.3, T3.2). Resolves with
+   * the per-action choice; an error fails closed to `cancel`.
+   */
+  requestPreflight?: (
+    runId: string,
+    action: AgentAction,
+    result: PreflightResult,
+    tier: PreflightPromptTier,
+    context: { attempt: number }
+  ) => Promise<PreflightChoice>
+  /** Cancel any outstanding preflight requests (e.g. the user aborted). */
+  cancelPreflights?: () => void
   /** Learned approvals that suppress future prompts (Sprint v2.3, B.3). */
   approvedCommands?: ApprovedCommands
   /** Optional: enables chat review of agent edits (apply/reject). */
@@ -451,6 +466,14 @@ export class AgentService {
     warnings: PlanWarning[]
   ) => Promise<PlanDecision>
   private readonly cancelPlans?: () => void
+  private readonly requestPreflight?: (
+    runId: string,
+    action: AgentAction,
+    result: PreflightResult,
+    tier: PreflightPromptTier,
+    context: { attempt: number }
+  ) => Promise<PreflightChoice>
+  private readonly cancelPreflights?: () => void
   private readonly approvedCommands?: ApprovedCommands
   private readonly files?: ProjectFiles
   private readonly runStore: RunStore
@@ -486,6 +509,8 @@ export class AgentService {
     this.cancelApprovals = options.cancelApprovals
     this.requestPlan = options.requestPlan
     this.cancelPlans = options.cancelPlans
+    this.requestPreflight = options.requestPreflight
+    this.cancelPreflights = options.cancelPreflights
     if (options.approvedCommands) this.approvedCommands = options.approvedCommands
     if (options.files) this.files = options.files
     this.runStore = options.runStore ?? new RunStore()
@@ -906,6 +931,38 @@ export class AgentService {
           }
         : undefined
 
+    // v2.6.3 T3.2: turn a preflight block into an interactive, audited decision.
+    // Only wired when a gate exists (remote projects); every answer is recorded.
+    const preflightOverride =
+      preflightGate && this.requestPreflight && audit && activeProject
+        ? async (
+            action: AgentAction,
+            result: PreflightResult,
+            tier: PreflightTier,
+            context: { attempt: number }
+          ): Promise<PreflightChoice> => {
+            // The orchestrator only calls this for block/critical, but narrow
+            // explicitly so the audited tier and the broker agree by type.
+            if (tier !== 'block' && tier !== 'critical') return 'cancel'
+            const choice = await this.requestPreflight!(runId, action, result, tier, context)
+            void audit
+              .append(
+                auditLineFromPreflightOverride({
+                  projectId: activeProject.id,
+                  ...(activeProject.vpsId ? { vpsId: activeProject.vpsId } : {}),
+                  runId,
+                  tool: action.name,
+                  tier,
+                  reason: extractPreflightReason(result.checks),
+                  choice,
+                  ...(goalContext.goal ? { goalId: goalContext.goal.id } : {})
+                })
+              )
+              .catch(() => undefined)
+            return choice
+          }
+        : undefined
+
     const orchestrator = new AgentOrchestrator({
       sandbox: this.sandbox,
       providers,
@@ -927,6 +984,7 @@ export class AgentService {
       ...(approvalGate ? { approvalGate } : {}),
       ...(planGate ? { planGate, planApproval: approvalMode } : {}),
       ...(preflightGate ? { preflightGate } : {}),
+      ...(preflightOverride ? { preflightOverride } : {}),
       // v2.5.3: report the live diagnostic posture so the system prompt matches
       // the containment rules the remote tools will actually apply this run.
       diagnosticMode: () => Boolean(this.getDiagnosticPolicy?.()),
@@ -1000,6 +1058,7 @@ export class AgentService {
     for (const controller of this.controllers) controller.abort()
     this.cancelApprovals?.()
     this.cancelPlans?.()
+    this.cancelPreflights?.()
   }
   /** Root-scoped file IO for the run store, or undefined when files are disabled. */
   private fileIO(): RunFileIO | undefined {

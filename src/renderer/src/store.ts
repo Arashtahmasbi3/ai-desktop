@@ -11,13 +11,14 @@ import type {
 import { DEFAULT_SELECTION, resolveSelection } from '@shared/selection'
 import type { ApprovalMode, ApprovalOutcome } from '@shared/approval'
 import type { ApprovedPlan, PlanDecision } from '@shared/plan'
+import type { PreflightChoice, PreflightRequestView } from '@shared/preflight'
 import type { TaskPlan } from '@shared/task-plan'
 import type { Goal } from '@shared/goal'
 import type { ResolvedGoal } from '@core/agent/goal-store'
 import type { ProjectMetadataPatch } from '@shared/project-metadata'
 import type { OnboardingStatus } from '@shared/onboarding'
 import type { VpsConnectionState, VpsServerView } from '@shared/vps'
-import type { DiagnosticStatus } from '@shared/ui'
+import type { DiagnosticStatus, PreflightNotice } from '@shared/ui'
 import type { ChatSummary, StoredMessage } from '@shared/chat'
 import type { Job } from '@shared/jobs'
 import type { Locale } from './i18n/locale'
@@ -85,6 +86,8 @@ export interface ChatMessage {
    * with the structured detail (command, target, streams, exit code) when known.
    */
   toolCall?: ToolCallView
+  /** v2.6.3: the run this message belongs to, for per-step trace grouping. */
+  runId?: string
 }
 
 /** Project a `tool:result` event into the compact shape stored on a message. */
@@ -103,6 +106,7 @@ function toolCallFromView(view: ToolResultView): ToolCallView {
     ...(view.exitCode !== undefined ? { exitCode: view.exitCode } : {}),
     ...(view.durationMs !== undefined ? { durationMs: view.durationMs } : {}),
     ...(view.attempts !== undefined ? { attempts: view.attempts } : {}),
+    ...(view.step !== undefined ? { step: view.step } : {}),
     ...(view.recovery ? { recovery: view.recovery } : {})
   }
 }
@@ -113,6 +117,8 @@ const MAX_DECISIONS = 200
 const MAX_TERMINAL_LINES = 500
 export const CONTEXT_SETTINGS_KEY = 'ai-desktop:show-context-before-send'
 const CHAT_TREE_KEY = 'ai-desktop:chat-tree-open'
+const RAW_TOOL_ROWS_KEY = 'ai-desktop:show-raw-tool-rows'
+const SIDEBAR_PIN_KEY = 'ai-desktop:sidebar-pinned'
 const JOBS_PANEL_KEY = 'ai-desktop:show-jobs-panel'
 const ZOOM_KEY = 'ai-desktop:zoom-level'
 /** Electron zoom-level step per keyboard press (v2.6.2 T5.3). */
@@ -152,6 +158,32 @@ export function readShowJobsPanelAlways(): boolean {
     return globalThis.localStorage?.getItem(JOBS_PANEL_KEY) === '1'
   } catch {
     return false
+  }
+}
+
+/**
+ * Read the persisted "show raw tool rows" preference (v2.6.3, default off).
+ * Tool rows already grouped inside the inline trace are hidden unless this is on,
+ * which keeps the chat readable but leaves a debugging escape hatch.
+ */
+export function readShowRawToolRows(): boolean {
+  try {
+    return globalThis.localStorage?.getItem(RAW_TOOL_ROWS_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Read the persisted "keep the sidebar expanded" preference (v2.6.3, default on).
+ * Pinned keeps the sidebar expanded down to MIN_CHAT_WIDTH; unpinned lets it fall
+ * to the rail whenever the chat cannot get its full comfortable measure.
+ */
+export function readSidebarPinned(): boolean {
+  try {
+    return globalThis.localStorage?.getItem(SIDEBAR_PIN_KEY) !== '0'
+  } catch {
+    return true
   }
 }
 
@@ -212,6 +244,8 @@ interface AppState {
   /** v2.6.2 T3.2: trace decisions for the active run, oldest first. */
   decisions: TraceDecision[]
   warnings: LoopWarning[]
+  /** v2.6.3 T3.1: the latest non-ok preflight result, shown as a tiered banner. */
+  preflightNotice: PreflightNotice | null
   /** Set when the last run stopped early because the agent looked stuck. */
   loopStop: LoopStopInfo | null
   sessions: SessionInfo[]
@@ -244,6 +278,8 @@ interface AppState {
   locale: Locale
   /** Collapsed state of the left sidebar. */
   sidebarCollapsed: boolean
+  /** v2.6.3 T1.2: keep the sidebar expanded even on mid-size windows (persisted). */
+  sidebarPinned: boolean
   /** Whether the context preview is shown before each send (v2.3.2, B.4). */
   showContextBeforeSend: boolean
   /** Every recorded LLM call's token usage, oldest first (v2.5.4). */
@@ -273,6 +309,8 @@ interface AppState {
   pendingApproval: ApprovalRequest | null
   /** Plan awaiting the user's approval before it executes (v2.3.2, A.5). */
   pendingPlan: PlanRequest | null
+  /** Preflight block awaiting an explicit, per-action answer (v2.6.3, T3.2). */
+  pendingPreflight: PreflightRequestView | null
   /** A plan the user trusted for 30 minutes; its steps skip approval (v2.5.5). */
   activePlan: ApprovedPlan | null
   /**
@@ -320,6 +358,8 @@ interface AppState {
   jobsPanelOpen: boolean
   /** Pin the jobs panel open even with nothing running (T5.2). */
   showJobsPanelAlways: boolean
+  /** v2.6.3: show raw tool rows instead of hiding those grouped in the trace. */
+  showRawToolRows: boolean
   /** Electron zoom level, 0 == 100% (T5.3). */
   zoomLevel: number
   /** Keyboard-shortcut cheat sheet visibility (T5.3). */
@@ -327,6 +367,10 @@ interface AppState {
 
   setLocale: (locale: Locale) => void
   toggleSidebar: () => void
+  /** v2.6.3 T1.2: pin/unpin the sidebar (persisted; pinning also expands). */
+  setSidebarPinned: (value: boolean) => void
+  /** v2.6.3 T3.1: hide the preflight banner until the next non-ok result. */
+  dismissPreflight: () => void
   /** Toggle the pre-send context preview. */
   setShowContextBeforeSend: (value: boolean) => void
   /** Record one LLM call's usage and persist it (v2.5.4). */
@@ -359,6 +403,8 @@ interface AppState {
   setPlanModeDefault: (value: boolean) => Promise<void>
   respondApproval: (answer: boolean | ApprovalOutcome) => void
   respondPlan: (decision: PlanDecision) => void
+  /** Answer a preflight block; the drawer closes and main resolves the run. */
+  respondPreflight: (choice: PreflightChoice) => void
   stopPlan: () => void
   rememberApprovalTool: (tool: string) => Promise<void>
   dismissApprovalSuggestion: () => void
@@ -372,6 +418,8 @@ interface AppState {
   refreshJobs: () => Promise<void>
   setJobsPanelOpen: (open: boolean) => void
   setShowJobsPanelAlways: (value: boolean) => void
+  /** v2.6.3: toggle raw tool rows (persisted). */
+  setShowRawToolRows: (value: boolean) => void
   /** Apply (and persist) an Electron zoom level, clamped to a safe range (T5.3). */
   applyZoom: (level: number) => void
   zoomIn: () => void
@@ -480,6 +528,7 @@ export const useStore = create<AppState>((set, get) => ({
   logs: [],
   decisions: [],
   warnings: [],
+  preflightNotice: null,
   loopStop: null,
   sessions: [],
   memory: null,
@@ -502,6 +551,7 @@ export const useStore = create<AppState>((set, get) => ({
 
   locale: detectLocale(),
   sidebarCollapsed: false,
+  sidebarPinned: readSidebarPinned(),
   showContextBeforeSend: readShowContextBeforeSend(),
   usageRecords: loadUsage(),
   sessionStartedAt: Date.now(),
@@ -515,6 +565,7 @@ export const useStore = create<AppState>((set, get) => ({
   planMode: false,
   pendingApproval: null,
   pendingPlan: null,
+  pendingPreflight: null,
   activePlan: null,
   taskPlan: null,
   taskPlans: {},
@@ -537,6 +588,7 @@ export const useStore = create<AppState>((set, get) => ({
   jobs: [],
   jobsPanelOpen: false,
   showJobsPanelAlways: readShowJobsPanelAlways(),
+  showRawToolRows: readShowRawToolRows(),
   zoomLevel: readZoomLevel(),
   shortcutsOpen: false,
 
@@ -545,6 +597,17 @@ export const useStore = create<AppState>((set, get) => ({
     void i18nChangeLanguage(locale)
   },
   toggleSidebar: () => set({ sidebarCollapsed: !get().sidebarCollapsed }),
+  setSidebarPinned(value) {
+    // Pinning means "keep it open", so it also un-collapses; unpinning leaves the
+    // current collapsed state untouched.
+    set(value ? { sidebarPinned: true, sidebarCollapsed: false } : { sidebarPinned: false })
+    try {
+      globalThis.localStorage?.setItem(SIDEBAR_PIN_KEY, value ? '1' : '0')
+    } catch {
+      // Persisting the preference is best-effort.
+    }
+  },
+  dismissPreflight: () => set({ preflightNotice: null }),
   setShowContextBeforeSend(value) {
     set({ showContextBeforeSend: value })
     try {
@@ -710,6 +773,12 @@ export const useStore = create<AppState>((set, get) => ({
     set({ pendingPlan: null })
     void window.api.agent.respondPlan(pending.id, decision)
   },
+  respondPreflight(choice) {
+    const pending = get().pendingPreflight
+    if (!pending) return
+    set({ pendingPreflight: null })
+    void window.api.agent.respondPreflight(pending.id, choice)
+  },
   stopPlan() {
     set({ activePlan: null })
     void window.api.agent.stopPlan()
@@ -771,6 +840,14 @@ export const useStore = create<AppState>((set, get) => ({
     set({ showJobsPanelAlways: value, ...(value ? { jobsPanelOpen: true } : {}) })
     try {
       globalThis.localStorage?.setItem(JOBS_PANEL_KEY, value ? '1' : '0')
+    } catch {
+      // Persisting the preference is best-effort.
+    }
+  },
+  setShowRawToolRows(value) {
+    set({ showRawToolRows: value })
+    try {
+      globalThis.localStorage?.setItem(RAW_TOOL_ROWS_KEY, value ? '1' : '0')
     } catch {
       // Persisting the preference is best-effort.
     }
@@ -954,10 +1031,12 @@ export const useStore = create<AppState>((set, get) => ({
           decisions: [],
           pendingApproval: null,
           pendingPlan: null,
+          pendingPreflight: null,
           activePlan: null,
           taskPlan: null,
           taskPaused: false,
-          loopStop: null
+          loopStop: null,
+          preflightNotice: null
         })
         break
       case 'approval:request':
@@ -965,6 +1044,12 @@ export const useStore = create<AppState>((set, get) => ({
         break
       case 'plan:request':
         set({ pendingPlan: event.request })
+        break
+      case 'preflight:request':
+        set({ pendingPreflight: event.request })
+        break
+      case 'preflight:resolved':
+        if (get().pendingPreflight?.id === event.id) set({ pendingPreflight: null })
         break
       case 'plan:resolved':
         if (get().pendingPlan?.id === event.id) set({ pendingPlan: null })
@@ -1010,6 +1095,19 @@ export const useStore = create<AppState>((set, get) => ({
             decisions.splice(0, decisions.length - MAX_DECISIONS)
           }
           set({ logs, decisions })
+        } else if (event.entry.event === 'preflight' && Array.isArray(event.entry.checks)) {
+          // v2.6.3 T3.1: the orchestrator emits one tiered entry per non-ok check.
+          set({
+            logs,
+            preflightNotice: {
+              tool: String(event.entry.tool ?? ''),
+              ...(typeof event.entry.step === 'number' ? { step: event.entry.step } : {}),
+              tier: (event.entry.tier as PreflightNotice['tier']) ?? 'warn',
+              checks: event.entry.checks as PreflightNotice['checks'],
+              blocked: Boolean(event.entry.blocked),
+              at: Date.now()
+            }
+          })
         } else {
           set({ logs })
         }
@@ -1026,6 +1124,7 @@ export const useStore = create<AppState>((set, get) => ({
               role: 'tool',
               content: `${toolCall.name}${code}`,
               at: event.at,
+              runId: event.runId,
               toolCall
             }
           ]
@@ -1044,6 +1143,7 @@ export const useStore = create<AppState>((set, get) => ({
             role: 'assistant',
             content: text,
             at: event.at,
+            runId: event.runId,
             ...(event.model ? { model: event.model } : {}),
             ...(usedRemote ? { usedRemote: true } : {})
           })
@@ -1055,6 +1155,7 @@ export const useStore = create<AppState>((set, get) => ({
           loopStop: event.stop ?? null,
           pendingApproval: null,
           pendingPlan: null,
+          pendingPreflight: null,
           activePlan: null,
           messages
         })
@@ -1083,6 +1184,7 @@ export const useStore = create<AppState>((set, get) => ({
           currentRunId: null,
           pendingApproval: null,
           pendingPlan: null,
+          pendingPreflight: null,
           activePlan: null,
           error: redact(event.message),
           loopStop: null,
@@ -1263,6 +1365,7 @@ export const useStore = create<AppState>((set, get) => ({
       logs: [],
       decisions: [],
       warnings: [],
+      preflightNotice: null,
       loopStop: null,
       memory: null,
       running: false,
@@ -1270,6 +1373,7 @@ export const useStore = create<AppState>((set, get) => ({
       error: null,
       pendingApproval: null,
       pendingPlan: null,
+      pendingPreflight: null,
       activePlan: null,
       approvalSuggestion: null,
       queuedExplain: null,

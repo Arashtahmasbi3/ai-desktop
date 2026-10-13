@@ -36,6 +36,8 @@
   },
   "sidebar": {
     "newChat": "چت جدید",
+    "pin": "باز نگه‌داشتن نوار کناری",
+    "unpin": "لغو باز نگه‌داشتن نوار کناری",
     "chats": "چت‌ها",
     "projects": "پروژه‌ها",
     "chatCount": "{{count}} چت",
@@ -69,6 +71,18 @@
   "chat": {
     "placeholder": "هر کاری انجام بده",
     "typing": "در حال تایپ…",
+    "livePlanning": "در حال فکر کردن…",
+    "liveInspecting": "در حال بررسی…",
+    "liveExecuting": "در حال اجرا…",
+    "liveVerifying": "در حال بررسی نتیجه…",
+    "liveDone": "در حال جمع‌بندی…",
+    "statusLabel": "وضعیت",
+    "statusIdle": "بی‌کار",
+    "statusUnknown": "هنوز تصمیمی ثبت نشده",
+    "liveReading": "در حال خواندن {{tool}}…",
+    "liveSearching": "در حال جست‌وجو…",
+    "liveWriting": "در حال نوشتن {{tool}}…",
+    "liveRunning": "در حال اجرای {{tool}}…",
     "emptyTitle": "AI Desktop",
     "emptyBody": "دستیار رومیزی شما برای چت، کدنویسی، اجرای دستور در سندباکس و کار با فایل‌های پروژه.",
     "send": "ارسال",
@@ -250,6 +264,8 @@
     "languageHint": "زبان رابط کاربری و جهت متن.",
     "showContextBeforeSend": "نمایش پیش‌نمایش کانتکست قبل از ارسال",
     "showJobsPanelAlways": "همیشه پنل کارهای پس‌زمینه را نشان بده",
+    "showRawToolRows": "نمایش ردیف‌های خام ابزار (برای اشکال‌زدایی)",
+    "showRawToolRowsHint": "فراخوانی‌های ابزاری که در «ردّ اجرا» نمایش داده شده‌اند، به‌صورت پیش‌فرض پنهان می‌شوند.",
     "projectName": "نام",
     "projectPath": "مسیر (مثلاً C:\\Users\\me\\project)",
     "noProjects": "هنوز پروژه‌ای نداری.",
@@ -487,6 +503,7 @@
     "done": "تمام شد",
     "stopped": "توقف برای ورودی",
     "recovery": "بازیابی",
+    "decision": "تصمیم",
     "recoveredAfter": "پس از {{count}} تلاش بازیابی شد",
     "retryFailed": "تلاش مجدد پس از {{count}} بار ناموفق ماند",
     "switchedTo": "تغییر به {{to}}",
@@ -534,7 +551,16 @@
   },
   "preflight": {
     "title": "هشدارهای پیشپرواز:",
-    "proceed": "با این حال ادامه بده"
+    "proceed": "با این حال ادامه بده",
+    "blockTitle": "پیش‌پرواز جلوی این عملیات را گرفت:",
+    "criticalTitle": "پیش‌پرواز به ورک‌اسپیس دسترسی پیدا نکرد:",
+    "overrideTitle": "پیش‌پرواز جلوی این عملیات را گرفت",
+    "override": "با این حال اجرا کن",
+    "cleanup": "پاک‌سازی و ادامه",
+    "retry": "تلاش مجدد بررسی",
+    "overrideWarning": "این تصمیم در audit ثبت می‌شود و فقط همین اکشن را شامل می‌شود.",
+    "criticalLocked": "ورک‌اسپیس در دسترس نیست و اجرای امنی وجود ندارد. فقط لغو یا تلاش مجدد مجاز است.",
+    "timeoutHint": "لغو خودکار در {{seconds}} ثانیه"
   },
   "successWarning": {
     "title": "هوش مصنوعی بدون تأیید ادعای موفقیت میکند.",
@@ -631,7 +657,10 @@
     "decision": "تصمیم",
     "askWhy": "چرا؟",
     "why": "دلیل",
-    "askWhyFailed": "بارگذاری توضیح ممکن نشد."
+    "askWhyFailed": "بارگذاری توضیح ممکن نشد.",
+    "inlineTitle": "ردّ اجرا",
+    "showAll": "نمایش همه ({{count}} مورد دیگر)",
+    "showLess": "نمایش کمتر"
   },
   "shortcuts": {
     "title": "کلیدهای میانبر",

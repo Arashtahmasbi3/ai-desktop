@@ -16,6 +16,7 @@ import { RemoteServer } from '@core/remote/remote-server'
 import { AgentService } from './agent-service'
 import { ApprovalBroker } from './approval-broker'
 import { PlanBroker } from './plan-broker'
+import { PreflightBroker } from './preflight-broker'
 import { SessionProfileService } from './session-profile-service'
 import { FileService } from './file-service'
 import { ChatStore } from './chat-store'
@@ -90,6 +91,7 @@ export class AppServices {
   readonly agent: AgentService
   readonly approvals: ApprovalBroker
   readonly plans: PlanBroker
+  readonly preflights: PreflightBroker
   readonly approvedCommands: ApprovedCommands
   /** Run -> project binding for patch isolation (v2.5, P0-1). */
   readonly runs = new RunStore()
@@ -145,6 +147,10 @@ export class AppServices {
     this.plans = new PlanBroker({
       emit: (event: AgentEvent) => this.emit('agent:event', event)
     })
+    // v2.6.3 T3.2: interactive preflight override (fail closed to cancel).
+    this.preflights = new PreflightBroker({
+      emit: (event: AgentEvent) => this.emit('agent:event', event)
+    })
     this.sessionProfile = new SessionProfileService(this.persistence, {
       onChanged: (state) => this.emit('session:changed', state)
     })
@@ -168,6 +174,16 @@ export class AppServices {
       cancelApprovals: () => this.approvals.cancelAll(),
       requestPlan: async (runId, plan, warnings) => this.plans.request(runId, plan, warnings),
       cancelPlans: () => this.plans.cancelAll(),
+      // v2.6.3 T3.2: interactive preflight override. The broker fails closed to
+      // cancel, so a dropped renderer can never silently force an action through.
+      requestPreflight: async (runId, action, result, tier, context) =>
+        this.preflights.request(runId, action, {
+          tier,
+          checks: result.checks,
+          attempt: context.attempt,
+          ...(await this.approvalContext())
+        }),
+      cancelPreflights: () => this.preflights.cancelAll(),
       approvedCommands: this.approvedCommands,
       files: this.files,
       runStore: this.runs,

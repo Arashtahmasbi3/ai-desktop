@@ -36,6 +36,8 @@
   },
   "sidebar": {
     "newChat": "New chat",
+    "pin": "Keep sidebar expanded",
+    "unpin": "Stop pinning the sidebar",
     "chats": "Chats",
     "projects": "Projects",
     "chatCount": "{{count}} chats",
@@ -69,6 +71,18 @@
   "chat": {
     "placeholder": "Do anything",
     "typing": "Typing…",
+    "livePlanning": "Thinking…",
+    "liveInspecting": "Inspecting…",
+    "liveExecuting": "Working…",
+    "liveVerifying": "Verifying…",
+    "liveDone": "Finishing…",
+    "statusLabel": "STATUS",
+    "statusIdle": "Idle",
+    "statusUnknown": "No decision recorded yet",
+    "liveReading": "Reading {{tool}}…",
+    "liveSearching": "Searching…",
+    "liveWriting": "Writing {{tool}}…",
+    "liveRunning": "Running {{tool}}…",
     "emptyTitle": "AI Desktop",
     "emptyBody": "Your desktop assistant for chat, coding, sandboxed commands and project files.",
     "send": "Send",
@@ -250,6 +264,8 @@
     "languageHint": "Interface language and text direction.",
     "showContextBeforeSend": "Show context preview before sending",
     "showJobsPanelAlways": "Always show the background jobs panel",
+    "showRawToolRows": "Show raw tool rows (for debugging)",
+    "showRawToolRowsHint": "Tool calls already shown inside the execution trace are hidden by default.",
     "projectName": "Name",
     "projectPath": "Path (e.g. C:\\Users\\me\\project)",
     "noProjects": "No projects yet.",
@@ -487,6 +503,7 @@
     "done": "Completed",
     "stopped": "Paused for input",
     "recovery": "Recovery",
+    "decision": "Decision",
     "recoveredAfter": "Recovered after {{count}} attempts",
     "retryFailed": "Retry failed after {{count}} attempts",
     "switchedTo": "Switched to {{to}}",
@@ -534,7 +551,16 @@
   },
   "preflight": {
     "title": "Preflight warnings:",
-    "proceed": "Proceed anyway"
+    "blockTitle": "Preflight blocked this action:",
+    "criticalTitle": "Preflight could not reach the workspace:",
+    "proceed": "Proceed anyway",
+    "overrideTitle": "Preflight blocked this action",
+    "override": "Override anyway",
+    "cleanup": "Cleanup and proceed",
+    "retry": "Retry check",
+    "overrideWarning": "This override is recorded in the audit trail and applies to this action only.",
+    "criticalLocked": "The workspace is unreachable, so there is nothing safe to run. Only cancel or retry is allowed.",
+    "timeoutHint": "Auto-cancels in {{seconds}}s"
   },
   "successWarning": {
     "title": "AI claims success without verification.",
@@ -631,7 +657,10 @@
     "decision": "Decision",
     "askWhy": "Ask Why",
     "why": "Why",
-    "askWhyFailed": "Could not load the explanation."
+    "askWhyFailed": "Could not load the explanation.",
+    "inlineTitle": "Execution trace",
+    "showAll": "Show all ({{count}} more)",
+    "showLess": "Show less"
   },
   "shortcuts": {
     "title": "Keyboard shortcuts",

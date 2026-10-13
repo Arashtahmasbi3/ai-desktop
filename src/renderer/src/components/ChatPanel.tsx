@@ -5,7 +5,6 @@ import {
   ArrowDown,
   Bot,
   Eye,
-  Loader2,
   Paperclip,
   Send,
   Square,
@@ -22,18 +21,25 @@ import TemplateMenu from './TemplateMenu'
 import TerminalPanel from './TerminalPanel'
 import ModelSwitcher from './ModelSwitcher'
 import ProviderWarning from './ProviderWarning'
+import PreflightBanner from './PreflightBanner'
 import LoopStopCard from './LoopStopCard'
 import ApprovalDialog from './ApprovalDialog'
+import PreflightOverrideDialog from './PreflightOverrideDialog'
 import PlanCard from './PlanCard'
 import TaskTracker from './TaskTracker'
 import ExecutionBar from './ExecutionBar'
 import ProgressTimeline from './ProgressTimeline'
+import StatusCard from './StatusCard'
+import InlineTrace from './InlineTrace'
+import LiveStatus from './LiveStatus'
 import JobsPanel from './JobsPanel'
 import MicButton from './MicButton'
 import { FullAccessBanner, FullAccessToggle } from './FullAccessToggle'
 import { filterSlashCommands, resolveSlashCommand } from '../lib/slash'
 import { decideSend } from '../lib/context-gate'
 import { workspaceStatus, shouldShowWorkspaceBanner } from '../lib/project-status'
+import { CHAT_MAX_WIDTH } from '../lib/layout'
+import { visibleChatMessages } from '../lib/tool-rows'
 import { contextBudget } from '@shared/memory'
 
 const SUGGESTION_KEYS = [
@@ -54,6 +60,8 @@ interface SlashCommand {
 export default function ChatPanel(): JSX.Element {
   const { t, i18n } = useTranslation()
   const messages = useStore((state) => state.messages)
+  const decisions = useStore((state) => state.decisions)
+  const showRawToolRows = useStore((state) => state.showRawToolRows)
   const running = useStore((state) => state.running)
   const warnings = useStore((state) => state.warnings)
   const send = useStore((state) => state.send)
@@ -74,6 +82,8 @@ export default function ChatPanel(): JSX.Element {
   const dismissApprovalSuggestion = useStore((state) => state.dismissApprovalSuggestion)
   const loopStop = useStore((state) => state.loopStop)
   const dismissLoopStop = useStore((state) => state.dismissLoopStop)
+  const preflightNotice = useStore((state) => state.preflightNotice)
+  const dismissPreflight = useStore((state) => state.dismissPreflight)
   const fileChanges = useStore((state) => state.fileChanges)
   const terminalOpen = useStore((state) => state.terminalOpen)
 
@@ -154,6 +164,10 @@ export default function ChatPanel(): JSX.Element {
 
   const matches = useMemo(() => filterSlashCommands(commands, input), [commands, input])
   const budget = useMemo(() => contextBudget(messages, input), [messages, input])
+  const chatMessages = useMemo(
+    () => visibleChatMessages(messages, decisions, showRawToolRows),
+    [messages, decisions, showRawToolRows]
+  )
   const contextPercent = Math.min(100, Math.round(budget.ratio * 100))
 
   useEffect(() => {
@@ -292,13 +306,21 @@ export default function ChatPanel(): JSX.Element {
         </div>
       ) : null}
 
-      <div className="flex min-h-0 flex-1">
       <div
         ref={scrollRef}
         onScroll={onScroll}
         dir={dir}
         className="relative flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto py-4"
       >
+        <div
+          data-testid="chat-measure"
+          style={{ maxWidth: CHAT_MAX_WIDTH }}
+          className="mx-auto flex min-h-0 w-full flex-1 flex-col gap-3 px-4"
+        >
+        <StatusCard />
+
+        {timelineOpen ? <ProgressTimeline embedded /> : null}
+
         {messages.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent/15">
@@ -327,15 +349,10 @@ export default function ChatPanel(): JSX.Element {
             <TemplateMenu currentInput={input} onPick={(text) => setInput(text)} />
           </div>
         ) : (
-          messages.map((message) => <MessageBubble key={message.id} message={message} />)
+          chatMessages.map((message) => <MessageBubble key={message.id} message={message} />)
         )}
 
-        {running ? (
-          <div className="flex items-center gap-2 px-4 text-xs text-neutral-400">
-            <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" />
-            {t('chat.typing')}
-          </div>
-        ) : null}
+        <LiveStatus />
 
         {loopStop && !running ? (
           <LoopStopCard
@@ -351,8 +368,9 @@ export default function ChatPanel(): JSX.Element {
             onStop={dismissLoopStop}
           />
         ) : null}
-      </div>
-      {timelineOpen ? <ProgressTimeline /> : null}
+
+        <InlineTrace />
+        </div>
       </div>
       <JobsPanel />
 
@@ -369,6 +387,16 @@ export default function ChatPanel(): JSX.Element {
 
       <ProviderWarning />
 
+      {preflightNotice ? (
+        <div className="mx-3 mb-2">
+          <PreflightBanner
+            checks={preflightNotice.checks}
+            tier={preflightNotice.tier}
+            onDismiss={dismissPreflight}
+          />
+        </div>
+      ) : null}
+
       {warnings.length > 0 ? (
         <div className="mx-3 mb-2 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-300">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
@@ -382,7 +410,12 @@ export default function ChatPanel(): JSX.Element {
 
       {terminalOpen ? <TerminalPanel /> : null}
 
-      <div className="shrink-0 border-t border-border bg-bg-secondary p-3">
+      <div className="shrink-0 border-t border-border bg-bg-secondary py-3">
+        <div
+          data-testid="chat-composer"
+          style={{ maxWidth: CHAT_MAX_WIDTH }}
+          className="mx-auto w-full px-4"
+        >
         {approvalSuggestion ? (
           <div className="mx-3 mb-1 flex items-center justify-between gap-2 rounded-lg border border-accent/40 bg-accent/10 px-2 py-1.5 text-[11px] text-neutral-200">
             <span>
@@ -541,11 +574,13 @@ export default function ChatPanel(): JSX.Element {
         <div className="mt-1.5 flex items-center justify-between px-1 text-[10px] text-neutral-600">
           <span>Enter = {t('chat.send')} · Shift+Enter = ↵ · Ctrl+Enter = {t('chat.send')}</span>
         </div>
+        </div>
       </div>
 
       <TaskTracker />
       <PlanCard />
       <ApprovalDialog />
+      <PreflightOverrideDialog />
       {contextCard ? (
         <ContextPreviewCard
           preview={contextCard.preview}

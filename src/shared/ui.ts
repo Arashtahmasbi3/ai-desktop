@@ -13,6 +13,7 @@ import type { Plan, ApprovedPlan, PlanDecision, PlanWarning } from './plan'
 import type { ProjectMetadata } from './project-metadata'
 import type { ResolvedProfile } from './profile'
 import type { TaskPlan, TaskStep } from './task-plan'
+import type { PreflightChoice, PreflightRequestView } from './preflight'
 
 /** A project (folder) the user has added to the app. */
 export interface ProjectRecord extends ProjectMetadata {
@@ -205,6 +206,8 @@ export interface ToolResultView {
   error?: string
   durationMs: number
   attempts: number
+  /** Agent loop step the call belonged to (v2.6.3, for per-step grouping). */
+  step?: number
   command?: string
   serverId?: string
   cwd?: string
@@ -236,7 +239,23 @@ export interface ToolCallView {
   exitCode?: number
   durationMs?: number
   attempts?: number
+  /** Agent loop step the call belonged to, so the chat can group it (v2.6.3). */
+  step?: number
   recovery?: ToolRecoveryInfo
+}
+
+/**
+ * v2.6.3 T3.1 - a preflight state check surfaced to the chat. The orchestrator
+ * emits it as a structured log entry; the renderer turns it into a tiered banner.
+ */
+export interface PreflightNotice {
+  tool: string
+  step?: number
+  tier: 'ok' | 'warn' | 'block' | 'critical'
+  checks: Array<{ name: string; status: 'pass' | 'warn' | 'fail'; message: string }>
+  /** True when the action was actually prevented from running. */
+  blocked: boolean
+  at: number
 }
 
 export type AgentEvent =
@@ -263,6 +282,8 @@ export type AgentEvent =
   | { type: 'approval:suggestion'; tool: string; count: number }
   | { type: 'plan:request'; request: PlanRequest }
   | { type: 'plan:resolved'; id: string; decision: PlanDecision; at: number }
+  | { type: 'preflight:request'; request: PreflightRequestView }
+  | { type: 'preflight:resolved'; id: string; choice: PreflightChoice; at: number }
   | { type: 'plan:active'; plan: ApprovedPlan; at: number }
   | { type: 'plan:inactive'; at: number; reason?: 'expired' | 'cleared' | 'legacy'; message?: string }
   | { type: 'file:change'; change: FileChangeView; at: number }

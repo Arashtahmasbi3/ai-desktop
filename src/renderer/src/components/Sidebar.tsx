@@ -13,6 +13,7 @@ import {
   MapPin,
   MessageSquare,
   MoreHorizontal,
+  Pin,
   Plug,
   Plus,
   Search,
@@ -74,9 +75,17 @@ function dotClass(state: DotState): string {
   return 'bg-red-500'
 }
 
-export default function Sidebar(): JSX.Element {
+export interface SidebarProps {
+  /**
+   * v2.6.3 T1: force the icon rail when the viewport is too narrow to keep the
+   * sidebar expanded alongside a readable chat. The user's own collapse still wins.
+   */
+  rail?: boolean
+}
+
+export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
   const { t } = useTranslation()
-  const collapsed = useStore((state) => state.sidebarCollapsed)
+  const collapsed = useStore((state) => state.sidebarCollapsed) || Boolean(rail)
   const view = useStore((state) => state.view)
   const setView = useStore((state) => state.setView)
   const openSettings = useStore((state) => state.openSettings)
@@ -98,6 +107,8 @@ export default function Sidebar(): JSX.Element {
     (state) => state.jobs.filter((job) => job.status === 'running' || job.status === 'pending').length
   )
   const setJobsPanelOpen = useStore((state) => state.setJobsPanelOpen)
+  const sidebarPinned = useStore((state) => state.sidebarPinned)
+  const setSidebarPinned = useStore((state) => state.setSidebarPinned)
 
   const [query, setQuery] = useState('')
   const [chatMenuFor, setChatMenuFor] = useState<string | null>(null)
@@ -250,10 +261,25 @@ export default function Sidebar(): JSX.Element {
         })}
         <button
           type="button"
+          data-testid="sidebar-pin"
+          title={t('sidebar.pin')}
+          aria-label={t('sidebar.pin')}
+          aria-pressed={sidebarPinned}
+          onClick={() => setSidebarPinned(!sidebarPinned)}
+          className={`mt-auto flex h-9 w-9 items-center justify-center rounded-lg ${
+            sidebarPinned
+              ? 'bg-accent/15 text-accent'
+              : 'text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300'
+          }`}
+        >
+          <Pin className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
           title={t('common.settings')}
           aria-label={t('common.settings')}
           onClick={openSettings}
-          className="mt-auto flex h-9 w-9 items-center justify-center rounded-lg text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300"
+          className="flex h-9 w-9 items-center justify-center rounded-lg text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300"
         >
           <Settings2 className="h-4 w-4" />
         </button>
@@ -343,6 +369,21 @@ export default function Sidebar(): JSX.Element {
             ) : (worker?.active ?? 0) > 0 ? (
               <span className="absolute right-1 top-1 h-1.5 w-1.5 animate-pulse rounded-full bg-sky-400" />
             ) : null}
+          </button>
+          <button
+            type="button"
+            data-testid="sidebar-pin"
+            title={sidebarPinned ? t('sidebar.unpin') : t('sidebar.pin')}
+            aria-label={sidebarPinned ? t('sidebar.unpin') : t('sidebar.pin')}
+            aria-pressed={sidebarPinned}
+            onClick={() => setSidebarPinned(!sidebarPinned)}
+            className={`flex h-7 w-7 items-center justify-center rounded-lg ${
+              sidebarPinned
+                ? 'bg-accent/15 text-accent'
+                : 'text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300'
+            }`}
+          >
+            <Pin className="h-3.5 w-3.5" />
           </button>
         </div>
 

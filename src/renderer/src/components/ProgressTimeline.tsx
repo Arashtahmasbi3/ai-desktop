@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AlertTriangle, Check, Circle, Loader2, PauseCircle, RotateCcw, Sparkles, Wrench } from 'lucide-react'
+import { AlertTriangle, Brain, Check, Circle, Loader2, PauseCircle, RotateCcw, Sparkles, Wrench } from 'lucide-react'
 import { buildTimeline, type StepKind, type TimelineStep } from '../lib/timeline'
 import { useStore } from '../store'
 import DecisionCard from './DecisionCard'
@@ -12,20 +12,30 @@ const KIND_ICON: Record<StepKind, typeof Check> = {
   error: AlertTriangle,
   done: Check,
   stopped: PauseCircle,
-  recovery: RotateCcw
+  recovery: RotateCcw,
+  decision: Brain
 }
 
-/** Collapsible right-hand vertical timeline of the current agent run (D.6). */
-export default function ProgressTimeline(): JSX.Element {
+export interface ProgressTimelineProps {
+  /**
+   * v2.6.3 T1.3: render inside the chat's single column instead of as a fixed
+   * right-hand column, so the conversation is never squeezed by a side panel.
+   */
+  embedded?: boolean
+}
+
+/** Collapsible vertical timeline of the current agent run (D.6). */
+export default function ProgressTimeline({ embedded }: ProgressTimelineProps = {}): JSX.Element {
   const { t } = useTranslation()
   const logs = useStore((state) => state.logs)
   const running = useStore((state) => state.running)
   const decisions = useStore((state) => state.decisions)
   const steps = useMemo(() => buildTimeline(logs, running), [logs, running])
 
-  const label = (kind: StepKind, tool?: string): string => {
-    if (kind === 'tool' && tool) return t('timeline.tool', { tool })
-    return t(`timeline.${kind}`)
+  const label = (step: TimelineStep): string => {
+    if (step.kind === 'tool' && step.tool) return t('timeline.tool', { tool: step.tool })
+    if (step.kind === 'decision' && step.decision) return step.decision.intent.summary
+    return t(`timeline.${step.kind}`)
   }
 
   /** Secondary line: agent phase and/or the recovery decision (v2.5.2). */
@@ -49,7 +59,14 @@ export default function ProgressTimeline(): JSX.Element {
   }
 
   return (
-    <aside className="flex h-full w-64 shrink-0 flex-col border-l border-border bg-bg-secondary">
+    <aside
+      data-testid="progress-timeline"
+      className={
+        embedded
+          ? 'flex max-h-72 w-full shrink-0 flex-col overflow-hidden rounded-xl border border-border bg-bg-secondary'
+          : 'flex h-full w-64 shrink-0 flex-col border-l border-border bg-bg-secondary'
+      }
+    >
       <div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-1.5">
         <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
           {t('timeline.title')}
@@ -95,7 +112,7 @@ export default function ProgressTimeline(): JSX.Element {
                       step.status === 'pending' ? 'text-neutral-600' : 'text-neutral-300'
                     }`}
                   >
-                    {label(step.kind, step.tool)}
+                    {label(step)}
                   </span>
                   {detail(step) ? (
                     <span className="mt-0.5 block text-[10px] leading-snug text-neutral-500">

@@ -84,3 +84,30 @@ describe('buildTimeline v2.5.2 phases and recovery', () => {
     expect(steps[0].recovery).toMatchObject({ decision: 'switch', from: 'deepseek', to: 'openai' })
   })
 })
+
+describe('buildTimeline v2.6.3 decision steps (Fix D)', () => {
+  const decision = {
+    id: 'run-1:2',
+    runId: 'run-1',
+    phase: 'executing',
+    intent: { summary: 'Edit the config' },
+    evidence: [],
+    decision: 'write_file(config.ts)',
+    outcome: 'ok',
+    at: 2
+  }
+
+  it('surfaces a decision log as its own step in the fallback timeline', () => {
+    const steps = buildTimeline(
+      [log('run.start'), log('decision', { step: 2, decision })],
+      false
+    )
+    expect(steps.map((step) => step.kind)).toEqual(['start', 'decision'])
+    expect(steps[1].decision).toMatchObject({ id: 'run-1:2', decision: 'write_file(config.ts)' })
+  })
+
+  it('ignores a malformed decision payload', () => {
+    const steps = buildTimeline([log('decision', { decision: { nope: true } })], false)
+    expect(steps.some((step) => step.kind === 'decision')).toBe(false)
+  })
+})
