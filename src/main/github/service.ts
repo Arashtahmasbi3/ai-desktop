@@ -89,9 +89,16 @@ export class GitHubService {
     }
     try {
       this.client.setToken(await this.cipher.decrypt(this.state.tokenEnc))
-    } catch {
+      this.lastError = undefined
+    } catch (error) {
+      // v2.6.5: a keyring change used to log the user out silently. The stored
+      // (still encrypted) token is kept — dropping it destroyed the only copy —
+      // and the failure is reported so the UI can ask for a new sign-in instead
+      // of pretending the account was never connected.
       this.client.setToken(undefined)
-      this.state.tokenEnc = undefined
+      this.lastError =
+        'Stored GitHub token could not be decrypted (the OS keyring may have changed). ' +
+        `Sign in again. ${error instanceof Error ? error.message : String(error)}`
     }
   }
 

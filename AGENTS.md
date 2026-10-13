@@ -289,10 +289,13 @@ promoting — just flip the release's `prerelease` flag to `false`.
 
 - Config lives in `electron-builder.yml` (referenced by `npm run build:win` / `npm run pack`).
   Windows x64, NSIS installer + portable exe, icon in `build/icon.ico` / `build/icon.png`.
-- `dependencies` is intentionally **empty**: the renderer is fully bundled by Vite and
-  main/preload only use Electron + Node built-ins. Keep new runtime deps bundled (add to
-  `devDependencies`) so `node_modules` never ships inside the app. `files` packages only
-  `out/` + `package.json`.
+- **`dependencies` holds exactly one entry: `ssh2`** (v2.6.5). Everything the renderer uses
+  (`@xterm/xterm`, `@xterm/addon-fit`, `i18next`, `react-i18next`) is bundled by Vite and
+  therefore lives in `devDependencies` — that is what keeps `node_modules` out of the app.
+  `ssh2` is the one genuine runtime dependency: it is externalized out of the main bundle and
+  shipped through the explicit `node_modules/ssh2/**/*` globs in `electron-builder.yml`. Any
+  *new* library used by main/preload must be added to `dependencies` **and** to those globs, or
+  the packaged app will be missing it. `files` otherwise packages only `out/` + `package.json`.
 - Production build is minified/tree-shaken via `optimizeBuild` in `electron.vite.config.ts`
   (esbuild minify, no source maps, `debugger` dropped). Don't turn minify off for releases.
 - Code signing is automatic when `CSC_LINK`/`CSC_KEY_PASSWORD` (or an OS cert) are present;
