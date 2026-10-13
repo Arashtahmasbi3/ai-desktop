@@ -1,5 +1,17 @@
-import { posix, resolve, sep } from 'node:path'
+import { posix, win32, type PlatformPath } from 'node:path'
 import { PathEscapeError } from './errors'
+
+/**
+ * Pick the path implementation that matches how the sandbox root is written
+ * (v2.6.5). `resolve()` is platform-specific, so on Windows a POSIX root such as
+ * `/tmp/sbx` became `C:\tmp\sbx`; the containment comparison that follows was
+ * then comparing two different worlds. Roots that start with `/` are POSIX on
+ * every platform; everything else uses the host's own dialect.
+ */
+function pathImplFor(root: string): PlatformPath {
+  if (root.startsWith('/')) return posix
+  return process.platform === 'win32' ? win32 : posix
+}
 
 /**
  * Normalize a caller-supplied path to a clean, relative POSIX path and reject
@@ -26,9 +38,10 @@ export function normalizeSandboxPath(input: string): string {
 /** Resolve a sandbox-relative path to an absolute host path inside `root`. */
 export function resolveInsideWorkspace(root: string, relativePath: string): string {
   const normalized = normalizeSandboxPath(relativePath)
-  const absoluteRoot = resolve(root)
-  const target = resolve(absoluteRoot, normalized.split('/').join(sep))
-  if (target !== absoluteRoot && !target.startsWith(absoluteRoot + sep)) {
+  const impl = pathImplFor(root)
+  const absoluteRoot = impl.resolve(root)
+  const target = impl.resolve(absoluteRoot, normalized.split('/').join(impl.sep))
+  if (target !== absoluteRoot && !target.startsWith(absoluteRoot + impl.sep)) {
     throw new PathEscapeError(relativePath)
   }
   return target
@@ -36,7 +49,7 @@ export function resolveInsideWorkspace(root: string, relativePath: string): stri
 
 /** Resolve a working directory (may be '.'), always contained by the workspace. */
 export function resolveWorkspaceDir(root: string, relativeDir: string | undefined): string {
-  if (!relativeDir || relativeDir === '.') return resolve(root)
+  if (!relativeDir || relativeDir === '.') return pathImplFor(root).resolve(root)
   return resolveInsideWorkspace(root, relativeDir)
 }
 

@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs'
 import { randomUUID } from 'node:crypto'
-import { dirname, isAbsolute, join, normalize, resolve } from 'node:path'
+import { dirname, isAbsolute, join, normalize, posix, resolve } from 'node:path'
 import { homedir } from 'node:os'
 import type { ProviderId } from '@shared/types'
 import { isWindowsAbsolutePath } from '@shared/paths'
@@ -114,6 +114,16 @@ export function normalizeProjectPath(path: string): string {
   const windowsAbsolute = isWindowsAbsolutePath(trimmed)
   if (!windowsAbsolute && !isAbsolute(trimmed)) {
     throw new Error(`Project path must be absolute: ${trimmed}`)
+  }
+  // v2.6.5: a POSIX path stays POSIX on every platform. `resolve()` on Windows
+  // rewrote `/home/me/project` as `C:\home\me\project`, which corrupted stored
+  // project records and broke the POSIX round-trip that migrateProjectRecord
+  // relies on to detect a remote project.
+  if (!windowsAbsolute && posix.isAbsolute(trimmed)) {
+    const normalizedPosix = posix.normalize(trimmed)
+    // `posix.normalize` keeps a trailing slash; the Windows branch drops it, so
+    // drop it here too and keep the two forms interchangeable.
+    return normalizedPosix.length > 1 ? normalizedPosix.replace(/\/+$/, '') : normalizedPosix
   }
   const normalized = normalize(trimmed)
   if (windowsAbsolute) {
