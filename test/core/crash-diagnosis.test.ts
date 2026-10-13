@@ -137,8 +137,22 @@ describe('Task 3.2 - diagnose_crash tool', () => {
   it('substitutes the project root into the project probes', () => {
     const probes = buildCrashProbes('/opt/sepehr-motor')
     const probe = probes.find((entry) => entry.id === 'recent-releases')
-    expect(probe?.command).toContain('/opt/sepehr-motor/releases/')
+    expect(probe?.command).toContain("'/opt/sepehr-motor'/releases/")
     expect(CRASH_PROBES.find((entry) => entry.id === 'recent-releases')?.command).toContain('{{ROOT}}')
+  })
+
+  it('quotes the project root so a space or quote cannot break the probe (B-18)', () => {
+    const root = "/srv/my app/it's"
+    const probes = buildCrashProbes(root)
+    const list = probes.find((entry) => entry.id === 'project-root')
+    const releases = probes.find((entry) => entry.id === 'recent-releases')
+
+    // The root is POSIX single-quoted (with the `'\''` escape for the quote).
+    expect(list?.command).toContain(`'/srv/my app/it'\\''s'/`)
+    expect(releases?.command).toContain(`'/srv/my app/it'\\''s'/releases/`)
+    // ...so the raw, shell-breaking form never reaches the command.
+    expect(list?.command).not.toContain("/srv/my app/it's/")
+    expect(list?.command).not.toContain('ls -la /srv')
   })
 
   it('formatDiagnosis includes evidence, cause and recommendations', () => {

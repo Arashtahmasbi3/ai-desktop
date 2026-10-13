@@ -575,7 +575,11 @@ export class AgentService {
       : {}
 
     const hint = activeRemoteProjectHint(active, connectedServers)
-    if (hint) return { systemHint: hint, ...routing }
+    if (hint) {
+      // B-11: never swap or lose the chat-header host silently.
+      const withWarning = [hint, runServer.warning].filter(Boolean).join(' ')
+      return { systemHint: withWarning, ...routing }
+    }
 
     // Resolve the target explicitly: the user's chat-header choice wins, then the
     // active remote project's own VPS. Never inferred from the task text (P0-4).
@@ -594,6 +598,11 @@ export class AgentService {
       isRemote ? active?.path : undefined,
       diagnostic
     )
+    // B-11: the resolver's reconciliation (a stale chat-header VPS dropped in
+    // favour of the project's server) must reach the agent prompt, not vanish.
+    if (runServer.warning) {
+      runtime.systemHint = [runtime.systemHint, runServer.warning].filter(Boolean).join(' ')
+    }
     if (isRemote && connected && serverId && active?.path) {
       const remoteHint = remoteWorkspaceHint(serverId, active.path)
       runtime.systemHint = [runtime.systemHint, remoteHint].filter(Boolean).join(' ')

@@ -413,7 +413,10 @@ export class Persistence {
     this.loaded = true
     // A migrated payload removed nothing sensitive on disk yet; rewrite it so
     // legacy plaintext keys (and any schema drift) are replaced by ciphertext.
-    if (storedVersion !== SETTINGS_SCHEMA_VERSION) {
+    // B-14: only an *older* payload is migrated forward. A file written by a
+    // newer (future/beta) build is left untouched — rewriting it would silently
+    // drop the fields this build does not know about.
+    if (storedVersion < SETTINGS_SCHEMA_VERSION) {
       await this.persist()
     }
     return this.settings

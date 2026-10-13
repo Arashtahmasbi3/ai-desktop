@@ -158,6 +158,42 @@ describe('AuditTrail', () => {
     // The redacted content is what the hash commits to, so verify still passes.
     expect((await trail.verify()).ok).toBe(true)
   })
+
+  it('B-6: continues the chain after a torn final line and marks it repairable', async () => {
+    const first = new AuditTrail({ file })
+    await first.append(entry())
+    const second = await first.append(entry({ runId: 'run-2' }))
+    // A crash mid-`appendFile` leaves a half-written (unparseable) final line.
+    await fs.appendFile(file, '{"seq":3,"prevHash":"', 'utf8')
+
+    const restarted = new AuditTrail({ file })
+    const third = await restarted.append(entry({ runId: 'run-3' }))
+
+    // The chain continues from the last *parsed* line instead of restarting at 1.
+    expect(third.seq).toBe(3)
+    expect(third.prevHash).toBe(second.hash)
+    expect(restarted.recovery).toEqual({ line: 2, seq: 2 })
+
+    const broken = await restarted.verify()
+    expect(broken.ok).toBe(false)
+    expect(broken.brokenAt).toBe(2) // the torn line, not a cascading sequence gap
+    expect(broken.reason).toBe('unparseable line')
+    expect(broken.repairable).toBe(true)
+
+    // Repairing the file — dropping that one torn line — restores a valid chain.
+    const repaired: string[] = []
+    const raw = await fs.readFile(file, 'utf8')
+    for (const line of raw.split('\n')) {
+      if (!line.trim()) continue
+      try {
+        repaired.push(JSON.stringify(JSON.parse(line)))
+      } catch {
+        // drop the torn line
+      }
+    }
+    await fs.writeFile(file, `${repaired.join('\n')}\n`, 'utf8')
+    expect(await restarted.verify()).toEqual({ ok: true, lines: 3 })
+  })
 })
 
 describe('auditFileFor', () => {
@@ -221,6 +257,17 @@ describe('auditLineFromDecision', () => {
     expect(line.command).toBeUndefined()
     expect(line.path).toBeUndefined()
     expect(line.goalId).toBeUndefined()
+  })
+
+  it('B-17: omits an unknown user instead of writing an empty one', async () => {
+    const line = auditLineFromDecision(decision(), { projectId: 'p1' })
+    // '' is not nullish, so it used to override the trail's real user on append.
+    expect(line.userId).toBeUndefined()
+
+    const trail = new AuditTrail({ file, userId: 'tester' })
+    const appended = await trail.append(line)
+    expect(appended.userId).toBe('tester')
+    expect((await lines())[0].userId).toBe('tester')
   })
 })
 

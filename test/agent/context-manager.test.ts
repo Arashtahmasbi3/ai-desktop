@@ -194,4 +194,40 @@ describe('ContextManager token budget and compaction', () => {
     const contents = context.buildMessages().map((m) => m.content)
     expect(contents).toEqual(['S', 'a!', 'b!', 'c'])
   })
+
+  it('B-13: pinned system hints count against the character budget', () => {
+    const context = new ContextManager({ systemPrompt: 'SYS', maxChars: 100, minMessages: 1 })
+    context.appendHint(`trusted note: ${'h'.repeat(16)}`)
+    context.appendUser('a'.repeat(40))
+    context.appendUser('b'.repeat(40))
+
+    const messages = context.buildMessages()
+    const total = messages.reduce((sum, message) => sum + (message.content?.length ?? 0), 0)
+
+    // The hint is pinned, but it is no longer free: the budget holds.
+    expect(total).toBeLessThanOrEqual(100)
+    expect(messages.map((message) => message.content)).toEqual([
+      'SYS',
+      `trusted note: ${'h'.repeat(16)}`,
+      'b'.repeat(40)
+    ])
+  })
+
+  it('B-13: compaction always makes progress when only pinned hints can be dropped', async () => {
+    const context = new ContextManager({ systemPrompt: 'S', maxTokens: 100, minMessages: 2 })
+    for (let i = 0; i < 12; i++) context.appendHint(`hint ${i} ${'x'.repeat(30)}`)
+
+    expect(context.needsCompaction()).toBe(true)
+    const tokensBefore = context.estimateTokens()
+    const result = await context.compact()
+
+    // Old behaviour: only system messages were droppable, so compact() returned
+    // null and needsCompaction() stayed true for ever.
+    expect(result).not.toBeNull()
+    expect(result?.droppedMessages).toBe(9)
+    expect(context.estimateTokens()).toBeLessThan(tokensBefore)
+    expect(context.needsCompaction()).toBe(false)
+    // The newest pinned hint survives the forced fold.
+    expect(context.buildMessages().some((m) => m.content === `hint 9 ${'x'.repeat(30)}`)).toBe(true)
+  })
 })

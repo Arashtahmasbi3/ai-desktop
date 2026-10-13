@@ -144,6 +144,7 @@ describe('v2.6.4 - reconcileRunServer', () => {
       connectedServers: ['srv-phone', 'srv-proj']
     })
     expect(run).toEqual({ serverId: 'srv-phone', connected: true, reconciled: false })
+    expect(run.warning).toBeUndefined()
   })
 
   it('falls back to the project server when the header selection is not connected', () => {
@@ -152,7 +153,11 @@ describe('v2.6.4 - reconcileRunServer', () => {
       projectVpsId: 'srv-proj',
       connectedServers: ['srv-proj']
     })
-    expect(run).toEqual({ serverId: 'srv-proj', connected: true, reconciled: true })
+    expect(run).toMatchObject({ serverId: 'srv-proj', connected: true, reconciled: true })
+    // B-11: the swap is no longer silent.
+    expect(run.warning).toBe(
+      'Requested VPS "srv-stale" is not connected; using the project\'s server "srv-proj" instead.'
+    )
   })
 
   it('uses the project server when there is no explicit selection', () => {
@@ -169,11 +174,21 @@ describe('v2.6.4 - reconcileRunServer', () => {
       projectVpsId: 'srv-proj',
       connectedServers: []
     })
-    expect(run).toEqual({ serverId: 'srv-proj', connected: false, reconciled: true })
+    expect(run).toMatchObject({ serverId: 'srv-proj', connected: false, reconciled: true })
+    expect(run.warning).toContain('"srv-stale" is not connected')
+    expect(run.warning).toContain('"srv-proj"')
   })
 
   it('is a local, unconnected run when nothing is selected or connected', () => {
     const run = reconcileRunServer({ connectedServers: ['srv-other'] })
     expect(run).toEqual({ serverId: undefined, connected: false, reconciled: false })
+  })
+
+  it('B-11: explains a dropped header selection even when it leaves no server', () => {
+    const run = reconcileRunServer({ requestedVpsId: 'srv-stale', connectedServers: [] })
+    expect(run).toMatchObject({ serverId: undefined, connected: false, reconciled: true })
+    expect(run.warning).toBe(
+      'Requested VPS "srv-stale" is not connected; continuing without a VPS.'
+    )
   })
 })

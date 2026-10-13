@@ -143,6 +143,47 @@ describe('Persistence', () => {
     expect(onDisk).not.toContain('sk-plain')
     expect(JSON.parse(onDisk).version).toBe(SETTINGS_SCHEMA_VERSION)
   })
+
+  it('B-14: keeps a newer (future) payload intact instead of downgrading it', async () => {
+    const apiKeyEnc = await cipher.encrypt('sk-future')
+    const future = {
+      version: SETTINGS_SCHEMA_VERSION + 1,
+      activeProvider: 'deepseek',
+      providers: { deepseek: { apiKeyEnc, model: 'future-model' } },
+      projects: [],
+      updatedAt: 1,
+      // A field written by the newer build; this build knows nothing about it.
+      betaOnlyField: { experimental: true }
+    }
+    const original = `${JSON.stringify(future, null, 2)}\n`
+    await fs.writeFile(file, original, 'utf8')
+
+    const store = new Persistence({ file, cipher })
+    await store.load()
+
+    // Untouched on disk: no downgrade, no dropped fields.
+    expect(await fs.readFile(file, 'utf8')).toBe(original)
+    expect(JSON.parse(await fs.readFile(file, 'utf8')).betaOnlyField).toEqual({ experimental: true })
+    // The known fields are still readable, so the app keeps working.
+    expect(store.getSettings().activeProvider).toBe('deepseek')
+    expect(store.getSettings().providers.deepseek?.model).toBe('future-model')
+    expect(await store.getApiKey('deepseek')).toBe('sk-future')
+  })
+
+  it('B-14: still migrates and rewrites an older payload', async () => {
+    await fs.writeFile(
+      file,
+      JSON.stringify({ version: SETTINGS_SCHEMA_VERSION - 1, activeProvider: 'deepseek' }),
+      'utf8'
+    )
+
+    const store = new Persistence({ file, cipher })
+    await store.load()
+
+    const onDisk = JSON.parse(await fs.readFile(file, 'utf8'))
+    expect(onDisk.version).toBe(SETTINGS_SCHEMA_VERSION)
+    expect(onDisk.activeProvider).toBe('deepseek')
+  })
 })
 
 describe('migrateSettings', () => {

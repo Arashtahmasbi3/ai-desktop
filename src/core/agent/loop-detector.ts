@@ -324,6 +324,7 @@ export class LoopDetector {
     return normalizeCommand(firstString(asRecord(args), COMMAND_ARG_KEYS))
   }
 
+  /** B-5: occurrences of `signature` in the current window (not the whole run). */
   signatureCount(signature: string): number {
     return this.counts.get(signature) ?? 0
   }
@@ -603,6 +604,11 @@ export class LoopDetector {
    * Real progress happened (a file was written, tests passed, ...). Clears the
    * repeat window, the failure streak and the no-progress timer so the model
    * gets a fresh budget.
+   *
+   * Note (B-5): only the *per-call* guard's budget is refreshed here. The
+   * step-level analyzer stays window-bounded instead, because a successful action
+   * that keeps repeating is still a loop: a run that repeats the same successful
+   * command five times must keep surfacing `repeated_action`.
    */
   markProgress(): void {
     this.lastProgressAt = this.now()
@@ -622,9 +628,25 @@ export class LoopDetector {
     let stopReason: LoopStopReason | undefined
 
     // --- Repeated actions over a sliding window -------------------------------
+    // B-5: the counters are *derived from* the window. They used to be cumulative
+    // for the whole run — `this.window` was dead code — so five legitimate
+    // re-reads of the same file spread over a long run stopped it, and
+    // `markProgress()` had no effect on this layer at all.
     for (const signature of observation.signatures) {
       this.window.push(signature)
-      if (this.window.length > this.policy.windowSize) this.window.shift()
+      while (this.window.length > this.policy.windowSize) {
+        const evicted = this.window.shift()
+        if (evicted === undefined) break
+        const remaining = (this.counts.get(evicted) ?? 0) - 1
+        if (remaining > 0) {
+          this.counts.set(evicted, remaining)
+        } else {
+          this.counts.delete(evicted)
+          // A signature that has left the window entirely may warn again if it
+          // comes back: the earlier repeat burst is over.
+          this.warnedSignatures.delete(evicted)
+        }
+      }
 
       const count = (this.counts.get(signature) ?? 0) + 1
       this.counts.set(signature, count)

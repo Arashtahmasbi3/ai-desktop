@@ -295,14 +295,24 @@ export class ContextManager {
     const prefix = this.history.slice(0, keepFrom)
     // Fix 4: system messages in the prefix are pinned, not summarized away.
     const pinned = this.pinnedSystem(prefix)
-    const dropped = prefix.filter((message) => message.role !== 'system')
+    let dropped = prefix.filter((message) => message.role !== 'system')
+    let retainedPinned = pinned
+    if (dropped.length === 0 && pinned.length > 0) {
+      // B-13: the prefix is nothing but pinned system hints, so pinning would make
+      // compaction a permanent no-op and `needsCompaction()` would stay true for
+      // ever. Fold the older hints into the summary and keep the newest one; this
+      // is the only case where a pinned message is given up, and it is the only
+      // way to make progress.
+      retainedPinned = pinned.length > 1 ? pinned.slice(-1) : []
+      dropped = pinned.slice(0, pinned.length - retainedPinned.length)
+    }
     if (dropped.length === 0) return null
 
     const summary = await this.buildSummary(dropped, summarizer)
     this.summary = summary
     this.droppedCount += dropped.length
     this.history.splice(0, keepFrom)
-    if (pinned.length > 0) this.history.unshift(...pinned)
+    if (retainedPinned.length > 0) this.history.unshift(...retainedPinned)
 
     return {
       droppedMessages: dropped.length,
@@ -334,13 +344,21 @@ export class ContextManager {
   private trimmedHistory(): ChatMessage[] {
     if (this.history.length === 0) return []
 
+    // Fix 4 + B-13: system messages (trusted plan, approval decisions) are pinned
+    // — never trimmed — but they are *not* free. Their size is reserved from the
+    // budget here, because re-adding them after the budget was applied pushed the
+    // prompt past `maxChars` and the budget was silently not enforced.
+    const pinned = this.history.filter((message) => message.role === 'system')
+    const pinnedChars = pinned.reduce((total, message) => total + messageChars(message), 0)
+    const budget = Math.max(0, this.maxChars - pinnedChars)
+
     let chars = 0
     const kept: ChatMessage[] = []
     for (let i = this.history.length - 1; i >= 0; i--) {
       const message = this.history[i]
       const size = messageChars(message)
       const withinMinimum = kept.length < this.minMessages
-      if (!withinMinimum && chars + size > this.maxChars) break
+      if (!withinMinimum && chars + size > budget) break
       kept.unshift(message)
       chars += size
     }
@@ -349,12 +367,10 @@ export class ContextManager {
     // message to be preceded by the assistant turn that requested it.
     while (kept.length > 0 && kept[0].role === 'tool') kept.shift()
 
-    // Fix 4: system messages (trusted plan, approval decisions) are never
-    // trimmed away, even when the character budget is tight.
-    const pinned = this.history.filter(
-      (message) => message.role === 'system' && !kept.includes(message)
-    )
-    if (pinned.length > 0) kept.unshift(...pinned)
+    // Any pinned message that did not fit inside the budget is still kept, at the
+    // front; it is already accounted for above, so the total stays bounded.
+    const missingPinned = pinned.filter((message) => !kept.includes(message))
+    if (missingPinned.length > 0) kept.unshift(...missingPinned)
 
     const transform = this.transformOldMessages
     if (!transform || kept.length <= this.keepRecent) return kept
