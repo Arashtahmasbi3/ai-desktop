@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.3] — 2026-10-13
+
+Release v2.6.3 "Trace & Conformance" makes the agent's reasoning visible inline
+in the chat, adds an auditable preflight override, and refines the chat layout to
+a single centered column.
+
+### Inline Trace
+
+- **Decision cards in the conversation.** Agent steps render inline as
+  `DecisionCard`s, with the running trace grouped by step and a live, phase-aware
+  status line.
+- **Tool-aware status.** The live "thinking" line names the action in progress
+  (reading a file, searching, writing, running a command) instead of a generic
+  spinner.
+- **Conformance.** `InlineTrace` shows the newest three decisions and expands to
+  thirty; raw tool rows are hidden once they are grouped into the trace.
+
+### Preflight Override
+
+- An interactive preflight override flows from the orchestrator to the renderer:
+  a broker resolves decisions, the orchestrator applies them with cleanup, and
+  each override is written to the tamper-evident audit chain.
+- Tiered preflight results are surfaced in the chat so the user can review and
+  override before a run proceeds.
+
+### Chat Layout
+
+- **One centered column.** Messages and the composer share an 820px measure with a
+  `px-4` gutter; the run timeline is embedded in the column when toggled instead
+  of docking as a fixed side panel, and a STATUS card shows the current phase and
+  last decision at all times.
+- **Responsive sidebar.** A persisted *pin* keeps the sidebar expanded down to the
+  minimum chat width, while the Ctrl+B collapse always wins; squeezing side
+  columns are overlaid to keep the chat readable.
+- **Dismissable tree overlay.** The file tree floats over the chat with a backdrop
+  and a close control whenever it cannot dock.
+- **Compact tool cards.** A 13px header over 10px meta chips, one-line success
+  cards, and error cards that auto-expand so the failure is visible without a click.
+
 ## [2.6.2] — 2026-10-05
 
 Release v2.6.2 "Collaborative Design" adds session profiles, the Secret Path
@@ -697,7 +736,8 @@ First stable release. Ships as a Windows x64 NSIS installer and a portable execu
   `node_modules` are shipped inside the app package.
 - Optional code signing via `CSC_LINK` / `CSC_KEY_PASSWORD` (skipped safely when absent).
 
-[Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.6.2...HEAD
+[Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.6.3...HEAD
+[2.6.3]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.6.2...v2.6.3
 [2.6.2]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.6.1...v2.6.2
 [2.6.1]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.6.0...v2.6.1
 [2.3.2]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.3.1...v2.3.2
