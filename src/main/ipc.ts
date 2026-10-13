@@ -287,7 +287,25 @@ export function registerIpc(
       }
     ],
     ['agent:applyChange', (id: string) => services.agent.applyChange(id)],
-    ['shell:exec', (command: string) => runLocalCommand(command, { cwd: services.files.getRoot() })],
+    // v2.6.5: the local terminal now passes the same guards as every remote
+    // command and records what ran on the user's own machine.
+    [
+      'shell:exec',
+      (command: string) =>
+        runLocalCommand(command, {
+          cwd: services.files.getRoot(),
+          audit: (entry) => {
+            void services.vps
+              .recordAudit({
+                type: 'exec',
+                ok: entry.ok,
+                command: `local: ${entry.command}`,
+                ...(entry.detail ? { detail: entry.detail } : {})
+              })
+              .catch(() => undefined)
+          }
+        })
+    ],
     ['search:code', (query: string) => {
       const root = services.files.getRoot()
       if (!root) throw new Error('No active project. Add or select a project first.')

@@ -53,12 +53,20 @@ export async function createProjectUser(
     return { username, created: false, logs }
   }
 
-  // 2. Creating it needs sudo, which needs approval.
-  if (deps.approveSudo) {
-    const approved = await deps.approveSudo(serverId, `useradd -m ${username}`)
-    if (!approved) {
-      return { username, created: false, logs: ['Sudo approval denied.'], blocked: true }
+  // 2. Creating it needs sudo, which needs approval. v2.6.5: the gate is
+  // mandatory and fails closed — it used to be `if (deps.approveSudo)`, so any
+  // caller that did not wire the hook ran `sudo useradd` with no prompt.
+  if (!deps.approveSudo) {
+    return {
+      username,
+      created: false,
+      logs: ['Refusing to create a system user without a configured sudo approval gate.'],
+      blocked: true
     }
+  }
+  const approved = await deps.approveSudo(serverId, `useradd -m ${username}`)
+  if (!approved) {
+    return { username, created: false, logs: ['Sudo approval denied.'], blocked: true }
   }
 
   const create = await deps.exec(
@@ -102,9 +110,19 @@ export async function removeProjectUser(
   if (!usernameIsSafe(username)) {
     return { username, created: false, logs: [`Unsafe username: ${username}`], blocked: true }
   }
-  if (deps.approveSudo) {
-    const approved = await deps.approveSudo(serverId, `userdel -r ${username}`)
-    if (!approved) return { username, created: false, logs: ['Sudo approval denied.'], blocked: true }
+  // v2.6.5: same mandatory, fail-closed sudo gate as creation — `userdel -r`
+  // deletes the user's home directory.
+  if (!deps.approveSudo) {
+    return {
+      username,
+      created: false,
+      logs: ['Refusing to remove a system user without a configured sudo approval gate.'],
+      blocked: true
+    }
+  }
+  const approved = await deps.approveSudo(serverId, `userdel -r ${username}`)
+  if (!approved) {
+    return { username, created: false, logs: ['Sudo approval denied.'], blocked: true }
   }
   const result = await deps.exec(serverId, `sudo userdel -r ${shellQuote(username)}`)
   if (!result.ok) {
