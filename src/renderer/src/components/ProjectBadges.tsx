@@ -50,10 +50,10 @@ export default function ProjectBadges({
         {projectTypeBadge(project.type)}
       </span>
       <span className="min-w-0 truncate text-xs">{project.name}</span>
-      <span className="shrink-0 text-[10px] text-neutral-500">
+      <span className="shrink-0 text-3xs text-neutral-500">
         ({serverName ?? t('sidebar.local')})
       </span>
-      <span className="shrink-0 text-[10px] text-neutral-500">{`[${envLabel}]`}</span>
+      <span className="shrink-0 text-3xs text-neutral-500">{`[${envLabel}]`}</span>
       {policyMismatch ? (
         <span
           role="img"

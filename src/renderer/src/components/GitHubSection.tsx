@@ -113,7 +113,7 @@ export default function GitHubSection(): JSX.Element {
         </div>
       ) : (
           <div className="space-y-2">
-            <div className="flex gap-1 rounded-lg border border-border bg-bg-secondary p-0.5 text-[11px]">
+            <div className="flex gap-1 rounded-lg border border-border bg-bg-secondary p-0.5 text-2xs">
               <button
                 type="button"
                 onClick={() => setMode('device')}
@@ -136,7 +136,7 @@ export default function GitHubSection(): JSX.Element {
 
             {mode === 'device' ? (
               <>
-                <p className="text-[11px] leading-relaxed text-neutral-500">
+                <p className="text-2xs leading-relaxed text-neutral-500">
                   Create a GitHub OAuth App with Device Flow enabled, paste its client ID, then
                   approve the code on github.com. The token is stored encrypted and never leaves the
                   main process.
@@ -145,7 +145,7 @@ export default function GitHubSection(): JSX.Element {
                   href="https://github.com/settings/developers"
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-[11px] text-accent underline"
+                  className="inline-flex items-center gap-1 text-2xs text-accent underline"
                 >
                   Create an OAuth App <ExternalLink className="h-3 w-3" />
                 </a>
@@ -168,7 +168,7 @@ export default function GitHubSection(): JSX.Element {
               </>
             ) : (
               <>
-                <p className="text-[11px] leading-relaxed text-neutral-500">
+                <p className="text-2xs leading-relaxed text-neutral-500">
                   Fastest option: create a Personal Access Token with the <code>repo</code> and{' '}
                   <code>read:user</code> scopes and paste it here. Stored encrypted on this machine.
                 </p>
@@ -176,7 +176,7 @@ export default function GitHubSection(): JSX.Element {
                   href="https://github.com/settings/tokens"
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-[11px] text-accent underline"
+                  className="inline-flex items-center gap-1 text-2xs text-accent underline"
                 >
                   Create a token <ExternalLink className="h-3 w-3" />
                 </a>
@@ -222,7 +222,7 @@ export default function GitHubSection(): JSX.Element {
       ) : null}
 
       {error ? (
-        <p className="mt-2 rounded bg-red-500/10 px-2 py-1 text-[11px] text-red-300">{error}</p>
+        <p className="mt-2 rounded bg-red-500/10 px-2 py-1 text-2xs text-red-300">{error}</p>
       ) : null}
     </section>
   )

@@ -88,7 +88,7 @@ export default function CodeBlock({ code, language }: CodeBlockProps): JSX.Eleme
       onKeyDown={onKeyDown}
       className="my-2 overflow-hidden rounded-lg border border-border bg-bg-primary"
     >
-      <div className="flex items-center gap-2 border-b border-border px-2 py-1 text-[10px] text-neutral-500">
+      <div className="flex items-center gap-2 border-b border-border px-2 py-1 text-3xs text-neutral-500">
         <Terminal className="h-3 w-3" />
         <span className="font-mono">{LANGUAGE_LABEL[normalized] ?? language ?? 'text'}</span>
         <span className="flex-1" />
@@ -129,7 +129,7 @@ export default function CodeBlock({ code, language }: CodeBlockProps): JSX.Eleme
           <button
             type="button"
             onClick={() => setShowOutput((value) => !value)}
-            className="flex w-full items-center gap-1.5 px-2 py-1 text-[10px] text-neutral-500 hover:text-neutral-300"
+            className="flex w-full items-center gap-1.5 px-2 py-1 text-3xs text-neutral-500 hover:text-neutral-300"
           >
             <ChevronDown
               className={`h-3 w-3 transition ${showOutput ? '' : '-rotate-90'}`}
@@ -142,7 +142,7 @@ export default function CodeBlock({ code, language }: CodeBlockProps): JSX.Eleme
             </span>
           </button>
           {showOutput ? (
-            <pre className="max-h-64 overflow-auto bg-black/40 p-2 text-[11px] leading-relaxed">
+            <pre className="max-h-64 overflow-auto bg-black/40 p-2 text-2xs leading-relaxed">
               {result.stdout ? (
                 <code dir="ltr" className="block whitespace-pre-wrap text-neutral-300">
                   {result.stdout}

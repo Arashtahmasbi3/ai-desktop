@@ -63,7 +63,7 @@ export default function TerminalPanel(): JSX.Element {
 
   return (
     <div className="flex h-56 shrink-0 flex-col border-t border-border bg-bg-primary">
-      <div className="flex h-7 shrink-0 items-center justify-between border-b border-border px-3 text-[11px] text-neutral-500">
+      <div className="flex h-7 shrink-0 items-center justify-between border-b border-border px-3 text-2xs text-neutral-500">
         <span className="flex items-center gap-1.5">
           <Terminal className="h-3.5 w-3.5" />
           {t('chat.terminalTitle')}
@@ -89,14 +89,14 @@ export default function TerminalPanel(): JSX.Element {
           </button>
         </div>
       </div>
-      <div ref={scrollRef} dir="ltr" className="min-h-0 flex-1 overflow-auto px-3 py-2 font-mono text-[11px]">
+      <div ref={scrollRef} dir="ltr" className="min-h-0 flex-1 overflow-auto px-3 py-2 font-mono text-2xs">
         {lines.map((line) => (
           <div key={line.id} className={`whitespace-pre-wrap ${LINE_CLASS[line.kind] ?? ''}`}>
             {line.text}
           </div>
         ))}
       </div>
-      <div className="flex shrink-0 items-center gap-2 border-t border-border px-3 py-1.5 font-mono text-[11px]">
+      <div className="flex shrink-0 items-center gap-2 border-t border-border px-3 py-1.5 font-mono text-2xs">
         <span className="text-accent">$</span>
         <input
           value={input}

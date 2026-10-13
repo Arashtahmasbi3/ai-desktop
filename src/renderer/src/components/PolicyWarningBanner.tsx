@@ -32,24 +32,24 @@ export default function PolicyWarningBanner({
         <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-400" />
         {t('chat.policyWarningTitle')}
       </p>
-      <p className="mt-1 pl-5 text-[11px] text-amber-300/90">
+      <p className="mt-1 pl-5 text-2xs text-amber-300/90">
         {t('chat.policyWarningMode', { mode: t(MODE_KEY[warning.mode]) })}
       </p>
       {warning.reason ? (
-        <p className="mt-0.5 pl-5 text-[11px] text-amber-300/80">{warning.reason}</p>
+        <p className="mt-0.5 pl-5 text-2xs text-amber-300/80">{warning.reason}</p>
       ) : null}
       <div className="mt-2 flex justify-end gap-2 pl-5">
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-lg border border-border px-3 py-1 text-[11px] text-neutral-300 hover:bg-bg-tertiary"
+          className="rounded-lg border border-border px-3 py-1 text-2xs text-neutral-300 hover:bg-bg-tertiary"
         >
           {t('chat.policyWarningCancel')}
         </button>
         <button
           type="button"
           onClick={onProceed}
-          className="rounded-lg border border-amber-500/50 px-3 py-1 text-[11px] font-medium text-amber-200 hover:bg-amber-500/15"
+          className="rounded-lg border border-amber-500/50 px-3 py-1 text-2xs font-medium text-amber-200 hover:bg-amber-500/15"
         >
           {t('chat.policyWarningProceed')}
         </button>

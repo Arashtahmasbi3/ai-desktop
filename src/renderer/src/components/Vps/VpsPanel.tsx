@@ -148,7 +148,7 @@ export default function VpsPanel(): JSX.Element {
                 className="min-w-0 flex-1 text-left"
               >
                 <div className="truncate text-xs font-medium text-neutral-200">{server.name}</div>
-                <div className="truncate text-[10px] text-neutral-500">
+                <div className="truncate text-3xs text-neutral-500">
                   {server.username}@{server.host}:{server.port}
                 </div>
               </button>
@@ -177,7 +177,7 @@ export default function VpsPanel(): JSX.Element {
                 {status.status}
               </span>
               {status.fingerprint ? (
-                <span className="truncate font-mono text-[10px] text-neutral-600">
+                <span className="truncate font-mono text-3xs text-neutral-600">
                   {status.fingerprint}
                 </span>
               ) : null}
@@ -205,7 +205,7 @@ export default function VpsPanel(): JSX.Element {
                 <ShieldAlert className="h-4 w-4 shrink-0 text-amber-400" />
                 <div className="min-w-0 text-xs text-amber-200">
                   <div>Unverified host key. Confirm this fingerprint belongs to your server:</div>
-                  <div className="truncate font-mono text-[10px] text-amber-300">
+                  <div className="truncate font-mono text-3xs text-amber-300">
                     {status.pendingFingerprint}
                   </div>
                 </div>
@@ -255,7 +255,7 @@ export default function VpsPanel(): JSX.Element {
               ) : tab === 'files' ? (
                 <RemoteFileExplorer serverId={activeId} />
               ) : (
-                <div className="h-full overflow-auto p-3 font-mono text-[11px]">
+                <div className="h-full overflow-auto p-3 font-mono text-2xs">
                   {audit.length === 0 ? (
                     <p className="text-neutral-600">No commands yet.</p>
                   ) : (
@@ -276,7 +276,7 @@ export default function VpsPanel(): JSX.Element {
                             <button
                               type="button"
                               onClick={() => void restoreBackup(entry.detail as string)}
-                              className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] text-neutral-300 hover:bg-bg-tertiary"
+                              className="shrink-0 rounded border border-border px-1.5 py-0.5 text-3xs text-neutral-300 hover:bg-bg-tertiary"
                             >
                               Restore
                             </button>

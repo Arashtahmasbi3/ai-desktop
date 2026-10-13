@@ -52,7 +52,7 @@ export default function SourcesList(): JSX.Element {
   return (
     <div className="flex flex-col gap-3 text-xs">
       <section data-testid="chat-memory">
-        <p className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-600">
+        <p className="mb-1 flex items-center gap-1.5 text-3xs font-semibold uppercase tracking-wide text-neutral-600">
           <Brain className="h-3 w-3" />
           {t('workspace.memoryTitle')}
         </p>
@@ -93,7 +93,7 @@ export default function SourcesList(): JSX.Element {
             setConfirming(false)
             void clearMemory()
           }}
-          className="mt-2 flex items-center gap-1.5 rounded border border-border px-2 py-1 text-[10px] text-neutral-400 transition enabled:hover:border-red-500/60 enabled:hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-40"
+          className="mt-2 flex items-center gap-1.5 rounded border border-border px-2 py-1 text-3xs text-neutral-400 transition enabled:hover:border-red-500/60 enabled:hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Trash2 className="h-3 w-3" />
           {confirming ? t('workspace.memoryClearConfirm') : t('workspace.memoryClear')}
@@ -101,7 +101,7 @@ export default function SourcesList(): JSX.Element {
       </section>
 
       <section>
-        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-600">
+        <p className="mb-1 text-3xs font-semibold uppercase tracking-wide text-neutral-600">
           {t('workspace.filesRead')}
         </p>
         {filesRead.length === 0 ? (
@@ -111,7 +111,7 @@ export default function SourcesList(): JSX.Element {
             {filesRead.map((path, index) => (
               <li
                 key={`${path}-${index}`}
-                className="flex items-center gap-1.5 truncate font-mono text-[10px] text-neutral-400"
+                className="flex items-center gap-1.5 truncate font-mono text-3xs text-neutral-400"
                 dir="ltr"
               >
                 <FileText className="h-3 w-3 shrink-0 text-neutral-600" />
@@ -123,7 +123,7 @@ export default function SourcesList(): JSX.Element {
       </section>
 
       <section>
-        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-600">
+        <p className="mb-1 text-3xs font-semibold uppercase tracking-wide text-neutral-600">
           {t('workspace.context')}
         </p>
         <ul className="space-y-0.5">
@@ -140,12 +140,12 @@ export default function SourcesList(): JSX.Element {
 
       {preview.blockedFiles.length > 0 ? (
         <section>
-          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-amber-500">
+          <p className="mb-1 text-3xs font-semibold uppercase tracking-wide text-amber-500">
             {t('workspace.withheld')}
           </p>
           <ul className="space-y-0.5">
             {preview.blockedFiles.map((file) => (
-              <li key={file} className="truncate font-mono text-[10px] text-amber-300/80" dir="ltr">
+              <li key={file} className="truncate font-mono text-3xs text-amber-300/80" dir="ltr">
                 {file}
               </li>
             ))}
@@ -154,7 +154,7 @@ export default function SourcesList(): JSX.Element {
       ) : null}
 
       <section>
-        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-600">
+        <p className="mb-1 text-3xs font-semibold uppercase tracking-wide text-neutral-600">
           {t('workspace.excluded')}
         </p>
         <ul className="space-y-0.5 text-neutral-600">

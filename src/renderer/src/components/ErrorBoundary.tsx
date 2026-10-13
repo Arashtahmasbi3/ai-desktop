@@ -33,7 +33,7 @@ export default class ErrorBoundary extends Component<Props, State> {
           <p className="text-sm text-neutral-200">
             {this.props.label ?? 'This panel'} crashed while rendering.
           </p>
-          <p className="mt-1 max-w-md font-mono text-[11px] text-neutral-500">{error.message}</p>
+          <p className="mt-1 max-w-md font-mono text-2xs text-neutral-500">{error.message}</p>
         </div>
         <button
           type="button"

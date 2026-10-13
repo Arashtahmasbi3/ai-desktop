@@ -73,7 +73,7 @@ export default function ProjectSwitchDialog(): JSX.Element | null {
                     <span className="block text-xs font-medium text-neutral-100">
                       {t(option.labelKey)}
                     </span>
-                    <span className="mt-0.5 block text-[10px] leading-snug text-neutral-500">
+                    <span className="mt-0.5 block text-3xs leading-snug text-neutral-500">
                       {t(option.hintKey, { project: project.name })}
                     </span>
                   </span>
@@ -85,7 +85,7 @@ export default function ProjectSwitchDialog(): JSX.Element | null {
         </ul>
 
         <div className="mt-3 flex items-center justify-between gap-3">
-          <label className="flex cursor-pointer items-center gap-2 text-[11px] text-neutral-400">
+          <label className="flex cursor-pointer items-center gap-2 text-2xs text-neutral-400">
             <input
               type="checkbox"
               checked={remember}
@@ -97,7 +97,7 @@ export default function ProjectSwitchDialog(): JSX.Element | null {
           <button
             type="button"
             onClick={cancel}
-            className="rounded px-2 py-1 text-[11px] text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200"
+            className="rounded px-2 py-1 text-2xs text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200"
           >
             {t('projectSwitch.cancel')}
           </button>

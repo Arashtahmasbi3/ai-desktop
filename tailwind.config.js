@@ -17,6 +17,14 @@ module.exports = {
       },
       fontFamily: {
           sans: ['Inter', 'Vazirmatn', 'ui-sans-serif', 'system-ui', 'sans-serif']
+      },
+      // v2.6.4 Fix F: one type scale for the dense UI chrome. Size-only tokens
+      // (no line-height) so they swap in for the old arbitrary `text-[Npx]`
+      // values without shifting any layout.
+      fontSize: {
+        '4xs': '9px',
+        '3xs': '10px',
+        '2xs': '11px'
       }
     }
   },

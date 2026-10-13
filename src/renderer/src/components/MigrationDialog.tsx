@@ -115,12 +115,12 @@ export default function MigrationDialog(): JSX.Element | null {
                 <FolderSearch className="h-3.5 w-3.5 shrink-0 text-amber-400" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-xs text-neutral-200">{project.name}</p>
-                  <p className="truncate font-mono text-[10px] text-neutral-500" dir="ltr">
+                  <p className="truncate font-mono text-3xs text-neutral-500" dir="ltr">
                     {project.path}
                   </p>
                 </div>
                 {project.osMismatch ? (
-                  <span className="shrink-0 rounded border border-amber-500/40 px-1.5 py-0.5 text-[9px] text-amber-300">
+                  <span className="shrink-0 rounded border border-amber-500/40 px-1.5 py-0.5 text-4xs text-amber-300">
                     {t('migration.osMismatch')}
                   </span>
                 ) : null}
@@ -130,7 +130,7 @@ export default function MigrationDialog(): JSX.Element | null {
                   type="button"
                   onClick={() => void locate(project.id)}
                   disabled={busy === project.id}
-                  className="flex items-center gap-1 rounded border border-border px-2 py-1 text-[10px] text-neutral-300 hover:bg-bg-tertiary disabled:opacity-40"
+                  className="flex items-center gap-1 rounded border border-border px-2 py-1 text-3xs text-neutral-300 hover:bg-bg-tertiary disabled:opacity-40"
                 >
                   <MapPin className="h-3 w-3" />
                   {t('migration.locate')}
@@ -140,7 +140,7 @@ export default function MigrationDialog(): JSX.Element | null {
                   onChange={(event) =>
                     setChoice((current) => ({ ...current, [project.id]: event.target.value }))
                   }
-                  className="rounded border border-border bg-bg-secondary px-1.5 py-1 text-[10px] text-neutral-300"
+                  className="rounded border border-border bg-bg-secondary px-1.5 py-1 text-3xs text-neutral-300"
                 >
                   {servers.length === 0 ? <option value="">{t('vps.noServers')}</option> : null}
                   {servers.map((server) => (
@@ -153,7 +153,7 @@ export default function MigrationDialog(): JSX.Element | null {
                   type="button"
                   onClick={() => void connectToVps(project.id, project.name, project.path)}
                   disabled={busy === project.id || servers.length === 0}
-                  className="flex items-center gap-1 rounded border border-sky-500/40 px-2 py-1 text-[10px] text-sky-300 hover:bg-sky-500/10 disabled:opacity-40"
+                  className="flex items-center gap-1 rounded border border-sky-500/40 px-2 py-1 text-3xs text-sky-300 hover:bg-sky-500/10 disabled:opacity-40"
                 >
                   <Server className="h-3 w-3" />
                   {t('migration.connectVps')}
@@ -162,7 +162,7 @@ export default function MigrationDialog(): JSX.Element | null {
                   type="button"
                   onClick={() => void removeProject(project.id)}
                   disabled={busy === project.id}
-                  className="flex items-center gap-1 rounded border border-border px-2 py-1 text-[10px] text-red-300 hover:bg-red-500/10 disabled:opacity-40"
+                  className="flex items-center gap-1 rounded border border-border px-2 py-1 text-3xs text-red-300 hover:bg-red-500/10 disabled:opacity-40"
                 >
                   <Trash2 className="h-3 w-3" />
                   {t('migration.remove')}

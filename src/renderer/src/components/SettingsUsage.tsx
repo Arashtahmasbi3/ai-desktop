@@ -26,7 +26,7 @@ function TotalsRow({
         <span className="text-xs font-medium text-neutral-300">{label}</span>
         <span className="font-mono text-xs text-neutral-200">{formatCost(totals.cost)}</span>
       </div>
-      <div className="grid grid-cols-3 gap-2 text-[11px] text-neutral-500">
+      <div className="grid grid-cols-3 gap-2 text-2xs text-neutral-500">
         <span>
           {t('settings.usageInput')}:{' '}
           <span className="font-mono text-neutral-300">{totals.inputTokens.toLocaleString()}</span>
@@ -41,7 +41,7 @@ function TotalsRow({
         </span>
       </div>
       {totals.costUnknown ? (
-        <p className="mt-1 text-[10px] text-amber-400">{t('settings.usageUnknownCost')}</p>
+        <p className="mt-1 text-3xs text-amber-400">{t('settings.usageUnknownCost')}</p>
       ) : null}
     </div>
   )
@@ -57,12 +57,12 @@ function BreakdownList({
   if (rows.length === 0) return null
   return (
     <div>
-      <p className="mb-1 text-[11px] font-medium text-neutral-400">{title}</p>
+      <p className="mb-1 text-2xs font-medium text-neutral-400">{title}</p>
       <ul className="flex flex-col gap-1">
         {rows.map((row) => (
           <li
             key={row.key}
-            className="flex items-center justify-between rounded-lg bg-bg-primary px-2.5 py-1.5 text-[11px]"
+            className="flex items-center justify-between rounded-lg bg-bg-primary px-2.5 py-1.5 text-2xs"
           >
             <span className="truncate text-neutral-300">{row.key}</span>
             <span className="shrink-0 font-mono text-neutral-500">
@@ -131,7 +131,7 @@ export default function SettingsUsage(): JSX.Element {
         <BarChart3 className="h-3.5 w-3.5" />
         {t('settings.usage')}
       </h3>
-      <p className="text-[11px] text-neutral-500">{t('settings.usageHint')}</p>
+      <p className="text-2xs text-neutral-500">{t('settings.usageHint')}</p>
       <dl className="flex flex-col gap-2">
         {rows.map(([label, value]) => (
           <div
@@ -166,7 +166,7 @@ export default function SettingsUsage(): JSX.Element {
       </div>
 
       <div className="flex items-center justify-between border-t border-border pt-2">
-        <span className="text-[11px] font-medium text-neutral-400">
+        <span className="text-2xs font-medium text-neutral-400">
           {t('settings.usageAllTime')}
         </span>
         <div className="flex items-center gap-1">
@@ -175,7 +175,7 @@ export default function SettingsUsage(): JSX.Element {
             onClick={exportCsv}
             disabled={usageRecords.length === 0}
             title={t('settings.usageExport')}
-            className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200 disabled:opacity-40"
+            className="flex items-center gap-1 rounded-lg px-2 py-1 text-2xs text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200 disabled:opacity-40"
           >
             <Download className="h-3 w-3" />
             {t('settings.usageExport')}
@@ -185,7 +185,7 @@ export default function SettingsUsage(): JSX.Element {
             onClick={resetUsage}
             disabled={usageRecords.length === 0}
             title={t('settings.usageReset')}
-            className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200 disabled:opacity-40"
+            className="flex items-center gap-1 rounded-lg px-2 py-1 text-2xs text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200 disabled:opacity-40"
           >
             <RotateCcw className="h-3 w-3" />
             {t('settings.usageReset')}
@@ -194,7 +194,7 @@ export default function SettingsUsage(): JSX.Element {
       </div>
 
       {usageRecords.length === 0 ? (
-        <p className="rounded-xl border border-border bg-bg-primary px-3 py-2 text-[11px] text-neutral-500">
+        <p className="rounded-xl border border-border bg-bg-primary px-3 py-2 text-2xs text-neutral-500">
           {t('settings.usageEmpty')}
         </p>
       ) : (
@@ -206,7 +206,7 @@ export default function SettingsUsage(): JSX.Element {
           <BreakdownList title={t('settings.usageByModel')} rows={summary.byModel} />
 
           <div>
-            <p className="mb-1 text-[11px] font-medium text-neutral-400">
+            <p className="mb-1 text-2xs font-medium text-neutral-400">
               {t('settings.usageLast7Days')}
             </p>
             <div className="flex h-16 items-end gap-1">
@@ -225,7 +225,7 @@ export default function SettingsUsage(): JSX.Element {
                         style={{ height: `${Math.max(tokens > 0 ? 6 : 0, height)}%` }}
                       />
                     </div>
-                    <span className="text-[9px] text-neutral-600">{day.day.slice(5)}</span>
+                    <span className="text-4xs text-neutral-600">{day.day.slice(5)}</span>
                   </div>
                 )
               })}

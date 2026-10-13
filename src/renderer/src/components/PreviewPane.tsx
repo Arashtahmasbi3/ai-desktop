@@ -36,10 +36,10 @@ const MARKDOWN_COMPONENTS = {
     <a className="text-accent underline" {...props} />
   ),
   code: (props: JSX.IntrinsicElements['code']) => (
-    <code className="rounded bg-bg-tertiary px-1 font-mono text-[11px] text-neutral-200" {...props} />
+    <code className="rounded bg-bg-tertiary px-1 font-mono text-2xs text-neutral-200" {...props} />
   ),
   pre: (props: JSX.IntrinsicElements['pre']) => (
-    <pre className="my-2 overflow-auto rounded-lg bg-bg-tertiary p-3 font-mono text-[11px]" {...props} />
+    <pre className="my-2 overflow-auto rounded-lg bg-bg-tertiary p-3 font-mono text-2xs" {...props} />
   ),
   blockquote: (props: JSX.IntrinsicElements['blockquote']) => (
     <blockquote className="my-2 border-l-2 border-border pl-3 text-neutral-400" {...props} />

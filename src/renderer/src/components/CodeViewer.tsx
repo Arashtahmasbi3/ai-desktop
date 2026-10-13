@@ -103,7 +103,7 @@ export default function CodeViewer(): JSX.Element {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-bg-primary">
-      <div className="flex h-8 shrink-0 items-center justify-between border-b border-border px-2 text-[11px]">
+      <div className="flex h-8 shrink-0 items-center justify-between border-b border-border px-2 text-2xs">
         <span className="truncate font-mono text-neutral-400" dir="ltr" title={selectedFile}>
           {selectedFile}
           {changed ? <span className="ml-2 text-amber-400">● modified</span> : null}
@@ -199,11 +199,11 @@ export default function CodeViewer(): JSX.Element {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search in file…"
-            className="w-full rounded border border-border bg-bg-secondary py-0.5 pr-7 pl-2 text-[11px] text-neutral-200 outline-none focus:border-accent/50"
+            className="w-full rounded border border-border bg-bg-secondary py-0.5 pr-7 pl-2 text-2xs text-neutral-200 outline-none focus:border-accent/50"
           />
         </div>
         {query ? (
-          <div className="flex items-center gap-1 text-[10px] text-neutral-500">
+          <div className="flex items-center gap-1 text-3xs text-neutral-500">
             <span>
               {matchLines.length === 0 ? 0 : matchIndex + 1}/{matchLines.length}
             </span>
@@ -216,7 +216,7 @@ export default function CodeViewer(): JSX.Element {
           </div>
         ) : null}
         {changed ? (
-          <span className="flex items-center gap-1 text-[10px]">
+          <span className="flex items-center gap-1 text-3xs">
             <span className="text-emerald-400">+{summary.added}</span>
             <span className="text-red-400">-{summary.removed}</span>
           </span>
@@ -226,7 +226,7 @@ export default function CodeViewer(): JSX.Element {
             type="button"
             onClick={() => setSplitDiff((value) => !value)}
             title={splitDiff ? 'Unified diff' : 'Side-by-side diff'}
-            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200"
+            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-3xs text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200"
           >
             <Columns2 className="h-3 w-3" />
             {splitDiff ? 'Unified' : 'Split'}
@@ -237,7 +237,7 @@ export default function CodeViewer(): JSX.Element {
             type="button"
             onClick={() => setPreview((value) => !value)}
             title={preview ? 'Show source' : 'Preview markdown'}
-            className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] ${
+            className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-3xs ${
               preview ? 'bg-accent/20 text-accent' : 'text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200'
             }`}
           >
@@ -335,7 +335,7 @@ export default function CodeViewer(): JSX.Element {
       )}
 
       {draft !== null && !editing ? (
-        <div className="flex shrink-0 items-center gap-2 border-t border-border bg-bg-secondary px-3 py-1 text-[11px] text-amber-400">
+        <div className="flex shrink-0 items-center gap-2 border-t border-border bg-bg-secondary px-3 py-1 text-2xs text-amber-400">
           <FileWarning className="h-3 w-3" />
           Unsaved changes — preview shows a diff against the file on disk.
         </div>

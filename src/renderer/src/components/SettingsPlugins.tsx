@@ -65,7 +65,7 @@ export default function SettingsPlugins(): JSX.Element {
 
       <div className="flex flex-col gap-2">
         {entries.length === 0 ? (
-          <p className="text-[11px] text-neutral-600">{t('settings.noMatches')}</p>
+          <p className="text-2xs text-neutral-600">{t('settings.noMatches')}</p>
         ) : (
           entries.map((entry) => {
             const active =
@@ -77,7 +77,7 @@ export default function SettingsPlugins(): JSX.Element {
               >
                 <div className="min-w-0">
                   <p className="text-sm text-neutral-200">{entry.name}</p>
-                  <p className="mt-0.5 text-[11px] text-neutral-500">{entry.description}</p>
+                  <p className="mt-0.5 text-2xs text-neutral-500">{entry.description}</p>
                 </div>
                 <button
                   type="button"
@@ -101,7 +101,7 @@ export default function SettingsPlugins(): JSX.Element {
         )}
       </div>
 
-      <p className="text-[11px] text-neutral-600">{t('settings.browseDirectoryHint')}</p>
+      <p className="text-2xs text-neutral-600">{t('settings.browseDirectoryHint')}</p>
     </section>
   )
 }

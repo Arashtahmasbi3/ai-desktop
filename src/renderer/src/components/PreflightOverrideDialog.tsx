@@ -81,7 +81,7 @@ export default function PreflightOverrideDialog(): JSX.Element | null {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-neutral-500">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-neutral-500">
           <span className="flex items-center gap-1">
             {t('chat.approvalTool')}:
             <code className="max-w-[18rem] truncate font-mono text-neutral-200" dir="ltr">
@@ -110,7 +110,7 @@ export default function PreflightOverrideDialog(): JSX.Element | null {
 
         <ul className="mt-3 flex flex-col gap-1" data-testid="preflight-checks">
           {request.checks.map((check) => (
-            <li key={check.name} className="flex items-start justify-between gap-2 text-[11px]">
+            <li key={check.name} className="flex items-start justify-between gap-2 text-2xs">
               <span className="text-neutral-400" dir="ltr">
                 {check.name}
               </span>
@@ -120,18 +120,18 @@ export default function PreflightOverrideDialog(): JSX.Element | null {
         </ul>
 
         {critical ? (
-          <p className="mt-3 flex items-start gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-2 text-[11px] text-red-300">
+          <p className="mt-3 flex items-start gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-2 text-2xs text-red-300">
             <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             {t('preflight.criticalLocked')}
           </p>
         ) : (
-          <p className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-[11px] text-amber-300">
+          <p className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-2xs text-amber-300">
             <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             {t('preflight.overrideWarning')}
           </p>
         )}
 
-        <p className="mt-3 flex items-center gap-1 text-[10px] text-neutral-600">
+        <p className="mt-3 flex items-center gap-1 text-3xs text-neutral-600">
           <Timer className="h-3 w-3" />
           {t('preflight.timeoutHint', { seconds })}
         </p>

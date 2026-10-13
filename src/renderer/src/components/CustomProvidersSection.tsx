@@ -166,7 +166,7 @@ export default function CustomProvidersSection(): JSX.Element {
 
           {result ? (
             <span
-              className={`flex items-center gap-1 rounded px-2 py-0.5 text-[11px] ${
+              className={`flex items-center gap-1 rounded px-2 py-0.5 text-2xs ${
                 result.ok
                   ? 'bg-emerald-500/15 text-emerald-400'
                   : 'bg-red-500/15 text-red-400'
@@ -176,7 +176,7 @@ export default function CustomProvidersSection(): JSX.Element {
               {result.ok ? `OK (${result.latencyMs} ms)` : (result.message ?? 'Failed')}
             </span>
           ) : null}
-          {error ? <span className="text-[11px] text-red-400">{error}</span> : null}
+          {error ? <span className="text-2xs text-red-400">{error}</span> : null}
         </div>
       </div>
 
@@ -195,15 +195,15 @@ export default function CustomProvidersSection(): JSX.Element {
                 className="min-w-0 flex-1 text-left"
               >
                 <span className="text-neutral-200">{provider.label}</span>
-                <span className="ml-2 font-mono text-[10px] text-neutral-500" dir="ltr">
+                <span className="ml-2 font-mono text-3xs text-neutral-500" dir="ltr">
                   {provider.model} · {provider.baseUrl}
                 </span>
                 {provider.hasApiKey ? (
-                  <span className="ml-2 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] text-emerald-400">
+                  <span className="ml-2 rounded bg-emerald-500/15 px-1.5 py-0.5 text-3xs text-emerald-400">
                     key saved
                   </span>
                 ) : (
-                  <span className="ml-2 rounded bg-bg-tertiary px-1.5 py-0.5 text-[10px] text-neutral-500">
+                  <span className="ml-2 rounded bg-bg-tertiary px-1.5 py-0.5 text-3xs text-neutral-500">
                     no key
                   </span>
                 )}

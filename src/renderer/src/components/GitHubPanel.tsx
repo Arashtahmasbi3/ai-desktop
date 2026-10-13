@@ -114,7 +114,7 @@ export default function GitHubPanel(): JSX.Element {
             key={id}
             type="button"
             onClick={() => setTab(id)}
-            className={`flex items-center gap-1 rounded px-2 py-1 text-[11px] ${
+            className={`flex items-center gap-1 rounded px-2 py-1 text-2xs ${
               tab === id ? 'bg-accent/20 text-accent' : 'text-neutral-400 hover:bg-bg-tertiary'
             }`}
           >
@@ -133,7 +133,7 @@ export default function GitHubPanel(): JSX.Element {
       </div>
 
       {error ? (
-        <div className="shrink-0 border-b border-red-500/30 bg-red-500/10 px-3 py-1 text-[11px] text-red-300">
+        <div className="shrink-0 border-b border-red-500/30 bg-red-500/10 px-3 py-1 text-2xs text-red-300">
           {error}
         </div>
       ) : null}
@@ -157,7 +157,7 @@ export default function GitHubPanel(): JSX.Element {
               </div>
 
               {status.files.length > 0 ? (
-                <ul className="max-h-40 overflow-auto rounded border border-border font-mono text-[11px]">
+                <ul className="max-h-40 overflow-auto rounded border border-border font-mono text-2xs">
                   {status.files.map((file) => (
                     <li key={file.path} className="flex gap-2 px-2 py-0.5">
                       <span className="text-amber-400">{file.index}{file.workingDir}</span>
@@ -172,7 +172,7 @@ export default function GitHubPanel(): JSX.Element {
                   value={message}
                   onChange={(event) => setMessage(event.target.value)}
                   placeholder="Commit message"
-                  className="flex-1 rounded border border-border bg-bg-secondary px-2 py-1 text-[11px] text-neutral-200 outline-none focus:border-accent/50"
+                  className="flex-1 rounded border border-border bg-bg-secondary px-2 py-1 text-2xs text-neutral-200 outline-none focus:border-accent/50"
                 />
                 <button
                   type="button"
@@ -206,7 +206,7 @@ export default function GitHubPanel(): JSX.Element {
               </div>
 
               {output ? (
-                <pre className="max-h-40 overflow-auto rounded bg-bg-tertiary p-2 font-mono text-[10px] text-neutral-400">
+                <pre className="max-h-40 overflow-auto rounded bg-bg-tertiary p-2 font-mono text-3xs text-neutral-400">
                   {output}
                 </pre>
               ) : null}
@@ -220,7 +220,7 @@ export default function GitHubPanel(): JSX.Element {
                 onChange={(event) => setRepo(event.target.value)}
                 placeholder="owner/repo"
                 dir="ltr"
-                className="flex-1 rounded border border-border bg-bg-secondary px-2 py-1 text-[11px] text-neutral-200 outline-none focus:border-accent/50"
+                className="flex-1 rounded border border-border bg-bg-secondary px-2 py-1 text-2xs text-neutral-200 outline-none focus:border-accent/50"
               />
               <button
                 type="button"
@@ -234,7 +234,7 @@ export default function GitHubPanel(): JSX.Element {
               <select
                 value={repo}
                 onChange={(event) => setRepo(event.target.value)}
-                className="w-full rounded border border-border bg-bg-secondary px-2 py-1 text-[11px] text-neutral-200"
+                className="w-full rounded border border-border bg-bg-secondary px-2 py-1 text-2xs text-neutral-200"
               >
                 {repos.map((entry) => (
                   <option key={entry.fullName} value={entry.fullName}>
@@ -259,7 +259,7 @@ export default function GitHubPanel(): JSX.Element {
                   >
                     #{entry.number} {entry.title}
                   </a>
-                  <div className="mt-0.5 flex gap-2 text-[10px] text-neutral-600">
+                  <div className="mt-0.5 flex gap-2 text-3xs text-neutral-600">
                     <span>@{entry.author}</span>
                     <span>{entry.state}</span>
                     {'draft' in entry && entry.draft ? <span>draft</span> : null}

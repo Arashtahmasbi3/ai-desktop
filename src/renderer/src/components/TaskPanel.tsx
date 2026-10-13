@@ -37,7 +37,7 @@ const JOB_STATUS_CLASS: Record<string, string> = {
 
 function LogRow({ entry }: { entry: AgentLogEntry }): JSX.Element {
   return (
-    <div className="flex items-start gap-2 border-b border-border/60 px-3 py-1 font-mono text-[11px] leading-5">
+    <div className="flex items-start gap-2 border-b border-border/60 px-3 py-1 font-mono text-2xs leading-5">
       <span className="shrink-0 text-neutral-600">{entry.ts.slice(11, 19)}</span>
       <span className={`shrink-0 rounded px-1 ${LEVEL_BADGE[entry.level]}`}>{entry.level}</span>
       {entry.step !== undefined ? (
@@ -79,7 +79,7 @@ export default function TaskPanel(): JSX.Element {
 
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-bg-primary">
-      <div className="flex h-8 shrink-0 items-center justify-between border-b border-border px-3 text-[11px] text-neutral-500">
+      <div className="flex h-8 shrink-0 items-center justify-between border-b border-border px-3 text-2xs text-neutral-500">
         <span className="flex items-center gap-1">
           <ListChecks className="h-3.5 w-3.5" />
           Tasks &amp; logs
@@ -93,7 +93,7 @@ export default function TaskPanel(): JSX.Element {
       {warnings.length > 0 ? (
         <div className="border-b border-border bg-amber-500/5 px-3 py-2">
           {warnings.map((warning, index) => (
-            <div key={`${warning.kind}-${index}`} className="flex items-center gap-2 text-[11px] text-amber-300">
+            <div key={`${warning.kind}-${index}`} className="flex items-center gap-2 text-2xs text-amber-300">
               <AlertTriangle className="h-3 w-3" />
               <span>{warning.message}</span>
             </div>
@@ -119,7 +119,7 @@ export default function TaskPanel(): JSX.Element {
       </div>
 
       <div className="shrink-0 border-t border-border bg-bg-secondary p-3">
-        <div className="mb-2 flex items-center justify-between text-[11px] text-neutral-400">
+        <div className="mb-2 flex items-center justify-between text-2xs text-neutral-400">
           <span className="flex items-center gap-1">
             <Terminal className="h-3.5 w-3.5" />
             Background worker
@@ -191,7 +191,7 @@ export default function TaskPanel(): JSX.Element {
             {worker.jobs.map((job) => (
               <div
                 key={job.id}
-                className="flex items-center justify-between border-b border-border/60 px-2 py-1 text-[11px] last:border-b-0"
+                className="flex items-center justify-between border-b border-border/60 px-2 py-1 text-2xs last:border-b-0"
               >
                 <span className="truncate font-mono text-neutral-300" dir="ltr">
                   {job.label}

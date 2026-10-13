@@ -47,7 +47,7 @@ function DiagnosticModeSection(): JSX.Element {
             )}
             {t('settings.diagnosticTitle')}
           </p>
-          <p className="mt-0.5 text-[11px] text-neutral-500">
+          <p className="mt-0.5 text-2xs text-neutral-500">
             {active ? t('settings.diagnosticOn') : t('settings.diagnosticOff')}
             {active && remainingMin > 0
               ? ` · ${t('settings.diagnosticRemaining', { minutes: remainingMin })}`
@@ -57,7 +57,7 @@ function DiagnosticModeSection(): JSX.Element {
         <button
           type="button"
           onClick={() => void setDiagnosticMode(!active)}
-          className={`shrink-0 rounded px-2.5 py-1 text-[11px] transition ${
+          className={`shrink-0 rounded px-2.5 py-1 text-2xs transition ${
             active
               ? 'border border-amber-500/40 text-amber-300 hover:bg-amber-500/10'
               : 'bg-accent text-white hover:bg-accent-hover'
@@ -66,9 +66,9 @@ function DiagnosticModeSection(): JSX.Element {
           {active ? t('settings.diagnosticDisable') : t('settings.diagnosticEnable')}
         </button>
       </div>
-      <p className="text-[11px] leading-relaxed text-neutral-500">{t('settings.diagnosticDesc')}</p>
+      <p className="text-2xs leading-relaxed text-neutral-500">{t('settings.diagnosticDesc')}</p>
       {active && paths.length > 0 ? (
-        <p className="break-all text-[11px] text-neutral-600">
+        <p className="break-all text-2xs text-neutral-600">
           {t('settings.diagnosticPaths')}: <span className="font-mono">{paths.join(', ')}</span>
         </p>
       ) : null}
@@ -137,7 +137,7 @@ export default function SettingsConnections(): JSX.Element {
               />
               {t('settings.thisPc')}
             </p>
-            <p className="mt-0.5 text-[11px] text-neutral-500">
+            <p className="mt-0.5 text-2xs text-neutral-500">
               {pcEnabled ? t('settings.thisPcOn') : t('settings.thisPcOff')}
             </p>
           </div>
@@ -149,7 +149,7 @@ export default function SettingsConnections(): JSX.Element {
                 closeSettings()
                 toggleTerminal()
               }}
-              className="flex items-center gap-1 rounded border border-border px-2 py-1 text-[11px] text-neutral-300 hover:bg-bg-tertiary"
+              className="flex items-center gap-1 rounded border border-border px-2 py-1 text-2xs text-neutral-300 hover:bg-bg-tertiary"
             >
               <Terminal className="h-3.5 w-3.5" />
               {t('settings.openTerminal')}
@@ -178,21 +178,21 @@ export default function SettingsConnections(): JSX.Element {
         <div className="rounded-xl border border-border bg-bg-primary p-4 text-center">
           <Smartphone className="mx-auto h-5 w-5 text-neutral-600" />
           <p className="mt-2 text-xs text-neutral-400">{t('settings.noDevices')}</p>
-          <p className="mt-0.5 text-[11px] text-neutral-600">{t('settings.noDevicesHint')}</p>
+          <p className="mt-0.5 text-2xs text-neutral-600">{t('settings.noDevicesHint')}</p>
         </div>
       ) : null}
 
       {tab === 'ssh' ? (
         <div className="flex flex-col gap-3">
           <p className="text-xs leading-relaxed text-neutral-400">{t('onboarding.vpsBody')}</p>
-          <p className="text-[11px] text-neutral-500">
+          <p className="text-2xs text-neutral-500">
             {t('settings.sshProjects')}: {sshCount}
           </p>
           <SshConfigImport />
           <DiagnosticModeSection />
           <div className="flex flex-col gap-2">
             {vpsServers.length === 0 ? (
-              <p className="text-[11px] text-neutral-600">{t('settings.hostPolicyNone')}</p>
+              <p className="text-2xs text-neutral-600">{t('settings.hostPolicyNone')}</p>
             ) : (
               vpsServers.map((server) => <HostPolicyEditor key={server.id} server={server} />)
             )}

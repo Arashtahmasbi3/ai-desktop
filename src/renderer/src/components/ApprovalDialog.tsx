@@ -208,7 +208,7 @@ export default function ApprovalDialog(): JSX.Element | null {
         </div>
 
         <div
-          className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]"
+          className="flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs"
           data-testid="approval-summary"
         >
           <span
@@ -244,7 +244,7 @@ export default function ApprovalDialog(): JSX.Element | null {
         </div>
 
         {request.reason ? (
-          <p className="flex items-center gap-2 text-[11px] text-neutral-400">
+          <p className="flex items-center gap-2 text-2xs text-neutral-400">
             <ShieldAlert className="h-3.5 w-3.5 shrink-0 text-neutral-500" />
             {t('chat.approvalReason')}:{' '}
             <span className="font-medium text-neutral-200">{t(reasonKey(request.reason))}</span>
@@ -254,12 +254,12 @@ export default function ApprovalDialog(): JSX.Element | null {
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
         {request.dangerous ? (
-          <p className="mt-3 flex items-start gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-2 text-[11px] text-red-300">
+          <p className="mt-3 flex items-start gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-2 text-2xs text-red-300">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             {t('chat.approvalDangerous')}
           </p>
         ) : request.kind === 'write' ? (
-          <p className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-[11px] text-amber-300">
+          <p className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-2xs text-amber-300">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             {t('chat.approvalWriteWarning')}
           </p>
@@ -273,7 +273,7 @@ export default function ApprovalDialog(): JSX.Element | null {
           />
         ) : null}
 
-        <p className="mt-3 text-[10px] uppercase tracking-wide text-neutral-600">
+        <p className="mt-3 text-3xs uppercase tracking-wide text-neutral-600">
           {t('chat.approvalCommand')}
         </p>
 
@@ -286,7 +286,7 @@ export default function ApprovalDialog(): JSX.Element | null {
         {showDetails ? (
           <pre
             dir="ltr"
-            className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-bg-primary p-2 font-mono text-[10px] text-neutral-400"
+            className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-bg-primary p-2 font-mono text-3xs text-neutral-400"
           >
             {request.tool}
             {'\n'}
@@ -332,16 +332,16 @@ export default function ApprovalDialog(): JSX.Element | null {
               />
               {t('chat.approvalSession')}
             </label>
-            <p className="text-[10px] text-neutral-600">{t('chat.approvalRememberScope')}</p>
+            <p className="text-3xs text-neutral-600">{t('chat.approvalRememberScope')}</p>
           </div>
         ) : (
           <>
-            <p className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-[11px] text-amber-300">
+            <p className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-2xs text-amber-300">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               {t('chat.approvalCannotRemember')}
             </p>
             {request.dangerous || request.kind === 'write' || request.kind === 'shell' ? (
-              <p className="mt-2 flex items-start gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-2 text-[11px] text-red-300">
+              <p className="mt-2 flex items-start gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-2 text-2xs text-red-300">
                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 {t('chat.approvalNoUndo')}
               </p>
@@ -351,17 +351,17 @@ export default function ApprovalDialog(): JSX.Element | null {
 
         {showHistory ? (
           <div className="mx-4 mb-3 max-h-48 overflow-auto rounded-lg border border-border bg-bg-primary p-2">
-            <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-neutral-600">
+            <p className="mb-1 text-3xs font-medium uppercase tracking-wide text-neutral-600">
               {t('chat.approvalHistory')}
             </p>
             {history.length === 0 ? (
-              <p className="text-[11px] text-neutral-600">{t('chat.approvalHistoryEmpty')}</p>
+              <p className="text-2xs text-neutral-600">{t('chat.approvalHistoryEmpty')}</p>
             ) : (
               <ul className="mb-2 flex flex-col gap-1">
                 {history.map((entry) => (
                   <li
                     key={entry.id}
-                    className="flex items-center justify-between gap-2 text-[11px] text-neutral-400"
+                    className="flex items-center justify-between gap-2 text-2xs text-neutral-400"
                   >
                     <span className="truncate" dir="ltr">
                       {entry.summary}
@@ -373,11 +373,11 @@ export default function ApprovalDialog(): JSX.Element | null {
                 ))}
               </ul>
             )}
-            <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-neutral-600">
+            <p className="mb-1 text-3xs font-medium uppercase tracking-wide text-neutral-600">
               {t('settings.approvedCommands')}
             </p>
             {learned.length === 0 ? (
-              <p className="text-[11px] text-neutral-600">
+              <p className="text-2xs text-neutral-600">
                 {t('settings.approvedCommandsEmpty')}
               </p>
             ) : (
@@ -385,7 +385,7 @@ export default function ApprovalDialog(): JSX.Element | null {
                 {learned.map((item) => (
                   <li
                     key={item.id}
-                    className="flex items-center justify-between gap-2 text-[11px] text-neutral-400"
+                    className="flex items-center justify-between gap-2 text-2xs text-neutral-400"
                   >
                     <span className="truncate" dir="ltr">
                       {item.label}
@@ -414,14 +414,14 @@ export default function ApprovalDialog(): JSX.Element | null {
             <button
               type="button"
               onClick={() => setShowDetails((value) => !value)}
-              className="whitespace-nowrap text-[11px] text-neutral-500 hover:text-neutral-300"
+              className="whitespace-nowrap text-2xs text-neutral-500 hover:text-neutral-300"
             >
               {showDetails ? t('chat.approvalHideDetails') : t('chat.approvalShowDetails')}
             </button>
             <button
               type="button"
               onClick={() => setShowHistory((value) => !value)}
-              className="flex items-center gap-1 whitespace-nowrap text-[11px] text-neutral-500 hover:text-neutral-300"
+              className="flex items-center gap-1 whitespace-nowrap text-2xs text-neutral-500 hover:text-neutral-300"
             >
               <History className="h-3 w-3" />
               {t('chat.approvalHistory')}

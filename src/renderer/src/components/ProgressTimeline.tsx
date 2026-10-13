@@ -68,7 +68,7 @@ export default function ProgressTimeline({ embedded }: ProgressTimelineProps = {
       }
     >
       <div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-1.5">
-        <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
+        <span className="text-3xs font-semibold uppercase tracking-wide text-neutral-500">
           {t('timeline.title')}
         </span>
         {running ? <Loader2 className="h-3 w-3 animate-spin text-accent" /> : null}
@@ -82,7 +82,7 @@ export default function ProgressTimeline({ embedded }: ProgressTimelineProps = {
       ) : (
         <ol className="min-h-0 flex-1 overflow-y-auto p-3">
           {steps.length === 0 ? (
-          <p className="text-[11px] text-neutral-600">{t('timeline.empty')}</p>
+          <p className="text-2xs text-neutral-600">{t('timeline.empty')}</p>
         ) : (
           steps.map((step, index) => {
             const Icon = KIND_ICON[step.kind]
@@ -108,14 +108,14 @@ export default function ProgressTimeline({ embedded }: ProgressTimelineProps = {
                 )}
                 <span className="min-w-0 flex-1">
                   <span
-                    className={`block text-[11px] leading-snug ${
+                    className={`block text-2xs leading-snug ${
                       step.status === 'pending' ? 'text-neutral-600' : 'text-neutral-300'
                     }`}
                   >
                     {label(step)}
                   </span>
                   {detail(step) ? (
-                    <span className="mt-0.5 block text-[10px] leading-snug text-neutral-500">
+                    <span className="mt-0.5 block text-3xs leading-snug text-neutral-500">
                       {detail(step)}
                     </span>
                   ) : null}

@@ -145,7 +145,7 @@ export default function SettingsPanel(): JSX.Element | null {
             {NAV_GROUPS.map((group, groupIndex) => (
               <div key={group.labelKey ?? `group-${groupIndex}`} className="flex flex-col gap-0.5">
                 {group.labelKey ? (
-                  <span className="px-2.5 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wide text-neutral-600">
+                  <span className="px-2.5 pb-0.5 pt-2 text-3xs font-semibold uppercase tracking-wide text-neutral-600">
                     {t(group.labelKey)}
                   </span>
                 ) : null}
@@ -225,7 +225,7 @@ export default function SettingsPanel(): JSX.Element | null {
                     />
                     <span>
                       {t('settings.showRawToolRows')}
-                      <span className="mt-0.5 block text-[10px] text-neutral-500">
+                      <span className="mt-0.5 block text-3xs text-neutral-500">
                         {t('settings.showRawToolRowsHint')}
                       </span>
                     </span>
@@ -239,7 +239,7 @@ export default function SettingsPanel(): JSX.Element | null {
                     />
                     <span>
                       {t('settings.showContextWarning')}
-                      <span className="mt-0.5 block text-[10px] text-neutral-500">
+                      <span className="mt-0.5 block text-3xs text-neutral-500">
                         {t('settings.showContextWarningHint')}
                       </span>
                     </span>
@@ -247,7 +247,7 @@ export default function SettingsPanel(): JSX.Element | null {
                   <div className="mt-3 flex items-center justify-between gap-3">
                     <div>
                       <p className="text-xs text-neutral-300">{t('settings.chatOnProjectSwitch')}</p>
-                      <p className="mt-0.5 text-[10px] text-neutral-500">
+                      <p className="mt-0.5 text-3xs text-neutral-500">
                         {t('settings.chatOnProjectSwitchHint')}
                       </p>
                     </div>

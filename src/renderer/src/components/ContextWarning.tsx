@@ -26,7 +26,7 @@ export default function ContextWarning({
       <span
         title={t('chat.contextNearLimit', { percent })}
         aria-label={t('chat.contextNearLimit', { percent })}
-        className={`flex items-center gap-1 font-mono text-[10px] ${tone}`}
+        className={`flex items-center gap-1 font-mono text-3xs ${tone}`}
       >
         <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
         {percent}%
@@ -35,7 +35,7 @@ export default function ContextWarning({
         type="button"
         onClick={onCompact}
         disabled={running}
-        className="rounded border border-border px-1.5 py-0.5 text-[10px] text-neutral-300 hover:bg-bg-tertiary disabled:opacity-40"
+        className="rounded border border-border px-1.5 py-0.5 text-3xs text-neutral-300 hover:bg-bg-tertiary disabled:opacity-40"
       >
         {t('chat.compact')}
       </button>

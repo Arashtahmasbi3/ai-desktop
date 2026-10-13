@@ -70,7 +70,7 @@ export default function ContextPreviewCard({
             <p className="mb-1 font-medium text-amber-400">{t('chat.contextWithheld')}</p>
             <ul className="space-y-0.5">
               {preview.blockedFiles.map((file) => (
-                <li key={file} className="truncate font-mono text-[10px] text-amber-300/80" dir="ltr">
+                <li key={file} className="truncate font-mono text-3xs text-amber-300/80" dir="ltr">
                   • {file}
                 </li>
               ))}
@@ -90,7 +90,7 @@ export default function ContextPreviewCard({
         {expanded ? (
           <pre
             dir="ltr"
-            className="max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-bg-primary p-2 text-left font-mono text-[10px] text-neutral-400"
+            className="max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-bg-primary p-2 text-left font-mono text-3xs text-neutral-400"
           >
             {formatContextPreview(preview)}
           </pre>

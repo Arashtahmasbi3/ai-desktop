@@ -155,7 +155,7 @@ export default function ProjectsSection(): JSX.Element {
           {t('common.add')}
         </button>
       </div>
-      <p className="mb-3 text-[11px] leading-relaxed text-neutral-600">
+      <p className="mb-3 text-2xs leading-relaxed text-neutral-600">
         {t('settings.remoteHint')}
       </p>
 

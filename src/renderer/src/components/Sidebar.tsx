@@ -249,7 +249,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
               {item.id === 'tasks' && runningJobs > 0 ? (
                 <span
                   data-testid="sidebar-jobs-badge-collapsed"
-                  className="absolute -right-1 -top-1 min-w-[14px] rounded-full bg-accent px-1 text-center text-[9px] font-semibold leading-[14px] text-bg-primary"
+                  className="absolute -right-1 -top-1 min-w-[14px] rounded-full bg-accent px-1 text-center text-4xs font-semibold leading-3.5 text-bg-primary"
                 >
                   {runningJobs}
                 </span>
@@ -362,7 +362,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
             {runningJobs > 0 ? (
               <span
                 data-testid="sidebar-jobs-badge"
-                className="absolute -right-1 -top-1 min-w-[14px] rounded-full bg-accent px-1 text-center text-[9px] font-semibold leading-[14px] text-bg-primary"
+                className="absolute -right-1 -top-1 min-w-[14px] rounded-full bg-accent px-1 text-center text-4xs font-semibold leading-3.5 text-bg-primary"
               >
                 {runningJobs}
               </span>
@@ -397,7 +397,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
             aria-label={t('common.search')}
             className="w-full bg-transparent text-xs text-neutral-200 outline-none placeholder:text-neutral-600"
           />
-          <kbd className="shrink-0 rounded border border-border px-1 text-[9px] text-neutral-600">
+          <kbd className="shrink-0 rounded border border-border px-1 text-4xs text-neutral-600">
             Ctrl ⇧ K
           </kbd>
         </label>
@@ -409,7 +409,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
             type="button"
             onClick={() => setProjectsOpen((open) => !open)}
             aria-expanded={projectsOpen}
-            className="flex w-full items-center gap-1 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-500 hover:text-neutral-300"
+            className="flex w-full items-center gap-1 px-2 py-1 text-3xs font-semibold uppercase tracking-wide text-neutral-500 hover:text-neutral-300"
           >
             {projectsOpen ? (
               <ChevronDown className="h-3 w-3 shrink-0" />
@@ -419,7 +419,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
             {t('sidebar.projects')}
           </button>
           {projectsOpen && projects.length === 0 ? (
-            <p className="px-2 py-1 text-[11px] text-neutral-600">{t('settings.noProjects')}</p>
+            <p className="px-2 py-1 text-2xs text-neutral-600">{t('settings.noProjects')}</p>
           ) : projectsOpen ? (
             projects.map((project) => {
               const state = projectState(project)
@@ -449,16 +449,16 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                           )}
                         />
                         {project.type === 'remote' && !project.vpsId ? (
-                          <span className="block truncate text-[10px] text-amber-400/90">
+                          <span className="block truncate text-3xs text-amber-400/90">
                             ⚠ VPS را انتخاب کنید
                           </span>
                         ) : state === 'missing' ? (
-                          <span className="block truncate text-[10px] text-amber-400/90">
+                          <span className="block truncate text-3xs text-amber-400/90">
                             {project.osMismatch ? t('sidebar.osMismatch') : t('sidebar.missingPath')}
                           </span>
                         ) : (
                           <span
-                            className="block truncate text-[10px] text-neutral-600"
+                            className="block truncate text-3xs text-neutral-600"
                             dir="ltr"
                           >
                             {basename(project.path)}
@@ -470,7 +470,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                       <span
                         data-testid="project-chat-count"
                         title={t('sidebar.chatCount', { count: chatCount })}
-                        className="shrink-0 rounded bg-bg-primary px-1.5 py-0.5 text-[10px] text-neutral-500 group-hover:hidden"
+                        className="shrink-0 rounded bg-bg-primary px-1.5 py-0.5 text-3xs text-neutral-500 group-hover:hidden"
                       >
                         {chatCount}
                       </span>
@@ -542,7 +542,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
 
                   {vpsSearch?.id === project.id ? (
                     <div className="ml-2 mt-0.5 rounded-lg border border-border bg-bg-primary p-1">
-                      <p className="px-1 py-0.5 text-[10px] text-neutral-500">
+                      <p className="px-1 py-0.5 text-3xs text-neutral-500">
                         {t('vps.found', { count: vpsSearch.paths.length })}
                       </p>
                       {vpsSearch.paths.map((remotePath) => (
@@ -551,7 +551,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                           type="button"
                           dir="ltr"
                           onClick={() => void addFoundRemote(project.name, remotePath)}
-                          className="block w-full truncate rounded px-1.5 py-1 text-left text-[11px] text-neutral-300 hover:bg-bg-tertiary"
+                          className="block w-full truncate rounded px-1.5 py-1 text-left text-2xs text-neutral-300 hover:bg-bg-tertiary"
                         >
                           {remotePath}
                         </button>
@@ -565,15 +565,15 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
         </section>
 
         <section>
-          <h3 className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
+          <h3 className="px-2 py-1 text-3xs font-semibold uppercase tracking-wide text-neutral-500">
             {t('sidebar.recents')}
           </h3>
           {chats.length === 0 ? (
-            <p className="px-2 py-3 text-[11px] leading-relaxed text-neutral-600">
+            <p className="px-2 py-3 text-2xs leading-relaxed text-neutral-600">
               {t('sidebar.emptyChats')}
             </p>
           ) : filtered.length === 0 ? (
-            <p className="px-2 py-3 text-[11px] text-neutral-600">{t('palette.noResults')}</p>
+            <p className="px-2 py-3 text-2xs text-neutral-600">{t('palette.noResults')}</p>
           ) : (
             filtered.map((chat) => (
               <div key={chat.id} className="group relative">
@@ -588,7 +588,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                 >
                   <MessageSquare className="h-3.5 w-3.5 shrink-0 text-neutral-500" />
                   <span className="min-w-0 flex-1 truncate text-xs">{chat.title}</span>
-                  <span className="shrink-0 text-[10px] text-neutral-600">
+                  <span className="shrink-0 text-3xs text-neutral-600">
                     {relativeTime(chat.updatedAt)}
                   </span>
                   <span
@@ -677,7 +677,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
           <button
             type="button"
             onClick={() => setView('files')}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200"
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-2xs text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200"
           >
             <FolderTree className="h-3 w-3" />
             {t('sidebar.navWorkspace')}
@@ -685,7 +685,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
           <button
             type="button"
             onClick={openSettings}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200"
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-2xs text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200"
           >
             <Plug className="h-3 w-3" />
             Plugins

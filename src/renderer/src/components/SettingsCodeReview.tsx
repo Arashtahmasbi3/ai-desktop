@@ -56,15 +56,15 @@ export default function SettingsCodeReview(): JSX.Element {
         <GitFork className="h-3.5 w-3.5" />
         {t('settings.codeReview')}
       </h3>
-      <p className="text-[11px] text-neutral-500">{t('settings.codeReviewHint')}</p>
+      <p className="text-2xs text-neutral-500">{t('settings.codeReviewHint')}</p>
 
       {loading ? (
-        <p className="flex items-center gap-2 text-[11px] text-neutral-500">
+        <p className="flex items-center gap-2 text-2xs text-neutral-500">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
           {t('common.loading')}
         </p>
       ) : !connected ? (
-        <p className="text-[11px] text-neutral-600">{t('settings.codeReviewNoAuth')}</p>
+        <p className="text-2xs text-neutral-600">{t('settings.codeReviewNoAuth')}</p>
       ) : (
         <>
           <label className="flex items-center gap-2 rounded-lg border border-border bg-bg-primary px-2 py-1.5">
@@ -77,7 +77,7 @@ export default function SettingsCodeReview(): JSX.Element {
             />
           </label>
           {filtered.length === 0 ? (
-            <p className="text-[11px] text-neutral-600">{t('settings.noRepos')}</p>
+            <p className="text-2xs text-neutral-600">{t('settings.noRepos')}</p>
           ) : (
             <ul className="flex flex-col gap-2">
               {filtered.map((repo) => {
@@ -91,7 +91,7 @@ export default function SettingsCodeReview(): JSX.Element {
                     <span className="min-w-0 truncate text-xs text-neutral-200" dir="ltr">
                       {repo.fullName}
                     </span>
-                    <label className="flex shrink-0 cursor-pointer items-center gap-2 text-[11px] text-neutral-400">
+                    <label className="flex shrink-0 cursor-pointer items-center gap-2 text-2xs text-neutral-400">
                       <input
                         type="checkbox"
                         checked={active}

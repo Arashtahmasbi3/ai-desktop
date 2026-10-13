@@ -48,19 +48,19 @@ export default function SettingsAudit(): JSX.Element {
         <ScrollText className="h-3.5 w-3.5" />
         {t('settings.audit')}
       </h3>
-      <p className="text-[11px] text-neutral-500">{t('settings.auditHint')}</p>
+      <p className="text-2xs text-neutral-500">{t('settings.auditHint')}</p>
 
       <div className="rounded-xl border border-border bg-bg-primary p-3">
-        <div className="flex items-center gap-1.5 text-[11px] text-neutral-500">
+        <div className="flex items-center gap-1.5 text-2xs text-neutral-500">
           <FileCheck2 className="h-3.5 w-3.5" />
           {t('settings.auditPath')}
         </div>
         {path ? (
-          <code className="mt-1 block break-all text-[11px] text-neutral-300" dir="ltr">
+          <code className="mt-1 block break-all text-2xs text-neutral-300" dir="ltr">
             {path}
           </code>
         ) : (
-          <p className="mt-1 text-[11px] text-neutral-500">{t('settings.auditNoProject')}</p>
+          <p className="mt-1 text-2xs text-neutral-500">{t('settings.auditNoProject')}</p>
         )}
       </div>
 
@@ -74,16 +74,16 @@ export default function SettingsAudit(): JSX.Element {
         {verifying ? t('settings.auditVerifying') : t('settings.auditVerify')}
       </button>
 
-      {failed ? <p className="text-[11px] text-amber-400">{t('settings.auditError')}</p> : null}
+      {failed ? <p className="text-2xs text-amber-400">{t('settings.auditError')}</p> : null}
 
       {result ? (
         result.ok ? (
-          <p className="flex items-center gap-1.5 text-[11px] text-emerald-400">
+          <p className="flex items-center gap-1.5 text-2xs text-emerald-400">
             <ShieldCheck className="h-3.5 w-3.5" />
             {t('settings.auditOk', { count: result.lines })}
           </p>
         ) : (
-          <p className="flex items-center gap-1.5 text-[11px] text-red-400">
+          <p className="flex items-center gap-1.5 text-2xs text-red-400">
             <ShieldAlert className="h-3.5 w-3.5" />
             {t('settings.auditBroken', {
               line: (result.brokenAt ?? 0) + 1,

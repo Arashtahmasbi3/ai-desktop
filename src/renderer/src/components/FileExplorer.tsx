@@ -55,7 +55,7 @@ export default function FileExplorer({ onClose }: FileExplorerProps = {}): JSX.E
 
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-bg-primary">
-      <div className="flex h-8 shrink-0 items-center justify-between border-b border-border px-3 text-[11px] text-neutral-500">
+      <div className="flex h-8 shrink-0 items-center justify-between border-b border-border px-3 text-2xs text-neutral-500">
         <span className="flex items-center gap-1">
           <FolderOpen className="h-3.5 w-3.5" />
           Workspace
@@ -117,7 +117,7 @@ export default function FileExplorer({ onClose }: FileExplorerProps = {}): JSX.E
               >
                 <ArrowRight className="h-3.5 w-3.5" />
               </button>
-              <span className="truncate font-mono text-[11px] text-neutral-400" dir="ltr" title={activeProject?.path}>
+              <span className="truncate font-mono text-2xs text-neutral-400" dir="ltr" title={activeProject?.path}>
                 ./{cwd === '.' ? '' : cwd}
               </span>
             </div>
@@ -153,7 +153,7 @@ export default function FileExplorer({ onClose }: FileExplorerProps = {}): JSX.E
                     {entry.name}
                   </span>
                   {entry.size !== undefined ? (
-                    <span className="ml-auto shrink-0 text-[10px] text-neutral-600">{entry.size}b</span>
+                    <span className="ml-auto shrink-0 text-3xs text-neutral-600">{entry.size}b</span>
                   ) : null}
                 </button>
               ))

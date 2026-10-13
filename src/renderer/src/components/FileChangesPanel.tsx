@@ -99,7 +99,7 @@ export default function FileChangesPanel({ changes }: FileChangesPanelProps): JS
   return (
     <div className="mb-2 flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2 px-1">
-        <p className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-neutral-500">
+        <p className="flex items-center gap-1.5 text-3xs uppercase tracking-wide text-neutral-500">
           <Layers className="h-3 w-3" />
           {t('chat.changesTitle')}
           <span className="text-neutral-600">({changes.length})</span>
@@ -108,21 +108,21 @@ export default function FileChangesPanel({ changes }: FileChangesPanelProps): JS
           <button
             type="button"
             onClick={() => setReviewId(changes[0]?.id ?? null)}
-            className="rounded border border-border px-2 py-0.5 text-[10px] text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200"
+            className="rounded border border-border px-2 py-0.5 text-3xs text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200"
           >
             {t('chat.reviewIndividually')}
           </button>
           <button
             type="button"
             onClick={rejectAll}
-            className="rounded border border-border px-2 py-0.5 text-[10px] text-neutral-400 hover:bg-bg-tertiary hover:text-red-400"
+            className="rounded border border-border px-2 py-0.5 text-3xs text-neutral-400 hover:bg-bg-tertiary hover:text-red-400"
           >
             {t('chat.rejectAll')}
           </button>
           <button
             type="button"
             onClick={applyAll}
-            className="rounded bg-accent px-2 py-0.5 text-[10px] font-medium text-white hover:bg-accent-hover"
+            className="rounded bg-accent px-2 py-0.5 text-3xs font-medium text-white hover:bg-accent-hover"
           >
             {t('chat.applyAll')}
           </button>
@@ -135,7 +135,7 @@ export default function FileChangesPanel({ changes }: FileChangesPanelProps): JS
           const isOpen = expanded.has(change.id)
           return (
             <div key={change.id} className="border-b border-border last:border-b-0">
-              <div className="group flex items-center gap-2 px-3 py-1.5 text-[11px]">
+              <div className="group flex items-center gap-2 px-3 py-1.5 text-2xs">
                 <button
                   type="button"
                   onClick={() =>
@@ -205,7 +205,7 @@ export default function FileChangesPanel({ changes }: FileChangesPanelProps): JS
         <button
           type="button"
           onClick={() => setShowAll(true)}
-          className="flex items-center gap-1 px-1 text-[10px] text-accent hover:underline"
+          className="flex items-center gap-1 px-1 text-3xs text-accent hover:underline"
         >
           <ChevronDown className="h-3 w-3" />
           {t('chat.showMoreFiles', { count: hidden })}

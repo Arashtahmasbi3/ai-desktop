@@ -87,22 +87,22 @@ export default function TaskTracker(): JSX.Element | null {
                     {step.number}. {step.description}
                   </span>
                   {duration ? (
-                    <span className="shrink-0 text-[10px] text-neutral-600">{duration}</span>
+                    <span className="shrink-0 text-3xs text-neutral-600">{duration}</span>
                   ) : null}
                 </div>
                 {command ? (
-                  <code className="mt-0.5 block truncate font-mono text-[10px] text-neutral-500">
+                  <code className="mt-0.5 block truncate font-mono text-3xs text-neutral-500">
                     $ {command}
                   </code>
                 ) : null}
                 {step.status === 'running' ? (
-                  <span className="text-[10px] text-accent">running…</span>
+                  <span className="text-3xs text-accent">running…</span>
                 ) : null}
                 {step.status === 'failed' && step.notes ? (
-                  <span className="block text-[10px] text-red-400">{step.notes}</span>
+                  <span className="block text-3xs text-red-400">{step.notes}</span>
                 ) : null}
                 {details && Object.keys(step.args).length > 0 ? (
-                  <pre className="mt-1 overflow-x-auto rounded bg-bg-primary p-1 font-mono text-[10px] text-neutral-400">
+                  <pre className="mt-1 overflow-x-auto rounded bg-bg-primary p-1 font-mono text-3xs text-neutral-400">
                     {JSON.stringify(step.args, null, 2)}
                   </pre>
                 ) : null}
@@ -122,7 +122,7 @@ export default function TaskTracker(): JSX.Element | null {
             aria-valuenow={percent}
           />
         </div>
-        <div className="mt-1 flex items-center justify-between text-[11px] text-neutral-500">
+        <div className="mt-1 flex items-center justify-between text-2xs text-neutral-500">
           <span data-testid="task-progress">
             Progress: {done}/{total} ({percent}%)
           </span>
