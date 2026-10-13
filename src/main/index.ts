@@ -23,7 +23,11 @@ function createWindow(): BrowserWindow {
     backgroundColor: '#0d0d0d',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false,
+      // v2.6.5: the renderer sandbox is on. The preload only uses `contextBridge`,
+      // `ipcRenderer` and `webUtils` (no Node built-ins), so there is no reason to
+      // run an unsandboxed renderer — and it is the process that renders model
+      // output. `contextIsolation` + `nodeIntegration: false` stay as they were.
+      sandbox: true,
       contextIsolation: true,
       nodeIntegration: false,
       webviewTag: true

@@ -3,12 +3,21 @@
 An Electron desktop AI assistant — a local, Codex-like companion that connects to the
 DeepSeek API, VPS servers (SSH), GitHub (Git), and your local files.
 
-> Status: **v2.3.0 (pre-release)**. A Codex-like agent workspace: provider-agnostic LLM
+> Status: **v2.6.5 (in development; latest release v2.6.4)**. A Codex-like agent workspace:
+> provider-agnostic LLM
 > adapters (OpenAI/Anthropic/DeepSeek/Google), the `SandboxManager` code-execution layer, the
 > `AgentOrchestrator` Planning → Execution → Observation → Reflection loop, token-budgeted
 > context/session state, and the full renderer UI (chat, tasks/logs, workspace explorer + code
 > viewer with diff, internal browser, GitHub, VPS/SSH remote, status bar), plus a
 > background worker queue, a localhost remote-access server and Windows packaging.
+>
+> **Install note:** `npm install` alone may leave Electron without its binary on npm versions
+> that block dependency install scripts. If `node_modules/electron/path.txt` is missing, run
+> `node node_modules/electron/install.js` before `npm run dev`.
+>
+> **Platform note:** the agent writes POSIX shell commands, so the local sandbox prefers a real
+> POSIX shell on Windows (Git for Windows' `bash.exe`). Without one it falls back to `cmd.exe`,
+> where those commands cannot run — install Git for Windows or use Docker.
 >
 > v2.3 adds a Codex-style workspace (redesigned sidebar, composer and Settings), an approval
 > system that learns (remembered tools, inline full-access toggle), a file-changes panel with

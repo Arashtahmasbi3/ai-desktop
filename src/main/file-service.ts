@@ -1,6 +1,40 @@
-import { existsSync, promises as fs } from 'node:fs'
+import { existsSync, realpathSync, promises as fs } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import type { FileEntry } from '@shared/ui'
+
+/** The real path of `target`, falling back to its nearest existing ancestor. */
+function realPathOf(target: string): string | null {
+  let current = target
+  for (;;) {
+    try {
+      return realpathSync(current)
+    } catch {
+      const parent = dirname(current)
+      if (parent === current) return null
+      current = parent
+    }
+  }
+}
+
+/**
+ * Prove that `target` really lives inside `base` once links are resolved
+ * (v2.6.5). A lexical comparison cannot see a junction or symlink that points
+ * outside the project, so this closes that path. A non-existent root resolves to
+ * nothing and the check is skipped.
+ */
+function assertRealPathInside(base: string, target: string): void {
+  let baseReal: string
+  try {
+    baseReal = realpathSync(base)
+  } catch {
+    return
+  }
+  const targetReal = realPathOf(target)
+  if (!targetReal) return
+  if (targetReal !== baseReal && !targetReal.startsWith(baseReal + sep)) {
+    throw new Error(`Path escapes the project root through a link: ${target}`)
+  }
+}
 
 /** Error code returned when a requested folder no longer exists on this OS. */
 export const PATH_NOT_FOUND = 'PATH_NOT_FOUND'
@@ -43,7 +77,14 @@ export class FileService {
     return this.root
   }
 
-  /** Resolve a project-relative path against an explicit root, rejecting escapes. */
+  /**
+   * Resolve a project-relative path against an explicit root, rejecting escapes.
+   *
+   * v2.6.5: the check is lexical *and* real. A junction/symlink placed inside the
+   * project (or a symlinked ancestor) passed the string comparison while the read
+   * or write still landed outside the root, so when the target or one of its
+   * existing ancestors resolves, that real path is proven contained too.
+   */
   resolveSafeAt(root: string, relativePath: string): string {
     const base = resolve(root)
     const cleaned = relativePath.replace(/\\/g, '/').replace(/^\/+/, '')
@@ -51,6 +92,7 @@ export class FileService {
     if (target !== base && !target.startsWith(base + sep)) {
       throw new Error(`Path escapes the project root: ${relativePath}`)
     }
+    assertRealPathInside(base, target)
     return target
   }
 
