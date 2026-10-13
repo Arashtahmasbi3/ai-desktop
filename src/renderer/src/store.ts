@@ -324,6 +324,8 @@ interface AppState {
   vpsServers: VpsServerView[]
   /** Live VPS connection state from the main process. */
   vpsStatus: VpsConnectionState
+  /** Per-server connection state, so one host's change never repaints another's. */
+  vpsStates: Record<string, VpsConnectionState>
   /** Every currently-connected server id (v2.6.4, multi-connection truth). */
   vpsConnected: string[]
   /** Diagnostic Mode state (v2.5.3); null until first fetched. */
@@ -609,6 +611,7 @@ export const useStore = create<AppState>((set, get) => ({
   vpsServerId: undefined,
   vpsServers: [],
   vpsStatus: { status: 'disconnected' },
+  vpsStates: {},
   vpsConnected: [],
   diagnostic: null,
   fullAccessExpiresAt: null,
@@ -739,41 +742,54 @@ export const useStore = create<AppState>((set, get) => ({
     if (get().vpsConnected.includes(serverId)) return
     try {
       const status = await window.api.vps.connect(serverId)
-      set({ vpsStatus: status })
+      get().setVpsStatus(status)
     } catch (error) {
-      set({
-        vpsStatus: {
-          status: 'error',
-          serverId,
-          error: error instanceof Error ? error.message : String(error)
-        }
+      get().setVpsStatus({
+        status: 'error',
+        serverId,
+        error: error instanceof Error ? error.message : String(error)
       })
     }
     await get().refreshVpsConnected()
   },
   async connectVps(serverId) {
-    set({ vpsStatus: { status: 'connecting', serverId } })
+    // Select first so the status that comes back is treated as the *selected*
+    // server's (v2.6.5), then let setVpsStatus route it.
+    set({ vpsServerId: serverId })
+    get().setVpsStatus({ status: 'connecting', serverId })
     try {
       const status = await window.api.vps.connect(serverId)
-      set({ vpsStatus: status, ...(status.status === 'connected' ? { vpsServerId: serverId } : {}) })
+      get().setVpsStatus(status)
       await get().refreshVpsConnected()
     } catch (error) {
-      set({
-        vpsStatus: {
-          status: 'error',
-          serverId,
-          error: error instanceof Error ? error.message : String(error)
-        }
+      get().setVpsStatus({
+        status: 'error',
+        serverId,
+        error: error instanceof Error ? error.message : String(error)
       })
       await get().refreshVpsConnected()
     }
   },
   async disconnectVps(serverId) {
     const status = await window.api.vps.disconnect(serverId)
-    set({ vpsStatus: status })
+    get().setVpsStatus({ ...status, serverId: status.serverId ?? serverId })
     await get().refreshVpsConnected()
   },
-  setVpsStatus: (status) => set({ vpsStatus: status }),
+  /**
+   * v2.6.5: a status event describes ONE server, but it used to be written
+   * straight into the single `vpsStatus` the chat header renders. With "every
+   * project stays connected" the keepalive brings other projects' hosts up, so
+   * the header showed a different host's state — and an idle disconnect of an
+   * unrelated server flipped the selected one to "disconnected". Track every
+   * server and only move the global when the event concerns the selection.
+   */
+  setVpsStatus: (status) =>
+    set((state) => {
+      const serverId = status.serverId
+      const vpsStates = serverId ? { ...state.vpsStates, [serverId]: status } : state.vpsStates
+      const concernsSelection = !serverId || !state.vpsServerId || state.vpsServerId === serverId
+      return { vpsStates, ...(concernsSelection ? { vpsStatus: status } : {}) }
+    }),
   toggleTerminal: () => set({ terminalOpen: !get().terminalOpen }),
   setSearchOpen: (open) => set({ searchOpen: open, ...(open ? {} : { searchResults: [] }) }),
   async runCodeSearch(query) {

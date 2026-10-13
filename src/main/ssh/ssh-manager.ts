@@ -58,6 +58,8 @@ export class SshManager {
   private readonly onData?: (sessionId: string, chunk: string) => void
   private readonly readKeyFile: (path: string) => Promise<Buffer>
   private connections = new Map<string, ConnectionEntry>()
+  /** In-flight connect attempts, so two callers cannot open two SSH clients. */
+  private connecting = new Map<string, Promise<VpsConnectionState>>()
   private pendingFingerprints = new Map<string, string>()
   /** Last known state per server, so the UI can reason about each independently. */
   private serverStates = new Map<string, VpsConnectionState>()
@@ -125,12 +127,48 @@ export class SshManager {
     return this.getState()
   }
 
+  /**
+   * Mark a server as recently used so the idle watchdog leaves it alone
+   * (v2.6.5). An open remote project is "in use" even while the agent is idle,
+   * and reaping it produced a reconnect every ~30 minutes plus a brief
+   * "project missing" state in the UI.
+   */
+  markActive(serverId: string): void {
+    this.touch(serverId)
+  }
+
   private touch(serverId: string): void {
     const entry = this.connections.get(serverId)
     if (entry) entry.lastActivity = this.now()
   }
 
+  /**
+   * Connect to a saved server.
+   *
+   * v2.6.5: concurrent attempts for the same server are coalesced. A double-click
+   * on Connect, or the keepalive racing a manual connect, used to open two SSH
+   * clients; the map kept the second and the first was never `end()`ed, leaking
+   * an authenticated connection for the life of the process.
+   */
   async connect(serverId: string): Promise<VpsConnectionState> {
+    const existing = this.connections.get(serverId)
+    if (existing) {
+      const known = this.serverStates.get(serverId)
+      return this.setState(
+        known ? { ...known, status: 'connected' } : { status: 'connected', serverId }
+      )
+    }
+    const inFlight = this.connecting.get(serverId)
+    if (inFlight) return inFlight
+
+    const attempt = this.doConnect(serverId).finally(() => {
+      this.connecting.delete(serverId)
+    })
+    this.connecting.set(serverId, attempt)
+    return attempt
+  }
+
+  private async doConnect(serverId: string): Promise<VpsConnectionState> {
     await this.store.load()
     const decrypted = await this.store.getDecrypted(serverId)
     if (!decrypted) return this.setState({ status: 'error', error: `Unknown server: ${serverId}` })
@@ -358,6 +396,12 @@ export class SshManager {
         if (current?.terminal?.id === sessionId) current.terminal = undefined
       }
     })
+    // v2.6.5: re-opening a terminal (panel remount, a reconnect) overwrote the
+    // handle and leaked the previous shell channel, whose data listener kept
+    // touching the connection so the idle watchdog never reaped it. Close the old
+    // shell first — its `onClose` clears `entry.terminal` while it still refers to
+    // the previous session, so the assignment below is the last word.
+    entry.terminal?.close()
     entry.terminal = session
     return session.id
   }

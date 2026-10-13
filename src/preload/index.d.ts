@@ -142,6 +142,8 @@ export interface Api {
     connected(): Promise<string[]>
     connect(id: string): Promise<VpsConnectionState>
     disconnect(id: string): Promise<VpsConnectionState>
+    /** Refresh a server's idle stamp so the watchdog keeps an open project's host up. */
+    keepAlive(id: string): Promise<VpsConnectionState>
     approveFingerprint(id: string): Promise<VpsConnectionState>
     exec(id: string, command: string): Promise<VpsExecResult>
     audit(): Promise<AuditEntryView[]>

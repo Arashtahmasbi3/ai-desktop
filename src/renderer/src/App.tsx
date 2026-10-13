@@ -100,7 +100,15 @@ export default function App(): JSX.Element {
       for (const id of remoteVpsIds(settings?.projects ?? [], vpsServerId)) {
         // `ensureVpsConnected` is a no-op when already connected, so this keeps
         // every remote project's host up without touching the selection.
-        if (!vpsConnected.includes(id)) await ensureVpsConnected(id)
+        if (vpsConnected.includes(id)) {
+          // v2.6.5: an open project is in use even while the agent is idle, so the
+          // 30-minute idle watchdog used to reap it and this loop reconnected it —
+          // a reconnect every ~30 min per idle project, plus a brief "missing"
+          // state in the UI. Refresh the activity stamp instead.
+          void window.api.vps.keepAlive(id).catch(() => undefined)
+        } else {
+          await ensureVpsConnected(id)
+        }
       }
     }
 
