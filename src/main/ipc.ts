@@ -1,4 +1,4 @@
-import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import type { CustomProviderInput, ProviderId } from '@shared/types'
 import type { ApprovalMode, ApprovalOutcome } from '@shared/approval'
 import type { InvestigateScope, SessionProfile } from '@shared/profile'
@@ -287,6 +287,9 @@ export function registerIpc(
       }
     ],
     ['agent:applyChange', (id: string) => services.agent.applyChange(id)],
+    // v2.6.5: one source of truth for the version shown in the UI. Settings →
+    // Developer hardcoded "v2.3.3" in a 2.6.4 build.
+    ['app:version', () => app.getVersion()],
     // v2.6.5: the local terminal now passes the same guards as every remote
     // command and records what ran on the user's own machine.
     [

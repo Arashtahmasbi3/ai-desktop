@@ -66,6 +66,8 @@ import type { ResolvedGoal } from '@core/agent/goal-store'
 export interface Api {
   app: {
     ping(): Promise<string>
+    /** The running app version (from Electron), so the UI never hardcodes it. */
+    version(): Promise<string>
   }
   window: {
     minimize(): Promise<void>

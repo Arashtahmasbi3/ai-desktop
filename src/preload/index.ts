@@ -63,7 +63,9 @@ const invoke = <T>(channel: string, ...args: unknown[]): Promise<T> =>
 
 export const api = {
   app: {
-    ping: (): Promise<string> => invoke<string>('app:ping')
+    ping: (): Promise<string> => invoke<string>('app:ping'),
+    /** v2.6.5: the running app version, so the UI never hardcodes it. */
+    version: (): Promise<string> => invoke<string>('app:version')
   },
 
   window: {
