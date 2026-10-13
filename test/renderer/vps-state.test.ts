@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import {
   readLastVpsId,
+  remoteVpsIds,
   resolveReconnectId,
   vpsIndicator,
   vpsServerName,
@@ -95,5 +96,31 @@ describe('single connection state derivation (Task A.4)', () => {
     ]
     expect(new Set(surfaces).size).toBe(1)
     expect(surfaces[0]).toBe('connected')
+  })
+
+  it('(v2.6.4) derives the indicator for the selected server from the connected set', () => {
+    // A status that names another host must not make the selected server look
+    // connected, and vice versa.
+    expect(vpsIndicator('a', { status: 'connected', serverId: 'b' }, ['a', 'b'])).toBe('connected')
+    expect(vpsIndicator('a', { status: 'connected', serverId: 'b' }, ['b'])).toBe('disconnected')
+    expect(vpsIndicator('a', { status: 'error', serverId: 'b', error: 'x' }, ['a'])).toBe('connected')
+  })
+})
+
+describe('remoteVpsIds (v2.6.4 multi-connection)', () => {
+  it('collects every remote project server plus an explicit selection, deduped', () => {
+    const projects = [
+      { type: 'remote', vpsId: 'srv-a' },
+      { type: 'remote', vpsId: 'srv-b' },
+      { type: 'local' },
+      { type: 'remote' }
+    ]
+    expect(remoteVpsIds(projects, 'srv-a')).toEqual(['srv-a', 'srv-b'])
+    expect(remoteVpsIds(projects, 'srv-header')).toEqual(['srv-a', 'srv-b', 'srv-header'])
+  })
+
+  it('returns just the explicit selection when there are no remote projects', () => {
+    expect(remoteVpsIds([{ type: 'local' }], 'srv-header')).toEqual(['srv-header'])
+    expect(remoteVpsIds([], undefined)).toEqual([])
   })
 })

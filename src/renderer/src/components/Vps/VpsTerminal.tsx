@@ -36,7 +36,9 @@ export default function VpsTerminal({ serverId }: { serverId: string }): JSX.Ele
     void window.api.vps
       .terminalOpen(serverId, term.cols, term.rows)
       .then((id) => {
-        if (disposed) void window.api.vps.disconnect(serverId)
+        // v2.6.4: if we unmounted while opening, close just this shell — never
+        // the SSH connection, which other projects may still be using.
+        if (disposed) void window.api.vps.terminalClose(serverId, id)
         else sessionId = id
       })
       .catch((cause) => setError(cause instanceof Error ? cause.message : String(cause)))
@@ -49,6 +51,7 @@ export default function VpsTerminal({ serverId }: { serverId: string }): JSX.Ele
 
     return () => {
       disposed = true
+      if (sessionId) void window.api.vps.terminalClose(serverId, sessionId)
       observer.disconnect()
       off()
       dataSub.dispose()

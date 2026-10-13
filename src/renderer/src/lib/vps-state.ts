@@ -59,3 +59,21 @@ export function readLastVpsId(): string | undefined {
     return undefined
   }
 }
+
+/**
+ * Every server the app should keep connected: each remote project's own VPS,
+ * plus the chat-header selection. v2.6.4 multi-connection — switching projects
+ * must not drop another project's host, so they are all kept up in the
+ * background rather than only the currently-selected one.
+ */
+export function remoteVpsIds(
+  projects: readonly { type?: string; vpsId?: string }[],
+  explicitVpsId?: string | undefined
+): string[] {
+  const ids = new Set<string>()
+  for (const project of projects) {
+    if (project.type === 'remote' && project.vpsId) ids.add(project.vpsId)
+  }
+  if (explicitVpsId) ids.add(explicitVpsId)
+  return [...ids]
+}

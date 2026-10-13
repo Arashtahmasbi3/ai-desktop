@@ -335,4 +335,25 @@ describe('ssh manager - multi-connection (v2.6.4)', () => {
     expect((await connecting).status).toBe('connected')
     expect(manager.connectedServers().sort()).toEqual([a, server.id].sort())
   })
+
+  it('closing a terminal keeps the SSH connection (and other servers) up', async () => {
+    const a = await connectedServer('alpha')
+    const b = await connectedServer('bravo')
+
+    const sessionA = await manager.openTerminal(a, 80, 24)
+    const sessionB = await manager.openTerminal(b, 80, 24)
+
+    // Closing B's shell must not touch A's shell, and neither connection drops.
+    manager.closeTerminal(b, sessionB)
+    expect(manager.isConnected(a)).toBe(true)
+    expect(manager.isConnected(b)).toBe(true)
+
+    // A stale/unknown session id is ignored rather than closing the wrong shell.
+    manager.closeTerminal(a, 'not-a-session')
+    expect(manager.isConnected(a)).toBe(true)
+
+    manager.closeTerminal(a, sessionA)
+    expect(manager.isConnected(a)).toBe(true)
+    expect(manager.isConnected(b)).toBe(true)
+  })
 })

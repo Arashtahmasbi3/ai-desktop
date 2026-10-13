@@ -206,6 +206,12 @@ export function registerVpsIpc(services: AppServices): () => void {
         services.vps.resizeTerminal(id, cols, rows)
       }
     ],
+    [
+      'vps:terminalClose',
+      (id: string, sessionId?: string) => {
+        services.vps.closeTerminal(id, sessionId)
+      }
+    ],
     ['vps:files:list', (id: string, path: string) => services.vps.listFiles(id, path)],
     ['vps:files:read', (id: string, path: string) => services.vps.readFile(id, path)],
     [

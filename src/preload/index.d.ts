@@ -162,6 +162,7 @@ export interface Api {
     terminalOpen(id: string, cols?: number, rows?: number): Promise<string>
     terminalWrite(id: string, data: string): Promise<void>
     terminalResize(id: string, cols: number, rows: number): Promise<void>
+    terminalClose(id: string, sessionId?: string): Promise<void>
     files: {
       list(id: string, path: string): Promise<RemoteFileEntry[]>
       read(id: string, path: string): Promise<string>

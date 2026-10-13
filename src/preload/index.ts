@@ -204,6 +204,8 @@ export const api = {
     terminalWrite: (id: string, data: string): Promise<void> => invoke('vps:terminalWrite', id, data),
     terminalResize: (id: string, cols: number, rows: number): Promise<void> =>
       invoke('vps:terminalResize', id, cols, rows),
+    terminalClose: (id: string, sessionId?: string): Promise<void> =>
+      invoke('vps:terminalClose', id, sessionId),
     files: {
       list: (id: string, path: string): Promise<RemoteFileEntry[]> =>
         invoke('vps:files:list', id, path),

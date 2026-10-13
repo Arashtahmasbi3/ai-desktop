@@ -367,6 +367,19 @@ export class SshManager {
     this.touch(serverId)
   }
 
+  /**
+   * Close only the interactive shell for a server, leaving its SSH connection
+   * (and every other server's connection) up. v2.6.4: a terminal panel
+   * unmounting must not tear down a connection other projects rely on.
+   */
+  closeTerminal(serverId: string, sessionId?: string): void {
+    const entry = this.connections.get(serverId)
+    if (!entry?.terminal) return
+    if (sessionId && entry.terminal.id !== sessionId) return
+    entry.terminal.close()
+    entry.terminal = undefined
+  }
+
   resizeTerminal(serverId: string, cols: number, rows: number): void {
     this.connections.get(serverId)?.terminal?.resize(cols, rows)
   }

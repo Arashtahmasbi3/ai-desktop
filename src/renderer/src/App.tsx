@@ -23,7 +23,7 @@ import Titlebar from './components/Titlebar'
 import WorkspacePanel from './components/WorkspacePanel'
 import ToastHost from './components/ToastHost'
 import { basename, subscribeToEvents, useStore } from './store'
-import { readLastVpsId, resolveReconnectId } from './lib/vps-state'
+import { readLastVpsId, remoteVpsIds, resolveReconnectId } from './lib/vps-state'
 import { resolveLayout } from './lib/layout'
 
 /** Retry interval for a selected-but-dropped VPS connection. */
@@ -79,20 +79,28 @@ export default function App(): JSX.Element {
     const boot = async (): Promise<void> => {
       await useStore.getState().refreshVps()
       void useStore.getState().refreshDiagnostic()
-      const { vpsServers, vpsStatus, connectVps, setVpsServerId } = useStore.getState()
+      const { vpsServers, settings, setVpsServerId, ensureVpsConnected } = useStore.getState()
       const target = resolveReconnectId(vpsServers, readLastVpsId())
-      if (!target || cancelled) return
-      setVpsServerId(target)
-      if (vpsStatus.status !== 'connected' || vpsStatus.serverId !== target) {
-        await connectVps(target)
+      if (target && !cancelled) {
+        setVpsServerId(target)
+        await ensureVpsConnected(target)
+      }
+      // Multi-connection (v2.6.4): bring up every remote project's host, not just
+      // the selected one, so switching projects is instant and never drops a
+      // connection another project is using.
+      for (const id of remoteVpsIds(settings?.projects ?? [], target)) {
+        if (cancelled) return
+        await useStore.getState().ensureVpsConnected(id)
       }
     }
 
     const keepalive = async (): Promise<void> => {
-      const { vpsServerId, vpsStatus, connectVps } = useStore.getState()
-      if (!vpsServerId) return
-      const connected = vpsStatus.status === 'connected' && vpsStatus.serverId === vpsServerId
-      if (!connected && vpsStatus.status !== 'connecting') await connectVps(vpsServerId)
+      const { vpsServerId, vpsConnected, settings, ensureVpsConnected } = useStore.getState()
+      for (const id of remoteVpsIds(settings?.projects ?? [], vpsServerId)) {
+        // `ensureVpsConnected` is a no-op when already connected, so this keeps
+        // every remote project's host up without touching the selection.
+        if (!vpsConnected.includes(id)) await ensureVpsConnected(id)
+      }
     }
 
     void boot().then(() => {

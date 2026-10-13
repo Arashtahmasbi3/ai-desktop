@@ -402,6 +402,8 @@ interface AppState {
   setVpsStatus: (status: VpsConnectionState) => void
   /** Refresh the list of currently-connected server ids. */
   refreshVpsConnected: () => Promise<void>
+  /** Connect a server in the background without changing the chat-header selection. */
+  ensureVpsConnected: (serverId: string) => Promise<void>
   setPlanMode: (value: boolean) => void
   setApprovalMode: (mode: ApprovalMode) => Promise<void>
   setPlanModeDefault: (value: boolean) => Promise<void>
@@ -683,6 +685,27 @@ export const useStore = create<AppState>((set, get) => ({
       // Leave the last known list: a transient failure must not flip every
       // project to "Not connected".
     }
+  },
+  /**
+   * v2.6.4: background connect for keepalive / other projects. Unlike
+   * `connectVps`, this never moves the chat-header selection, so bringing a
+   * second project's host up does not yank the user's current choice.
+   */
+  async ensureVpsConnected(serverId) {
+    if (get().vpsConnected.includes(serverId)) return
+    try {
+      const status = await window.api.vps.connect(serverId)
+      set({ vpsStatus: status })
+    } catch (error) {
+      set({
+        vpsStatus: {
+          status: 'error',
+          serverId,
+          error: error instanceof Error ? error.message : String(error)
+        }
+      })
+    }
+    await get().refreshVpsConnected()
   },
   async connectVps(serverId) {
     set({ vpsStatus: { status: 'connecting', serverId } })
