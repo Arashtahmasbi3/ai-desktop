@@ -9,8 +9,9 @@
  */
 
 import { randomUUID } from 'node:crypto'
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { readFile, rename } from 'node:fs/promises'
+import { join } from 'node:path'
+import { writeFileAtomic } from '@core/atomic-write'
 import {
   GOAL_FILE_VERSION,
   goalProgress,
@@ -54,11 +55,42 @@ export class GoalStore {
     return join(this.dir, 'projects', projectId, 'goals.json')
   }
 
+  /**
+   * Read the project's goals.
+   *
+   * v2.6.5: a *missing* file legitimately means "no goals yet", but any other
+   * failure (a locked file, `EACCES`, a transient read error) must NOT be
+   * reported as an empty list — the caller writes the list straight back, so a
+   * single failed read silently destroyed every goal the user had recorded. A
+   * transient failure is retried, a corrupt file is preserved as `.corrupt`
+   * before degrading, and a persistent read error is surfaced.
+   */
   private async readFile(projectId: string): Promise<GoalFile> {
+    const target = this.fileFor(projectId)
+    let text: string
     try {
-      const text = await readFile(this.fileFor(projectId), 'utf8')
+      text = await readFile(target, 'utf8')
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code
+      if (code === 'ENOENT') return { version: GOAL_FILE_VERSION, goals: [] }
+      // One retry for a transient Windows sharing violation.
+      await new Promise((resolve) => setTimeout(resolve, 25))
+      try {
+        text = await readFile(target, 'utf8')
+      } catch (retryError) {
+        const retryCode = (retryError as NodeJS.ErrnoException).code
+        if (retryCode === 'ENOENT') return { version: GOAL_FILE_VERSION, goals: [] }
+        throw new Error(
+          `Could not read goals for this project (${retryCode ?? 'unknown error'}). ` +
+            'Refusing to continue so the stored goals are not overwritten.'
+        )
+      }
+    }
+    try {
       return this.parseFile(JSON.parse(text), projectId)
     } catch {
+      // Keep the unreadable original so nothing is lost, then start clean.
+      await rename(target, `${target}.corrupt-${Date.now()}`).catch(() => undefined)
       return { version: GOAL_FILE_VERSION, goals: [] }
     }
   }
@@ -80,11 +112,10 @@ export class GoalStore {
 
   private async writeFile(projectId: string, file: GoalFile): Promise<void> {
     const target = this.fileFor(projectId)
-    await mkdir(dirname(target), { recursive: true })
-    // Write-then-rename so a crash mid-write cannot truncate the goals file.
-    const temp = `${target}.${process.pid}.${this.generateId()}.tmp`
-    await writeFile(temp, JSON.stringify(file, null, 2), 'utf8')
-    await rename(temp, target)
+    // Write-then-rename so a crash mid-write cannot truncate the goals file, with
+    // a retry for the Windows sharing violation that used to surface as a raw
+    // EPERM out of the goal panel (v2.6.5).
+    await writeFileAtomic(target, JSON.stringify(file, null, 2))
   }
 
   /** Every goal recorded for a project, oldest first. */

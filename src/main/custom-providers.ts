@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs'
-import { dirname } from 'node:path'
 import { randomUUID } from 'node:crypto'
+import { writeFileAtomic } from '@core/atomic-write'
 import type {
   CustomProvider,
   CustomProviderInput,
@@ -125,10 +125,7 @@ export class CustomProviderStore {
       version: CUSTOM_PROVIDERS_SCHEMA_VERSION,
       providers: this.providers
     }
-    await fs.mkdir(dirname(this.file), { recursive: true })
-    const tmp = `${this.file}.${process.pid}.${Date.now()}.tmp`
-    await fs.writeFile(tmp, `${JSON.stringify(payload, null, 2)}\n`, 'utf8')
-    await fs.rename(tmp, this.file)
+    await writeFileAtomic(this.file, `${JSON.stringify(payload, null, 2)}\n`)
   }
 
   /** Public, secret-free list for the renderer. */

@@ -1,7 +1,8 @@
 import { promises as fs } from 'node:fs'
 import { randomUUID } from 'node:crypto'
-import { dirname, isAbsolute, join, normalize, posix, resolve } from 'node:path'
+import { isAbsolute, join, normalize, posix, resolve } from 'node:path'
 import { homedir } from 'node:os'
+import { writeFileAtomic } from '@core/atomic-write'
 import type { ProviderId } from '@shared/types'
 import { isWindowsAbsolutePath } from '@shared/paths'
 import { coerceApprovalMode, type ApprovalMode } from '@shared/approval'
@@ -421,10 +422,7 @@ export class Persistence {
   private async persist(): Promise<void> {
     this.settings.version = SETTINGS_SCHEMA_VERSION
     this.settings.updatedAt = this.now()
-    await fs.mkdir(dirname(this.file), { recursive: true })
-    const tmp = `${this.file}.${process.pid}.${Date.now()}.tmp`
-    await fs.writeFile(tmp, `${JSON.stringify(this.settings, null, 2)}\n`, 'utf8')
-    await fs.rename(tmp, this.file)
+    await writeFileAtomic(this.file, `${JSON.stringify(this.settings, null, 2)}\n`)
   }
 
   getSettings(): AppSettings {
