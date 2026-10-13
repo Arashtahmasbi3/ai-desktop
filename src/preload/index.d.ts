@@ -138,6 +138,7 @@ export interface Api {
     save(input: VpsServerInput): Promise<VpsServerView>
     remove(id: string): Promise<boolean>
     status(): Promise<VpsConnectionState>
+    connected(): Promise<string[]>
     connect(id: string): Promise<VpsConnectionState>
     disconnect(id: string): Promise<VpsConnectionState>
     approveFingerprint(id: string): Promise<VpsConnectionState>

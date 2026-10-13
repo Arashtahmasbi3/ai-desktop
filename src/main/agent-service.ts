@@ -39,7 +39,7 @@ import type { PreflightChoice, PreflightPromptTier } from '@shared/preflight'
 import { buildWorkspaceSystemHint } from '@core/agent/workspace-prompt'
 import type { RemoteWorkspaceInfo } from '@shared/workspace-info'
 import { DEFAULT_APPROVAL_MODE } from '@core/agent/approval'
-import { resolveVpsForRun, requiresVps } from '@core/agent/vps-resolver'
+import { resolveVpsForRun, requiresVps, reconcileRunServer } from '@core/agent/vps-resolver'
 import type { ApprovedPlan, Plan, PlanDecision, PlanScopeContext, PlanWarning } from '@shared/plan'
 import { PLAN_REAPPROVE_MESSAGE } from '@shared/plan'
 import type { ResolvedProfile } from '@shared/profile'
@@ -538,8 +538,18 @@ export class AgentService {
     const active = settings.projects.find((project) => project.id === settings.activeProjectId)
     const connectedServers = this.vps ? this.vps.connectedServers() : []
     const isRemote = active?.type === 'remote'
-    const serverId = active?.vpsId
-    const connected = Boolean(serverId && connectedServers.includes(serverId))
+    // v2.6.4: the chat-header VPS only overrides the project's server when it is
+    // actually connected. Falling back to the active project keeps the routing
+    // decision and the tool runtime pinned to the *same* host, so a stale header
+    // selection can no longer make the UI say "Connected" while the tools
+    // report "Not connected".
+    const runServer = reconcileRunServer({
+      ...(vpsServerId ? { requestedVpsId: vpsServerId } : {}),
+      ...(active?.vpsId ? { projectVpsId: active.vpsId } : {}),
+      connectedServers
+    })
+    const serverId = runServer.serverId
+    const connected = runServer.connected
     // Read the diagnostic policy once per run so a toggle mid-run does not change
     // the containment rules under the agent's feet (v2.5.3). T2.4 unions it with
     // the environment's Investigate read roots: a dev box may be read anywhere,
@@ -570,7 +580,7 @@ export class AgentService {
     // Resolve the target explicitly: the user's chat-header choice wins, then the
     // active remote project's own VPS. Never inferred from the task text (P0-4).
     const resolved = resolveVpsForRun({
-      ...(vpsServerId ? { explicitVpsId: vpsServerId } : {}),
+      ...(serverId ? { explicitVpsId: serverId } : {}),
       ...(active ? { project: active } : {}),
       requiresVps: false
     })

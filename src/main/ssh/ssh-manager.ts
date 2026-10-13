@@ -59,6 +59,8 @@ export class SshManager {
   private readonly readKeyFile: (path: string) => Promise<Buffer>
   private connections = new Map<string, ConnectionEntry>()
   private pendingFingerprints = new Map<string, string>()
+  /** Last known state per server, so the UI can reason about each independently. */
+  private serverStates = new Map<string, VpsConnectionState>()
   private state: VpsConnectionState = { status: 'disconnected' }
   private watchdog?: ReturnType<typeof setInterval>
 
@@ -77,6 +79,18 @@ export class SshManager {
 
   getState(): VpsConnectionState {
     return { ...this.state }
+  }
+
+  /** Last known state of one server, or disconnected when we have never seen it. */
+  stateFor(serverId: string): VpsConnectionState {
+    return this.serverStates.get(serverId) ?? { status: 'disconnected', serverId }
+  }
+
+  /** Per-server state snapshot (v2.6.4): every server keeps its own connection. */
+  states(): Record<string, VpsConnectionState> {
+    const entries: Record<string, VpsConnectionState> = {}
+    for (const [id, state] of this.serverStates) entries[id] = { ...state }
+    return entries
   }
 
   connectedServers(): string[] {
@@ -106,6 +120,7 @@ export class SshManager {
 
   private setState(next: VpsConnectionState): VpsConnectionState {
     this.state = next
+    if (next.serverId) this.serverStates.set(next.serverId, { ...next })
     this.onStatus?.(this.getState())
     return this.getState()
   }

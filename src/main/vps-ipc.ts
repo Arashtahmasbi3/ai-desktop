@@ -144,6 +144,7 @@ export function registerVpsIpc(services: AppServices): () => void {
     ['vps:save', (input: VpsServerInput) => services.vpsServers.save(input)],
     ['vps:remove', (id: string) => services.vpsServers.remove(id)],
     ['vps:status', () => services.vps.getState()],
+    ['vps:connected', () => services.vps.connectedServers()],
     ['vps:connect', (id: string) => services.vps.connect(id)],
     ['vps:disconnect', (id: string) => services.vps.disconnect(id)],
     ['vps:approveFingerprint', (id: string) => services.vps.approveFingerprint(id)],

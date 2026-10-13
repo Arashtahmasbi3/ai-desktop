@@ -75,4 +75,37 @@ describe('v2.6.0 D.1 - deriveConnectionStatus', () => {
   it('6. every tone maps to its own colour class', () => {
     expect(new Set(Object.values(CONNECTION_TONE_CLASS)).size).toBe(4)
   })
+
+  it('7. (v2.6.4) a remote project stays connected while another host owns the global status', () => {
+    const status = deriveConnectionStatus(
+      input({
+        project: { type: 'remote', path: '/srv/api', vpsId: 'vps-1' },
+        vpsStatus: { status: 'connected', serverId: 'vps-2' },
+        vpsConnected: ['vps-1', 'vps-2']
+      })
+    )
+    expect(status.kind).toBe('connected')
+  })
+
+  it('8. (v2.6.4) an error on another server does not mark this project errored', () => {
+    const status = deriveConnectionStatus(
+      input({
+        project: { type: 'remote', path: '/srv/api', vpsId: 'vps-1' },
+        vpsStatus: { status: 'error', serverId: 'vps-2', error: 'boom' },
+        vpsConnected: ['vps-1']
+      })
+    )
+    expect(status.kind).toBe('connected')
+  })
+
+  it('9. (v2.6.4) a dropped connection reports disconnected even if the global status is connected', () => {
+    const status = deriveConnectionStatus(
+      input({
+        project: { type: 'remote', path: '/srv/api', vpsId: 'vps-1' },
+        vpsStatus: { status: 'connected', serverId: 'vps-2' },
+        vpsConnected: ['vps-2']
+      })
+    )
+    expect(status.kind).toBe('disconnected')
+  })
 })

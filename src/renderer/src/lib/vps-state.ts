@@ -12,11 +12,20 @@ export const VPS_RECONNECT_KEY = 'last-active-vps'
 /** Derive the indicator for the active VPS from the single main-process state. */
 export function vpsIndicator(
   activeVpsId: string | undefined | null,
-  status: VpsConnectionState
+  status: VpsConnectionState,
+  /**
+   * v2.6.4: every connected server id. When provided, the selected server's
+   * indicator is decided by whether *it* is connected, not by whichever server
+   * the single global status last touched (multi-connection).
+   */
+  connectedServers?: string[]
 ): VpsIndicator {
   if (!activeVpsId) return 'off'
-  if (status.status === 'connecting') return 'connecting'
-  if (status.status === 'error') return 'error'
+  if (status.status === 'connecting' && status.serverId === activeVpsId) return 'connecting'
+  if (status.status === 'error' && status.serverId === activeVpsId) return 'error'
+  if (connectedServers) {
+    return connectedServers.includes(activeVpsId) ? 'connected' : 'disconnected'
+  }
   if (status.status === 'connected' && status.serverId === activeVpsId) return 'connected'
   return 'disconnected'
 }

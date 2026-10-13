@@ -167,6 +167,7 @@ export const api = {
     save: (input: VpsServerInput): Promise<VpsServerView> => invoke('vps:save', input),
     remove: (id: string): Promise<boolean> => invoke('vps:remove', id),
     status: (): Promise<VpsConnectionState> => invoke('vps:status'),
+    connected: (): Promise<string[]> => invoke('vps:connected'),
     connect: (id: string): Promise<VpsConnectionState> => invoke('vps:connect', id),
     disconnect: (id: string): Promise<VpsConnectionState> => invoke('vps:disconnect', id),
     approveFingerprint: (id: string): Promise<VpsConnectionState> =>

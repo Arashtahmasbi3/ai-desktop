@@ -16,13 +16,14 @@ export default function VpsSelector(): JSX.Element {
   const running = useStore((state) => state.running)
   const servers = useStore((state) => state.vpsServers)
   const status = useStore((state) => state.vpsStatus)
+  const connected = useStore((state) => state.vpsConnected)
   const refreshVps = useStore((state) => state.refreshVps)
 
   useEffect(() => {
     void refreshVps()
   }, [refreshVps])
 
-  const indicator = vpsIndicator(vpsServerId, status)
+  const indicator = vpsIndicator(vpsServerId, status, connected)
 
   return (
     <div className="flex items-center gap-1">

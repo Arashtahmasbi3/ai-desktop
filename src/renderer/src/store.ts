@@ -296,6 +296,8 @@ interface AppState {
   vpsServers: VpsServerView[]
   /** Live VPS connection state from the main process. */
   vpsStatus: VpsConnectionState
+  /** Every currently-connected server id (v2.6.4, multi-connection truth). */
+  vpsConnected: string[]
   /** Diagnostic Mode state (v2.5.3); null until first fetched. */
   diagnostic: DiagnosticStatus | null
   /**
@@ -398,6 +400,8 @@ interface AppState {
   disconnectVps: (serverId: string) => Promise<void>
   /** Apply a status pushed from the main process. */
   setVpsStatus: (status: VpsConnectionState) => void
+  /** Refresh the list of currently-connected server ids. */
+  refreshVpsConnected: () => Promise<void>
   setPlanMode: (value: boolean) => void
   setApprovalMode: (mode: ApprovalMode) => Promise<void>
   setPlanModeDefault: (value: boolean) => Promise<void>
@@ -560,6 +564,7 @@ export const useStore = create<AppState>((set, get) => ({
   vpsServerId: undefined,
   vpsServers: [],
   vpsStatus: { status: 'disconnected' },
+  vpsConnected: [],
   diagnostic: null,
   fullAccessExpiresAt: null,
   planMode: false,
@@ -658,9 +663,25 @@ export const useStore = create<AppState>((set, get) => ({
         window.api.vps.list(),
         window.api.vps.status()
       ])
-      set({ vpsServers: servers, vpsStatus: status })
+      // Fetch the connected set independently: it is additive information, so a
+      // failure here must not wipe the server list or the connection status.
+      let connected: string[] = status.status === 'connected' && status.serverId ? [status.serverId] : []
+      try {
+        connected = await window.api.vps.connected()
+      } catch {
+        // Older bridge or transient failure: fall back to the single status.
+      }
+      set({ vpsServers: servers, vpsStatus: status, vpsConnected: connected })
     } catch {
-      set({ vpsServers: [], vpsStatus: { status: 'disconnected' } })
+      set({ vpsServers: [], vpsStatus: { status: 'disconnected' }, vpsConnected: [] })
+    }
+  },
+  async refreshVpsConnected() {
+    try {
+      set({ vpsConnected: await window.api.vps.connected() })
+    } catch {
+      // Leave the last known list: a transient failure must not flip every
+      // project to "Not connected".
     }
   },
   async connectVps(serverId) {
@@ -668,6 +689,7 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       const status = await window.api.vps.connect(serverId)
       set({ vpsStatus: status, ...(status.status === 'connected' ? { vpsServerId: serverId } : {}) })
+      await get().refreshVpsConnected()
     } catch (error) {
       set({
         vpsStatus: {
@@ -676,11 +698,13 @@ export const useStore = create<AppState>((set, get) => ({
           error: error instanceof Error ? error.message : String(error)
         }
       })
+      await get().refreshVpsConnected()
     }
   },
   async disconnectVps(serverId) {
     const status = await window.api.vps.disconnect(serverId)
     set({ vpsStatus: status })
+    await get().refreshVpsConnected()
   },
   setVpsStatus: (status) => set({ vpsStatus: status }),
   toggleTerminal: () => set({ terminalOpen: !get().terminalOpen }),
@@ -1600,9 +1624,10 @@ export function subscribeToEvents(): void {
   const offFiles = window.api.events.on('files:changed', () => {
     void useStore.getState().refreshFiles()
   })
-  const offVps = window.api.events.on('vps:status', (status) =>
+  const offVps = window.api.events.on('vps:status', (status) => {
     useStore.getState().setVpsStatus(status)
-  )
+    void useStore.getState().refreshVpsConnected()
+  })
   const offDiagnostic = window.api.events.on('diagnostic:status', (diagnostic) =>
     useStore.setState({ diagnostic })
   )
