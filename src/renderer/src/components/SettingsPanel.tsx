@@ -103,6 +103,8 @@ export default function SettingsPanel(): JSX.Element | null {
   const setShowRawToolRows = useStore((state) => state.setShowRawToolRows)
   const chatTransferPreference = useStore((state) => state.chatTransferPreference)
   const setChatTransferPreference = useStore((state) => state.setChatTransferPreference)
+  const showContextWarning = useStore((state) => state.showContextWarning)
+  const setShowContextWarning = useStore((state) => state.setShowContextWarning)
 
   const [tab, setTab] = useState<TabId>('general')
   const refreshVps = useStore((state) => state.refreshVps)
@@ -225,6 +227,20 @@ export default function SettingsPanel(): JSX.Element | null {
                       {t('settings.showRawToolRows')}
                       <span className="mt-0.5 block text-[10px] text-neutral-500">
                         {t('settings.showRawToolRowsHint')}
+                      </span>
+                    </span>
+                  </label>
+                  <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs text-neutral-300">
+                    <input
+                      type="checkbox"
+                      checked={showContextWarning}
+                      onChange={(event) => setShowContextWarning(event.target.checked)}
+                      className="accent-accent"
+                    />
+                    <span>
+                      {t('settings.showContextWarning')}
+                      <span className="mt-0.5 block text-[10px] text-neutral-500">
+                        {t('settings.showContextWarningHint')}
                       </span>
                     </span>
                   </label>

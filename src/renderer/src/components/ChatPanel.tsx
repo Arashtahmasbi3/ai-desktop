@@ -40,7 +40,7 @@ import { decideSend } from '../lib/context-gate'
 import { workspaceStatus, shouldShowWorkspaceBanner } from '../lib/project-status'
 import { CHAT_MAX_WIDTH } from '../lib/layout'
 import { visibleChatMessages } from '../lib/tool-rows'
-import { contextBudget } from '@shared/memory'
+import { contextBudget, contextWarningVisible } from '@shared/memory'
 
 const SUGGESTION_KEYS = [
   'chat.suggestion1',
@@ -73,6 +73,7 @@ export default function ChatPanel(): JSX.Element {
   const connectVps = useStore((state) => state.connectVps)
   const addProject = useStore((state) => state.addProject)
   const showContextBeforeSend = useStore((state) => state.showContextBeforeSend)
+  const showContextWarning = useStore((state) => state.showContextWarning)
   const compactContext = useStore((state) => state.compactContext)
   const selection = useStore((state) => state.selection)
   const openSettings = useStore((state) => state.openSettings)
@@ -561,7 +562,7 @@ export default function ChatPanel(): JSX.Element {
                 {t('chat.viewContext')}
               </button>
             </div>
-            {budget.nearLimit ? (
+            {contextWarningVisible(showContextWarning, budget.nearLimit) ? (
               <ContextWarning
                 percent={contextPercent}
                 overBudget={budget.overBudget}

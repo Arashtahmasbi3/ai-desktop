@@ -125,6 +125,7 @@ const MAX_TERMINAL_LINES = 500
 export const CONTEXT_SETTINGS_KEY = 'ai-desktop:show-context-before-send'
 const CHAT_TREE_KEY = 'ai-desktop:chat-tree-open'
 const RAW_TOOL_ROWS_KEY = 'ai-desktop:show-raw-tool-rows'
+const CONTEXT_WARNING_KEY = 'ai-desktop:show-context-warning'
 const SIDEBAR_PIN_KEY = 'ai-desktop:sidebar-pinned'
 const JOBS_PANEL_KEY = 'ai-desktop:show-jobs-panel'
 const ZOOM_KEY = 'ai-desktop:zoom-level'
@@ -191,6 +192,19 @@ export function readSidebarPinned(): boolean {
     return globalThis.localStorage?.getItem(SIDEBAR_PIN_KEY) !== '0'
   } catch {
     return true
+  }
+}
+
+/**
+ * Read the persisted "show the context-filling warning" preference (v2.6.4,
+ * Fix E — default off). The nudge is only useful for older, small-context
+ * models, so modern long-context models stay quiet unless the user opts in.
+ */
+export function readShowContextWarning(): boolean {
+  try {
+    return globalThis.localStorage?.getItem(CONTEXT_WARNING_KEY) === '1'
+  } catch {
+    return false
   }
 }
 
@@ -376,6 +390,8 @@ interface AppState {
   showJobsPanelAlways: boolean
   /** v2.6.3: show raw tool rows instead of hiding those grouped in the trace. */
   showRawToolRows: boolean
+  /** v2.6.4 Fix E: show the composer's context-filling warning (default off). */
+  showContextWarning: boolean
   /** Electron zoom level, 0 == 100% (T5.3). */
   zoomLevel: number
   /** Keyboard-shortcut cheat sheet visibility (T5.3). */
@@ -440,6 +456,7 @@ interface AppState {
   setShowJobsPanelAlways: (value: boolean) => void
   /** v2.6.3: toggle raw tool rows (persisted). */
   setShowRawToolRows: (value: boolean) => void
+  setShowContextWarning: (value: boolean) => void
   /** Apply (and persist) an Electron zoom level, clamped to a safe range (T5.3). */
   applyZoom: (level: number) => void
   zoomIn: () => void
@@ -622,6 +639,7 @@ export const useStore = create<AppState>((set, get) => ({
   jobsPanelOpen: false,
   showJobsPanelAlways: readShowJobsPanelAlways(),
   showRawToolRows: readShowRawToolRows(),
+  showContextWarning: readShowContextWarning(),
   zoomLevel: readZoomLevel(),
   shortcutsOpen: false,
 
@@ -921,6 +939,14 @@ export const useStore = create<AppState>((set, get) => ({
     set({ showRawToolRows: value })
     try {
       globalThis.localStorage?.setItem(RAW_TOOL_ROWS_KEY, value ? '1' : '0')
+    } catch {
+      // Persisting the preference is best-effort.
+    }
+  },
+  setShowContextWarning(value) {
+    set({ showContextWarning: value })
+    try {
+      globalThis.localStorage?.setItem(CONTEXT_WARNING_KEY, value ? '1' : '0')
     } catch {
       // Persisting the preference is best-effort.
     }
