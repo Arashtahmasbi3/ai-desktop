@@ -1407,7 +1407,10 @@ export class AgentOrchestrator {
     let lastError: unknown
     for (let p = 0; p < this.providers.length; p++) {
       const entry = this.providers[p]
-      for (let attempt = 1; attempt <= this.recovery.maxLlmAttempts; attempt++) {
+      // v2.6.5: a config with `maxLlmAttempts <= 0` skipped this loop entirely, so
+      // the function ended in `throw undefined` ("LLM call failed: undefined").
+      const attempts = Math.max(1, this.recovery.maxLlmAttempts)
+      for (let attempt = 1; attempt <= attempts; attempt++) {
         if (options.signal?.aborted) throw new Error('Run aborted by caller')
         try {
           const response = await entry.adapter.chat(
@@ -1457,7 +1460,7 @@ export class AgentOrchestrator {
         })
       }
     }
-    throw lastError
+    throw lastError ?? new Error('No LLM provider was available to run this step')
   }
 
   /**
@@ -1587,8 +1590,12 @@ export class AgentOrchestrator {
       }
       if (choice === 'cleanup') {
         this.log('warn', 'preflight.cleanup', runId, { step, tool: action.name, tier })
-        context.appendHint(PREFLIGHT_CLEANUP_NOTE)
+        // v2.6.5: append the observation FIRST, then the hint. A system message
+        // between the assistant turn and its tool results breaks the contiguous
+        // run that `sanitizeToolPairs` consumes, so the real results were treated
+        // as orphans and silently replaced with "[no tool result was recorded]".
         this.rejectPreflight(action, check, runId, step, context, observations)
+        context.appendHint(PREFLIGHT_CLEANUP_NOTE)
         return 'blocked'
       }
       // `cancel`, and any choice the tier does not allow, stops the step.
@@ -1697,8 +1704,7 @@ export class AgentOrchestrator {
     return this.executeAction(executor, action, runId, step, options)
   }
 
-  /** Execute one action, retrying transient sandbox failures. */
-  /** Reads the pre-write contents of a `write_file` target ('' when new). */
+  /** Reads the pre-write contents of a `write_file` target. */
   private async snapshotBefore(
     action: AgentAction,
     sandboxId: string | null
@@ -1708,8 +1714,14 @@ export class AgentOrchestrator {
     if (typeof path !== 'string') return null
     try {
       return await this.sandbox.readFile(sandboxId, path)
-    } catch {
-      return ''
+    } catch (error) {
+      // v2.6.5: only "the file does not exist" means a new file. Any other read
+      // failure used to return '' as well, so an existing file was presented as
+      // brand new and the review diff showed every line as an addition.
+      const code = (error as NodeJS.ErrnoException).code
+      const message = error instanceof Error ? error.message : String(error)
+      if (code === 'ENOENT' || /no such file|not found|does not exist/i.test(message)) return ''
+      return null
     }
   }
 
@@ -1740,6 +1752,9 @@ export class AgentOrchestrator {
         ...(plan.guidance ? { message: plan.guidance } : {})
       })
       await sleep(plan.delayMs, options.signal)
+      // v2.6.5: `sleep` resolves immediately once the signal is aborted, so the
+      // tool used to run one more time after the user pressed Stop.
+      if (options.signal?.aborted) break
       attempt += 1
       const retriedResult = await executor.execute(action, {
         ...(options.signal ? { signal: options.signal } : {})

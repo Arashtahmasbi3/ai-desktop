@@ -19,6 +19,12 @@ export interface AgentRun {
   /** path -> hash of the file content the (next) patch is based on. */
   readonly baseRevisions: Map<string, string>
   readonly startedAt: number
+  /**
+   * Last time this run captured or applied a patch (v2.6.5). The TTL used to be
+   * measured from `startedAt`, so a run longer than the TTL had *every* patch
+   * already expired the moment it was captured and the user could never apply it.
+   */
+  lastActivityAt: number
   status: AgentRunStatus
 }
 
@@ -92,25 +98,37 @@ export class RunStore {
   }
 
   createRun(input: CreateRunInput): AgentRun {
+    // Drop runs that can no longer be applied so the map cannot grow forever.
+    this.evictExpired(input.startedAt ?? this.now())
+    const startedAt = input.startedAt ?? this.now()
     const run: AgentRun = {
       id: input.id ?? randomUUID(),
       projectId: input.projectId,
       projectRoot: input.projectRoot,
       ...(input.goalId ? { goalId: input.goalId } : {}),
       baseRevisions: new Map(),
-      startedAt: input.startedAt ?? this.now(),
+      startedAt,
+      lastActivityAt: startedAt,
       status: 'running'
     }
     this.runs.set(run.id, run)
     return run
   }
 
+  /** Remove runs whose TTL has lapsed (v2.6.5: the map used to keep them forever). */
+  private evictExpired(at: number): void {
+    for (const [id, run] of this.runs) {
+      if (at - run.lastActivityAt > this.ttlMs) this.runs.delete(id)
+    }
+  }
+
   getRun(id: string): AgentRun | undefined {
     return this.runs.get(id)
   }
 
+  /** Freshness is measured from the last patch activity, not from the run start. */
   isExpired(run: AgentRun, at = this.now()): boolean {
-    return at - run.startedAt > this.ttlMs
+    return at - run.lastActivityAt > this.ttlMs
   }
 
   markCompleted(id: string): void {
@@ -132,6 +150,7 @@ export class RunStore {
   async capturePatch(input: CapturePatchInput): Promise<{ before: string }> {
     const run = this.runs.get(input.runId)
     if (!run) return { before: input.fallbackBefore }
+    run.lastActivityAt = this.now()
     try {
       const before = await input.io.readAt(run.projectRoot, input.path)
       run.baseRevisions.set(input.path, hashContent(before))

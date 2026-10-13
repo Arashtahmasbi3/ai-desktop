@@ -62,9 +62,41 @@ describe('Task 2.2 - plan-based auto-approval', () => {
     expect(trust.stepIds).toEqual(['a1', 'a2', 'a3'])
     expect(trust.expiresAt).toBe(NOW + PLAN_TRUST_TTL_MS)
 
-    expect(shouldAutoApprove(trust, action('a1'), NOW)).toBe(true)
-    expect(shouldAutoApprove(trust, action('a2'), NOW + 60_000)).toBe(true)
-    expect(shouldAutoApprove(trust, action('a3'), NOW + PLAN_TRUST_TTL_MS - 1)).toBe(true)
+    // v2.6.5: the action must still carry the tool + arguments the plan step was
+    // approved with, not merely reuse its id.
+    expect(
+      shouldAutoApprove(trust, action('a1', 'remote_shell', { command: 'npm install' }), NOW)
+    ).toBe(true)
+    expect(
+      shouldAutoApprove(
+        trust,
+        action('a2', 'remote_write_file', { path: '/srv/app/x.ts', content: 'x' }),
+        NOW + 60_000
+      )
+    ).toBe(true)
+    expect(
+      shouldAutoApprove(trust, action('a3', 'remote_shell', { command: 'npm test' }), NOW + PLAN_TRUST_TTL_MS - 1)
+    ).toBe(true)
+  })
+
+  it('1b. an id reused for a different tool or arguments is NOT auto-approved', () => {
+    const trust = trustFor(threeSteps, { type: 'approve', trust: true })!
+    // Same id, different command.
+    expect(
+      shouldAutoApprove(trust, action('a1', 'remote_shell', { command: 'rm -rf /var/www' }), NOW)
+    ).toBe(false)
+    // Same id, different tool.
+    expect(
+      shouldAutoApprove(trust, action('a1', 'remote_write_file', { path: '/etc/passwd', content: 'x' }), NOW)
+    ).toBe(false)
+    // Same id, same tool, different target.
+    expect(
+      shouldAutoApprove(
+        trust,
+        action('a2', 'remote_write_file', { path: '/etc/shadow', content: 'x' }),
+        NOW
+      )
+    ).toBe(false)
   })
 
   it('2. after 30 minutes the trust expires and approval comes back', () => {

@@ -75,7 +75,9 @@ describe('v2.6.1 Fix 5 - AgentService memory', () => {
       stepIds: ['step-1', 'step-2'],
       approvedAt: 0,
       expiresAt: Date.now() + 60_000,
-      scope: { planHash: 'hash-1' }
+      scope: { planHash: 'hash-1' },
+      // v2.6.5: a trust record must bind each step to its tool+arguments.
+      stepFingerprints: { 'step-1': 'h1', 'step-2': 'h2' }
     })
 
     expect((await agent.memory('chat-1')).trustedPlan).toEqual({
@@ -94,7 +96,8 @@ describe('v2.6.1 Fix 5 - AgentService memory', () => {
       stepIds: ['step-1'],
       approvedAt: 0,
       expiresAt: Date.now() + 60_000,
-      scope: { planHash: 'hash-1' }
+      scope: { planHash: 'hash-1' },
+      stepFingerprints: { 'step-1': 'h1' }
     })
 
     expect(await agent.clearMemory('chat-1')).toBe(true)

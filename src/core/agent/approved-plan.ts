@@ -17,8 +17,9 @@ function decisionSteps(plan: Plan, decision: PlanDecision): PlanStep[] {
 }
 
 /**
- * Fingerprint the steps a trust record covers (v2.6.2, T4.2). Editing the plan
- * changes the hash, so an older approval stops applying to the new steps.
+ * Fingerprint one step's tool + arguments (v2.6.5). Bound into the trust record
+ * so an auto-approval can only ever skip the prompt for the *exact* step the user
+ * saw, not for whatever later reuses the same action id.
  */
 export function hashPlanSteps(steps: PlanStep[]): string {
   const stable = steps.map((step) => ({
@@ -27,6 +28,13 @@ export function hashPlanSteps(steps: PlanStep[]): string {
     arguments: step.arguments
   }))
   return createHash('sha256').update(JSON.stringify(stable), 'utf8').digest('hex')
+}
+
+/** The tool+arguments half of {@link hashPlanSteps}, for one step. */
+export function hashStepBinding(tool: string, args: Record<string, unknown>): string {
+  return createHash('sha256')
+    .update(JSON.stringify({ tool, arguments: args ?? {} }), 'utf8')
+    .digest('hex')
 }
 
 export interface CreateApprovedPlanOptions {
@@ -57,7 +65,22 @@ export function createApprovedPlan(
   if (stepIds.length === 0) return null
   const scope: PlanScope = { planHash: hashPlanSteps(steps), ...options.scope }
   const ttlMs = options.ttlMs ?? planTrustTtlMs(options.scope?.environment)
-  return { id: plan.id, runId, stepIds, approvedAt: now, expiresAt: now + ttlMs, scope }
+  // Bind each id to the step it was approved for (v2.6.5).
+  const stepFingerprints: Record<string, string> = {}
+  for (const step of steps) {
+    if (typeof step.actionId === 'string' && step.actionId.length > 0) {
+      stepFingerprints[step.actionId] = hashStepBinding(step.tool, step.arguments)
+    }
+  }
+  return {
+    id: plan.id,
+    runId,
+    stepIds,
+    approvedAt: now,
+    expiresAt: now + ttlMs,
+    scope,
+    stepFingerprints
+  }
 }
 
 /** True when the record carries a well-formed scope (v2.6.2+). */
@@ -65,7 +88,11 @@ export function hasPlanScope(plan: ApprovedPlan): plan is ApprovedPlan & { scope
   return (
     plan.scope !== undefined &&
     typeof plan.scope.planHash === 'string' &&
-    plan.scope.planHash.length > 0
+    plan.scope.planHash.length > 0 &&
+    // v2.6.5: a record without step bindings predates the fix and can never
+    // auto-approve, so the user is asked instead of inheriting an id-only trust.
+    plan.stepFingerprints !== undefined &&
+    Object.keys(plan.stepFingerprints).length > 0
   )
 }
 
@@ -126,6 +153,10 @@ export function shouldAutoApprove(
   if (!plan) return false
   if (!isPlanTrustValid(plan, now, current)) return false
   if (!planIncludesStep(plan, action.id)) return false
+  // v2.6.5: the id alone is not the step. The action must still carry the exact
+  // tool + arguments the user trusted for that id.
+  const bound = plan.stepFingerprints?.[action.id]
+  if (!bound || bound !== hashStepBinding(action.name, action.arguments)) return false
   if (isDenyListedAction(action)) return false
   return true
 }
