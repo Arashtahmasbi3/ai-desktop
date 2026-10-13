@@ -4,11 +4,21 @@ import { ArrowRight, Bot, Check, FolderPlus, KeyRound, Server, Settings } from '
 import { ONBOARDING_STEPS, USE_CASES, recommendModel } from '@shared/onboarding'
 import type { UseCase } from '@shared/onboarding'
 import { useStore } from '../store'
+import Modal from './ui/Modal'
 
+/** U-17: the wizard used to be English-only; every string now has a key. */
 const USE_CASE_LABELS: Record<UseCase, string> = {
-  quick: 'Quick & cheap',
-  balanced: 'Balanced',
-  powerful: 'Most capable'
+  quick: 'onboarding.useCaseQuick',
+  balanced: 'onboarding.useCaseBalanced',
+  powerful: 'onboarding.useCasePowerful'
+}
+
+const TITLE_KEYS: Record<string, string> = {
+  welcome: 'onboarding.titleWelcome',
+  connect: 'onboarding.titleConnect',
+  project: 'onboarding.titleProject',
+  vps: 'onboarding.vpsTitle',
+  done: 'onboarding.titleDone'
 }
 
 /**
@@ -31,6 +41,7 @@ export default function Onboarding(): JSX.Element | null {
   if (!ready || !onboarding || onboarding.completed) return null
 
   const current = ONBOARDING_STEPS[step]
+  const title = t(TITLE_KEYS[current] ?? 'onboarding.titleWelcome')
   const hasKey = Object.values(settings?.providers ?? {}).some((provider) => provider?.hasApiKey)
   const hasProject = (settings?.projects?.length ?? 0) > 0
   const last = step === ONBOARDING_STEPS.length - 1
@@ -50,21 +61,20 @@ export default function Onboarding(): JSX.Element | null {
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md">
-      <div className="flex max-h-[calc(100vh-2rem)] w-[min(34rem,92vw)] flex-col overflow-hidden rounded-2xl border border-border bg-bg-secondary shadow-2xl">
+    // U-17: the shared Modal primitive — the hand-rolled overlay sat at z-40,
+    // far below the real modal layer (z-[9999]), and had no focus trap.
+    <Modal
+      open
+      maxWidth="min(34rem, 92vw)"
+      maxHeight="calc(100vh - 2rem)"
+      ariaLabel={title}
+    >
+      {/* The panel's own column: a fixed header, the scrolling body and a fixed
+          footer, so the wizard's actions stay reachable for any content. */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="flex shrink-0 items-center gap-2 border-b border-border px-5 py-4">
           <Sparkle current={current} />
-          <h2 className="text-sm font-semibold text-neutral-100">
-            {current === 'welcome'
-              ? 'Welcome to AI Desktop'
-              : current === 'connect'
-                ? 'Connect a provider'
-                : current === 'project'
-                  ? 'Add your first project'
-                  : current === 'vps'
-                    ? t('onboarding.vpsTitle')
-                    : 'You are all set'}
-          </h2>
+          <h2 className="text-sm font-semibold text-neutral-100">{title}</h2>
           <span className="ml-auto text-3xs text-neutral-500">
             {t('onboarding.stepOf', { current: step + 1, total: ONBOARDING_STEPS.length })}
           </span>
@@ -73,10 +83,7 @@ export default function Onboarding(): JSX.Element | null {
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 text-sm text-neutral-300">
           {current === 'welcome' ? (
             <div className="flex flex-col gap-4">
-              <p>
-                AI Desktop connects an AI assistant to your local files, GitHub and VPS. Pick what
-                you will mostly use it for — we will pre-select a model for you.
-              </p>
+              <p>{t('onboarding.welcomeBody')}</p>
               <div className="flex flex-wrap gap-2">
                 {USE_CASES.map((option) => (
                   <button
@@ -89,31 +96,33 @@ export default function Onboarding(): JSX.Element | null {
                         : 'border-border text-neutral-400 hover:bg-bg-tertiary'
                     }`}
                   >
-                    {USE_CASE_LABELS[option]}
+                    {t(USE_CASE_LABELS[option])}
                   </button>
                 ))}
               </div>
               <p className="text-xs text-neutral-500">
-                Suggested model: <span className="font-mono">{recommendModel(useCase).model}</span>{' '}
-                — {recommendModel(useCase).reason}
+                {t('onboarding.suggestedModel', {
+                  model: recommendModel(useCase).model,
+                  reason: recommendModel(useCase).reason
+                })}
               </p>
             </div>
           ) : null}
 
           {current === 'connect' ? (
             <div className="flex flex-col gap-3">
-              <StatusRow ok={hasKey} label={hasKey ? 'A provider key is saved' : 'No provider key yet'} />
-              <p className="text-xs text-neutral-500">
-                Add a DeepSeek, OpenAI, Anthropic or Gemini key in Settings. You can also add any
-                OpenAI-compatible endpoint under “Custom providers”.
-              </p>
+              <StatusRow
+                ok={hasKey}
+                label={hasKey ? t('onboarding.keySaved') : t('onboarding.noKey')}
+              />
+              <p className="text-xs text-neutral-500">{t('onboarding.connectBody')}</p>
               <button
                 type="button"
                 onClick={openSettings}
                 className="flex w-fit items-center gap-2 rounded border border-border px-3 py-1.5 text-xs text-neutral-200 hover:bg-bg-tertiary"
               >
                 <Settings className="h-3.5 w-3.5" />
-                Open Settings
+                {t('onboarding.openSettings')}
               </button>
             </div>
           ) : null}
@@ -122,19 +131,16 @@ export default function Onboarding(): JSX.Element | null {
             <div className="flex flex-col gap-3">
               <StatusRow
                 ok={hasProject}
-                label={hasProject ? 'A project is available' : 'No project yet'}
+                label={hasProject ? t('onboarding.projectReady') : t('onboarding.noProject')}
               />
-              <p className="text-xs text-neutral-500">
-                Projects point the assistant at a folder on your machine. Add one in Settings, or
-                drag a folder onto the window later.
-              </p>
+              <p className="text-xs text-neutral-500">{t('onboarding.projectBody')}</p>
               <button
                 type="button"
                 onClick={openSettings}
                 className="flex w-fit items-center gap-2 rounded border border-border px-3 py-1.5 text-xs text-neutral-200 hover:bg-bg-tertiary"
               >
                 <FolderPlus className="h-3.5 w-3.5" />
-                Add a project
+                {t('onboarding.addProject')}
               </button>
             </div>
           ) : null}
@@ -159,11 +165,8 @@ export default function Onboarding(): JSX.Element | null {
 
           {current === 'done' ? (
             <div className="flex flex-col gap-3">
-              <StatusRow ok label="Setup complete" />
-              <p className="text-xs text-neutral-500">
-                Use the model picker in the chat header to switch models any time. Press Ctrl+, to
-                reopen Settings.
-              </p>
+              <StatusRow ok label={t('onboarding.setupComplete')} />
+              <p className="text-xs text-neutral-500">{t('onboarding.doneBody')}</p>
             </div>
           ) : null}
         </div>
@@ -196,7 +199,7 @@ export default function Onboarding(): JSX.Element | null {
           </div>
         </div>
       </div>
-    </div>
+    </Modal>
   )
 }
 

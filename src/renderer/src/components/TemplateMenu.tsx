@@ -73,7 +73,7 @@ export default function TemplateMenu({ currentInput, onPick }: TemplateMenuProps
                       type="button"
                       aria-label={t('common.remove')}
                       onClick={() => setUserTemplates(removeUserTemplate(template.id))}
-                      className="mr-1 hidden rounded p-1 text-neutral-600 hover:text-red-400 group-hover:block"
+                      className="mr-1 hidden rounded p-1 text-neutral-400 hover:text-red-400 focus-visible:block group-hover:block group-focus-within:block"
                     >
                       <Trash2 className="h-3 w-3" />
                     </button>

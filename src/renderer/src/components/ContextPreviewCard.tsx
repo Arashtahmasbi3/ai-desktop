@@ -24,7 +24,7 @@ export default function ContextPreviewCard({
   const [expanded, setExpanded] = useState(false)
 
   return (
-    <Modal open onClose={onClose} maxWidth="28rem" ariaLabel={t('chat.contextTitle')}>
+    <Modal open onClose={onClose} maxWidth="28rem" ariaLabel={t('chat.contextTitle')} closeOnBackdrop>
       <header className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
         <h2 className="text-sm font-semibold text-neutral-100">{t('chat.contextTitle')}</h2>
         <button

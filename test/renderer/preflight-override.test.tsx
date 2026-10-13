@@ -48,11 +48,13 @@ function request(overrides: Partial<PreflightRequestView> = {}): PreflightReques
 }
 
 describe('preflight override store wiring', () => {
-  it('opens a prompt on preflight:request and answers via IPC', () => {
+  it('opens a prompt on preflight:request and answers via IPC', async () => {
     useStore.getState().applyEvent({ type: 'preflight:request', request: request() })
     expect(useStore.getState().pendingPreflight?.id).toBe('preflight-1')
 
-    useStore.getState().respondPreflight('proceed')
+    // U-5: the gate is cleared only once main accepts the answer, so the store
+    // call is awaited.
+    await useStore.getState().respondPreflight('proceed')
     expect(useStore.getState().pendingPreflight).toBeNull()
     expect(respondPreflight).toHaveBeenCalledWith('preflight-1', 'proceed')
   })
@@ -89,12 +91,14 @@ describe('PreflightOverrideDialog', () => {
     expect(screen.getByRole('button', { name: /Cleanup and proceed/i })).toBeTruthy()
   })
 
-  it('sends the chosen option and closes', () => {
+  it('sends the chosen option and closes', async () => {
     useStore.setState({ pendingPreflight: request() })
     render(<PreflightOverrideDialog />)
 
     fireEvent.click(screen.getByRole('button', { name: /Override anyway/i }))
     expect(respondPreflight).toHaveBeenCalledWith('preflight-1', 'proceed')
+    // U-5: the dialog closes on the reply, not optimistically.
+    await act(async () => {})
     expect(useStore.getState().pendingPreflight).toBeNull()
   })
 

@@ -122,6 +122,44 @@ const MAX_LOGS = 500
 /** v2.6.2 T3.2: keep the timeline bounded too. */
 const MAX_DECISIONS = 200
 const MAX_TERMINAL_LINES = 500
+/**
+ * U-10: `messages` used to grow without bound — every `tool:result` appends one
+ * and `ChatPanel` renders all of them eagerly — so a long run leaked memory and
+ * painted thousands of rows. Cap the in-memory history at the newest
+ * MAX_MESSAGES (the on-disk chat/session still holds the full transcript, and
+ * the agent's own ContextManager compacts the prompt independently). The
+ * tradeoff is that a very old tail disappears from the UI until the chat is
+ * reloaded from disk.
+ */
+const MAX_MESSAGES = 500
+/** U-10: `taskPlans` only ever grew; bound it the same way. */
+const MAX_TASK_PLANS = 50
+
+/**
+ * U-10: trim `messages` to the newest MAX_MESSAGES, but never drop a message
+ * that belongs to the run currently producing them.
+ */
+function capMessages(messages: ChatMessage[], runId: string | null): ChatMessage[] {
+  if (messages.length <= MAX_MESSAGES) return messages
+  const cutoff = messages.length - MAX_MESSAGES
+  if (runId) {
+    const firstInFlight = messages.findIndex((message) => message.runId === runId)
+    if (firstInFlight >= 0 && firstInFlight < cutoff) return messages.slice(firstInFlight)
+  }
+  return messages.slice(cutoff)
+}
+
+/** U-10: insert a plan into the map, dropping the oldest entries past the cap. */
+function withTaskPlan(
+  plans: Record<string, TaskPlan>,
+  plan: TaskPlan
+): Record<string, TaskPlan> {
+  const next = { ...plans, [plan.id]: plan }
+  const ids = Object.keys(next)
+  if (ids.length <= MAX_TASK_PLANS) return next
+  for (const id of ids.slice(0, ids.length - MAX_TASK_PLANS)) delete next[id]
+  return next
+}
 export const CONTEXT_SETTINGS_KEY = 'ai-desktop:show-context-before-send'
 const CHAT_TREE_KEY = 'ai-desktop:chat-tree-open'
 const RAW_TOOL_ROWS_KEY = 'ai-desktop:show-raw-tool-rows'
@@ -533,7 +571,7 @@ interface AppState {
   removeProject: (id: string) => Promise<void>
   openProject: (id: string) => Promise<void>
   /** Open a project without offering to transfer the open chat. */
-  switchProject: (id: string) => Promise<void>
+  switchProject: (id: string, keepChat?: boolean) => Promise<void>
   /** Apply the chosen chat transfer and switch to the pending project. */
   completeProjectSwitch: (
     id: string,
@@ -552,6 +590,46 @@ interface AppState {
 
   clearError: () => void
   dismissLoopStop: () => void
+}
+
+/**
+ * U-1: slices that belong to the *open project*. None of them may survive a
+ * project switch or removal: keeping them left project A's pending agent diffs
+ * listed with live Apply buttons (writing into A while the UI said B), A's
+ * "what this chat remembers" panel, and A's open file — which Ctrl+S would then
+ * commit. `memory` is cleared too and re-read for the new chat afterwards.
+ */
+function projectScopedReset(): Partial<AppState> {
+  return {
+    entries: [],
+    cwd: '.',
+    selectedFile: null,
+    fileContent: '',
+    draft: null,
+    saving: false,
+    projectMissing: false,
+    fileChanges: [],
+    memory: null,
+    taskPlan: null,
+    taskPlans: {},
+    searchResults: [],
+    searchOpen: false
+  }
+}
+
+/** U-1: slices that belong to the open chat, dropped when it is not transferred. */
+function chatScopedReset(): Partial<AppState> {
+  return {
+    sessionId: newId(),
+    activeChatId: null,
+    messages: [],
+    logs: [],
+    decisions: [],
+    warnings: [],
+    preflightNotice: null,
+    loopStop: null,
+    memory: null
+  }
 }
 
 let autosaveTimer: ReturnType<typeof setInterval> | null = null
@@ -859,11 +937,23 @@ export const useStore = create<AppState>((set, get) => ({
   async setPlanModeDefault(value) {
     set({ settings: await window.api.settings.setPlanModeDefault(value) })
   },
-  respondApproval(answer) {
+  async respondApproval(answer) {
     const pending = get().pendingApproval
     if (!pending) return
     const outcome: ApprovalOutcome =
       typeof answer === 'boolean' ? { approved: answer } : answer
+    // U-5: only clear the gate once main has accepted the answer. Clearing it
+    // optimistically made a failed reply look like a decision, while the run
+    // hung until main's 2-minute fail-closed timeout with no visible error.
+    try {
+      await window.api.agent.respondApproval(pending.id, answer)
+    } catch (error) {
+      get().pushToast(
+        'error',
+        `${i18n.t('toast.actionFailed')} ${error instanceof Error ? error.message : String(error)}`
+      )
+      return
+    }
     if (outcome.explain) {
       set({
         queuedExplain:
@@ -872,19 +962,34 @@ export const useStore = create<AppState>((set, get) => ({
       })
     }
     set({ pendingApproval: null })
-    void window.api.agent.respondApproval(pending.id, answer)
   },
-  respondPlan(decision) {
+  async respondPlan(decision) {
     const pending = get().pendingPlan
     if (!pending) return
+    try {
+      await window.api.agent.respondPlan(pending.id, decision)
+    } catch (error) {
+      get().pushToast(
+        'error',
+        `${i18n.t('toast.actionFailed')} ${error instanceof Error ? error.message : String(error)}`
+      )
+      return
+    }
     set({ pendingPlan: null })
-    void window.api.agent.respondPlan(pending.id, decision)
   },
-  respondPreflight(choice) {
+  async respondPreflight(choice) {
     const pending = get().pendingPreflight
     if (!pending) return
+    try {
+      await window.api.agent.respondPreflight(pending.id, choice)
+    } catch (error) {
+      get().pushToast(
+        'error',
+        `${i18n.t('toast.actionFailed')} ${error instanceof Error ? error.message : String(error)}`
+      )
+      return
+    }
     set({ pendingPreflight: null })
-    void window.api.agent.respondPreflight(pending.id, choice)
   },
   stopPlan() {
     set({ activePlan: null })
@@ -912,8 +1017,10 @@ export const useStore = create<AppState>((set, get) => ({
   pushToast(kind, message) {
     const id = newId()
     set({ toasts: [...get().toasts, { id, kind, message: redact(message) }] })
-    const ttl = kind === 'error' ? 5000 : 3000
-    setTimeout(() => get().dismissToast(id), ttl)
+    // U-13: an error is the only record of a failure, so it stays until the user
+    // dismisses it. Success/warning toasts remain self-clearing.
+    if (kind === 'error') return
+    setTimeout(() => get().dismissToast(id), 3000)
   },
   dismissToast(id) {
     set({ toasts: get().toasts.filter((toast) => toast.id !== id) })
@@ -1181,7 +1288,7 @@ export const useStore = create<AppState>((set, get) => ({
       case 'task:failed':
         set({
           taskPlan: event.plan,
-          taskPlans: { ...get().taskPlans, [event.plan.id]: event.plan },
+          taskPlans: withTaskPlan(get().taskPlans, event.plan),
           ...(event.type === 'task:complete' || event.type === 'task:failed'
             ? { taskPaused: false }
             : {})
@@ -1232,17 +1339,20 @@ export const useStore = create<AppState>((set, get) => ({
         const toolCall = toolCallFromView(event.result)
         const code = event.result.code !== undefined ? ` (${String(event.result.code)})` : ''
         set({
-          messages: [
-            ...get().messages,
-            {
-              id: newId(),
-              role: 'tool',
-              content: `${toolCall.name}${code}`,
-              at: event.at,
-              runId: event.runId,
-              toolCall
-            }
-          ]
+          messages: capMessages(
+            [
+              ...get().messages,
+              {
+                id: newId(),
+                role: 'tool',
+                content: `${toolCall.name}${code}`,
+                at: event.at,
+                runId: event.runId,
+                toolCall
+              }
+            ],
+            event.runId
+          )
         })
         break
       }
@@ -1272,7 +1382,7 @@ export const useStore = create<AppState>((set, get) => ({
           pendingPlan: null,
           pendingPreflight: null,
           activePlan: null,
-          messages
+          messages: capMessages(messages, null)
         })
         const explain = get().queuedExplain
         if (explain) {
@@ -1303,10 +1413,13 @@ export const useStore = create<AppState>((set, get) => ({
           activePlan: null,
           error: redact(event.message),
           loopStop: null,
-          messages: [
-            ...get().messages,
-            { id: newId(), role: 'system', content: `Error: ${redact(event.message)}`, at: Date.now() }
-          ]
+          messages: capMessages(
+            [
+              ...get().messages,
+              { id: newId(), role: 'system', content: `Error: ${redact(event.message)}`, at: Date.now() }
+            ],
+            get().currentRunId
+          )
         })
         get().pushToast('error', event.message)
         break
@@ -1316,7 +1429,7 @@ export const useStore = create<AppState>((set, get) => ({
   setTaskPlan(plan) {
     set({
       taskPlan: plan,
-      ...(plan ? { taskPlans: { ...get().taskPlans, [plan.id]: plan } } : {})
+      ...(plan ? { taskPlans: withTaskPlan(get().taskPlans, plan) } : {})
     })
   },
   pauseTaskPlan() {
@@ -1334,7 +1447,7 @@ export const useStore = create<AppState>((set, get) => ({
     const stopped: TaskPlan = { ...plan, status: 'failed' }
     set({
       taskPlan: stopped,
-      taskPlans: { ...get().taskPlans, [stopped.id]: stopped },
+      taskPlans: withTaskPlan(get().taskPlans, stopped),
       taskPaused: false
     })
   },
@@ -1663,7 +1776,9 @@ export const useStore = create<AppState>((set, get) => ({
 
   async removeProject(id) {
     set({ settings: await window.api.settings.removeProject(id) })
-    set({ entries: [], selectedFile: null, cwd: '.' })
+    // U-1: the removed project's diffs, memory, open file and draft must not
+    // outlive it — Apply/Ctrl+S would otherwise write into the deleted project.
+    set({ ...projectScopedReset(), ...chatScopedReset() })
   },
 
   async openProject(id) {
@@ -1690,10 +1805,17 @@ export const useStore = create<AppState>((set, get) => ({
     await get().completeProjectSwitch(id, plan.choice)
   },
 
-  async switchProject(id) {
+  /**
+   * U-1: a switch always drops every project-scoped slice. `keepChat` is true
+   * only for a deliberate `link` transfer, where the conversation itself moves
+   * with the user (its memory is re-read for the same chat id below).
+   */
+  async switchProject(id, keepChat = false) {
     set({ settings: await window.api.projects.open(id) })
+    set({ ...projectScopedReset(), ...(keepChat ? {} : chatScopedReset()) })
     await get().refreshFiles('.')
     await get().refreshGoals()
+    await get().refreshMemory()
   },
 
   async completeProjectSwitch(id, choice, remember = false) {
@@ -1704,7 +1826,8 @@ export const useStore = create<AppState>((set, get) => ({
     // Persist under the current project first so the chat is never lost.
     await get().persistChat()
     const chatId = get().activeChatId
-    await get().switchProject(id)
+    // U-1: only the `link` choice deliberately carries the conversation over.
+    await get().switchProject(id, choice === 'link')
     set({ pendingProjectSwitch: null })
 
     if (choice !== 'new' && chatId) {

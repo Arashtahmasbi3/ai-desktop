@@ -74,7 +74,7 @@ export default function RemoteFileExplorer({ serverId }: { serverId: string }): 
       <div className="flex items-center gap-2 border-b border-border px-2 py-1.5">
         <button
           onClick={() => void list(parent)}
-          disabled={path === '/'}
+          disabled={path === '/' || busy}
           className="rounded p-1 text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-100 disabled:opacity-30"
           title="Up"
         >
@@ -82,10 +82,12 @@ export default function RemoteFileExplorer({ serverId }: { serverId: string }): 
         </button>
         <button
           onClick={() => void list(path)}
-          className="rounded p-1 text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-100"
+          disabled={busy}
+          aria-busy={busy}
+          className="rounded p-1 text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-100 disabled:opacity-50"
           title="Refresh"
         >
-          <RefreshCw className="h-3.5 w-3.5" />
+          <RefreshCw className={`h-3.5 w-3.5 ${busy ? 'animate-spin' : ''}`} />
         </button>
         <span className="truncate font-mono text-xs text-neutral-500">{path}</span>
         {selected ? (
@@ -107,7 +109,8 @@ export default function RemoteFileExplorer({ serverId }: { serverId: string }): 
             <button
               key={entry.path}
               onClick={() => void open(entry)}
-              className={`flex w-full items-center gap-2 px-2 py-1 text-left text-xs hover:bg-bg-tertiary ${
+              disabled={busy}
+              className={`flex w-full items-center gap-2 px-2 py-1 text-left text-xs hover:bg-bg-tertiary disabled:opacity-60 ${
                 selected === entry.path ? 'bg-bg-tertiary text-accent' : 'text-neutral-300'
               }`}
             >

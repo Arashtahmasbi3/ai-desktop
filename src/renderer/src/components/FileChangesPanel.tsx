@@ -87,13 +87,16 @@ export default function FileChangesPanel({ changes }: FileChangesPanelProps): JS
     if (confirmWrite(1)) void applyFileChange(id)
   }
 
-  const applyAll = (): void => {
+  // U-5: apply one at a time. Firing every apply at once let several
+  // `set({ fileChanges })` updates race and resurrect an entry that had already
+  // been applied. Reject-all had the same race.
+  const applyAll = async (): Promise<void> => {
     if (!confirmWrite(changes.length)) return
-    for (const change of changes) void applyFileChange(change.id)
+    for (const id of changes.map((change) => change.id)) await applyFileChange(id)
   }
 
-  const rejectAll = (): void => {
-    for (const change of changes) void rejectFileChange(change.id)
+  const rejectAll = async (): Promise<void> => {
+    for (const id of changes.map((change) => change.id)) await rejectFileChange(id)
   }
 
   return (
@@ -114,14 +117,14 @@ export default function FileChangesPanel({ changes }: FileChangesPanelProps): JS
           </button>
           <button
             type="button"
-            onClick={rejectAll}
+            onClick={() => void rejectAll()}
             className="rounded border border-border px-2 py-0.5 text-3xs text-neutral-400 hover:bg-bg-tertiary hover:text-red-400"
           >
             {t('chat.rejectAll')}
           </button>
           <button
             type="button"
-            onClick={applyAll}
+            onClick={() => void applyAll()}
             className="rounded bg-accent px-2 py-0.5 text-3xs font-medium text-white hover:bg-accent-hover"
           >
             {t('chat.applyAll')}
@@ -218,6 +221,7 @@ export default function FileChangesPanel({ changes }: FileChangesPanelProps): JS
         maxWidth="min(64rem, 92vw)"
         maxHeight="calc(100vh - 3rem)"
         ariaLabel={reviewing?.path}
+        closeOnBackdrop
       >
         {reviewing ? (
           <>

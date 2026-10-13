@@ -52,7 +52,10 @@ export default function Titlebar(): JSX.Element {
     >
       <button
         type="button"
-        onClick={() => newSession()}
+        onClick={() => {
+          // U-4: `newSession` wipes messages, logs, decisions and pending diffs.
+          if (window.confirm(t('common.clearChatConfirm'))) newSession()
+        }}
         title={`${t('titlebar.newChat')} (Ctrl+N)`}
         aria-label={t('titlebar.newChat')}
         className="no-drag flex h-7 w-7 items-center justify-center rounded hover:bg-bg-tertiary hover:text-neutral-200"

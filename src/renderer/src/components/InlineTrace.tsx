@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Activity, AlertCircle, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react'
 import DecisionCard from './DecisionCard'
@@ -36,6 +36,22 @@ export default function InlineTrace(): JSX.Element | null {
   const [open, setOpen] = useState(true)
   const [expanded, setExpanded] = useState(false)
 
+  // U-11: `toolsFor` used to filter the entire message list once per visible
+  // decision (O(steps x messages) every render). Index the tool messages by
+  // `runId:step` once instead.
+  const toolsByStep = useMemo(() => {
+    const index = new Map<string, ChatMessage[]>()
+    for (const message of messages) {
+      const step = message.toolCall?.step
+      if (message.role !== 'tool' || !message.runId || step === undefined) continue
+      const key = `${message.runId}:${step}`
+      const bucket = index.get(key)
+      if (bucket) bucket.push(message)
+      else index.set(key, [message])
+    }
+    return index
+  }, [messages])
+
   if (decisions.length === 0) return null
 
   const bounded = decisions.slice(-INLINE_TRACE_LIMIT)
@@ -46,18 +62,16 @@ export default function InlineTrace(): JSX.Element | null {
   const toolsFor = (decision: TraceDecision): ChatMessage[] => {
     const step = stepOf(decision)
     if (step === undefined) return []
-    return messages.filter(
-      (message) =>
-        message.role === 'tool' &&
-        message.runId === decision.runId &&
-        message.toolCall?.step === step
-    )
+    return toolsByStep.get(`${decision.runId}:${step}`) ?? []
   }
 
   return (
     <section
       data-testid="inline-trace"
-      dir="ltr"
+      // U-7: `dir="ltr"` forced a Persian intent summary to render left-to-right
+      // inside an RTL chat. `auto` resolves per element, and the commands/tool
+      // chips below keep their own explicit LTR direction.
+      dir="auto"
       className="mx-4 flex flex-col gap-1 rounded-lg border border-border bg-bg-secondary/40 p-2"
     >
       <button

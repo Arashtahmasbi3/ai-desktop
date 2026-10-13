@@ -59,6 +59,7 @@ export default function ShortcutsOverlay(): JSX.Element | null {
       onClose={() => setOpen(false)}
       maxWidth="min(44rem, 92vw)"
       ariaLabel={t('shortcuts.title')}
+      closeOnBackdrop
     >
       <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
         <h2 className="text-sm font-semibold text-neutral-100">{t('shortcuts.title')}</h2>
@@ -75,7 +76,7 @@ export default function ShortcutsOverlay(): JSX.Element | null {
         <div className="grid gap-5 sm:grid-cols-2">
           {GROUPS.map((group) => (
             <section key={group.titleKey} className="flex flex-col gap-2">
-              <h3 className="text-2xs font-semibold uppercase tracking-wide text-text-tertiary">
+              <h3 className="text-2xs font-semibold uppercase tracking-wide text-neutral-500">
                 {t(group.titleKey)}
               </h3>
               <ul className="flex flex-col gap-1.5">

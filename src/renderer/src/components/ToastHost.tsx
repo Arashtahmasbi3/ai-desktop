@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+import { createPortal } from 'react-dom'
 import { AlertTriangle, CheckCircle2, Info, X } from 'lucide-react'
 import { useStore, type ToastKind } from '../store'
 
@@ -14,7 +15,14 @@ const COLORS: Record<ToastKind, string> = {
   warning: 'border-amber-500/30 bg-amber-500/10 text-amber-300'
 }
 
-/** Bottom-right stack of transient notifications. */
+/**
+ * Bottom-right stack of transient notifications.
+ *
+ * U-13: portalled into `document.body` (so the app root being `inert` behind a
+ * dialog cannot disable them) and stacked above the modal layer — at `z-[60]`
+ * every toast raised while a dialog was open was painted under the backdrop and
+ * was unreadable and unclickable.
+ */
 export default function ToastHost(): JSX.Element | null {
   const { t } = useTranslation()
   const toasts = useStore((state) => state.toasts)
@@ -22,8 +30,11 @@ export default function ToastHost(): JSX.Element | null {
 
   if (toasts.length === 0) return null
 
-  return (
-    <div className="pointer-events-none fixed bottom-10 right-3 z-[60] flex w-80 flex-col gap-2">
+  return createPortal(
+    <div
+      aria-live="polite"
+      className="pointer-events-none fixed bottom-10 right-3 z-[10000] flex w-80 flex-col gap-2"
+    >
       {toasts.map((toast) => {
         const Icon = ICONS[toast.kind]
         return (
@@ -45,6 +56,7 @@ export default function ToastHost(): JSX.Element | null {
           </div>
         )
       })}
-    </div>
+    </div>,
+    document.body
   )
 }

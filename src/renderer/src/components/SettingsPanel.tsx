@@ -122,6 +122,7 @@ export default function SettingsPanel(): JSX.Element | null {
       maxWidth="min(58rem, 92vw)"
       maxHeight="min(85vh, 44rem)"
       ariaLabel={t('settings.title')}
+      closeOnBackdrop
     >
       <div className="flex h-[min(85vh,44rem)] max-h-full flex-col overflow-hidden">
         <div className="flex h-11 shrink-0 items-center justify-between border-b border-border px-4">

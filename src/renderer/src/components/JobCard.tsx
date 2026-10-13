@@ -45,14 +45,14 @@ export default function JobCard({
     >
       <div className="flex items-center gap-2">
         <StatusIcon status={job.status} />
-        <span className="font-mono text-xs text-text-secondary">
+        <span className="font-mono text-xs text-neutral-400">
           {t('jobs.cardTitle', { id: job.id.slice(0, 8), status: job.status })}
         </span>
-        <span className="ms-auto text-3xs text-text-tertiary">
+        <span className="ms-auto text-3xs text-neutral-500">
           {t('jobs.startedAgo', { time: relativeTime(job.startedAt, at) })}
         </span>
       </div>
-      <div className="mt-1 truncate font-mono text-xs text-text-primary" title={job.command}>
+      <div className="mt-1 truncate font-mono text-xs text-neutral-200" title={job.command}>
         $ {job.command}
       </div>
       <div className="mt-2 flex items-center gap-2">
@@ -76,7 +76,7 @@ export default function JobCard({
         )}
       </div>
       {open && (
-        <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded bg-black/40 p-2 font-mono text-2xs text-text-secondary">
+        <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded bg-black/40 p-2 font-mono text-2xs text-neutral-400">
           {job.output || t('jobs.noOutput')}
         </pre>
       )}

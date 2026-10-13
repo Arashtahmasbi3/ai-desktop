@@ -25,6 +25,7 @@ import WorkspacePanel from './components/WorkspacePanel'
 import ToastHost from './components/ToastHost'
 import { basename, subscribeToEvents, useStore } from './store'
 import { readLastVpsId, remoteVpsIds, resolveReconnectId } from './lib/vps-state'
+import { topmostEscapeTarget } from './lib/escape'
 import { resolveLayout } from './lib/layout'
 
 /** Retry interval for a selected-but-dropped VPS connection. */
@@ -235,11 +236,44 @@ export default function App(): JSX.Element {
           } as const)[event.key as '1' | '2' | '3' | '4' | '5' | '6' | '7']
         )
       } else if (event.key === 'Escape') {
-        if (state.searchOpen) state.setSearchOpen(false)
-        else if (state.paletteOpen) state.setPaletteOpen(false)
-        else if (state.shortcutsOpen) state.setShortcutsOpen(false)
-        else if (state.settingsOpen) state.closeSettings()
-        else clearError()
+        // U-15: Escape targets the topmost open surface (see lib/escape.ts).
+        // `pendingApproval`/`pendingPreflight` are deliberately absent: a
+        // security gate is answered with an explicit button (U-14), and the
+        // dialogs that do have a close action consume Escape themselves (U-2).
+        switch (topmostEscapeTarget(state)) {
+          case 'search':
+            state.setSearchOpen(false)
+            break
+          case 'palette':
+            state.setPaletteOpen(false)
+            break
+          case 'projectSwitch':
+            state.cancelProjectSwitch()
+            break
+          case 'shortcuts':
+            state.setShortcutsOpen(false)
+            break
+          case 'settings':
+            state.closeSettings()
+            break
+          case 'migration':
+            state.closeMigration()
+            break
+          case 'jobs':
+            state.setJobsPanelOpen(false)
+            break
+          case 'tree':
+            state.toggleChatTree()
+            break
+          case 'terminal':
+            state.toggleTerminal()
+            break
+          case 'error':
+            clearError()
+            break
+          default:
+            break
+        }
       }
     }
     window.addEventListener('keydown', onKeyDown)
@@ -266,10 +300,16 @@ export default function App(): JSX.Element {
       onDragLeave={() => setDragging(false)}
       onDrop={onDrop}
     >
-      <Titlebar />
+      {/* U-16: every top-level surface gets its own boundary, so one panel's
+          render error can never blank the whole window. */}
+      <ErrorBoundary label="Titlebar">
+        <Titlebar />
+      </ErrorBoundary>
 
       <div className="flex min-h-0 flex-1">
-        <Sidebar rail={layout.sidebar === 'rail'} />
+        <ErrorBoundary label="Sidebar">
+          <Sidebar rail={layout.sidebar === 'rail'} />
+        </ErrorBoundary>
 
         <div className="flex min-h-0 min-w-0 flex-1">
           {!ready ? (
@@ -313,28 +353,51 @@ export default function App(): JSX.Element {
         <div className="flex items-center gap-2 border-t border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs text-red-300">
           <AlertTriangle className="h-3.5 w-3.5" />
           <span className="flex-1">{error}</span>
-          <button type="button" onClick={clearError} className="rounded p-0.5 hover:bg-red-500/20">
+          <button
+            type="button"
+            onClick={clearError}
+            aria-label={t('common.close')}
+            className="rounded p-0.5 hover:bg-red-500/20"
+          >
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
       ) : null}
 
-      <StatusBar />
+      <ErrorBoundary label="Status bar">
+        <StatusBar />
+      </ErrorBoundary>
 
-      <Onboarding />
+      <ErrorBoundary label="Onboarding">
+        <Onboarding />
+      </ErrorBoundary>
 
-      <SettingsPanel />
+      <ErrorBoundary label="Settings">
+        <SettingsPanel />
+      </ErrorBoundary>
 
-      <ShortcutsOverlay />
+      <ErrorBoundary label="Shortcuts">
+        <ShortcutsOverlay />
+      </ErrorBoundary>
 
-      <MigrationDialog />
-      <ProjectSwitchDialog />
+      <ErrorBoundary label="Migration">
+        <MigrationDialog />
+      </ErrorBoundary>
+      <ErrorBoundary label="Project switch">
+        <ProjectSwitchDialog />
+      </ErrorBoundary>
 
-      <CommandPalette />
+      <ErrorBoundary label="Command palette">
+        <CommandPalette />
+      </ErrorBoundary>
 
-      <CodeSearchModal />
+      <ErrorBoundary label="Code search">
+        <CodeSearchModal />
+      </ErrorBoundary>
 
-      <ToastHost />
+      <ErrorBoundary label="Toasts">
+        <ToastHost />
+      </ErrorBoundary>
 
       {dragging ? (
         <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center bg-accent/10 backdrop-blur-sm">

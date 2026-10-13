@@ -71,7 +71,12 @@ export default function TerminalPanel(): JSX.Element {
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={() => useStore.setState({ terminalLines: [] })}
+            onClick={() => {
+              // U-4: wiping the scrollback was a single unconfirmed click.
+              if (window.confirm(t('common.clearTerminalConfirm'))) {
+                useStore.setState({ terminalLines: [] })
+              }
+            }}
             title={t('common.clear')}
             aria-label={t('common.clear')}
             className="rounded p-1 hover:bg-bg-tertiary hover:text-neutral-300"

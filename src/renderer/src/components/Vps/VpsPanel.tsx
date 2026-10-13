@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Plug, PlugZap, Plus, RefreshCw, ShieldAlert, Trash2 } from 'lucide-react'
 import type { AuditEntryView, VpsConnectionState, VpsServerView } from '@shared/vps'
 import RemoteFileExplorer from './RemoteFileExplorer'
@@ -21,6 +22,7 @@ const STATUS_COLOR: Record<VpsConnectionState['status'], string> = {
 
 /** VPS view: server list, connection lifecycle, live terminal, SFTP and audit. */
 export default function VpsPanel(): JSX.Element {
+  const { t } = useTranslation()
   const [servers, setServers] = useState<VpsServerView[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
@@ -29,12 +31,18 @@ export default function VpsPanel(): JSX.Element {
   const [audit, setAudit] = useState<AuditEntryView[]>([])
   const [error, setError] = useState<string | null>(null)
   const [healthOpen, setHealthOpen] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [connectingId, setConnectingId] = useState<string | null>(null)
 
   const refresh = useCallback(async (): Promise<void> => {
+    // U-12: an in-flight flag, so double-clicking Refresh cannot fire two lists.
+    setRefreshing(true)
     try {
       setServers(await window.api.vps.list())
     } catch (cause) {
       setError(text(cause))
+    } finally {
+      setRefreshing(false)
     }
   }, [])
 
@@ -68,6 +76,9 @@ export default function VpsPanel(): JSX.Element {
   }, [refresh, refreshAudit])
 
   const connect = async (id: string): Promise<void> => {
+    // U-12: a double-click used to fire two connects; publish the in-flight state
+    // and let the row's own control disable itself.
+    setConnectingId(id)
     setActiveId(id)
     setError(null)
     try {
@@ -76,6 +87,8 @@ export default function VpsPanel(): JSX.Element {
       if (next.status === 'error' && !next.pendingFingerprint) setError(next.error ?? 'Connection failed')
     } catch (cause) {
       setError(text(cause))
+    } finally {
+      setConnectingId(null)
     }
   }
 
@@ -88,7 +101,10 @@ export default function VpsPanel(): JSX.Element {
     setStatus(await window.api.vps.disconnect(id))
   }
 
-  const remove = async (id: string): Promise<void> => {
+  const remove = async (id: string, name: string): Promise<void> => {
+    // U-4: deleting a saved server is destructive and was a single unconfirmed
+    // click on a hover-only button.
+    if (!window.confirm(t('vps.removeConfirm', { name }))) return
     await window.api.vps.remove(id)
     if (activeId === id) setActiveId(null)
     await refresh()
@@ -104,15 +120,17 @@ export default function VpsPanel(): JSX.Element {
           <div className="flex items-center gap-1">
             <button
               onClick={() => void refresh()}
-              className="rounded p-1 text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-200"
-              title="Refresh"
+              disabled={refreshing}
+              aria-busy={refreshing}
+              className="rounded p-1 text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-200 disabled:opacity-50"
+              title={t('vps.refresh')}
             >
-              <RefreshCw className="h-3.5 w-3.5" />
+              <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
             <button
               onClick={() => setFormOpen((open) => !open)}
               className="rounded p-1 text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-200"
-              title="Add server"
+              title={t('vps.addServer')}
             >
               <Plus className="h-4 w-4" />
             </button>
@@ -145,17 +163,24 @@ export default function VpsPanel(): JSX.Element {
             >
               <button
                 onClick={() => void connect(server.id)}
-                className="min-w-0 flex-1 text-left"
+                disabled={connectingId === server.id}
+                aria-busy={connectingId === server.id}
+                className="min-w-0 flex-1 text-left disabled:opacity-60"
               >
-                <div className="truncate text-xs font-medium text-neutral-200">{server.name}</div>
+                <div className="truncate text-xs font-medium text-neutral-200">
+                  {server.name}
+                  {connectingId === server.id ? (
+                    <RefreshCw className="ms-1 inline h-3 w-3 animate-spin text-accent" />
+                  ) : null}
+                </div>
                 <div className="truncate text-3xs text-neutral-500">
                   {server.username}@{server.host}:{server.port}
                 </div>
               </button>
               <button
-                onClick={() => void remove(server.id)}
-                className="opacity-0 transition group-hover:opacity-100"
-                title="Remove"
+                onClick={() => void remove(server.id, server.name)}
+                className="rounded p-1 text-neutral-500 opacity-0 transition hover:text-red-400 focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
+                title={t('common.remove')}
               >
                 <Trash2 className="h-3.5 w-3.5 text-neutral-500 hover:text-red-400" />
               </button>

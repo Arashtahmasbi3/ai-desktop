@@ -160,7 +160,13 @@ export default function MigrationDialog(): JSX.Element | null {
                 </button>
                 <button
                   type="button"
-                  onClick={() => void removeProject(project.id)}
+                  onClick={() => {
+                    // U-4: the same "remove project" action confirms in the
+                    // Sidebar and ProjectCard; here it used to fire at once.
+                    if (window.confirm(t('settings.deleteProjectConfirm', { name: project.name }))) {
+                      void removeProject(project.id)
+                    }
+                  }}
                   disabled={busy === project.id}
                   className="flex items-center gap-1 rounded border border-border px-2 py-1 text-3xs text-red-300 hover:bg-red-500/10 disabled:opacity-40"
                 >

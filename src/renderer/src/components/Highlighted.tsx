@@ -13,7 +13,9 @@ export default function HighlightedLine({
   return (
     <>
       {tokens.map((token, index) => (
-        <span key={index} className={tokenClassName(token.type)}>
+        // U-11: key by position *and* text, so an edited line cannot reuse the
+        // previous token's DOM node (and stale styling).
+        <span key={`${index}:${token.text}`} className={tokenClassName(token.type)}>
           {token.text}
         </span>
       ))}

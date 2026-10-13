@@ -34,9 +34,11 @@ export default function WorkspacePanel({ overlay }: WorkspacePanelProps = {}): J
     <aside
       aria-label={t('workspace.title')}
       className={
+        // U-7: logical properties, so the panel pins to the *end* edge and its
+        // divider sits on the start side in RTL as well as LTR.
         overlay
-          ? 'absolute inset-y-0 right-0 z-40 flex w-[22rem] max-w-[90vw] shrink-0 flex-col border-l border-border bg-bg-secondary shadow-2xl'
-          : 'absolute inset-y-0 right-0 z-40 flex w-[22rem] max-w-[90vw] shrink-0 flex-col border-l border-border bg-bg-secondary shadow-2xl xl:static xl:z-auto xl:shadow-none'
+          ? 'absolute inset-y-0 end-0 z-40 flex w-[22rem] max-w-[90vw] shrink-0 flex-col border-s border-border bg-bg-secondary shadow-2xl'
+          : 'absolute inset-y-0 end-0 z-40 flex w-[22rem] max-w-[90vw] shrink-0 flex-col border-s border-border bg-bg-secondary shadow-2xl xl:static xl:z-auto xl:shadow-none'
       }
     >
       <header className="flex h-10 shrink-0 items-center gap-1 border-b border-border px-2">

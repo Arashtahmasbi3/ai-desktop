@@ -37,6 +37,18 @@
     line-height: 1.7;
   }
 
+  /*
+   * U-3: keyboard focus was invisible app-wide — zero `focus:`/`focus-visible:`
+   * styles and 38 `outline-none` utilities. A single global rule keeps it
+   * consistent, and only for keyboard focus so a mouse click stays clean.
+   * `:root :focus-visible` is (0,2,0) specificity, so it also wins over the
+   * `.outline-none` utility (0,1,0) that would otherwise hide it.
+   */
+  :root :focus-visible {
+    outline: 2px solid #a78bfa;
+    outline-offset: 1px;
+  }
+
   /* Slim, dark scrollbars that match the app instead of the OS default. */
   * {
     scrollbar-width: thin;

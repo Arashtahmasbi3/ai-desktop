@@ -166,7 +166,10 @@ export default function ExecutionBar({
           <VpsSelector />
           <button
             type="button"
-            onClick={() => newSession()}
+            onClick={() => {
+              // U-4: `newSession` wipes messages, logs, decisions and pending diffs.
+              if (window.confirm(t('common.clearChatConfirm'))) newSession()
+            }}
             title={t('chat.clear')}
             className="flex items-center gap-1 rounded px-1.5 py-0.5 text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300"
           >

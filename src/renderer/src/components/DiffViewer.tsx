@@ -40,7 +40,11 @@ export default function DiffViewer({ before, after, language }: DiffViewerProps)
       </div>
 
       {rows.map((row, index) => (
-        <div key={index} className="flex border-b border-border/40 last:border-b-0">
+        // U-11: a content-based key so a re-diffed row is not reused in place.
+        <div
+          key={`${index}:${row.left?.text ?? ''}:${row.right?.text ?? ''}`}
+          className="flex border-b border-border/40 last:border-b-0"
+        >
           <Side row={row.left} side="left" language={language} />
           <div className="w-px shrink-0 bg-border" />
           <Side row={row.right} side="right" language={language} />

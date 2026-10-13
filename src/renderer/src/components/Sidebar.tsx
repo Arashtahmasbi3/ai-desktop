@@ -395,9 +395,9 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
             onChange={(event) => setQuery(event.target.value)}
             placeholder={t('common.search')}
             aria-label={t('common.search')}
-            className="w-full bg-transparent text-xs text-neutral-200 outline-none placeholder:text-neutral-600"
+            className="w-full bg-transparent text-xs text-neutral-200 outline-none placeholder:text-neutral-400"
           />
-          <kbd className="shrink-0 rounded border border-border px-1 text-4xs text-neutral-600">
+          <kbd className="shrink-0 rounded border border-border px-1 text-4xs text-neutral-400">
             Ctrl ⇧ K
           </kbd>
         </label>
@@ -419,7 +419,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
             {t('sidebar.projects')}
           </button>
           {projectsOpen && projects.length === 0 ? (
-            <p className="px-2 py-1 text-2xs text-neutral-600">{t('settings.noProjects')}</p>
+            <p className="px-2 py-1 text-2xs text-neutral-400">{t('settings.noProjects')}</p>
           ) : projectsOpen ? (
             projects.map((project) => {
               const state = projectState(project)
@@ -450,7 +450,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                         />
                         {project.type === 'remote' && !project.vpsId ? (
                           <span className="block truncate text-3xs text-amber-400/90">
-                            ⚠ VPS را انتخاب کنید
+                            {`⚠ ${t('sidebar.remoteNoVps')}`}
                           </span>
                         ) : state === 'missing' ? (
                           <span className="block truncate text-3xs text-amber-400/90">
@@ -458,7 +458,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                           </span>
                         ) : (
                           <span
-                            className="block truncate text-3xs text-neutral-600"
+                            className="block truncate text-3xs text-neutral-400"
                             dir="ltr"
                           >
                             {basename(project.path)}
@@ -470,7 +470,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                       <span
                         data-testid="project-chat-count"
                         title={t('sidebar.chatCount', { count: chatCount })}
-                        className="shrink-0 rounded bg-bg-primary px-1.5 py-0.5 text-3xs text-neutral-500 group-hover:hidden"
+                        className="shrink-0 rounded bg-bg-primary px-1.5 py-0.5 text-3xs text-neutral-400 group-hover:hidden group-focus-within:hidden"
                       >
                         {chatCount}
                       </span>
@@ -481,7 +481,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                       onClick={() =>
                         setProjectMenuFor(projectMenuFor === project.id ? null : project.id)
                       }
-                      className="hidden shrink-0 rounded p-1 text-neutral-500 hover:bg-bg-primary hover:text-neutral-200 group-hover:block"
+                      className="hidden shrink-0 rounded p-1 text-neutral-500 hover:bg-bg-primary hover:text-neutral-200 focus-visible:block group-hover:block group-focus-within:block"
                     >
                       <MoreHorizontal className="h-3.5 w-3.5" />
                     </button>
@@ -569,11 +569,11 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
             {t('sidebar.recents')}
           </h3>
           {chats.length === 0 ? (
-            <p className="px-2 py-3 text-2xs leading-relaxed text-neutral-600">
+            <p className="px-2 py-3 text-2xs leading-relaxed text-neutral-400">
               {t('sidebar.emptyChats')}
             </p>
           ) : filtered.length === 0 ? (
-            <p className="px-2 py-3 text-2xs text-neutral-600">{t('palette.noResults')}</p>
+            <p className="px-2 py-3 text-2xs text-neutral-400">{t('palette.noResults')}</p>
           ) : (
             filtered.map((chat) => (
               <div key={chat.id} className="group relative">
@@ -588,7 +588,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                 >
                   <MessageSquare className="h-3.5 w-3.5 shrink-0 text-neutral-500" />
                   <span className="min-w-0 flex-1 truncate text-xs">{chat.title}</span>
-                  <span className="shrink-0 text-3xs text-neutral-600">
+                  <span className="shrink-0 text-3xs text-neutral-400">
                     {relativeTime(chat.updatedAt)}
                   </span>
                   <span
@@ -605,7 +605,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                         setChatMenuFor(chat.id)
                       }
                     }}
-                    className="hidden shrink-0 rounded p-0.5 text-neutral-500 hover:bg-bg-primary hover:text-neutral-200 group-hover:block"
+                    className="hidden shrink-0 rounded p-0.5 text-neutral-500 hover:bg-bg-primary hover:text-neutral-200 focus-visible:block group-hover:block group-focus-within:block"
                   >
                     <MoreHorizontal className="h-3.5 w-3.5" />
                   </span>

@@ -183,7 +183,6 @@ export default function ApprovalDialog(): JSX.Element | null {
   return (
     <Modal
       open
-      onClose={() => respondApproval({ approved: false })}
       maxWidth="32rem"
       className={request.dangerous ? 'border-red-500/60' : ''}
       ariaLabel={t('chat.approvalTitle')}
@@ -196,11 +195,14 @@ export default function ApprovalDialog(): JSX.Element | null {
             />
             {t('chat.approvalTitle')}
           </h2>
+          {/* U-14: the only ways out of this gate are an explicit Approve or
+              Deny — Escape and a backdrop click do nothing, and this button
+              says what it really does. */}
           <button
             type="button"
             onClick={() => respondApproval(false)}
-            title={t('common.close')}
-            aria-label={t('common.close')}
+            title={t('chat.deny')}
+            aria-label={t('chat.deny')}
             className="rounded p-1 text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300"
           >
             <X className="h-3.5 w-3.5" />

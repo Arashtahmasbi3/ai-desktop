@@ -35,28 +35,33 @@ export default function StatusBar(): JSX.Element {
       <div className="flex items-center gap-3">
         <span className="flex items-center gap-1">
           <Dot ok={ready} />
-          {ready ? 'Ready' : t('common.loading')}
+          {ready ? t('statusBar.ready') : t('common.loading')}
         </span>
         <span
           className={`flex items-center gap-1 ${online ? 'text-neutral-400' : 'text-red-400'}`}
           title={
             online
-              ? `Agent running · worker ${worker?.state ?? 'online'}${agentAddress ? ` · ${agentAddress}` : ''}`
-              : 'Agent not running — the background worker is offline'
+              ? agentAddress
+                ? t('statusBar.agentTitleRunningRemote', {
+                    state: worker?.state ?? 'online',
+                    address: agentAddress
+                  })
+                : t('statusBar.agentTitleRunning', { state: worker?.state ?? 'online' })
+              : t('statusBar.agentTitleIdle')
           }
         >
           <Dot ok={online} />
-          Agent: {online ? 'running' : 'not running'}
+          {online ? t('statusBar.agentRunning') : t('statusBar.agentIdle')}
         </span>
-        <span className="flex items-center gap-1" title="Background worker">
+        <span className="flex items-center gap-1" title={t('statusBar.workerTitle')}>
           <Cpu className="h-3 w-3" />
-          worker: {worker?.state ?? 'n/a'}
+          {t('statusBar.worker', { state: worker?.state ?? 'n/a' })}
           {worker && worker.active + worker.queued > 0
-            ? ` (${worker.active} running, ${worker.queued} queued)`
+            ? ` ${t('statusBar.workerQueue', { active: worker.active, queued: worker.queued })}`
             : ''}
         </span>
         {worker ? (
-          <span className="flex items-center gap-1" title="Effective concurrency from CPU/RAM limits">
+          <span className="flex items-center gap-1" title={t('statusBar.limitsTitle')}>
             <HardDrive className="h-3 w-3" />
             {worker.cpuCores}cpu / {worker.memoryMb}MB
           </span>
@@ -80,7 +85,9 @@ export default function StatusBar(): JSX.Element {
           {approvalMode === 'full' ? <Zap className="h-3 w-3" /> : <ShieldCheck className="h-3 w-3" />}
           {approvalMode}
         </button>
-        <span className="text-neutral-600">session {effectiveSessionId.slice(0, 8)}</span>
+        <span className="text-neutral-400" dir="ltr">
+          {t('statusBar.session', { id: effectiveSessionId.slice(0, 8) })}
+        </span>
         <span
           data-connection={connection.kind}
           className={`flex items-center gap-1 ${CONNECTION_TONE_CLASS[connection.tone]}`}
@@ -115,20 +122,22 @@ export default function StatusBar(): JSX.Element {
         <button
           type="button"
           onClick={() => void setOnline(!online)}
-          title="Toggle online/offline (queues work while offline)"
+          title={t('statusBar.toggleOnline')}
           className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-bg-tertiary hover:text-neutral-200"
         >
           {online ? <Wifi className="h-3 w-3 text-emerald-500" /> : <WifiOff className="h-3 w-3 text-amber-500" />}
-          {online ? 'online' : 'offline'}
+          {online ? t('statusBar.online') : t('statusBar.offline')}
         </button>
         <button
           type="button"
           onClick={() => void toggleRemote()}
-          title="Toggle localhost remote access"
+          title={t('statusBar.toggleRemote')}
           className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-bg-tertiary hover:text-neutral-200"
         >
           <Server className="h-3 w-3" />
-          remote: {remote?.enabled ? `${remote.host}:${remote.port}` : 'off'}
+          {t('statusBar.remote', {
+            target: remote?.enabled ? `${remote.host}:${remote.port}` : t('statusBar.remoteOff')
+          })}
         </button>
       </div>
     </footer>

@@ -92,8 +92,10 @@ export default function DiagnosticsPanel({ serverId, serverName, onClose }: Prop
             <button
               type="button"
               onClick={() => void load()}
+              disabled={busy}
               title="Refresh"
-              className="flex h-6 w-6 items-center justify-center rounded text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300"
+              aria-busy={busy}
+              className="flex h-6 w-6 items-center justify-center rounded text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300 disabled:opacity-50"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${busy ? 'animate-spin' : ''}`} />
             </button>
@@ -196,7 +198,7 @@ function InstallConfirm({
   const recipe = getInstallRecipe(tool)
   if (!recipe) return <></>
   return (
-    <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/60">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60">
       <div className="w-[30rem] rounded-lg border border-border bg-bg-secondary p-4">
         <p className="mb-2 text-sm text-neutral-200">Install {recipe.label}?</p>
         <pre className="mb-3 max-h-40 overflow-auto whitespace-pre-wrap rounded border border-border bg-bg-primary p-2 text-2xs text-neutral-400">

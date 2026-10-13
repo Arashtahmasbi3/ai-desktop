@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   ArrowRight,
   FileCode2,
@@ -29,6 +30,9 @@ export interface FileExplorerProps {
 }
 
 export default function FileExplorer({ onClose }: FileExplorerProps = {}): JSX.Element {
+  // v2.6.5: this panel was never translated — its empty state was hardcoded Persian
+  // even in the English UI.
+  const { t } = useTranslation()
   const entries = useStore((state) => state.entries)
   const cwd = useStore((state) => state.cwd)
   const selectedFile = useStore((state) => state.selectedFile)
@@ -58,13 +62,13 @@ export default function FileExplorer({ onClose }: FileExplorerProps = {}): JSX.E
       <div className="flex h-8 shrink-0 items-center justify-between border-b border-border px-3 text-2xs text-neutral-500">
         <span className="flex items-center gap-1">
           <FolderOpen className="h-3.5 w-3.5" />
-          Workspace
+          {t('workspace.title')}
         </span>
         <span className="flex items-center gap-1">
           <button
             type="button"
             onClick={() => void refreshFiles()}
-            title="Refresh"
+            title={t('fileExplorer.refresh')}
             className="rounded p-0.5 hover:bg-bg-tertiary hover:text-neutral-300"
           >
             <RefreshCw className="h-3 w-3" />
@@ -74,8 +78,8 @@ export default function FileExplorer({ onClose }: FileExplorerProps = {}): JSX.E
               type="button"
               data-testid="tree-close"
               onClick={onClose}
-              title="Close"
-              aria-label="Close"
+              title={t('fileExplorer.close')}
+              aria-label={t('fileExplorer.close')}
               className="rounded p-0.5 hover:bg-bg-tertiary hover:text-neutral-300"
             >
               <X className="h-3.5 w-3.5" />
@@ -86,11 +90,8 @@ export default function FileExplorer({ onClose }: FileExplorerProps = {}): JSX.E
 
       {projects.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 text-center">
-          <Folder className="h-8 w-8 text-neutral-600" />
-          <p className="text-xs text-neutral-500">
-            هیچ پروژه‌ای اضافه نشده. از Settings یک پوشه پروژه اضافه کنید یا یک پوشه را روی پنجره
-            رها کنید (Drag &amp; Drop).
-          </p>
+          <Folder className="h-8 w-8 text-neutral-500" />
+          <p className="text-xs text-neutral-500">{t('fileExplorer.noProjects')}</p>
         </div>
       ) : (
         <>
@@ -112,7 +113,7 @@ export default function FileExplorer({ onClose }: FileExplorerProps = {}): JSX.E
                 type="button"
                 onClick={goUp}
                 disabled={cwd === '.'}
-                title="Up one level"
+                title={t('fileExplorer.upOneLevel')}
                 className="rounded p-1 hover:bg-bg-tertiary disabled:opacity-30"
               >
                 <ArrowRight className="h-3.5 w-3.5" />
@@ -127,7 +128,7 @@ export default function FileExplorer({ onClose }: FileExplorerProps = {}): JSX.E
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Filter files…"
+                placeholder={t('fileExplorer.filter')}
                 className="w-full rounded border border-border bg-bg-secondary py-1 pr-7 pl-2 text-xs text-neutral-200 outline-none focus:border-accent/50"
               />
             </div>
@@ -135,7 +136,7 @@ export default function FileExplorer({ onClose }: FileExplorerProps = {}): JSX.E
 
           <div className="min-h-0 flex-1 overflow-y-auto py-1">
             {visible.length === 0 ? (
-              <p className="px-3 py-3 text-xs text-neutral-600">Empty folder.</p>
+              <p className="px-3 py-3 text-xs text-neutral-400">{t('fileExplorer.empty')}</p>
             ) : (
               visible.map((entry) => (
                 <button

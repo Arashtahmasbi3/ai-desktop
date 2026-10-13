@@ -67,10 +67,20 @@ export default function MessageBubble({ message }: { message: ChatMessage }): JS
   }
 
   const copy = (): void => {
-    void navigator.clipboard.writeText(message.content).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1200)
-    })
+    // U-5: a clipboard write can be refused (insecure context, no permission).
+    // It used to fail silently — the copy button simply did nothing.
+    const clipboard = navigator.clipboard
+    if (!clipboard?.writeText) {
+      useStore.getState().pushToast('error', t('toast.copyFailed'))
+      return
+    }
+    void clipboard
+      .writeText(message.content)
+      .then(() => {
+        setCopied(true)
+        setTimeout(() => setCopied(false), 1200)
+      })
+      .catch(() => useStore.getState().pushToast('error', t('toast.copyFailed')))
   }
 
   return (
@@ -94,7 +104,7 @@ export default function MessageBubble({ message }: { message: ChatMessage }): JS
         </div>
         <div className="mt-0.5 flex items-center gap-2 px-1">
           {message.role === 'assistant' && message.model ? (
-            <span className="font-mono text-3xs text-neutral-600" dir="ltr">
+            <span className="font-mono text-3xs text-neutral-400" dir="ltr">
               {message.model}
             </span>
           ) : null}
@@ -109,8 +119,10 @@ export default function MessageBubble({ message }: { message: ChatMessage }): JS
             onClick={copy}
             title={t('toast.copied')}
             aria-label={t('common.export')}
-            className={`flex items-center gap-0.5 text-3xs text-neutral-600 transition hover:text-neutral-300 ${
-              copied ? '' : 'opacity-0 group-hover:opacity-100'
+            className={`flex items-center gap-0.5 text-3xs text-neutral-400 transition hover:text-neutral-200 ${
+              copied
+                ? ''
+                : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100 group-focus-within:opacity-100'
             }`}
           >
             {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
@@ -122,7 +134,7 @@ export default function MessageBubble({ message }: { message: ChatMessage }): JS
               onClick={() => void forkChat(activeChatId, message.id)}
               title={t('chat.forkFrom')}
               aria-label={t('chat.forkFrom')}
-              className="flex items-center gap-0.5 text-3xs text-neutral-600 opacity-0 transition hover:text-neutral-300 group-hover:opacity-100"
+              className="flex items-center gap-0.5 text-3xs text-neutral-400 opacity-0 transition hover:text-neutral-200 focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
             >
               <GitFork className="h-3 w-3" />
             </button>

@@ -147,7 +147,12 @@ function GoalCard({ goal }: { goal: Goal }): JSX.Element {
               type="button"
               disabled={busy}
               aria-label={t('goals.remove')}
-              onClick={() => void removeGoal(goal.id)}
+              onClick={() => {
+                // U-4: deleting a goal also drops its links to past runs.
+                if (window.confirm(t('goals.removeConfirm', { title: goal.title }))) {
+                  void removeGoal(goal.id)
+                }
+              }}
               className="ms-auto rounded border border-border p-1 text-neutral-400 hover:border-red-500/60 hover:text-red-300 disabled:opacity-60"
             >
               <Trash2 className="h-3.5 w-3.5" />

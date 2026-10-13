@@ -10,6 +10,15 @@ interface State {
   error: Error | null
 }
 
+/**
+ * U-16: show the reason, never a stack trace. An IPC or library failure can put
+ * a whole stack into `error.message`; only the first line is shown, capped.
+ */
+function safeMessage(error: Error): string {
+  const first = String(error?.message ?? error).split('\n')[0].trim()
+  return first.length > 300 ? `${first.slice(0, 300)}…` : first
+}
+
 /** Keeps one panel's render error from blanking the whole window. */
 export default class ErrorBoundary extends Component<Props, State> {
   override state: State = { error: null }
@@ -33,7 +42,9 @@ export default class ErrorBoundary extends Component<Props, State> {
           <p className="text-sm text-neutral-200">
             {this.props.label ?? 'This panel'} crashed while rendering.
           </p>
-          <p className="mt-1 max-w-md font-mono text-2xs text-neutral-500">{error.message}</p>
+          <p className="mt-1 max-w-md font-mono text-2xs text-neutral-400">
+            {safeMessage(error)}
+          </p>
         </div>
         <button
           type="button"
