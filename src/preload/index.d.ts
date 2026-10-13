@@ -228,6 +228,18 @@ export interface Api {
   shell: {
     exec(command: string): Promise<LocalShellResult>
   }
+  /**
+   * v2.6.5: this whole namespace existed in `preload/index.ts` but was never
+   * declared here, so the four profile/elevation channels were unreachable from
+   * typed renderer code — the declared contract had drifted from the bridge.
+   */
+  session: {
+    get(): Promise<ResolvedProfile>
+    setProfile(profile: SessionProfile): Promise<SettingsView>
+    setInvestigateScope(scope: InvestigateScope): Promise<SettingsView>
+    grantElevation(): Promise<SettingsView>
+    revokeElevation(): Promise<SettingsView>
+  }
 
   jobs: {
     list(): Promise<Job[]>
