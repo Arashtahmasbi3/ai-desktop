@@ -51,7 +51,7 @@ fails, a tool is missing, or the budget ran out — ask rather than guess).
 
 ## Status
 
-**v2.6.4 Sprint — Critical Bugs + Multi-Project UX + Design Polish, in progress on `feature/v2.6.4-critical-fixes`.** Fix A–F all complete (tool-call pairing, per-server VPS state, multi-connection keepalive + shell isolation, chat transfer, opt-in context warning, shared type scale); see the v2.6.4 sprint section at the end of this file. Full suite green (221 files, 1724 passed | 1 skipped). (2026-10-13)
+**v2.6.4 released — Multi-Project & Polish.** Released 2026-10-13. Merged `feature/v2.6.4-critical-fixes` into `master` (`8e12e9e`, `--no-ff`), tag `v2.6.4`. Full suite green (221 files, 1724 passed | 1 skipped, Docker-conditional); Windows artifacts published: https://github.com/Arashtahmasbi3/ai-desktop/releases/tag/v2.6.4. Ready for user testing on Windows. See the v2.6.4 sprint section at the end of this file. (2026-10-13)
 
 **v2.4 Sprint — phases A–E complete; version bumped to 2.4.0. A.1 jobs, A.2 preflight, A.3 success verification, B.1 db migration, B.2 docker transfer, B.3 checksum verify, C.1 project users, C.2 project SSH key, C.3 worktrees, D.1 scaffolding. Branch: feature/v2.4-full-compliance.** (2026-10-05)
 
@@ -879,3 +879,4 @@ Branch `feature/v2.6.4-critical-fixes`.
 
 ### Sprint status
 - Fix A (`92205f0`), Fix B (`eddc2b0`), Fix C (`c152554`), Fix D (`e24fa95`), Fix E (`4eb963f`), Polish F (`65df132`) complete. Full suite: 221 files, 1724 passed | 1 skipped; builds green.
+- `[RELEASE]` **v2.6.4 released.** `feature/v2.6.4-critical-fixes` merged into `master` with a `--no-ff` merge commit (`8e12e9e`); no conflicts (master was a straight ancestor). Annotated tag `v2.6.4` created and pushed. Windows artifacts built from Linux via Wine (`npm run build:win`, exit 0) and hashed: `AI.Desktop.Setup.2.6.4.exe` (sha256 `f1bec3aaadc2bea37b4515effd58e33f74280ef8fdb205016ad89542fba14f6e`, 112,514,057 B), `AI.Desktop.2.6.4.Portable.exe` (sha256 `3e9351925b6a862d8c38f0b455a908cbf5d1c5b8af5857e6fb34dc30b617201a`, 112,231,216 B), `SHA256SUMS.txt` (189 B, dotted names so `sha256sum -c` works against the published files). Published as a public (non-prerelease, non-draft) GitHub Release: https://github.com/Arashtahmasbi3/ai-desktop/releases/tag/v2.6.4 — all three assets present. Binaries are unsigned (SmartScreen may warn — noted in the release). **[RELEASE] v2.6.4 — Multi-Project & Polish. 1724 tests pass | 1 skipped (Docker-conditional). Ready for user testing on Windows.**
