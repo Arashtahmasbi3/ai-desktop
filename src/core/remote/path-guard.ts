@@ -93,15 +93,39 @@ export function enforceProjectPath(
 
 /**
  * Heuristic extraction of absolute filesystem paths from a shell command.
+ *
+ * Only a `/` that *starts a token* is a path separator the shell would read as
+ * absolute. Anchoring matters in both directions (v2.6.5):
+ *  - `cat src/index.ts` is a relative path, but an unanchored scan saw
+ *    `/index.ts`, resolved it as absolute, and refused a perfectly legal read;
+ *  - `cat etc/shadow` (after a `cd ..`) yielded `/shadow`, so the guard blocked
+ *    or admitted commands for the wrong reason instead of on the `..` itself.
  * URLs (`https://host/x`) are stripped first so a `curl` target is not mistaken
- * for a local path. Relative paths are ignored — the remote shell's cwd is the
- * project root, so they cannot escape it.
+ * for a local path. Relative paths are handled by
+ * {@link commandReferencesParent}.
  */
 export function extractAbsolutePaths(command: string): string[] {
   if (typeof command !== 'string' || !command) return []
   const withoutUrls = command.replace(/\b[a-z][a-z0-9+.-]*:\/\/\S+/gi, ' ')
-  const matches = withoutUrls.match(/\/[A-Za-z0-9_\-./]+/g) ?? []
-  return matches.filter((value) => value.length > 1)
+  const anchored = withoutUrls.match(/(?:^|[\s=('"`<>|;&])\/[A-Za-z0-9_\-./]+/g) ?? []
+  return anchored
+    .map((value) => value.replace(/^[\s=('"`<>|;&]/, ''))
+    .filter((value) => value.length > 1)
+}
+
+/**
+ * A `..` token that can escape the project root, e.g. `cd ..`,
+ * `cat ../../etc/shadow` or a bare `..` argument (v2.6.5).
+ *
+ * Absolute paths already go through {@link extractAbsolutePaths}, and
+ * `/a/../b` is normalised there, so this only needs to catch the forms that
+ * carry no leading slash. A quoted `..` such as `git commit -m "fix .."` is
+ * deliberately not matched.
+ */
+const PARENT_SEGMENT = /(?:^|[\s;&|(])\.\.(?:\/|[\s;&|)]|$)/
+
+export function commandReferencesParent(command: string): boolean {
+  return typeof command === 'string' && PARENT_SEGMENT.test(command)
 }
 
 /**
@@ -114,6 +138,15 @@ export function enforceCommandPaths(
   projectRoot: string,
   diagnostic?: DiagnosticPolicy | null
 ): PathGuardResult {
+  // A `..` segment escapes the root regardless of what the leading token is, so
+  // it is refused before any allow-list shortcut can admit the command (v2.6.5:
+  // `cd .. && cd .. && cat etc/shadow` used to pass every other check).
+  if (commandReferencesParent(command)) {
+    return {
+      ok: false,
+      error: `".." is not allowed in a project-scoped command; use a path inside "${normalizeRoot(projectRoot)}"`
+    }
+  }
   // Read-only host introspection (uname, df, ...) carries no project/system path
   // by design and is allowed before the path scan (v2.5.3, Fix 2). Metacharacters
   // are refused by the whitelist itself, so this cannot smuggle a second command.

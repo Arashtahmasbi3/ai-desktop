@@ -124,23 +124,36 @@ function cleanPath(value: unknown): string | undefined {
 }
 
 /**
- * Refuse a path that leaves the remote project root. A missing `projectRoot`
- * (callers that do not know the active project) skips the check so the tools stay
- * usable on their own; AgentService always supplies it for remote projects.
+ * Refuse a path that leaves the remote project root and return the path that
+ * must actually be sent to the host (v2.6.5).
+ *
+ * The guard resolves a relative request against the project root, but SFTP
+ * resolves it against the login directory (`$HOME`). Returning the guard's
+ * `resolvedPath` is what makes validation and execution agree: without it
+ * `remote_write_file { path: ".bashrc" }` was validated as `<root>/.bashrc` and
+ * then written to `$HOME/.bashrc`.
+ *
+ * A missing `projectRoot` (callers that do not know the active project) skips
+ * the containment check so the tools stay usable on their own; AgentService
+ * always supplies it for remote projects.
  */
 function containPath(
   deps: RemoteFsDeps,
   path: string,
   mode: 'read' | 'write' = 'read'
-): RemoteFsResult | undefined {
+): { blocked?: RemoteFsResult; resolvedPath: string } {
   // Secret Path Guard first: it applies even without a known project root and
   // even in Elevated mode (v2.6.2, §5).
   const secret = inspectSecretPath(path)
-  if (secret.blocked) return fail(`Blocked: ${secret.reason}`, true)
-  if (!deps.projectRoot) return undefined
+  if (secret.blocked) {
+    return { blocked: fail(`Blocked: ${secret.reason}`, true), resolvedPath: path }
+  }
+  if (!deps.projectRoot) return { resolvedPath: path }
   const guard = enforceProjectPath(path, deps.projectRoot, deps.diagnostic, mode)
-  if (!guard.ok) return fail(`Blocked: ${guard.error}`, true)
-  return undefined
+  if (!guard.ok) {
+    return { blocked: fail(`Blocked: ${guard.error}`, true), resolvedPath: path }
+  }
+  return { resolvedPath: guard.resolvedPath ?? path }
 }
 
 /** Guard a shell command we build internally with the same deny list as exec. */
@@ -219,11 +232,11 @@ async function readFile(
 ): Promise<RemoteFsResult> {
   const path = cleanPath(args.path)
   if (!path) return fail('remote_read_file requires a non-empty "path"')
-  const blocked = containPath(deps, path)
+  const { blocked, resolvedPath } = containPath(deps, path)
   if (blocked) return blocked
   try {
-    const content = await deps.readFile(serverId, path)
-    await deps.audit?.({ type: 'exec', ok: true, serverId, command: `fs:read ${path}` })
+    const content = await deps.readFile(serverId, resolvedPath)
+    await deps.audit?.({ type: 'exec', ok: true, serverId, command: `fs:read ${resolvedPath}` })
     return { ok: true, content }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
@@ -242,16 +255,16 @@ async function writeFile(
     return fail('remote_write_file requires "path" and "content"')
   }
   // Writes never use the Diagnostic Mode widening, even for an exposed path.
-  const blocked = containPath(deps, path, 'write')
+  const { blocked, resolvedPath } = containPath(deps, path, 'write')
   if (blocked) return blocked
 
   // Back up an existing file before overwriting it so the change can be undone.
-  const existing = await readExisting(deps, serverId, path)
+  const existing = await readExisting(deps, serverId, resolvedPath)
   if (existing !== undefined) {
-    const backup = backupPathFor(path, deps.now?.() ?? Date.now())
+    const backup = backupPathFor(resolvedPath, deps.now?.() ?? Date.now())
     const copy = await deps.exec(
       serverId,
-      `cp -p -- ${shellQuote(path)} ${shellQuote(backup)}`
+      `cp -p -- ${shellQuote(resolvedPath)} ${shellQuote(backup)}`
     )
     if (!copy.ok) {
       return fail(`Could not back up ${path} before writing: ${execOutput(copy)}`)
@@ -260,20 +273,20 @@ async function writeFile(
       type: 'backup_created',
       ok: true,
       serverId,
-      command: `fs:backup ${path}`,
+      command: `fs:backup ${resolvedPath}`,
       detail: backup
     })
   }
 
-  await deps.writeFile(serverId, path, content)
+  await deps.writeFile(serverId, resolvedPath, content)
   await deps.audit?.({
     type: 'exec',
     ok: true,
     serverId,
-    command: `fs:write ${path}`,
+    command: `fs:write ${resolvedPath}`,
     detail: `${content.length} chars`
   })
-  return { ok: true, content: `Wrote ${content.length} characters to ${path}` }
+  return { ok: true, content: `Wrote ${content.length} characters to ${resolvedPath}` }
 }
 
 async function listDir(
@@ -282,10 +295,10 @@ async function listDir(
   args: Record<string, unknown>
 ): Promise<RemoteFsResult> {
   const path = cleanPath(args.path) ?? '.'
-  const blocked = containPath(deps, path)
+  const { blocked, resolvedPath } = containPath(deps, path)
   if (blocked) return blocked
-  const entries = await deps.listFiles(serverId, path)
-  await deps.audit?.({ type: 'exec', ok: true, serverId, command: `fs:list ${path}` })
+  const entries = await deps.listFiles(serverId, resolvedPath)
+  await deps.audit?.({ type: 'exec', ok: true, serverId, command: `fs:list ${resolvedPath}` })
   if (entries.length === 0) return { ok: true, content: '(empty directory)' }
   const listing = entries
     .map((entry) => {
@@ -305,8 +318,9 @@ async function exists(
   const path = cleanPath(args.path)
   if (!path) return fail('remote_exists requires a non-empty "path"')
   const contained = containPath(deps, path)
-  if (contained) return contained
-  const command = `test -e ${shellQuote(path)} && echo yes || echo no`
+  if (contained.blocked) return contained.blocked
+  const resolvedPath = contained.resolvedPath
+  const command = `test -e ${shellQuote(resolvedPath)} && echo yes || echo no`
   const blocked = guardCommand(command)
   if (blocked) return blocked
   const result = await deps.exec(serverId, command)
@@ -326,14 +340,17 @@ async function grep(
   }
   const path = cleanPath(args.path) ?? '.'
   const contained = containPath(deps, path)
-  if (contained) return contained
-  const command = `grep -rnE -- ${shellQuote(pattern)} ${shellQuote(path)} 2>/dev/null | head -n 200`
+  if (contained.blocked) return contained.blocked
+  const resolvedPath = contained.resolvedPath
+  const command = `grep -rnE -- ${shellQuote(pattern)} ${shellQuote(resolvedPath)} 2>/dev/null | head -n 200`
   const blocked = guardCommand(command)
   if (blocked) return blocked
   const result = await deps.exec(serverId, command)
   if (result.blocked) return fail(`Blocked by policy: ${result.reason ?? 'denied'}`, true)
   const output = execOutput(result)
-  if (result.exitCode === 1) return { ok: true, content: `No matches for ${pattern} in ${path}` }
+  if (result.exitCode === 1) {
+    return { ok: true, content: `No matches for ${pattern} in ${resolvedPath}` }
+  }
   return { ok: result.ok, content: output || '(no matches)' }
 }
 
@@ -345,8 +362,8 @@ async function gitStatus(
   const path = cleanPath(args.path)
   if (!path) return fail('remote_git_status requires a non-empty "path"')
   const contained = containPath(deps, path)
-  if (contained) return contained
-  const command = `cd ${shellQuote(path)} && git status --porcelain=v1 -b 2>&1 | head -n 200`
+  if (contained.blocked) return contained.blocked
+  const command = `cd ${shellQuote(contained.resolvedPath)} && git status --porcelain=v1 -b 2>&1 | head -n 200`
   const blocked = guardCommand(command)
   if (blocked) return blocked
   const result = await deps.exec(serverId, command)
