@@ -1,8 +1,10 @@
 import { app, shell, BrowserWindow } from 'electron'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { AppServices } from './app-services'
 import { registerIpc } from './ipc'
 import { installWebviewPolicy } from './webview-policy'
+import { isAllowedUrl, isAppWindowNavigationAllowed } from '@shared/url'
 
 const isDev = !app.isPackaged
 
@@ -37,8 +39,32 @@ function createWindow(): BrowserWindow {
   })
 
   window.webContents.setWindowOpenHandler((details) => {
-    void shell.openExternal(details.url)
+    // `shell.openExternal` hands the URL to the OS, so only plain web pages may
+    // ever reach it — never file:, ms-msdt:, javascript: or other schemes whose
+    // handlers can execute local code.
+    if (isAllowedUrl(details.url)) void shell.openExternal(details.url)
     return { action: 'deny' }
+  })
+
+  // The main window owns the `window.api` preload bridge. If it were allowed to
+  // navigate to a foreign document, that document would inherit the bridge and
+  // could drive SSH, the filesystem and stored credentials. Refuse every
+  // navigation away from the bundled renderer.
+  const rendererUrl = process.env['ELECTRON_RENDERER_URL']
+  const rendererHref =
+    isDev && rendererUrl
+      ? rendererUrl
+      : pathToFileURL(join(__dirname, '../renderer/index.html')).toString()
+
+  window.webContents.on('will-navigate', (event, url) => {
+    if (isAppWindowNavigationAllowed(url, rendererHref)) return
+    event.preventDefault()
+    if (isAllowedUrl(url)) void shell.openExternal(url)
+  })
+
+  window.webContents.on('will-redirect', (event, url) => {
+    if (isAppWindowNavigationAllowed(url, rendererHref)) return
+    event.preventDefault()
   })
 
   // A <webview> must never inherit a preload or Node access from its host.
@@ -48,7 +74,6 @@ function createWindow(): BrowserWindow {
     webPreferences.contextIsolation = true
   })
 
-  const rendererUrl = process.env['ELECTRON_RENDERER_URL']
   if (isDev && rendererUrl) {
     void window.loadURL(rendererUrl)
   } else {
