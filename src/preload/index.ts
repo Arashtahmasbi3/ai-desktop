@@ -120,6 +120,8 @@ export const api = {
     save: (input: ChatSaveInput): Promise<StoredChat> => invoke('chats:save', input),
     rename: (id: string, title: string): Promise<ChatSummary | null> =>
       invoke('chats:rename', id, title),
+    linkProject: (id: string, workspaceId: string): Promise<ChatSummary | null> =>
+      invoke('chats:linkProject', id, workspaceId),
     remove: (id: string): Promise<boolean> => invoke('chats:remove', id)
   },
 

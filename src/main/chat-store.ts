@@ -99,6 +99,27 @@ export class ChatStore {
     return chat
   }
 
+  /**
+   * Re-point a chat at another workspace (v2.6.4 chat transfer). The chat keeps
+   * its id and full message history, so it is linked — not copied — into the
+   * target project and shows up in that project's list.
+   */
+  async linkProject(id: string, workspaceId: string): Promise<ChatSummary | null> {
+    const chat = await this.load(id)
+    if (!chat) return null
+    chat.workspaceId = workspaceId
+    chat.updatedAt = this.now()
+    await fs.writeFile(this.file(id), JSON.stringify(chat, null, 2), 'utf8')
+    return {
+      id: chat.id,
+      title: chat.title,
+      createdAt: chat.createdAt,
+      updatedAt: chat.updatedAt,
+      workspaceId: chat.workspaceId,
+      ...(chat.forkedFromId ? { forkedFromId: chat.forkedFromId } : {})
+    }
+  }
+
   async rename(id: string, title: string): Promise<ChatSummary | null> {
     const chat = await this.load(id)
     if (!chat) return null

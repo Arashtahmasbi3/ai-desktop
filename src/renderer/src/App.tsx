@@ -14,6 +14,7 @@ import GoalPanel from './components/GoalPanel'
 import VpsPanel from './components/Vps/VpsPanel'
 import Onboarding from './components/Onboarding'
 import MigrationDialog from './components/MigrationDialog'
+import ProjectSwitchDialog from './components/ProjectSwitchDialog'
 import SettingsPanel from './components/SettingsPanel'
 import ShortcutsOverlay from './components/ShortcutsOverlay'
 import Sidebar from './components/Sidebar'
@@ -319,6 +320,7 @@ export default function App(): JSX.Element {
       <ShortcutsOverlay />
 
       <MigrationDialog />
+      <ProjectSwitchDialog />
 
       <CommandPalette />
 

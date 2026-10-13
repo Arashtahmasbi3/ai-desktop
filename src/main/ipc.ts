@@ -59,6 +59,7 @@ export function registerIpc(
       (input: Parameters<typeof services.chats.save>[0]) => services.chats.save(input)
     ],
     ['chats:rename', (id: string, title: string) => services.chats.rename(id, title)],
+    ['chats:linkProject', (id: string, workspaceId: string) => services.chats.linkProject(id, workspaceId)],
     ['chats:remove', (id: string) => services.chats.remove(id)],
 
     ['settings:get', () => services.settingsView()],

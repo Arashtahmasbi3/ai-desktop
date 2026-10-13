@@ -24,6 +24,13 @@ import type { Job } from '@shared/jobs'
 import type { Locale } from './i18n/locale'
 import { detectLocale } from './i18n/locale'
 import { VPS_RECONNECT_KEY } from './lib/vps-state'
+import {
+  isConversationActive,
+  planChatTransfer,
+  readChatTransferPreference,
+  writeChatTransferPreference
+} from './lib/chat-transfer'
+import type { ChatTransferChoice, ChatTransferPreference } from './lib/chat-transfer'
 import { readEnabledTools } from './lib/tool-toggles'
 import {
   appendUsage,
@@ -273,6 +280,13 @@ interface AppState {
   onboarding: OnboardingStatus | null
   /** Startup project-migration modal visibility. */
   migrationOpen: boolean
+  /**
+   * Project id awaiting the chat-transfer decision when switching projects
+   * (v2.6.4, Fix D). Null when no switch is pending.
+   */
+  pendingProjectSwitch: string | null
+  /** Remembered chat-transfer choice applied to future project switches. */
+  chatTransferPreference: ChatTransferPreference
 
   /** Interface language (drives dir + all t() text). */
   locale: Locale
@@ -499,6 +513,16 @@ interface AppState {
   addRemoteProject: (name: string, path: string, vpsId: string) => Promise<void>
   removeProject: (id: string) => Promise<void>
   openProject: (id: string) => Promise<void>
+  /** Open a project without offering to transfer the open chat. */
+  switchProject: (id: string) => Promise<void>
+  /** Apply the chosen chat transfer and switch to the pending project. */
+  completeProjectSwitch: (
+    id: string,
+    choice: ChatTransferChoice,
+    remember?: boolean
+  ) => Promise<void>
+  cancelProjectSwitch: () => void
+  setChatTransferPreference: (preference: ChatTransferPreference) => void
   updateProjectPath: (id: string, path: string) => Promise<void>
   updateProjectMetadata: (id: string, patch: ProjectMetadataPatch) => Promise<void>
   searchVpsProject: (name: string) => Promise<string[]>
@@ -554,6 +578,8 @@ export const useStore = create<AppState>((set, get) => ({
   customProviders: [],
   onboarding: null,
   migrationOpen: false,
+  pendingProjectSwitch: null,
+  chatTransferPreference: readChatTransferPreference(),
 
   locale: detectLocale(),
   sidebarCollapsed: false,
@@ -1599,9 +1625,63 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   async openProject(id) {
+    const current = get().settings?.activeProjectId
+    if (id === current) {
+      await get().refreshFiles('.')
+      await get().refreshGoals()
+      return
+    }
+    // v2.6.4 Fix D: don't silently leave an open conversation behind. Decide
+    // (or ask) how the chat relates to the project being opened.
+    const plan = planChatTransfer(
+      get().chatTransferPreference,
+      isConversationActive(get().messages)
+    )
+    if (plan.prompt) {
+      set({ pendingProjectSwitch: id })
+      return
+    }
+    if (!plan.transfer) {
+      await get().switchProject(id)
+      return
+    }
+    await get().completeProjectSwitch(id, plan.choice)
+  },
+
+  async switchProject(id) {
     set({ settings: await window.api.projects.open(id) })
     await get().refreshFiles('.')
     await get().refreshGoals()
+  },
+
+  async completeProjectSwitch(id, choice, remember = false) {
+    if (remember) {
+      writeChatTransferPreference(choice)
+      set({ chatTransferPreference: choice })
+    }
+    // Persist under the current project first so the chat is never lost.
+    await get().persistChat()
+    const chatId = get().activeChatId
+    await get().switchProject(id)
+    set({ pendingProjectSwitch: null })
+
+    if (choice !== 'new' && chatId) {
+      // Link the *same* chat (id + full history) into the new project so it
+      // appears in that project's list rather than being copied.
+      await window.api.chats.linkProject(chatId, id)
+      await get().refreshChats()
+    }
+    if (choice !== 'link') {
+      get().newSession()
+      rememberChatId(get().sessionId)
+    }
+  },
+
+  cancelProjectSwitch: () => set({ pendingProjectSwitch: null }),
+
+  setChatTransferPreference(preference) {
+    writeChatTransferPreference(preference)
+    set({ chatTransferPreference: preference })
   },
 
   async updateProjectPath(id, path) {

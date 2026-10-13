@@ -99,4 +99,29 @@ describe('ChatStore', () => {
     expect((await store.load(fork.id))?.forkedFromId).toBe(source.id)
     expect((await store.load(source.id))?.forkedFromId).toBeUndefined()
   })
+
+  it('re-points a chat at another project while keeping its history (Fix D)', async () => {
+    const store = new ChatStore(await tempDir(), () => 3000)
+    const chat = await store.save({
+      workspaceId: 'project-a',
+      messages: [
+        { id: 'm1', role: 'user', content: 'hello from A', at: 1 },
+        { id: 'm2', role: 'assistant', content: 'hi', at: 2 }
+      ]
+    })
+
+    const linked = await store.linkProject(chat.id, 'project-b')
+    expect(linked).toMatchObject({ id: chat.id, workspaceId: 'project-b', title: chat.title })
+
+    // Same file: id and full message history survive the move.
+    const loaded = await store.load(chat.id)
+    expect(loaded?.workspaceId).toBe('project-b')
+    expect(loaded?.messages.map((message) => message.content)).toEqual(['hello from A', 'hi'])
+    expect(linked?.updatedAt).toBe(3000)
+  })
+
+  it('returns null when linking a chat that does not exist', async () => {
+    const store = new ChatStore(await tempDir(), () => 4000)
+    expect(await store.linkProject('missing', 'project-b')).toBeNull()
+  })
 })

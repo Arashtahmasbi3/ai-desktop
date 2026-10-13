@@ -104,6 +104,7 @@ export interface Api {
     load(id: string): Promise<StoredChat | null>
     save(input: ChatSaveInput): Promise<StoredChat>
     rename(id: string, title: string): Promise<ChatSummary | null>
+    linkProject(id: string, workspaceId: string): Promise<ChatSummary | null>
     remove(id: string): Promise<boolean>
   }
   customProviders: {
