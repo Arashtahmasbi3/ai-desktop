@@ -101,7 +101,7 @@ export default function LiveStatus(): JSX.Element | null {
   return (
     <div
       data-testid="live-status"
-      className="flex items-center gap-2 px-4 text-xs text-neutral-400"
+      className="flex items-center justify-end gap-2 px-4 text-xs text-neutral-400"
     >
       {Icon ? (
         <Icon className="h-3.5 w-3.5 shrink-0 text-accent" />

@@ -16,8 +16,16 @@ const KIND_ICON: Record<StepKind, typeof Check> = {
   decision: Brain
 }
 
-/** Collapsible right-hand vertical timeline of the current agent run (D.6). */
-export default function ProgressTimeline(): JSX.Element {
+export interface ProgressTimelineProps {
+  /**
+   * v2.6.3 T1.3: render inside the chat's single column instead of as a fixed
+   * right-hand column, so the conversation is never squeezed by a side panel.
+   */
+  embedded?: boolean
+}
+
+/** Collapsible vertical timeline of the current agent run (D.6). */
+export default function ProgressTimeline({ embedded }: ProgressTimelineProps = {}): JSX.Element {
   const { t } = useTranslation()
   const logs = useStore((state) => state.logs)
   const running = useStore((state) => state.running)
@@ -51,7 +59,14 @@ export default function ProgressTimeline(): JSX.Element {
   }
 
   return (
-    <aside className="flex h-full w-64 shrink-0 flex-col border-l border-border bg-bg-secondary">
+    <aside
+      data-testid="progress-timeline"
+      className={
+        embedded
+          ? 'flex max-h-72 w-full shrink-0 flex-col overflow-hidden rounded-xl border border-border bg-bg-secondary'
+          : 'flex h-full w-64 shrink-0 flex-col border-l border-border bg-bg-secondary'
+      }
+    >
       <div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-1.5">
         <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
           {t('timeline.title')}

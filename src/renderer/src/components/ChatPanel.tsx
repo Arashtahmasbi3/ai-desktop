@@ -29,6 +29,7 @@ import PlanCard from './PlanCard'
 import TaskTracker from './TaskTracker'
 import ExecutionBar from './ExecutionBar'
 import ProgressTimeline from './ProgressTimeline'
+import StatusCard from './StatusCard'
 import InlineTrace from './InlineTrace'
 import LiveStatus from './LiveStatus'
 import JobsPanel from './JobsPanel'
@@ -305,7 +306,6 @@ export default function ChatPanel(): JSX.Element {
         </div>
       ) : null}
 
-      <div className="flex min-h-0 flex-1">
       <div
         ref={scrollRef}
         onScroll={onScroll}
@@ -317,6 +317,10 @@ export default function ChatPanel(): JSX.Element {
           style={{ maxWidth: CHAT_MAX_WIDTH }}
           className="mx-auto flex min-h-0 w-full flex-1 flex-col gap-3 px-4"
         >
+        <StatusCard />
+
+        {timelineOpen ? <ProgressTimeline embedded /> : null}
+
         {messages.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent/15">
@@ -367,8 +371,6 @@ export default function ChatPanel(): JSX.Element {
 
         <InlineTrace />
         </div>
-      </div>
-      {timelineOpen ? <ProgressTimeline /> : null}
       </div>
       <JobsPanel />
 
