@@ -51,6 +51,8 @@ fails, a tool is missing, or the budget ran out — ask rather than guess).
 
 ## Status
 
+**v2.6.4 Sprint — Critical Bugs + Multi-Project UX + Design Polish, in progress on `feature/v2.6.4-critical-fixes`.** Fix A–B (VPS pairing/keepalive) and Fix D–F (chat transfer, opt-in context warning, shared type scale) are complete; see the v2.6.4 sprint section at the end of this file. Full suite green (221 files, 1724 passed | 1 skipped). (2026-10-05)
+
 **v2.4 Sprint — phases A–E complete; version bumped to 2.4.0. A.1 jobs, A.2 preflight, A.3 success verification, B.1 db migration, B.2 docker transfer, B.3 checksum verify, C.1 project users, C.2 project SSH key, C.3 worktrees, D.1 scaffolding. Branch: feature/v2.4-full-compliance.** (2026-10-05)
 
 - Reviewed [`DEVELOPMENT_CHECKLIST.md`](./DEVELOPMENT_CHECKLIST.md) sections 1–3 (pre-sprint:
@@ -840,3 +842,29 @@ Autonomous decisions logged per the sprint's golden rule (`[AUTO-DECISION]`, no 
 - Files (T1.3): `src/renderer/src/components/ToolResultCard.tsx`.
 - Tests: `test/renderer/tool-card-compact.test.tsx` (now 7 cases: header row, single collapsed row, truncation, expand, one-line success, error auto-expand, size hierarchy).
 - `[RELEASE]` **v2.6.3 released.** `feature/v2.6.3-trace-ui` merged into `master` with a `--no-ff` merge commit (`c1e1ffb`); no conflicts (master was a straight ancestor). Annotated tag `v2.6.3` created and pushed. Windows artifacts built from Linux via Wine (`npm run build:win`, exit 0) and hashed: `AI.Desktop.Setup.2.6.3.exe` (sha256 `4505502af47e9ffc1ff61f1c3ea201e948ad051d8b88215d88ecd10177009333`, 112,511,938 B), `AI.Desktop.2.6.3.Portable.exe` (sha256 `0fadc0f7496f502e45969c19ad5911feb149d2ddef0ef37ba7763f726bb0d949`, 112,229,098 B), `SHA256SUMS.txt` (dotted names, so `sha256sum -c` works against the published files). The `gh release create` first pass hit an `EOF` uploading the two ~112 MB assets, leaving a **draft** with only the checksum; the assets were re-uploaded with `gh release upload --clobber` (exit 0) and the release was published (non-draft, non-prerelease, latest): https://github.com/Arashtahmasbi3/ai-desktop/releases/tag/v2.6.3 — all three assets present. Binaries are unsigned (SmartScreen may warn — noted in the release). **[RELEASE] v2.6.3 — Inline Trace, Preflight Override, Centered Chat Layout. 1681+ tests pass. Ready for user testing on Windows.**
+
+## Sprint v2.6.4 — Critical Bugs + Multi-Project UX + Design Polish
+
+Branch `feature/v2.6.4-critical-fixes`.
+
+### Fix D — Chat transfer on project switch
+- `[DECISION v2.6.4]` Switching to another project no longer silently orphans the open chat. When the current session has at least one user message we prompt with `ProjectSwitchDialog` (link / move / keep+new); an empty session switches silently. `ChatStore.linkProject` re-points a chat at the new `workspaceId` **in place** (same file, id, title and full message history), rather than copying it — the backend used to duplicate history on a project change.
+  - Why link-not-copy: a copy would fork the conversation and double the stored history; re-pointing keeps one canonical transcript while letting the chat "belong" to the new project.
+  - Preference: `chatTransferPreference` (`ask` default | `link` | `move` | `new`) persisted in `localStorage`, surfaced in Settings → General; a "remember my choice" checkbox writes it.
+  - `move` = link then `newSession()`; `new` = leave the chat where it is and start a fresh one in the target project.
+- Files: `src/main/chat-store.ts` (`linkProject`), `src/main/ipc.ts` (`chats:linkProject`), `src/preload/index.ts` + `index.d.ts`, `src/renderer/src/lib/chat-transfer.ts`, `src/renderer/src/components/ProjectSwitchDialog.tsx`, `App.tsx`, `store.ts`, `SettingsPanel.tsx`, `i18n/{en,fa}.json`.
+- Tests: `test/main/chat-store.test.ts` (2 cases), `test/renderer/chat-transfer.test.ts`, `test/renderer/project-switch.test.tsx`. Commit `e24fa95`.
+
+### Fix E — Context-filling warning is opt-in (default off)
+- `[DECISION v2.6.4]` The composer's near-limit "context is filling up" nudge is only useful for older, small-context models, so it is hidden by default. `showContextWarning` preference (default `false`, persisted) gates it; `contextWarningVisible(enabled, nearLimit)` in `@shared/memory` is the single predicate. The full accounting still lives in Settings → Usage and "View context" is untouched.
+  - This keeps modern long-context sessions quiet while leaving an explicit opt-in for older models.
+- Files: `src/shared/memory.ts`, `src/renderer/src/store.ts`, `ChatPanel.tsx`, `SettingsPanel.tsx`, `i18n/{en,fa}.json`.
+- Tests: `test/renderer/context-warning-opt-in.test.tsx`, added case in `test/shared/memory.test.ts`. Commit `4eb963f`.
+
+### Fix F — Shared type scale (no re-layout)
+- `[DECISION v2.6.4]` Added size-only `fontSize` tokens `text-2xs`/`text-3xs`/`text-4xs` (11/10/9px, no line-height) and migrated 326 arbitrary `text-[Npx]` classes to them, plus `leading-[14px] → leading-3.5`. Size-only on purpose: a token with a line-height would shift layout, which this polish must not do.
+  - Left as-is (documented): `text-[12px]` (3×) and `text-[13px]` (2×) — 12px has no line-height-neutral Tailwind equivalent (`text-xs` carries 16px), and 13px sits between tokens; changing either would move layout. Revisit only with a deliberate spacing pass.
+- Files: `tailwind.config.js`, all renderer components using the dense sizes; `test/renderer/tool-card-compact.test.tsx` assertions updated. Commit `65df132`.
+
+### Sprint status
+- Fix A (`92205f0`), Fix B (`fix(vps): keep every project's connection up and close only its shell`), Fix D (`e24fa95`), Fix E (`4eb963f`), Fix F (`65df132`) complete. Full suite: 221 files, 1724 passed | 1 skipped; builds green.
