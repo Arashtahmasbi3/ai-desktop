@@ -36,7 +36,7 @@ describe('P3 ToolResultCard rich detail', () => {
     expect(screen.getByText('1.50s')).toBeDefined()
   })
 
-  it('2. reveals stdout, stderr, target and recovery on expand', () => {
+  it('2. auto-expands a failed card and collapses it on click', () => {
     render(
       <ToolResultCard
         name="run_command"
@@ -50,16 +50,17 @@ describe('P3 ToolResultCard rich detail', () => {
         recovery={{ decision: 'stop', attempts: 1, recovered: false }}
       />
     )
-    expect(screen.queryByText('2 tests failed')).toBeNull()
-    fireEvent.click(screen.getByRole('button'))
+    // v2.6.3 T1.3: errors open by default.
     expect(screen.getByText('2 tests failed')).toBeDefined()
     expect(screen.getByText('Error: boom')).toBeDefined()
     expect(screen.getByText('srv-1')).toBeDefined()
     expect(screen.getByText('/srv/app')).toBeDefined()
     expect(screen.getByText(/No automatic retry/)).toBeDefined()
+    fireEvent.click(screen.getByRole('button'))
+    expect(screen.queryByText('2 tests failed')).toBeNull()
   })
 
-  it('3. shows the technical cause and a retry outcome', () => {
+  it('3. shows the technical cause and a retry outcome for a failed card', () => {
     render(
       <ToolResultCard
         name="remote_shell"
@@ -70,7 +71,6 @@ describe('P3 ToolResultCard rich detail', () => {
         recovery={{ decision: 'retry', attempts: 3, recovered: false }}
       />
     )
-    fireEvent.click(screen.getByRole('button'))
     expect(screen.getByText('connection reset')).toBeDefined()
     expect(screen.getByText(/Failed after 3 attempts/)).toBeDefined()
   })

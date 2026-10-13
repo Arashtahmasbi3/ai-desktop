@@ -66,4 +66,42 @@ describe('v2.6.0 C.1 - compact tool card', () => {
     expect(screen.getByText('npm test')).toBeTruthy()
     expect(screen.getByTestId('tool-card-header').getAttribute('aria-expanded')).toBe('true')
   })
+
+  it('5. keeps a successful card as a single collapsed line', () => {
+    render(
+      <ToolResultCard name="run_command" ok command="npm run build" stdout="built" exitCode={0} />
+    )
+    const header = screen.getByTestId('tool-card-header')
+    expect(header.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.queryByText('built')).toBeNull()
+    // Collapsed: only the header row, no body sibling.
+    expect(header.parentElement!.children).toHaveLength(1)
+  })
+
+  it('6. opens a failed card by default so the error is visible', () => {
+    render(
+      <ToolResultCard
+        name="run_command"
+        ok={false}
+        command="npm test"
+        stdout="1 test failed"
+        error="assertion error"
+        exitCode={1}
+      />
+    )
+    expect(screen.getByTestId('tool-card-header').getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByText('1 test failed')).toBeTruthy()
+    expect(screen.getByText('assertion error')).toBeTruthy()
+  })
+
+  it('7. gives the header a larger size than the meta chips', () => {
+    render(<ToolResultCard name="run_command" ok command="npm run build" exitCode={0} durationMs={10} />)
+    const header = screen.getByTestId('tool-card-header')
+    const name = within(header).getByText('run_command')
+    const exit = within(header).getByText('exit 0')
+    const duration = within(header).getByText('0.01s')
+    expect(name.className).toContain('text-[13px]')
+    expect(exit.className).toContain('text-[10px]')
+    expect(duration.className).toContain('text-[10px]')
+  })
 })

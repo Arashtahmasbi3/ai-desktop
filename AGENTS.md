@@ -831,3 +831,11 @@ Autonomous decisions logged per the sprint's golden rule (`[AUTO-DECISION]`, no 
 - `[DECISION v2.6.3]` **T1.3 - one column, always-visible STATUS.** The chat is now a single centered column: the fixed right-hand `ProgressTimeline` column is gone; when toggled it renders `embedded` at the top of the message column (`w-full`, `max-h-72`). A new `StatusCard` shows `{phase, lastDecision}` at the top of the column at all times — `Idle`/`No decision recorded yet` (i18n `chat.statusIdle` / `chat.statusUnknown`) before the first decision, otherwise the latest trace decision's phase + summary. The live "thinking" row (`LiveStatus`) is right-aligned (`justify-end`) so it reads bottom-right like Codex. The redundant row wrapper around the scroll area was removed.
 - Files (T1.3): `src/renderer/src/components/{ChatPanel,ProgressTimeline,LiveStatus,StatusCard}.tsx`, `src/renderer/src/i18n/{en,fa}.json`.
 - Tests: `test/renderer/chat-conformance.test.tsx` (6 DOM cases: idle status, phase+decision, unknown fallback, composer in column, embedded timeline only after toggle, right-aligned live row).
+
+### v2.6.3 Topic 1 - Compact Tool Cards (T1.3)
+- `[DECISION v2.6.3]` Compact tool cards: header 13px, chips 10-11px. Error cards auto-expanded (`useState(!ok)`). Success one-line.
+  - Why: an error is the only case where the hidden body matters, so opening it by default removes a click and matches the Codex/Claude "expanded error" pattern; a successful call stays a single line. `hasBody` now also gates the body (`open && hasBody`) so a body-less failed card never renders an empty bordered area.
+  - Hierarchy: `13px` applies to the header's text (tool name + the truncated command preview), while chips (exit/duration/code) stay `10px` and the ok/error badge stays `10px`. This is the "header > chips" size hierarchy; padding went `px-3 py-1.5 → px-2.5 py-1`.
+  - This deliberately changes the old "always collapsed" default for failures, so `test/renderer/tool-detail-ui.test.tsx` cases 2-3 were updated to assert the expanded-by-default behavior instead of encoding the superseded default.
+- Files (T1.3): `src/renderer/src/components/ToolResultCard.tsx`.
+- Tests: `test/renderer/tool-card-compact.test.tsx` (now 7 cases: header row, single collapsed row, truncation, expand, one-line success, error auto-expand, size hierarchy).
