@@ -36,6 +36,8 @@
   },
   "sidebar": {
     "newChat": "New chat",
+    "pin": "Keep sidebar expanded",
+    "unpin": "Stop pinning the sidebar",
     "chats": "Chats",
     "projects": "Projects",
     "chatCount": "{{count}} chats",

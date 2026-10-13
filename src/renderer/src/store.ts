@@ -118,6 +118,7 @@ const MAX_TERMINAL_LINES = 500
 export const CONTEXT_SETTINGS_KEY = 'ai-desktop:show-context-before-send'
 const CHAT_TREE_KEY = 'ai-desktop:chat-tree-open'
 const RAW_TOOL_ROWS_KEY = 'ai-desktop:show-raw-tool-rows'
+const SIDEBAR_PIN_KEY = 'ai-desktop:sidebar-pinned'
 const JOBS_PANEL_KEY = 'ai-desktop:show-jobs-panel'
 const ZOOM_KEY = 'ai-desktop:zoom-level'
 /** Electron zoom-level step per keyboard press (v2.6.2 T5.3). */
@@ -170,6 +171,19 @@ export function readShowRawToolRows(): boolean {
     return globalThis.localStorage?.getItem(RAW_TOOL_ROWS_KEY) === '1'
   } catch {
     return false
+  }
+}
+
+/**
+ * Read the persisted "keep the sidebar expanded" preference (v2.6.3, default on).
+ * Pinned keeps the sidebar expanded down to MIN_CHAT_WIDTH; unpinned lets it fall
+ * to the rail whenever the chat cannot get its full comfortable measure.
+ */
+export function readSidebarPinned(): boolean {
+  try {
+    return globalThis.localStorage?.getItem(SIDEBAR_PIN_KEY) !== '0'
+  } catch {
+    return true
   }
 }
 
@@ -264,6 +278,8 @@ interface AppState {
   locale: Locale
   /** Collapsed state of the left sidebar. */
   sidebarCollapsed: boolean
+  /** v2.6.3 T1.2: keep the sidebar expanded even on mid-size windows (persisted). */
+  sidebarPinned: boolean
   /** Whether the context preview is shown before each send (v2.3.2, B.4). */
   showContextBeforeSend: boolean
   /** Every recorded LLM call's token usage, oldest first (v2.5.4). */
@@ -351,6 +367,8 @@ interface AppState {
 
   setLocale: (locale: Locale) => void
   toggleSidebar: () => void
+  /** v2.6.3 T1.2: pin/unpin the sidebar (persisted; pinning also expands). */
+  setSidebarPinned: (value: boolean) => void
   /** v2.6.3 T3.1: hide the preflight banner until the next non-ok result. */
   dismissPreflight: () => void
   /** Toggle the pre-send context preview. */
@@ -533,6 +551,7 @@ export const useStore = create<AppState>((set, get) => ({
 
   locale: detectLocale(),
   sidebarCollapsed: false,
+  sidebarPinned: readSidebarPinned(),
   showContextBeforeSend: readShowContextBeforeSend(),
   usageRecords: loadUsage(),
   sessionStartedAt: Date.now(),
@@ -578,6 +597,16 @@ export const useStore = create<AppState>((set, get) => ({
     void i18nChangeLanguage(locale)
   },
   toggleSidebar: () => set({ sidebarCollapsed: !get().sidebarCollapsed }),
+  setSidebarPinned(value) {
+    // Pinning means "keep it open", so it also un-collapses; unpinning leaves the
+    // current collapsed state untouched.
+    set(value ? { sidebarPinned: true, sidebarCollapsed: false } : { sidebarPinned: false })
+    try {
+      globalThis.localStorage?.setItem(SIDEBAR_PIN_KEY, value ? '1' : '0')
+    } catch {
+      // Persisting the preference is best-effort.
+    }
+  },
   dismissPreflight: () => set({ preflightNotice: null }),
   setShowContextBeforeSend(value) {
     set({ showContextBeforeSend: value })

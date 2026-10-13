@@ -13,6 +13,7 @@ import {
   MapPin,
   MessageSquare,
   MoreHorizontal,
+  Pin,
   Plug,
   Plus,
   Search,
@@ -106,6 +107,8 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
     (state) => state.jobs.filter((job) => job.status === 'running' || job.status === 'pending').length
   )
   const setJobsPanelOpen = useStore((state) => state.setJobsPanelOpen)
+  const sidebarPinned = useStore((state) => state.sidebarPinned)
+  const setSidebarPinned = useStore((state) => state.setSidebarPinned)
 
   const [query, setQuery] = useState('')
   const [chatMenuFor, setChatMenuFor] = useState<string | null>(null)
@@ -258,10 +261,25 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
         })}
         <button
           type="button"
+          data-testid="sidebar-pin"
+          title={t('sidebar.pin')}
+          aria-label={t('sidebar.pin')}
+          aria-pressed={sidebarPinned}
+          onClick={() => setSidebarPinned(!sidebarPinned)}
+          className={`mt-auto flex h-9 w-9 items-center justify-center rounded-lg ${
+            sidebarPinned
+              ? 'bg-accent/15 text-accent'
+              : 'text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300'
+          }`}
+        >
+          <Pin className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
           title={t('common.settings')}
           aria-label={t('common.settings')}
           onClick={openSettings}
-          className="mt-auto flex h-9 w-9 items-center justify-center rounded-lg text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300"
+          className="flex h-9 w-9 items-center justify-center rounded-lg text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300"
         >
           <Settings2 className="h-4 w-4" />
         </button>
@@ -351,6 +369,21 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
             ) : (worker?.active ?? 0) > 0 ? (
               <span className="absolute right-1 top-1 h-1.5 w-1.5 animate-pulse rounded-full bg-sky-400" />
             ) : null}
+          </button>
+          <button
+            type="button"
+            data-testid="sidebar-pin"
+            title={sidebarPinned ? t('sidebar.unpin') : t('sidebar.pin')}
+            aria-label={sidebarPinned ? t('sidebar.unpin') : t('sidebar.pin')}
+            aria-pressed={sidebarPinned}
+            onClick={() => setSidebarPinned(!sidebarPinned)}
+            className={`flex h-7 w-7 items-center justify-center rounded-lg ${
+              sidebarPinned
+                ? 'bg-accent/15 text-accent'
+                : 'text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300'
+            }`}
+          >
+            <Pin className="h-3.5 w-3.5" />
           </button>
         </div>
 

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Bot, AlertTriangle, UploadCloud, X } from 'lucide-react'
 import BrowserPanel from './components/BrowserPanel'
 import ChatPanel from './components/ChatPanel'
+import ChatTree from './components/ChatTree'
 import CodeViewer from './components/CodeViewer'
 import CodeSearchModal from './components/CodeSearchModal'
 import CommandPalette from './components/CommandPalette'
@@ -42,6 +43,8 @@ export default function App(): JSX.Element {
   const chatTreeOpen = useStore((state) => state.chatTreeOpen)
   const workspacePanelOpen = useStore((state) => state.workspacePanelOpen)
   const sidebarCollapsed = useStore((state) => state.sidebarCollapsed)
+  const sidebarPinned = useStore((state) => state.sidebarPinned)
+  const toggleChatTree = useStore((state) => state.toggleChatTree)
   const [dragging, setDragging] = useState(false)
   const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth)
 
@@ -60,7 +63,8 @@ export default function App(): JSX.Element {
   // docking them would squeeze the chat below its comfortable width.
   const layout = resolveLayout({
     width: viewportWidth,
-    sidebarPinned: !sidebarCollapsed,
+    sidebarPinned,
+    sidebarCollapsed,
     treeOpen: chatTreeOpen,
     workspaceOpen: workspacePanelOpen
   })
@@ -261,15 +265,7 @@ export default function App(): JSX.Element {
               {view === 'chat' ? (
                 <div className="relative flex min-h-0 min-w-0 flex-1">
                   {chatTreeOpen ? (
-                    <aside
-                      className={
-                        layout.tree === 'static'
-                          ? 'hidden w-64 shrink-0 border-r border-border md:flex'
-                          : 'absolute inset-y-0 left-0 z-40 flex w-64 max-w-[90vw] flex-col border-r border-border bg-bg-secondary shadow-2xl'
-                      }
-                    >
-                      <FileExplorer />
-                    </aside>
+                    <ChatTree mode={layout.tree} onClose={toggleChatTree} />
                   ) : null}
                   <ChatPanel />
                   {workspacePanelOpen ? (

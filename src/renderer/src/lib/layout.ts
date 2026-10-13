@@ -27,8 +27,10 @@ export const MIN_CHAT_WIDTH = 560
 export interface LayoutInput {
   /** Viewport width in CSS pixels. */
   width: number
-  /** The user explicitly wants the sidebar expanded (i.e. not collapsed via Ctrl+B). */
+  /** The user pinned the sidebar so it should stay expanded when it still fits. */
   sidebarPinned: boolean
+  /** The user explicitly collapsed the sidebar (Ctrl+B); this always wins. */
+  sidebarCollapsed: boolean
   treeOpen: boolean
   workspaceOpen: boolean
 }
@@ -43,11 +45,19 @@ export interface LayoutPlan {
  * Decide which columns dock and which overlay for a given viewport. Docked columns
  * are only used when the chat still keeps at least {@link CHAT_MAX_WIDTH}; otherwise
  * the panel floats over the chat.
+ *
+ * The sidebar has two user controls with distinct meaning:
+ * - `sidebarCollapsed` (Ctrl+B) hides it entirely -> always the rail.
+ * - `sidebarPinned` keeps it expanded. A pinned sidebar holds its width down to
+ *   {@link MIN_CHAT_WIDTH} (the chat may get narrow, but not unusably so); an
+ *   unpinned (auto) sidebar only stays expanded while the chat can claim its full
+ *   {@link CHAT_MAX_WIDTH} measure, so a mid-size window favors the conversation.
  */
 export function resolveLayout(input: LayoutInput): LayoutPlan {
-  const { width, sidebarPinned, treeOpen, workspaceOpen } = input
-  const expanded =
-    sidebarPinned && width - SIDEBAR_EXPANDED_WIDTH >= MIN_CHAT_WIDTH
+  const { width, sidebarPinned, sidebarCollapsed, treeOpen, workspaceOpen } = input
+
+  const sidebarFloor = sidebarPinned ? MIN_CHAT_WIDTH : CHAT_MAX_WIDTH
+  const expanded = !sidebarCollapsed && width - SIDEBAR_EXPANDED_WIDTH >= sidebarFloor
   const sidebar = expanded ? SIDEBAR_EXPANDED_WIDTH : SIDEBAR_RAIL_WIDTH
 
   const treeStatic =
