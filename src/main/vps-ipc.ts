@@ -144,6 +144,7 @@ export function registerVpsIpc(services: AppServices): () => void {
     ['vps:save', (input: VpsServerInput) => services.vpsServers.save(input)],
     ['vps:remove', (id: string) => services.vpsServers.remove(id)],
     ['vps:status', () => services.vps.getState()],
+    ['vps:connected', () => services.vps.connectedServers()],
     ['vps:connect', (id: string) => services.vps.connect(id)],
     ['vps:disconnect', (id: string) => services.vps.disconnect(id)],
     ['vps:approveFingerprint', (id: string) => services.vps.approveFingerprint(id)],
@@ -203,6 +204,12 @@ export function registerVpsIpc(services: AppServices): () => void {
       'vps:terminalResize',
       (id: string, cols: number, rows: number) => {
         services.vps.resizeTerminal(id, cols, rows)
+      }
+    ],
+    [
+      'vps:terminalClose',
+      (id: string, sessionId?: string) => {
+        services.vps.closeTerminal(id, sessionId)
       }
     ],
     ['vps:files:list', (id: string, path: string) => services.vps.listFiles(id, path)],

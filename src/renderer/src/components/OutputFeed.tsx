@@ -16,7 +16,7 @@ function OutputEntry({ call }: { call: ToolCallView }): JSX.Element {
       <button
         type="button"
         onClick={() => hasBody && setOpen((value) => !value)}
-        className="flex w-full items-center gap-1.5 px-2 py-1.5 text-left text-[11px]"
+        className="flex w-full items-center gap-1.5 px-2 py-1.5 text-left text-2xs"
       >
         {hasBody ? (
           open ? (
@@ -40,7 +40,7 @@ function OutputEntry({ call }: { call: ToolCallView }): JSX.Element {
         ) : null}
       </button>
       {open && hasBody ? (
-        <pre className="max-h-56 overflow-auto border-t border-border bg-black/40 p-2 text-[10px] leading-relaxed">
+        <pre className="max-h-56 overflow-auto border-t border-border bg-black/40 p-2 text-3xs leading-relaxed">
           {call.stdout ? (
             <code dir="ltr" className="block whitespace-pre-wrap text-neutral-300">
               {call.stdout}
@@ -78,7 +78,7 @@ export default function OutputFeed(): JSX.Element {
   return (
     <div className="flex flex-col gap-2">
       {running ? (
-        <div className="flex items-center gap-2 rounded-lg border border-accent/30 bg-accent/10 px-2 py-1.5 text-[11px] text-accent">
+        <div className="flex items-center gap-2 rounded-lg border border-accent/30 bg-accent/10 px-2 py-1.5 text-2xs text-accent">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
           {t('workspace.running')}
         </div>

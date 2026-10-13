@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import type { VpsExecResult } from '@shared/vps'
 import {
   NO_VPS_SELECTED_MESSAGE,
+  reconcileRunServer,
   requiresVps,
   resolveVpsForRun,
   VPS_REQUIRING_TOOLS
@@ -127,5 +128,52 @@ describe('planRemoteRuntime never auto-selects a VPS (P0-4)', () => {
     const runtime = planRemoteRuntime('do work', 'srv-2', fakeHost(['srv-1', 'srv-2']))
     expect(runtime.extraTools?.map((tool) => tool.name)).toContain('remote_shell')
     expect(runtime.systemHint).toContain('srv-2')
+  })
+})
+
+/**
+ * v2.6.4 - the run's routing decision and its tool runtime must target the same
+ * host. A stale chat-header selection that is no longer connected must fall back
+ * to the active project's server instead of splitting the two.
+ */
+describe('v2.6.4 - reconcileRunServer', () => {
+  it('keeps an explicit, connected header selection', () => {
+    const run = reconcileRunServer({
+      requestedVpsId: 'srv-phone',
+      projectVpsId: 'srv-proj',
+      connectedServers: ['srv-phone', 'srv-proj']
+    })
+    expect(run).toEqual({ serverId: 'srv-phone', connected: true, reconciled: false })
+  })
+
+  it('falls back to the project server when the header selection is not connected', () => {
+    const run = reconcileRunServer({
+      requestedVpsId: 'srv-stale',
+      projectVpsId: 'srv-proj',
+      connectedServers: ['srv-proj']
+    })
+    expect(run).toEqual({ serverId: 'srv-proj', connected: true, reconciled: true })
+  })
+
+  it('uses the project server when there is no explicit selection', () => {
+    const run = reconcileRunServer({
+      projectVpsId: 'srv-proj',
+      connectedServers: ['srv-proj']
+    })
+    expect(run).toEqual({ serverId: 'srv-proj', connected: true, reconciled: false })
+  })
+
+  it('reports not-connected when neither the request nor the project host is up', () => {
+    const run = reconcileRunServer({
+      requestedVpsId: 'srv-stale',
+      projectVpsId: 'srv-proj',
+      connectedServers: []
+    })
+    expect(run).toEqual({ serverId: 'srv-proj', connected: false, reconciled: true })
+  })
+
+  it('is a local, unconnected run when nothing is selected or connected', () => {
+    const run = reconcileRunServer({ connectedServers: ['srv-other'] })
+    expect(run).toEqual({ serverId: undefined, connected: false, reconciled: false })
   })
 })

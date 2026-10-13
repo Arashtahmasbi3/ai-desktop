@@ -75,7 +75,7 @@ export default function ShortcutsOverlay(): JSX.Element | null {
         <div className="grid gap-5 sm:grid-cols-2">
           {GROUPS.map((group) => (
             <section key={group.titleKey} className="flex flex-col gap-2">
-              <h3 className="text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">
+              <h3 className="text-2xs font-semibold uppercase tracking-wide text-text-tertiary">
                 {t(group.titleKey)}
               </h3>
               <ul className="flex flex-col gap-1.5">
@@ -86,7 +86,7 @@ export default function ShortcutsOverlay(): JSX.Element | null {
                       {item.keys.map((key) => (
                         <kbd
                           key={key}
-                          className="rounded border border-border bg-bg-primary px-1.5 py-0.5 text-[10px] text-neutral-400"
+                          className="rounded border border-border bg-bg-primary px-1.5 py-0.5 text-3xs text-neutral-400"
                         >
                           {key}
                         </kbd>

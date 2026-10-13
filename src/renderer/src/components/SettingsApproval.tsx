@@ -20,7 +20,7 @@ export default function SettingsApproval(): JSX.Element {
       <div className="flex flex-col gap-2 rounded-lg border border-border bg-bg-primary p-3">
         <div>
           <p className="text-xs font-medium text-neutral-200">{t('settings.approvalMode')}</p>
-          <p className="mt-0.5 text-[11px] text-neutral-500">{t('settings.approvalHint')}</p>
+          <p className="mt-0.5 text-2xs text-neutral-500">{t('settings.approvalHint')}</p>
         </div>
         {(
           [

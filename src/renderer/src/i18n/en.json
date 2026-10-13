@@ -266,6 +266,10 @@
     "showJobsPanelAlways": "Always show the background jobs panel",
     "showRawToolRows": "Show raw tool rows (for debugging)",
     "showRawToolRowsHint": "Tool calls already shown inside the execution trace are hidden by default.",
+    "chatOnProjectSwitch": "Open chat when switching projects",
+    "chatOnProjectSwitchHint": "What to do with the current conversation when you open another project.",
+    "showContextWarning": "Show the context-filling warning",
+    "showContextWarningHint": "Only needed for older models with a small context window. Off by default.",
     "projectName": "Name",
     "projectPath": "Path (e.g. C:\\Users\\me\\project)",
     "noProjects": "No projects yet.",
@@ -493,6 +497,19 @@
     "osMismatch": "Wrong OS",
     "located": "Project folder updated.",
     "autoMapped": "Found on the VPS: {path}"
+  },
+  "projectSwitch": {
+    "title": "What about this chat?",
+    "body": "You are opening “{{project}}”. Choose what happens to the current conversation.",
+    "link": "Link & continue",
+    "linkHint": "Keep this chat open with its full context; it now belongs to {{project}}.",
+    "move": "Move & start new",
+    "moveHint": "File this chat under {{project}}, then start a fresh session.",
+    "new": "Keep & start new chat",
+    "newHint": "Leave this chat in its project and start a new chat in {{project}}.",
+    "remember": "Remember my choice",
+    "cancel": "Cancel",
+    "ask": "Ask every time"
   },
   "timeline": {
     "title": "Progress",

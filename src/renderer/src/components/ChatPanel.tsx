@@ -40,7 +40,7 @@ import { decideSend } from '../lib/context-gate'
 import { workspaceStatus, shouldShowWorkspaceBanner } from '../lib/project-status'
 import { CHAT_MAX_WIDTH } from '../lib/layout'
 import { visibleChatMessages } from '../lib/tool-rows'
-import { contextBudget } from '@shared/memory'
+import { contextBudget, contextWarningVisible } from '@shared/memory'
 
 const SUGGESTION_KEYS = [
   'chat.suggestion1',
@@ -73,6 +73,7 @@ export default function ChatPanel(): JSX.Element {
   const connectVps = useStore((state) => state.connectVps)
   const addProject = useStore((state) => state.addProject)
   const showContextBeforeSend = useStore((state) => state.showContextBeforeSend)
+  const showContextWarning = useStore((state) => state.showContextWarning)
   const compactContext = useStore((state) => state.compactContext)
   const selection = useStore((state) => state.selection)
   const openSettings = useStore((state) => state.openSettings)
@@ -290,7 +291,7 @@ export default function ChatPanel(): JSX.Element {
 
       {wsBanner ? (
         <div
-          className={`mx-3 mt-2 flex items-center gap-2 rounded-lg border px-3 py-2 text-[11px] ${statusTone}`}
+          className={`mx-3 mt-2 flex items-center gap-2 rounded-lg border px-3 py-2 text-2xs ${statusTone}`}
         >
           <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
           <span className="flex-1">{t(wsStatus.messageKey as string, { path: wsStatus.path })}</span>
@@ -398,7 +399,7 @@ export default function ChatPanel(): JSX.Element {
       ) : null}
 
       {warnings.length > 0 ? (
-        <div className="mx-3 mb-2 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-300">
+        <div className="mx-3 mb-2 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-2xs text-amber-300">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <div className="flex flex-col gap-0.5">
             {warnings.map((warning, index) => (
@@ -417,7 +418,7 @@ export default function ChatPanel(): JSX.Element {
           className="mx-auto w-full px-4"
         >
         {approvalSuggestion ? (
-          <div className="mx-3 mb-1 flex items-center justify-between gap-2 rounded-lg border border-accent/40 bg-accent/10 px-2 py-1.5 text-[11px] text-neutral-200">
+          <div className="mx-3 mb-1 flex items-center justify-between gap-2 rounded-lg border border-accent/40 bg-accent/10 px-2 py-1.5 text-2xs text-neutral-200">
             <span>
               {t('chat.rememberSuggestion', { tool: approvalSuggestion.tool })}
             </span>
@@ -446,7 +447,7 @@ export default function ChatPanel(): JSX.Element {
             {attached.map((path) => (
               <span
                 key={path}
-                className="flex items-center gap-1 rounded border border-border bg-bg-primary px-2 py-0.5 text-[10px] text-neutral-400"
+                className="flex items-center gap-1 rounded border border-border bg-bg-primary px-2 py-0.5 text-3xs text-neutral-400"
               >
                 <span className="max-w-[14rem] truncate" dir="ltr">
                   {basename(path)}
@@ -555,13 +556,13 @@ export default function ChatPanel(): JSX.Element {
                   )
                 }
                 title={t('chat.viewContext')}
-                className="flex items-center gap-1 rounded-lg px-1.5 py-0.5 text-[10px] text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300"
+                className="flex items-center gap-1 rounded-lg px-1.5 py-0.5 text-3xs text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300"
               >
                 <Eye className="h-3 w-3" />
                 {t('chat.viewContext')}
               </button>
             </div>
-            {budget.nearLimit ? (
+            {contextWarningVisible(showContextWarning, budget.nearLimit) ? (
               <ContextWarning
                 percent={contextPercent}
                 overBudget={budget.overBudget}
@@ -571,7 +572,7 @@ export default function ChatPanel(): JSX.Element {
             ) : null}
           </div>
         </div>
-        <div className="mt-1.5 flex items-center justify-between px-1 text-[10px] text-neutral-600">
+        <div className="mt-1.5 flex items-center justify-between px-1 text-3xs text-neutral-600">
           <span>Enter = {t('chat.send')} · Shift+Enter = ↵ · Ctrl+Enter = {t('chat.send')}</span>
         </div>
         </div>

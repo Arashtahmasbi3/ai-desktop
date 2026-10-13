@@ -76,7 +76,7 @@ export default function GitSetupDialog({
         </div>
 
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
-          <p className="truncate text-[11px] text-neutral-500">{path}</p>
+          <p className="truncate text-2xs text-neutral-500">{path}</p>
 
           <label className={rowClass}>
             <input type="checkbox" checked={init} onChange={(e) => setInit(e.target.checked)} />
@@ -119,14 +119,14 @@ export default function GitSetupDialog({
           ) : null}
 
           {preview.length > 0 ? (
-            <pre className="max-h-32 overflow-auto whitespace-pre-wrap rounded border border-border bg-bg-primary p-2 text-[10px] text-neutral-500">
+            <pre className="max-h-32 overflow-auto whitespace-pre-wrap rounded border border-border bg-bg-primary p-2 text-3xs text-neutral-500">
               {preview.join('\n')}
             </pre>
           ) : null}
 
           {error ? <p className="text-xs text-red-400">{error}</p> : null}
           {output ? (
-            <pre className="max-h-32 overflow-auto whitespace-pre-wrap rounded border border-border bg-bg-primary p-2 text-[10px] text-emerald-400">
+            <pre className="max-h-32 overflow-auto whitespace-pre-wrap rounded border border-border bg-bg-primary p-2 text-3xs text-emerald-400">
               {output}
             </pre>
           ) : null}

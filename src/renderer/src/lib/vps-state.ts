@@ -12,11 +12,20 @@ export const VPS_RECONNECT_KEY = 'last-active-vps'
 /** Derive the indicator for the active VPS from the single main-process state. */
 export function vpsIndicator(
   activeVpsId: string | undefined | null,
-  status: VpsConnectionState
+  status: VpsConnectionState,
+  /**
+   * v2.6.4: every connected server id. When provided, the selected server's
+   * indicator is decided by whether *it* is connected, not by whichever server
+   * the single global status last touched (multi-connection).
+   */
+  connectedServers?: string[]
 ): VpsIndicator {
   if (!activeVpsId) return 'off'
-  if (status.status === 'connecting') return 'connecting'
-  if (status.status === 'error') return 'error'
+  if (status.status === 'connecting' && status.serverId === activeVpsId) return 'connecting'
+  if (status.status === 'error' && status.serverId === activeVpsId) return 'error'
+  if (connectedServers) {
+    return connectedServers.includes(activeVpsId) ? 'connected' : 'disconnected'
+  }
   if (status.status === 'connected' && status.serverId === activeVpsId) return 'connected'
   return 'disconnected'
 }
@@ -49,4 +58,22 @@ export function readLastVpsId(): string | undefined {
   } catch {
     return undefined
   }
+}
+
+/**
+ * Every server the app should keep connected: each remote project's own VPS,
+ * plus the chat-header selection. v2.6.4 multi-connection — switching projects
+ * must not drop another project's host, so they are all kept up in the
+ * background rather than only the currently-selected one.
+ */
+export function remoteVpsIds(
+  projects: readonly { type?: string; vpsId?: string }[],
+  explicitVpsId?: string | undefined
+): string[] {
+  const ids = new Set<string>()
+  for (const project of projects) {
+    if (project.type === 'remote' && project.vpsId) ids.add(project.vpsId)
+  }
+  if (explicitVpsId) ids.add(explicitVpsId)
+  return [...ids]
 }

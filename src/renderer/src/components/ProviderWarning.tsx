@@ -18,7 +18,7 @@ export default function ProviderWarning(): JSX.Element | null {
   const label = PROVIDERS[selection.provider]?.label ?? selection.provider
 
   return (
-    <div className="mx-3 mb-2 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-300">
+    <div className="mx-3 mb-2 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-2xs text-amber-300">
       <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
       <span className="flex-1">
         No API key for <span className="font-medium">{label}</span>. Add one to start chatting.

@@ -86,3 +86,13 @@ export function contextBudget(
   const ratio = budget > 0 ? tokens / budget : 0
   return { tokens, ratio, nearLimit: ratio >= CONTEXT_NEAR_LIMIT_RATIO, overBudget: tokens >= budget }
 }
+
+/**
+ * v2.6.4 Fix E: the composer's "context is filling up" nudge is opt-in. It is
+ * only useful for older, small-context models, so it stays hidden by default
+ * and appears solely when the user has enabled it *and* the budget is nearly
+ * full.
+ */
+export function contextWarningVisible(enabled: boolean, nearLimit: boolean): boolean {
+  return enabled && nearLimit
+}

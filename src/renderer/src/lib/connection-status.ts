@@ -46,11 +46,22 @@ export interface ConnectionInput {
   project?: { type: 'local' | 'remote'; path: string; vpsId?: string }
   vpsStatus: VpsConnectionState
   vpsServers: VpsServerView[]
+  /**
+   * Every currently-connected server id (v2.6.4). Optional for backwards
+   * compatibility; when absent the single `vpsStatus` is treated as the only
+   * possible connection.
+   */
+  vpsConnected?: string[]
 }
 
 /** Pure derivation, so it can be unit-tested without mounting React. */
 export function deriveConnectionStatus(input: ConnectionInput): ConnectionStatus {
   const { ready, workerOnline, project, vpsStatus, vpsServers } = input
+  // The single "last touched" status is always part of the connected set, so an
+  // empty/not-yet-refreshed list cannot briefly report a connected project as
+  // disconnected.
+  const connected = new Set(input.vpsConnected ?? [])
+  if (vpsStatus.status === 'connected' && vpsStatus.serverId) connected.add(vpsStatus.serverId)
 
   if (!ready) {
     return { kind: 'initializing', tone: 'warn', labelKey: 'connection.initializing', detail: '' }
@@ -61,10 +72,14 @@ export function deriveConnectionStatus(input: ConnectionInput): ConnectionStatus
   if (project?.type === 'remote') {
     const serverId = project.vpsId
     const name = vpsServerName(vpsServers, serverId) ?? serverId ?? ''
-    if (vpsStatus.status === 'connecting') {
+    // A transient status only concerns this project when it names its server (or
+    // names none, as older callers did); an error on another host must not mark
+    // this project as errored.
+    const statusForServer = vpsStatus.serverId === undefined || vpsStatus.serverId === serverId
+    if (vpsStatus.status === 'connecting' && statusForServer) {
       return { kind: 'connecting', tone: 'warn', labelKey: 'connection.connecting', detail: name, serverId }
     }
-    if (vpsStatus.status === 'error') {
+    if (vpsStatus.status === 'error' && statusForServer) {
       return {
         kind: 'error',
         tone: 'bad',
@@ -73,7 +88,9 @@ export function deriveConnectionStatus(input: ConnectionInput): ConnectionStatus
         serverId
       }
     }
-    if (vpsStatus.status === 'connected' && vpsStatus.serverId === serverId) {
+    // Multi-connection: the project is connected when *its own* server is in the
+    // connected set, regardless of which server the global status last touched.
+    if (serverId && connected.has(serverId)) {
       return { kind: 'connected', tone: 'ok', labelKey: 'connection.connected', detail: name, serverId }
     }
     return {
@@ -95,6 +112,7 @@ export function useConnectionStatus(): ConnectionStatus {
   const projectMissing = useStore((state) => state.projectMissing)
   const vpsStatus = useStore((state) => state.vpsStatus)
   const vpsServers = useStore((state) => state.vpsServers)
+  const vpsConnected = useStore((state) => state.vpsConnected)
 
   const active = settings?.projects.find((project) => project.id === settings.activeProjectId)
   const project =
@@ -107,7 +125,8 @@ export function useConnectionStatus(): ConnectionStatus {
     workerOnline: worker?.online ?? true,
     project,
     vpsStatus,
-    vpsServers
+    vpsServers,
+    vpsConnected
   })
 
   if (projectMissing) {

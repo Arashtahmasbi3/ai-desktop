@@ -59,6 +59,8 @@ export class SshManager {
   private readonly readKeyFile: (path: string) => Promise<Buffer>
   private connections = new Map<string, ConnectionEntry>()
   private pendingFingerprints = new Map<string, string>()
+  /** Last known state per server, so the UI can reason about each independently. */
+  private serverStates = new Map<string, VpsConnectionState>()
   private state: VpsConnectionState = { status: 'disconnected' }
   private watchdog?: ReturnType<typeof setInterval>
 
@@ -77,6 +79,18 @@ export class SshManager {
 
   getState(): VpsConnectionState {
     return { ...this.state }
+  }
+
+  /** Last known state of one server, or disconnected when we have never seen it. */
+  stateFor(serverId: string): VpsConnectionState {
+    return this.serverStates.get(serverId) ?? { status: 'disconnected', serverId }
+  }
+
+  /** Per-server state snapshot (v2.6.4): every server keeps its own connection. */
+  states(): Record<string, VpsConnectionState> {
+    const entries: Record<string, VpsConnectionState> = {}
+    for (const [id, state] of this.serverStates) entries[id] = { ...state }
+    return entries
   }
 
   connectedServers(): string[] {
@@ -106,6 +120,7 @@ export class SshManager {
 
   private setState(next: VpsConnectionState): VpsConnectionState {
     this.state = next
+    if (next.serverId) this.serverStates.set(next.serverId, { ...next })
     this.onStatus?.(this.getState())
     return this.getState()
   }
@@ -350,6 +365,19 @@ export class SshManager {
   writeTerminal(serverId: string, data: string): void {
     this.connections.get(serverId)?.terminal?.write(data)
     this.touch(serverId)
+  }
+
+  /**
+   * Close only the interactive shell for a server, leaving its SSH connection
+   * (and every other server's connection) up. v2.6.4: a terminal panel
+   * unmounting must not tear down a connection other projects rely on.
+   */
+  closeTerminal(serverId: string, sessionId?: string): void {
+    const entry = this.connections.get(serverId)
+    if (!entry?.terminal) return
+    if (sessionId && entry.terminal.id !== sessionId) return
+    entry.terminal.close()
+    entry.terminal = undefined
   }
 
   resizeTerminal(serverId: string, cols: number, rows: number): void {

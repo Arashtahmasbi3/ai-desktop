@@ -65,7 +65,7 @@ export default function Onboarding(): JSX.Element | null {
                     ? t('onboarding.vpsTitle')
                     : 'You are all set'}
           </h2>
-          <span className="ml-auto text-[10px] text-neutral-500">
+          <span className="ml-auto text-3xs text-neutral-500">
             {t('onboarding.stepOf', { current: step + 1, total: ONBOARDING_STEPS.length })}
           </span>
         </div>

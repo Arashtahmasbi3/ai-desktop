@@ -17,7 +17,7 @@ export default function SettingsMemory(): JSX.Element {
         <MemoryStick className="h-3.5 w-3.5" />
         {t('settings.memory')}
       </h3>
-      <p className="text-[11px] text-neutral-500">{t('settings.memoryHint')}</p>
+      <p className="text-2xs text-neutral-500">{t('settings.memoryHint')}</p>
 
       <div className="rounded-xl border border-border bg-bg-primary p-3">
         <div className="flex items-center justify-between text-xs text-neutral-300">
@@ -36,7 +36,7 @@ export default function SettingsMemory(): JSX.Element {
           />
         </div>
         {overBudget ? (
-          <p className="mt-2 text-[11px] text-amber-400">{t('settings.contextOverBudget')}</p>
+          <p className="mt-2 text-2xs text-amber-400">{t('settings.contextOverBudget')}</p>
         ) : null}
       </div>
     </section>

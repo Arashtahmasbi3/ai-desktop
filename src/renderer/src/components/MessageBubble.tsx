@@ -58,7 +58,7 @@ export default function MessageBubble({ message }: { message: ChatMessage }): JS
         {message.toolCall ? (
           <ToolResultCard {...message.toolCall} />
         ) : (
-          <span className="rounded-full border border-border bg-bg-secondary px-2.5 py-1 font-mono text-[11px] text-sky-300">
+          <span className="rounded-full border border-border bg-bg-secondary px-2.5 py-1 font-mono text-2xs text-sky-300">
             {message.content}
           </span>
         )}
@@ -81,7 +81,7 @@ export default function MessageBubble({ message }: { message: ChatMessage }): JS
           isUser ? 'items-end' : 'items-start'
         }`}
       >
-        <span className="mb-0.5 px-1 text-[10px] uppercase tracking-wide text-neutral-500">
+        <span className="mb-0.5 px-1 text-3xs uppercase tracking-wide text-neutral-500">
           {t(ROLE_LABEL[message.role])}
         </span>
         <div
@@ -94,12 +94,12 @@ export default function MessageBubble({ message }: { message: ChatMessage }): JS
         </div>
         <div className="mt-0.5 flex items-center gap-2 px-1">
           {message.role === 'assistant' && message.model ? (
-            <span className="font-mono text-[10px] text-neutral-600" dir="ltr">
+            <span className="font-mono text-3xs text-neutral-600" dir="ltr">
               {message.model}
             </span>
           ) : null}
           {message.usedRemote ? (
-            <span className="flex items-center gap-0.5 text-[10px] text-sky-400">
+            <span className="flex items-center gap-0.5 text-3xs text-sky-400">
               <Server className="h-2.5 w-2.5" />
               {t('chat.usedRemote')}
             </span>
@@ -109,7 +109,7 @@ export default function MessageBubble({ message }: { message: ChatMessage }): JS
             onClick={copy}
             title={t('toast.copied')}
             aria-label={t('common.export')}
-            className={`flex items-center gap-0.5 text-[10px] text-neutral-600 transition hover:text-neutral-300 ${
+            className={`flex items-center gap-0.5 text-3xs text-neutral-600 transition hover:text-neutral-300 ${
               copied ? '' : 'opacity-0 group-hover:opacity-100'
             }`}
           >
@@ -122,7 +122,7 @@ export default function MessageBubble({ message }: { message: ChatMessage }): JS
               onClick={() => void forkChat(activeChatId, message.id)}
               title={t('chat.forkFrom')}
               aria-label={t('chat.forkFrom')}
-              className="flex items-center gap-0.5 text-[10px] text-neutral-600 opacity-0 transition hover:text-neutral-300 group-hover:opacity-100"
+              className="flex items-center gap-0.5 text-3xs text-neutral-600 opacity-0 transition hover:text-neutral-300 group-hover:opacity-100"
             >
               <GitFork className="h-3 w-3" />
             </button>

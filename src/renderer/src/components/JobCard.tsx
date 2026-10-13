@@ -48,7 +48,7 @@ export default function JobCard({
         <span className="font-mono text-xs text-text-secondary">
           {t('jobs.cardTitle', { id: job.id.slice(0, 8), status: job.status })}
         </span>
-        <span className="ms-auto text-[10px] text-text-tertiary">
+        <span className="ms-auto text-3xs text-text-tertiary">
           {t('jobs.startedAgo', { time: relativeTime(job.startedAt, at) })}
         </span>
       </div>
@@ -59,7 +59,7 @@ export default function JobCard({
         <button
           type="button"
           onClick={() => setOpen((value) => !value)}
-          className="inline-flex items-center gap-1 rounded border border-border px-2 py-0.5 text-[11px] hover:bg-bg-secondary"
+          className="inline-flex items-center gap-1 rounded border border-border px-2 py-0.5 text-2xs hover:bg-bg-secondary"
         >
           {open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
           {open ? t('jobs.hideLog') : t('jobs.viewLog')}
@@ -68,7 +68,7 @@ export default function JobCard({
           <button
             type="button"
             onClick={() => onKill(job.id)}
-            className="inline-flex items-center gap-1 rounded border border-red-500/40 px-2 py-0.5 text-[11px] text-red-300 hover:bg-red-500/10"
+            className="inline-flex items-center gap-1 rounded border border-red-500/40 px-2 py-0.5 text-2xs text-red-300 hover:bg-red-500/10"
           >
             <Skull size={12} />
             {t('jobs.kill')}
@@ -76,7 +76,7 @@ export default function JobCard({
         )}
       </div>
       {open && (
-        <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded bg-black/40 p-2 font-mono text-[11px] text-text-secondary">
+        <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded bg-black/40 p-2 font-mono text-2xs text-text-secondary">
           {job.output || t('jobs.noOutput')}
         </pre>
       )}

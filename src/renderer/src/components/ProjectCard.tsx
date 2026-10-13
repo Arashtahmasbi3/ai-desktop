@@ -57,7 +57,7 @@ const ENV_BADGE: Record<string, string> = {
 
 const fieldClass =
   'w-full rounded border border-border bg-bg-primary px-2 py-1 text-xs text-neutral-200 outline-none focus:border-accent/50'
-const labelClass = 'flex flex-col gap-1 text-[11px] text-neutral-400'
+const labelClass = 'flex flex-col gap-1 text-2xs text-neutral-400'
 
 interface FieldProps {
   label: string
@@ -79,7 +79,7 @@ function Field({ label, value, onChange, ltr, error, placeholder }: FieldProps):
         placeholder={placeholder}
         className={`${fieldClass}${error ? ' border-red-500/60' : ''}${ltr ? ' font-mono' : ''}`}
       />
-      {error ? <span className="text-[10px] text-red-400">{error}</span> : null}
+      {error ? <span className="text-3xs text-red-400">{error}</span> : null}
     </label>
   )
 }
@@ -149,20 +149,20 @@ export default function ProjectCard({ project }: { project: ProjectRecord }): JS
           className="min-w-0 flex-1 text-left"
         >
           <span className="text-neutral-200">{project.name}</span>
-          <span className="ml-2 font-mono text-[10px] text-neutral-500" dir="ltr">
+          <span className="ml-2 font-mono text-3xs text-neutral-500" dir="ltr">
             {project.path}
           </span>
         </button>
 
         {isRemote ? (
-          <span className="inline-flex items-center gap-0.5 rounded bg-sky-500/15 px-1 py-0.5 text-[9px] text-sky-300">
+          <span className="inline-flex items-center gap-0.5 rounded bg-sky-500/15 px-1 py-0.5 text-4xs text-sky-300">
             <Server className="h-2.5 w-2.5" />
             {t('settings.remoteBadge')}
           </span>
         ) : null}
 
         <span
-          className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] ${
+          className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-4xs ${
             ENV_BADGE[environment] ?? ENV_BADGE.development
           }`}
         >
@@ -194,7 +194,7 @@ export default function ProjectCard({ project }: { project: ProjectRecord }): JS
       </div>
 
       {confirmingDelete ? (
-        <div className="flex items-center justify-between gap-2 border-t border-border bg-red-500/5 px-3 py-2 text-[11px]">
+        <div className="flex items-center justify-between gap-2 border-t border-border bg-red-500/5 px-3 py-2 text-2xs">
           <span className="text-red-300">{t('settings.deleteProjectConfirm', { name: project.name })}</span>
           <div className="flex items-center gap-1.5">
             <button
@@ -234,7 +234,7 @@ export default function ProjectCard({ project }: { project: ProjectRecord }): JS
               ))}
             </select>
             {error('environment') ? (
-              <span className="text-[10px] text-red-400">{error('environment')}</span>
+              <span className="text-3xs text-red-400">{error('environment')}</span>
             ) : null}
           </label>
 
@@ -306,7 +306,7 @@ export default function ProjectCard({ project }: { project: ProjectRecord }): JS
               ))}
             </select>
             {error('policyMode') ? (
-              <span className="text-[10px] text-red-400">{error('policyMode')}</span>
+              <span className="text-3xs text-red-400">{error('policyMode')}</span>
             ) : null}
           </label>
 

@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.4] — 2026-10-13
+
+Release v2.6.4 "Multi-Project & Polish" fixes a resumed-conversation crash, keeps
+every remote project connected at once, lets an open chat move between projects,
+and trims the UI's type scale.
+
+### Critical Fixes
+
+- **Tool-call pairing (HTTP 400).** Assistant/tool message pairs are sanitized at
+  the provider boundary and every tool call the step never ran is answered, so a
+  resumed or aborted conversation is no longer rejected by DeepSeek/OpenAI with
+  HTTP 400.
+- **Per-server VPS connection state.** The connected-server set is exposed over
+  IPC and each project derives its indicator from it, so a status change on one
+  host no longer reports another project as "Not connected".
+
+### Multi-Project
+
+- **Every remote project stays connected.** The SSH manager holds one connection
+  per server, and a startup keepalive brings up every remote project's host
+  without moving the chat-header selection — switching projects is instant and
+  never interrupts a running one; switching never disconnects.
+- **Shell isolation.** A terminal panel closing or unmounting closes only its own
+  shell session; the SSH connection other projects rely on stays up, and a stale
+  session id never closes the wrong shell.
+- **Chat transfer on project switch.** Switching projects no longer silently
+  orphans the open chat: link it into the new project and keep the context, move
+  it and start fresh, or leave it and start a new chat. The choice can be
+  remembered in Settings; an empty session switches silently.
+
+### UI Polish
+
+- **Opt-in context warning.** The composer's near-limit "context is filling up"
+  nudge is off by default and enabled per user; it only matters for older models
+  with a small context window.
+- **Shared type scale.** One set of size tokens (`text-2xs`/`3xs`/`4xs`) replaces
+  the one-off pixel font sizes across the dense UI chrome, with no layout change.
+
 ## [2.6.3] — 2026-10-13
 
 Release v2.6.3 "Trace & Conformance" makes the agent's reasoning visible inline
@@ -736,7 +774,8 @@ First stable release. Ships as a Windows x64 NSIS installer and a portable execu
   `node_modules` are shipped inside the app package.
 - Optional code signing via `CSC_LINK` / `CSC_KEY_PASSWORD` (skipped safely when absent).
 
-[Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.6.3...HEAD
+[Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.6.4...HEAD
+[2.6.4]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.6.3...v2.6.4
 [2.6.3]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.6.2...v2.6.3
 [2.6.2]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.6.1...v2.6.2
 [2.6.1]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.6.0...v2.6.1

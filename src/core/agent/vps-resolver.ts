@@ -89,3 +89,41 @@ export const VPS_REQUIRING_TOOLS: ReadonlySet<string> = new Set([
 export function requiresVps(toolName: string): boolean {
   return VPS_REQUIRING_TOOLS.has(toolName)
 }
+
+export interface RunServerContext {
+  /** VPS the chat header asked for, if any. */
+  requestedVpsId?: string
+  /** The active project's own VPS, if any. */
+  projectVpsId?: string
+  /** Every currently-connected server id. */
+  connectedServers: readonly string[]
+}
+
+export interface RunServer {
+  /** Server the run is pinned to, or undefined for a purely local run. */
+  serverId?: string
+  connected: boolean
+  /** True when the header's request was dropped because it was not connected. */
+  reconciled: boolean
+}
+
+/**
+ * v2.6.4: pick the single server a run targets, and only trust an explicit
+ * request that is actually connected. Before this, the routing decision was
+ * built from the active *project* while the tool runtime was pinned to the
+ * chat-header *request*; when the two disagreed the UI showed "Connected" while
+ * the tools reported "Not connected". Falling back to the project's server keeps
+ * both halves of the run on the same, reachable host.
+ */
+export function reconcileRunServer(ctx: RunServerContext): RunServer {
+  const requested =
+    ctx.requestedVpsId && ctx.connectedServers.includes(ctx.requestedVpsId)
+      ? ctx.requestedVpsId
+      : undefined
+  const serverId = requested ?? ctx.projectVpsId
+  return {
+    serverId,
+    connected: Boolean(serverId && ctx.connectedServers.includes(serverId)),
+    reconciled: Boolean(ctx.requestedVpsId && !requested)
+  }
+}

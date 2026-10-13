@@ -97,12 +97,12 @@ export default function Titlebar(): JSX.Element {
               role="menu"
               className="absolute left-0 top-8 z-50 w-72 overflow-hidden rounded-lg border border-border bg-bg-secondary py-1 shadow-2xl"
             >
-              <p className="px-3 py-1 text-[10px] uppercase tracking-wide text-neutral-500">
+              <p className="px-3 py-1 text-3xs uppercase tracking-wide text-neutral-500">
                 {t('titlebar.workspace')}
               </p>
               <div className="max-h-64 overflow-y-auto">
                 {projects.length === 0 ? (
-                  <p className="px-3 py-2 text-[11px] text-neutral-600">
+                  <p className="px-3 py-2 text-2xs text-neutral-600">
                     {t('settings.noProjects')}
                   </p>
                 ) : (
@@ -130,7 +130,7 @@ export default function Titlebar(): JSX.Element {
                           ) : null}
                         </span>
                         <span
-                          className="block truncate font-mono text-[10px] text-neutral-600"
+                          className="block truncate font-mono text-3xs text-neutral-600"
                           dir="ltr"
                         >
                           {project.path}

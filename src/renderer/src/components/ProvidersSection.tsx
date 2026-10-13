@@ -45,12 +45,12 @@ export default function ProvidersSection(): JSX.Element {
                 <span className="flex items-center gap-2 text-sm font-medium text-neutral-200">
                   {descriptor.label}
                   {view?.hasApiKey ? (
-                    <span className="flex items-center gap-1 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] text-emerald-400">
+                    <span className="flex items-center gap-1 rounded bg-emerald-500/15 px-1.5 py-0.5 text-3xs text-emerald-400">
                       <Check className="h-3 w-3" />
                       {t('settings.keySaved')}
                     </span>
                   ) : (
-                    <span className="rounded bg-bg-tertiary px-1.5 py-0.5 text-[10px] text-neutral-500">
+                    <span className="rounded bg-bg-tertiary px-1.5 py-0.5 text-3xs text-neutral-500">
                       {t('settings.noKey')}
                     </span>
                   )}
@@ -59,7 +59,7 @@ export default function ProvidersSection(): JSX.Element {
                   type="button"
                   onClick={() => void setActiveProvider(provider)}
                   disabled={active}
-                  className={`rounded px-2 py-0.5 text-[11px] ${
+                  className={`rounded px-2 py-0.5 text-2xs ${
                     active
                       ? 'bg-accent/20 text-accent'
                       : 'border border-border text-neutral-400 hover:bg-bg-tertiary'
@@ -106,7 +106,7 @@ export default function ProvidersSection(): JSX.Element {
               </div>
 
               <div className="mt-2 flex items-center gap-2">
-                <label className="text-[11px] text-neutral-500">{t('settings.model')}</label>
+                <label className="text-2xs text-neutral-500">{t('settings.model')}</label>
                 <select
                   value={model}
                   onChange={(event) => void setModel(provider, event.target.value)}

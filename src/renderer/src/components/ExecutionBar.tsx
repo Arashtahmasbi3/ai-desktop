@@ -45,7 +45,7 @@ function DiagnosticBadge(): JSX.Element | null {
       title={`${t('settings.diagnosticOn')}${
         minutes > 0 ? ` · ${t('settings.diagnosticRemaining', { minutes })}` : ''
       }`}
-      className="flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-300"
+      className="flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-3xs font-medium text-amber-300"
     >
       <Activity className="h-3 w-3" />
       {t('settings.diagnosticTitle')}
@@ -127,7 +127,7 @@ export default function ExecutionBar({
   return (
     <header
       data-testid="execution-bar"
-      className="flex shrink-0 flex-col gap-1 border-b border-border bg-bg-secondary/40 px-3 py-1.5 text-[11px]"
+      className="flex shrink-0 flex-col gap-1 border-b border-border bg-bg-secondary/40 px-3 py-1.5 text-2xs"
     >
       {/* Line 1 — identity: project / server / path */}
       <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
@@ -155,7 +155,7 @@ export default function ExecutionBar({
         <span
           data-testid="exec-path"
           dir="ltr"
-          className="min-w-0 flex-1 truncate font-mono text-[10px] text-neutral-500"
+          className="min-w-0 flex-1 truncate font-mono text-3xs text-neutral-500"
           title={path}
         >
           {path}

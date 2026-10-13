@@ -57,7 +57,7 @@ export default function PreflightBanner({
         <Icon size={14} />
         {t(tone.key)}
       </div>
-      <ul className={`mt-1 list-inside list-disc text-[11px] ${tone.text}`}>
+      <ul className={`mt-1 list-inside list-disc text-2xs ${tone.text}`}>
         {warnings.map((check) => (
           <li key={check.name}>{check.message}</li>
         ))}
@@ -67,7 +67,7 @@ export default function PreflightBanner({
           <button
             type="button"
             onClick={onProceed}
-            className="inline-flex items-center gap-1 rounded border border-amber-400/50 px-2 py-0.5 text-[11px] hover:bg-amber-500/20"
+            className="inline-flex items-center gap-1 rounded border border-amber-400/50 px-2 py-0.5 text-2xs hover:bg-amber-500/20"
           >
             <ArrowRight size={12} />
             {t('preflight.proceed')}
@@ -77,7 +77,7 @@ export default function PreflightBanner({
           <button
             type="button"
             onClick={onDismiss}
-            className="rounded border border-border px-2 py-0.5 text-[11px] hover:bg-bg-secondary"
+            className="rounded border border-border px-2 py-0.5 text-2xs hover:bg-bg-secondary"
           >
             {t('common.cancel')}
           </button>

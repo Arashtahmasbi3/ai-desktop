@@ -84,12 +84,12 @@ export default function CodeSearchModal(): JSX.Element | null {
                 dir="ltr"
                 className="flex w-full flex-col gap-0.5 border-b border-border/40 px-3 py-1.5 text-left last:border-b-0 hover:bg-bg-tertiary"
               >
-                <span className="flex items-center gap-1.5 font-mono text-[11px] text-accent">
+                <span className="flex items-center gap-1.5 font-mono text-2xs text-accent">
                   <FileCode2 className="h-3 w-3 shrink-0" />
                   {match.path}
                   <span className="text-neutral-600">:{match.line}</span>
                 </span>
-                <span className="truncate font-mono text-[11px] text-neutral-400">{match.text}</span>
+                <span className="truncate font-mono text-2xs text-neutral-400">{match.text}</span>
               </button>
             ))
           )}

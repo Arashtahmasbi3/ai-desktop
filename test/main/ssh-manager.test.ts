@@ -285,3 +285,75 @@ describe('ssh manager', () => {
     expect(await reloaded.policyFor(created.id)).toMatchObject({ mode: 'staging', requireApproval: 'destructive' })
   })
 })
+
+describe('ssh manager - multi-connection (v2.6.4)', () => {
+  async function connectedServer(name: string): Promise<string> {
+    const server = await store.save({
+      name,
+      host: `${name}.example.com`,
+      username: 'root',
+      authType: 'key',
+      privateKeyPath: '/home/me/.ssh/id_ed25519'
+    })
+    await manager.connect(server.id) // unseen host key -> pending fingerprint
+    await manager.approveFingerprint(server.id)
+    expect((await manager.connect(server.id)).status).toBe('connected')
+    return server.id
+  }
+
+  it('keeps every server connected and disconnect only drops its own', async () => {
+    const a = await connectedServer('alpha')
+    const b = await connectedServer('bravo')
+
+    expect(manager.connectedServers().sort()).toEqual([a, b].sort())
+    expect(manager.stateFor(b).status).toBe('connected')
+
+    await manager.disconnect(a)
+
+    expect(manager.connectedServers()).toEqual([b])
+    expect(manager.isConnected(a)).toBe(false)
+    expect(manager.isConnected(b)).toBe(true)
+    expect(manager.stateFor(a).status).toBe('disconnected')
+    expect(manager.stateFor(b).status).toBe('connected')
+    expect(manager.states()[b].status).toBe('connected')
+  })
+
+  it('sees the second server go from connecting to connected without disturbing the first', async () => {
+    const a = await connectedServer('alpha')
+    const server = await store.save({
+      name: 'bravo',
+      host: 'bravo.example.com',
+      username: 'root',
+      authType: 'key',
+      privateKeyPath: '/home/me/.ssh/id_ed25519'
+    })
+    await manager.connect(server.id)
+    await manager.approveFingerprint(server.id)
+
+    const connecting = manager.connect(server.id)
+    expect(manager.connectedServers()).toContain(a)
+    expect((await connecting).status).toBe('connected')
+    expect(manager.connectedServers().sort()).toEqual([a, server.id].sort())
+  })
+
+  it('closing a terminal keeps the SSH connection (and other servers) up', async () => {
+    const a = await connectedServer('alpha')
+    const b = await connectedServer('bravo')
+
+    const sessionA = await manager.openTerminal(a, 80, 24)
+    const sessionB = await manager.openTerminal(b, 80, 24)
+
+    // Closing B's shell must not touch A's shell, and neither connection drops.
+    manager.closeTerminal(b, sessionB)
+    expect(manager.isConnected(a)).toBe(true)
+    expect(manager.isConnected(b)).toBe(true)
+
+    // A stale/unknown session id is ignored rather than closing the wrong shell.
+    manager.closeTerminal(a, 'not-a-session')
+    expect(manager.isConnected(a)).toBe(true)
+
+    manager.closeTerminal(a, sessionA)
+    expect(manager.isConnected(a)).toBe(true)
+    expect(manager.isConnected(b)).toBe(true)
+  })
+})

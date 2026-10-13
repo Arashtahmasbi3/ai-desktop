@@ -101,6 +101,10 @@ export default function SettingsPanel(): JSX.Element | null {
   const setShowJobsPanelAlways = useStore((state) => state.setShowJobsPanelAlways)
   const showRawToolRows = useStore((state) => state.showRawToolRows)
   const setShowRawToolRows = useStore((state) => state.setShowRawToolRows)
+  const chatTransferPreference = useStore((state) => state.chatTransferPreference)
+  const setChatTransferPreference = useStore((state) => state.setChatTransferPreference)
+  const showContextWarning = useStore((state) => state.showContextWarning)
+  const setShowContextWarning = useStore((state) => state.setShowContextWarning)
 
   const [tab, setTab] = useState<TabId>('general')
   const refreshVps = useStore((state) => state.refreshVps)
@@ -141,7 +145,7 @@ export default function SettingsPanel(): JSX.Element | null {
             {NAV_GROUPS.map((group, groupIndex) => (
               <div key={group.labelKey ?? `group-${groupIndex}`} className="flex flex-col gap-0.5">
                 {group.labelKey ? (
-                  <span className="px-2.5 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wide text-neutral-600">
+                  <span className="px-2.5 pb-0.5 pt-2 text-3xs font-semibold uppercase tracking-wide text-neutral-600">
                     {t(group.labelKey)}
                   </span>
                 ) : null}
@@ -221,11 +225,48 @@ export default function SettingsPanel(): JSX.Element | null {
                     />
                     <span>
                       {t('settings.showRawToolRows')}
-                      <span className="mt-0.5 block text-[10px] text-neutral-500">
+                      <span className="mt-0.5 block text-3xs text-neutral-500">
                         {t('settings.showRawToolRowsHint')}
                       </span>
                     </span>
                   </label>
+                  <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs text-neutral-300">
+                    <input
+                      type="checkbox"
+                      checked={showContextWarning}
+                      onChange={(event) => setShowContextWarning(event.target.checked)}
+                      className="accent-accent"
+                    />
+                    <span>
+                      {t('settings.showContextWarning')}
+                      <span className="mt-0.5 block text-3xs text-neutral-500">
+                        {t('settings.showContextWarningHint')}
+                      </span>
+                    </span>
+                  </label>
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs text-neutral-300">{t('settings.chatOnProjectSwitch')}</p>
+                      <p className="mt-0.5 text-3xs text-neutral-500">
+                        {t('settings.chatOnProjectSwitchHint')}
+                      </p>
+                    </div>
+                    <select
+                      value={chatTransferPreference}
+                      onChange={(event) =>
+                        setChatTransferPreference(
+                          event.target.value as 'ask' | 'link' | 'move' | 'new'
+                        )
+                      }
+                      aria-label={t('settings.chatOnProjectSwitch')}
+                      className="shrink-0 rounded border border-border bg-bg-secondary px-2 py-1 text-xs text-neutral-200 outline-none focus:border-accent/50"
+                    >
+                      <option value="ask">{t('projectSwitch.ask')}</option>
+                      <option value="link">{t('projectSwitch.link')}</option>
+                      <option value="move">{t('projectSwitch.move')}</option>
+                      <option value="new">{t('projectSwitch.new')}</option>
+                    </select>
+                  </div>
                 </div>
               </section>
             ) : null}

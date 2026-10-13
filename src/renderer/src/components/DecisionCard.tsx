@@ -72,7 +72,7 @@ export default function DecisionCard({ decision, compact, onExplain }: DecisionC
     <li
       data-testid="decision-card"
       className={`rounded-md border border-border bg-bg-secondary/60 ${
-        compact ? 'text-[11px]' : ''
+        compact ? 'text-2xs' : ''
       }`}
     >
       <button
@@ -85,16 +85,16 @@ export default function DecisionCard({ decision, compact, onExplain }: DecisionC
         ) : (
           <ChevronRight className="h-3.5 w-3.5 shrink-0 text-neutral-500" />
         )}
-        <span className={`flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] ${style.className}`}>
+        <span className={`flex items-center gap-1 rounded border px-1.5 py-0.5 text-3xs ${style.className}`}>
           <Icon className="h-3 w-3" />
           {t(`trace.phase${decision.phase[0].toUpperCase()}${decision.phase.slice(1)}`)}
         </span>
-        <span className="min-w-0 flex-1 truncate text-[11px] text-neutral-300">
+        <span className="min-w-0 flex-1 truncate text-2xs text-neutral-300">
           {decision.intent.summary}
         </span>
         {decision.outcome ? (
           <span
-            className={`shrink-0 text-[10px] ${
+            className={`shrink-0 text-3xs ${
               decision.outcome === 'ok'
                 ? 'text-emerald-400'
                 : decision.outcome === 'failed'
@@ -110,12 +110,12 @@ export default function DecisionCard({ decision, compact, onExplain }: DecisionC
       {open ? (
         <div className="space-y-2 border-t border-border px-2.5 py-2">
           <section>
-            <h4 className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
+            <h4 className="text-3xs font-semibold uppercase tracking-wide text-neutral-500">
               {t('trace.intent')}
             </h4>
-            <p className="mt-0.5 text-[11px] leading-snug text-neutral-300">{decision.intent.summary}</p>
+            <p className="mt-0.5 text-2xs leading-snug text-neutral-300">{decision.intent.summary}</p>
             {decision.intent.rationale ? (
-              <p className="mt-1 text-[11px] leading-snug text-neutral-400">
+              <p className="mt-1 text-2xs leading-snug text-neutral-400">
                 <span className="text-neutral-500">{t('trace.assessment')}: </span>
                 {decision.intent.rationale}
               </p>
@@ -123,20 +123,20 @@ export default function DecisionCard({ decision, compact, onExplain }: DecisionC
           </section>
 
           <section>
-            <h4 className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
+            <h4 className="text-3xs font-semibold uppercase tracking-wide text-neutral-500">
               {t('trace.evidence')}
             </h4>
             {decision.evidence.length === 0 ? (
-              <p className="mt-0.5 text-[11px] text-neutral-500">{t('trace.noEvidence')}</p>
+              <p className="mt-0.5 text-2xs text-neutral-500">{t('trace.noEvidence')}</p>
             ) : (
               <ul className="mt-0.5 space-y-1">
                 {decision.evidence.map((item, index) => (
-                  <li key={`${item.hash ?? item.ref}-${index}`} className="text-[11px] leading-snug">
+                  <li key={`${item.hash ?? item.ref}-${index}`} className="text-2xs leading-snug">
                     <span className="text-neutral-400">{evidenceLabel(item)}</span>
                     <span className="mx-1 text-neutral-600">·</span>
                     <code className="text-neutral-300">{item.lines ?? item.summary}</code>
                     {item.kind === 'output' ? (
-                      <span className="ml-1 text-[10px] text-neutral-500">
+                      <span className="ml-1 text-3xs text-neutral-500">
                         {t('trace.viewOutput')}
                       </span>
                     ) : null}
@@ -147,17 +147,17 @@ export default function DecisionCard({ decision, compact, onExplain }: DecisionC
           </section>
 
           <section>
-            <h4 className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
+            <h4 className="text-3xs font-semibold uppercase tracking-wide text-neutral-500">
               {t('trace.decision')}
             </h4>
-            <p className="mt-0.5 text-[11px] leading-snug text-neutral-300">{decision.decision}</p>
+            <p className="mt-0.5 text-2xs leading-snug text-neutral-300">{decision.decision}</p>
           </section>
 
           <button
             type="button"
             onClick={() => void askWhy()}
             disabled={loading}
-            className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-[10px] text-neutral-300 hover:border-accent hover:text-accent disabled:opacity-50"
+            className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-3xs text-neutral-300 hover:border-accent hover:text-accent disabled:opacity-50"
           >
             {loading ? (
               <Loader2 className="h-3 w-3 animate-spin" />
@@ -167,16 +167,16 @@ export default function DecisionCard({ decision, compact, onExplain }: DecisionC
             {t('trace.askWhy')}
           </button>
 
-          {failed ? <p className="text-[10px] text-red-400">{t('trace.askWhyFailed')}</p> : null}
+          {failed ? <p className="text-3xs text-red-400">{t('trace.askWhyFailed')}</p> : null}
 
           {explanation ? (
             <div className="rounded border border-border/70 bg-bg-tertiary/40 p-2">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
+              <p className="text-3xs font-semibold uppercase tracking-wide text-neutral-500">
                 {t('trace.why')}
               </p>
               <ul className="mt-1 space-y-0.5">
                 {explanation.reasoning.map((line) => (
-                  <li key={line} className="text-[11px] leading-snug text-neutral-300">
+                  <li key={line} className="text-2xs leading-snug text-neutral-300">
                     • {line}
                   </li>
                 ))}

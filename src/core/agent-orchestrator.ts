@@ -1078,6 +1078,30 @@ export class AgentOrchestrator {
           })
         }
 
+        // Every requested tool call must be answered before the next assistant
+        // turn. The action loop can stop early (abort, blocked guard, cancelled
+        // plan/preflight), which would leave an assistant turn with tool_calls
+        // and no matching tool responses — DeepSeek/OpenAI reject that with 400.
+        const answeredIds = new Set(observations.map((result) => result.actionId))
+        for (const action of actions) {
+          if (answeredIds.has(action.id)) continue
+          const unanswered: AgentToolResult = {
+            actionId: action.id,
+            name: action.name,
+            ok: false,
+            output: '',
+            error: 'This tool call was not executed because the step stopped before it ran.',
+            code: 'blocked',
+            attempts: 0,
+            durationMs: 0
+          }
+          context.appendToolResult({
+            toolCallId: action.id,
+            name: action.name,
+            content: formatObservation(unanswered)
+          })
+        }
+
         // Fix 4: persist the step's plan/approval decisions as pinned system
         // messages, now that every assistant/tool pair is complete.
         if (approvalDecisions.length > 0) {

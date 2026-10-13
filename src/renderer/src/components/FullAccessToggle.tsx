@@ -44,7 +44,7 @@ export function FullAccessToggle(): JSX.Element {
                 void setApprovalMode(value)
                 setOpen(false)
               }}
-              className={`block w-full rounded px-2 py-1.5 text-left text-[11px] transition ${
+              className={`block w-full rounded px-2 py-1.5 text-left text-2xs transition ${
                 value === mode
                   ? 'bg-accent/15 text-accent'
                   : 'text-neutral-300 hover:bg-bg-tertiary'
@@ -80,7 +80,7 @@ export function FullAccessBanner(): JSX.Element | null {
   return (
     <div
       data-testid="full-access-banner"
-      className="mx-3 mb-1 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-500/50 bg-red-500/10 px-2 py-1.5 text-[11px] text-red-300"
+      className="mx-3 mb-1 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-500/50 bg-red-500/10 px-2 py-1.5 text-2xs text-red-300"
     >
       <span className="flex min-w-0 items-center gap-1.5">
         <AlertTriangle className="h-3.5 w-3.5 shrink-0" />

@@ -31,7 +31,7 @@ export default function StatusBar(): JSX.Element {
   const agentAddress = remote?.enabled ? `${remote.host}:${remote.port}` : null
 
   return (
-    <footer className="flex h-7 shrink-0 items-center justify-between border-t border-border bg-bg-secondary px-3 text-[11px] text-neutral-400">
+    <footer className="flex h-7 shrink-0 items-center justify-between border-t border-border bg-bg-secondary px-3 text-2xs text-neutral-400">
       <div className="flex items-center gap-3">
         <span className="flex items-center gap-1">
           <Dot ok={ready} />

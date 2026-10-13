@@ -117,12 +117,12 @@ export default function BrowserPanel(): JSX.Element {
               dir="ltr"
               spellCheck={false}
               placeholder="Search or enter an address"
-              className="w-full rounded border border-border bg-bg-secondary py-1 pl-7 pr-2 text-[11px] text-neutral-200 outline-none focus:border-accent/50"
+              className="w-full rounded border border-border bg-bg-secondary py-1 pl-7 pr-2 text-2xs text-neutral-200 outline-none focus:border-accent/50"
             />
           </div>
           <button
             type="submit"
-            className="rounded border border-border px-2 py-1 text-[11px] text-neutral-300 hover:bg-bg-tertiary"
+            className="rounded border border-border px-2 py-1 text-2xs text-neutral-300 hover:bg-bg-tertiary"
           >
             Go
           </button>
@@ -130,7 +130,7 @@ export default function BrowserPanel(): JSX.Element {
       </div>
 
       {error ? (
-        <div className="shrink-0 border-b border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[11px] text-amber-300">
+        <div className="shrink-0 border-b border-amber-500/30 bg-amber-500/10 px-3 py-1 text-2xs text-amber-300">
           {error}
         </div>
       ) : null}
@@ -165,7 +165,7 @@ export default function BrowserPanel(): JSX.Element {
                   key={entry}
                   type="button"
                   onClick={() => go(entry)}
-                  className="max-w-[16rem] truncate rounded-full border border-border px-2.5 py-1 text-[10px] text-neutral-400 hover:bg-bg-tertiary"
+                  className="max-w-[16rem] truncate rounded-full border border-border px-2.5 py-1 text-3xs text-neutral-400 hover:bg-bg-tertiary"
                   dir="ltr"
                 >
                   {entry}

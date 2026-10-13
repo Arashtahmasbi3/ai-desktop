@@ -72,10 +72,10 @@ export default function PlanCard(): JSX.Element | null {
       <header className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3">
         <ClipboardList className="h-4 w-4 shrink-0 text-accent" />
         <h3 className="text-sm font-semibold text-neutral-100">{t('plan.title')}</h3>
-        <span className="rounded bg-bg-tertiary px-1.5 py-0.5 text-[10px] text-neutral-400">
+        <span className="rounded bg-bg-tertiary px-1.5 py-0.5 text-3xs text-neutral-400">
           {t('plan.stepsCount', { count: drafts.length })}
         </span>
-        <span className="hidden text-[11px] text-neutral-500 sm:inline">{t('plan.subtitle')}</span>
+        <span className="hidden text-2xs text-neutral-500 sm:inline">{t('plan.subtitle')}</span>
         <button
           type="button"
           onClick={() => respondPlan({ type: 'cancel' })}
@@ -92,7 +92,7 @@ export default function PlanCard(): JSX.Element | null {
               {pending.warnings.map((warning) => (
                 <li
                   key={warning.code}
-                  className="flex items-center gap-1.5 text-[11px] text-amber-400"
+                  className="flex items-center gap-1.5 text-2xs text-amber-400"
                 >
                   <AlertTriangle className="h-3.5 w-3.5" />
                   {t(warningKey(warning.code), { count: drafts.length })}
@@ -102,7 +102,7 @@ export default function PlanCard(): JSX.Element | null {
           ) : null}
 
           {editing ? (
-            <p className="mb-2 text-[11px] text-neutral-500">{t('plan.editHint')}</p>
+            <p className="mb-2 text-2xs text-neutral-500">{t('plan.editHint')}</p>
           ) : null}
 
           <ol className="space-y-2">
@@ -117,13 +117,13 @@ export default function PlanCard(): JSX.Element | null {
                   <div className="flex items-baseline gap-2">
                     <span className="text-xs font-semibold text-neutral-500">{index + 1}.</span>
                     <span className="text-xs text-neutral-200">{step.title}</span>
-                    <code className="ml-auto rounded bg-black/30 px-1.5 py-0.5 font-mono text-[10px] text-accent">
+                    <code className="ml-auto rounded bg-black/30 px-1.5 py-0.5 font-mono text-3xs text-accent">
                       {step.tool}
                     </code>
                   </div>
                   {editing && key ? (
                     <div className="mt-2">
-                      <label className="mb-0.5 block text-[10px] text-neutral-500">
+                      <label className="mb-0.5 block text-3xs text-neutral-500">
                         {t('plan.command')}
                       </label>
                       <textarea
@@ -131,14 +131,14 @@ export default function PlanCard(): JSX.Element | null {
                         value={String(step.arguments[key] ?? '')}
                         onChange={(event) => updateStep(index, key, event.target.value)}
                         rows={2}
-                        className="w-full resize-y rounded border border-border bg-bg-secondary px-2 py-1 font-mono text-[11px] text-neutral-200 outline-none focus:border-accent"
+                        className="w-full resize-y rounded border border-border bg-bg-secondary px-2 py-1 font-mono text-2xs text-neutral-200 outline-none focus:border-accent"
                       />
                     </div>
                   ) : key ? (
                     <pre
                       dir="ltr"
                       data-testid="plan-step-command"
-                      className="mt-2 overflow-x-auto break-all rounded bg-bg-secondary/70 px-2 py-1 font-mono text-[11px] whitespace-pre-wrap text-neutral-300"
+                      className="mt-2 overflow-x-auto break-all rounded bg-bg-secondary/70 px-2 py-1 font-mono text-2xs whitespace-pre-wrap text-neutral-300"
                     >
                       {String(step.arguments[key] ?? '')}
                     </pre>
@@ -153,7 +153,7 @@ export default function PlanCard(): JSX.Element | null {
           data-testid="plan-footer"
           className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-3"
         >
-          <label className="flex cursor-pointer items-center gap-2 text-[11px] text-neutral-400">
+          <label className="flex cursor-pointer items-center gap-2 text-2xs text-neutral-400">
             <input
               type="checkbox"
               checked={trust}

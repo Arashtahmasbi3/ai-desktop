@@ -70,12 +70,12 @@ function GoalCard({ goal }: { goal: Goal }): JSX.Element {
           <div className="flex items-center gap-2">
             <span className="truncate text-sm text-neutral-100">{goal.title}</span>
             <span
-              className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] uppercase ${STATUS_CLASS[goal.status]}`}
+              className={`shrink-0 rounded px-1.5 py-0.5 text-3xs uppercase ${STATUS_CLASS[goal.status]}`}
             >
               {t(STATUS_LABEL[goal.status])}
             </span>
             {isActive ? (
-              <span className="shrink-0 rounded bg-accent/15 px-1.5 py-0.5 text-[10px] uppercase text-accent">
+              <span className="shrink-0 rounded bg-accent/15 px-1.5 py-0.5 text-3xs uppercase text-accent">
                 {t('goals.pinned')}
               </span>
             ) : null}
@@ -83,7 +83,7 @@ function GoalCard({ goal }: { goal: Goal }): JSX.Element {
 
           <div className="mt-2 flex items-center gap-2">
             <ProgressBar met={met} total={total} />
-            <span className="shrink-0 font-mono text-[10px] text-neutral-500">
+            <span className="shrink-0 font-mono text-3xs text-neutral-500">
               {t('goals.progress', { met, total })}
             </span>
           </div>
@@ -118,7 +118,7 @@ function GoalCard({ goal }: { goal: Goal }): JSX.Element {
                 type="button"
                 disabled={busy}
                 onClick={() => void setActiveGoal(isActive ? null : goal.id)}
-                className="rounded border border-border px-2 py-0.5 text-[11px] text-neutral-300 hover:border-accent/60 hover:text-accent disabled:opacity-60"
+                className="rounded border border-border px-2 py-0.5 text-2xs text-neutral-300 hover:border-accent/60 hover:text-accent disabled:opacity-60"
               >
                 {isActive ? t('goals.unpin') : t('goals.pin')}
               </button>
@@ -128,7 +128,7 @@ function GoalCard({ goal }: { goal: Goal }): JSX.Element {
                 type="button"
                 disabled={busy}
                 onClick={() => void achieveGoal(goal.id)}
-                className="rounded border border-border px-2 py-0.5 text-[11px] text-emerald-300 hover:border-emerald-500/60 disabled:opacity-60"
+                className="rounded border border-border px-2 py-0.5 text-2xs text-emerald-300 hover:border-emerald-500/60 disabled:opacity-60"
               >
                 {t('goals.achieve')}
               </button>
@@ -138,7 +138,7 @@ function GoalCard({ goal }: { goal: Goal }): JSX.Element {
                 type="button"
                 disabled={busy}
                 onClick={() => void abandonGoal(goal.id)}
-                className="rounded border border-border px-2 py-0.5 text-[11px] text-neutral-300 hover:border-amber-500/60 disabled:opacity-60"
+                className="rounded border border-border px-2 py-0.5 text-2xs text-neutral-300 hover:border-amber-500/60 disabled:opacity-60"
               >
                 {t('goals.abandon')}
               </button>
@@ -155,13 +155,13 @@ function GoalCard({ goal }: { goal: Goal }): JSX.Element {
           </div>
 
           {goal.links.length > 0 ? (
-            <p className="mt-2 flex items-center gap-1 text-[10px] text-neutral-500">
+            <p className="mt-2 flex items-center gap-1 text-3xs text-neutral-500">
               <Link2 className="h-3 w-3" />
               {t('goals.linkedRuns', { count: goal.links.length })}
             </p>
           ) : null}
           {goal.note ? (
-            <p className="mt-1 text-[11px] text-neutral-500">{goal.note}</p>
+            <p className="mt-1 text-2xs text-neutral-500">{goal.note}</p>
           ) : null}
         </div>
       </div>
@@ -274,7 +274,7 @@ export default function GoalPanel(): JSX.Element {
         )}
       </div>
 
-      <footer className="border-t border-border px-4 py-2 text-[10px] text-neutral-600">
+      <footer className="border-t border-border px-4 py-2 text-3xs text-neutral-600">
         {t('goals.footerHint')}
       </footer>
     </section>

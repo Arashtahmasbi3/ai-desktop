@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   DEFAULT_CONTEXT_TOKEN_BUDGET,
   contextBudget,
+  contextWarningVisible,
   estimateTokens,
   renderProjectMemory
 } from '@shared/memory'
@@ -46,5 +47,12 @@ describe('contextBudget', () => {
 
   it('has a conservative default budget', () => {
     expect(DEFAULT_CONTEXT_TOKEN_BUDGET).toBeGreaterThan(0)
+  })
+
+  it('hides the context warning unless the user opts in (Fix E)', () => {
+    expect(contextWarningVisible(false, true)).toBe(false)
+    expect(contextWarningVisible(false, false)).toBe(false)
+    expect(contextWarningVisible(true, false)).toBe(false)
+    expect(contextWarningVisible(true, true)).toBe(true)
   })
 })

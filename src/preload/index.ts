@@ -120,6 +120,8 @@ export const api = {
     save: (input: ChatSaveInput): Promise<StoredChat> => invoke('chats:save', input),
     rename: (id: string, title: string): Promise<ChatSummary | null> =>
       invoke('chats:rename', id, title),
+    linkProject: (id: string, workspaceId: string): Promise<ChatSummary | null> =>
+      invoke('chats:linkProject', id, workspaceId),
     remove: (id: string): Promise<boolean> => invoke('chats:remove', id)
   },
 
@@ -167,6 +169,7 @@ export const api = {
     save: (input: VpsServerInput): Promise<VpsServerView> => invoke('vps:save', input),
     remove: (id: string): Promise<boolean> => invoke('vps:remove', id),
     status: (): Promise<VpsConnectionState> => invoke('vps:status'),
+    connected: (): Promise<string[]> => invoke('vps:connected'),
     connect: (id: string): Promise<VpsConnectionState> => invoke('vps:connect', id),
     disconnect: (id: string): Promise<VpsConnectionState> => invoke('vps:disconnect', id),
     approveFingerprint: (id: string): Promise<VpsConnectionState> =>
@@ -203,6 +206,8 @@ export const api = {
     terminalWrite: (id: string, data: string): Promise<void> => invoke('vps:terminalWrite', id, data),
     terminalResize: (id: string, cols: number, rows: number): Promise<void> =>
       invoke('vps:terminalResize', id, cols, rows),
+    terminalClose: (id: string, sessionId?: string): Promise<void> =>
+      invoke('vps:terminalClose', id, sessionId),
     files: {
       list: (id: string, path: string): Promise<RemoteFileEntry[]> =>
         invoke('vps:files:list', id, path),

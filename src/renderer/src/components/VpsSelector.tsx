@@ -16,13 +16,14 @@ export default function VpsSelector(): JSX.Element {
   const running = useStore((state) => state.running)
   const servers = useStore((state) => state.vpsServers)
   const status = useStore((state) => state.vpsStatus)
+  const connected = useStore((state) => state.vpsConnected)
   const refreshVps = useStore((state) => state.refreshVps)
 
   useEffect(() => {
     void refreshVps()
   }, [refreshVps])
 
-  const indicator = vpsIndicator(vpsServerId, status)
+  const indicator = vpsIndicator(vpsServerId, status, connected)
 
   return (
     <div className="flex items-center gap-1">
@@ -37,7 +38,7 @@ export default function VpsSelector(): JSX.Element {
         disabled={running}
         title={t('vpsSelector.label')}
         aria-label={t('vpsSelector.label')}
-        className="max-w-[10rem] rounded border border-border bg-bg-secondary px-1.5 py-0.5 text-[11px] text-neutral-300 outline-none focus:border-accent/50 disabled:opacity-50"
+        className="max-w-[10rem] rounded border border-border bg-bg-secondary px-1.5 py-0.5 text-2xs text-neutral-300 outline-none focus:border-accent/50 disabled:opacity-50"
       >
         <option value="">{t('vpsSelector.none')}</option>
         {servers.map((server) => (
@@ -49,7 +50,7 @@ export default function VpsSelector(): JSX.Element {
       </select>
       {vpsServerId && indicator !== 'connected' ? (
         <span
-          className="flex items-center gap-0.5 text-[10px] text-amber-400"
+          className="flex items-center gap-0.5 text-3xs text-amber-400"
           title={t('vpsSelector.disconnected')}
         >
           <PlugZap className="h-3 w-3" />

@@ -104,6 +104,7 @@ export interface Api {
     load(id: string): Promise<StoredChat | null>
     save(input: ChatSaveInput): Promise<StoredChat>
     rename(id: string, title: string): Promise<ChatSummary | null>
+    linkProject(id: string, workspaceId: string): Promise<ChatSummary | null>
     remove(id: string): Promise<boolean>
   }
   customProviders: {
@@ -138,6 +139,7 @@ export interface Api {
     save(input: VpsServerInput): Promise<VpsServerView>
     remove(id: string): Promise<boolean>
     status(): Promise<VpsConnectionState>
+    connected(): Promise<string[]>
     connect(id: string): Promise<VpsConnectionState>
     disconnect(id: string): Promise<VpsConnectionState>
     approveFingerprint(id: string): Promise<VpsConnectionState>
@@ -161,6 +163,7 @@ export interface Api {
     terminalOpen(id: string, cols?: number, rows?: number): Promise<string>
     terminalWrite(id: string, data: string): Promise<void>
     terminalResize(id: string, cols: number, rows: number): Promise<void>
+    terminalClose(id: string, sessionId?: string): Promise<void>
     files: {
       list(id: string, path: string): Promise<RemoteFileEntry[]>
       read(id: string, path: string): Promise<string>

@@ -25,13 +25,13 @@ export default function SuccessWarning({
         <ShieldAlert size={14} />
         {t('successWarning.title')}
       </div>
-      {reason && <p className="mt-1 text-[11px] text-orange-200/90">{reason}</p>}
+      {reason && <p className="mt-1 text-2xs text-orange-200/90">{reason}</p>}
       <div className="mt-2 flex flex-wrap gap-2">
         {onRunTests && (
           <button
             type="button"
             onClick={onRunTests}
-            className="rounded border border-orange-400/50 px-2 py-0.5 text-[11px] hover:bg-orange-500/20"
+            className="rounded border border-orange-400/50 px-2 py-0.5 text-2xs hover:bg-orange-500/20"
           >
             {t('successWarning.runTests')}
           </button>
@@ -40,7 +40,7 @@ export default function SuccessWarning({
           <button
             type="button"
             onClick={onRunHealthCheck}
-            className="rounded border border-orange-400/50 px-2 py-0.5 text-[11px] hover:bg-orange-500/20"
+            className="rounded border border-orange-400/50 px-2 py-0.5 text-2xs hover:bg-orange-500/20"
           >
             {t('successWarning.runHealthCheck')}
           </button>
@@ -49,7 +49,7 @@ export default function SuccessWarning({
           <button
             type="button"
             onClick={onAccept}
-            className="rounded border border-border px-2 py-0.5 text-[11px] hover:bg-bg-secondary"
+            className="rounded border border-border px-2 py-0.5 text-2xs hover:bg-bg-secondary"
           >
             {t('successWarning.accept')}
           </button>

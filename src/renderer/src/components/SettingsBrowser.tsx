@@ -37,7 +37,7 @@ export default function SettingsBrowser(): JSX.Element {
         <Globe className="h-3.5 w-3.5" />
         {t('settings.browser')}
       </h3>
-      <p className="text-[11px] text-neutral-500">{t('settings.browserHint')}</p>
+      <p className="text-2xs text-neutral-500">{t('settings.browserHint')}</p>
 
       <div className="flex items-center gap-2">
         <input
@@ -62,7 +62,7 @@ export default function SettingsBrowser(): JSX.Element {
       </div>
 
       {permissions.length === 0 ? (
-        <p className="text-[11px] text-neutral-600">{t('settings.noPermissions')}</p>
+        <p className="text-2xs text-neutral-600">{t('settings.noPermissions')}</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {permissions.map((entry) => (
@@ -86,7 +86,7 @@ export default function SettingsBrowser(): JSX.Element {
                     )
                   }
                   aria-label={entry.host}
-                  className="rounded border border-border bg-bg-secondary px-2 py-0.5 text-[11px] text-neutral-200 outline-none focus:border-accent/50"
+                  className="rounded border border-border bg-bg-secondary px-2 py-0.5 text-2xs text-neutral-200 outline-none focus:border-accent/50"
                 >
                   {DECISIONS.map((decision) => (
                     <option key={decision} value={decision}>

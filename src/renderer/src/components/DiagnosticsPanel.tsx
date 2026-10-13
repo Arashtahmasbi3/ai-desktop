@@ -161,7 +161,7 @@ export default function DiagnosticsPanel({ serverId, serverName, onClose }: Prop
               )}
 
               {log ? (
-                <pre className="max-h-32 overflow-auto whitespace-pre-wrap rounded border border-border bg-bg-primary p-2 text-[10px] text-neutral-500">
+                <pre className="max-h-32 overflow-auto whitespace-pre-wrap rounded border border-border bg-bg-primary p-2 text-3xs text-neutral-500">
                   {log}
                 </pre>
               ) : null}
@@ -199,11 +199,11 @@ function InstallConfirm({
     <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/60">
       <div className="w-[30rem] rounded-lg border border-border bg-bg-secondary p-4">
         <p className="mb-2 text-sm text-neutral-200">Install {recipe.label}?</p>
-        <pre className="mb-3 max-h-40 overflow-auto whitespace-pre-wrap rounded border border-border bg-bg-primary p-2 text-[11px] text-neutral-400">
+        <pre className="mb-3 max-h-40 overflow-auto whitespace-pre-wrap rounded border border-border bg-bg-primary p-2 text-2xs text-neutral-400">
           {[recipe.preCheck, ...recipe.commands, recipe.verify].join('\n')}
         </pre>
         {recipe.requiresSudo ? (
-          <p className="mb-3 text-[11px] text-amber-300">
+          <p className="mb-3 text-2xs text-amber-300">
             This recipe needs root. Confirm you want to run these commands with sudo.
           </p>
         ) : null}

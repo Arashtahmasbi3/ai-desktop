@@ -24,6 +24,13 @@ import type { Job } from '@shared/jobs'
 import type { Locale } from './i18n/locale'
 import { detectLocale } from './i18n/locale'
 import { VPS_RECONNECT_KEY } from './lib/vps-state'
+import {
+  isConversationActive,
+  planChatTransfer,
+  readChatTransferPreference,
+  writeChatTransferPreference
+} from './lib/chat-transfer'
+import type { ChatTransferChoice, ChatTransferPreference } from './lib/chat-transfer'
 import { readEnabledTools } from './lib/tool-toggles'
 import {
   appendUsage,
@@ -118,6 +125,7 @@ const MAX_TERMINAL_LINES = 500
 export const CONTEXT_SETTINGS_KEY = 'ai-desktop:show-context-before-send'
 const CHAT_TREE_KEY = 'ai-desktop:chat-tree-open'
 const RAW_TOOL_ROWS_KEY = 'ai-desktop:show-raw-tool-rows'
+const CONTEXT_WARNING_KEY = 'ai-desktop:show-context-warning'
 const SIDEBAR_PIN_KEY = 'ai-desktop:sidebar-pinned'
 const JOBS_PANEL_KEY = 'ai-desktop:show-jobs-panel'
 const ZOOM_KEY = 'ai-desktop:zoom-level'
@@ -184,6 +192,19 @@ export function readSidebarPinned(): boolean {
     return globalThis.localStorage?.getItem(SIDEBAR_PIN_KEY) !== '0'
   } catch {
     return true
+  }
+}
+
+/**
+ * Read the persisted "show the context-filling warning" preference (v2.6.4,
+ * Fix E — default off). The nudge is only useful for older, small-context
+ * models, so modern long-context models stay quiet unless the user opts in.
+ */
+export function readShowContextWarning(): boolean {
+  try {
+    return globalThis.localStorage?.getItem(CONTEXT_WARNING_KEY) === '1'
+  } catch {
+    return false
   }
 }
 
@@ -273,6 +294,13 @@ interface AppState {
   onboarding: OnboardingStatus | null
   /** Startup project-migration modal visibility. */
   migrationOpen: boolean
+  /**
+   * Project id awaiting the chat-transfer decision when switching projects
+   * (v2.6.4, Fix D). Null when no switch is pending.
+   */
+  pendingProjectSwitch: string | null
+  /** Remembered chat-transfer choice applied to future project switches. */
+  chatTransferPreference: ChatTransferPreference
 
   /** Interface language (drives dir + all t() text). */
   locale: Locale
@@ -296,6 +324,8 @@ interface AppState {
   vpsServers: VpsServerView[]
   /** Live VPS connection state from the main process. */
   vpsStatus: VpsConnectionState
+  /** Every currently-connected server id (v2.6.4, multi-connection truth). */
+  vpsConnected: string[]
   /** Diagnostic Mode state (v2.5.3); null until first fetched. */
   diagnostic: DiagnosticStatus | null
   /**
@@ -360,6 +390,8 @@ interface AppState {
   showJobsPanelAlways: boolean
   /** v2.6.3: show raw tool rows instead of hiding those grouped in the trace. */
   showRawToolRows: boolean
+  /** v2.6.4 Fix E: show the composer's context-filling warning (default off). */
+  showContextWarning: boolean
   /** Electron zoom level, 0 == 100% (T5.3). */
   zoomLevel: number
   /** Keyboard-shortcut cheat sheet visibility (T5.3). */
@@ -398,6 +430,10 @@ interface AppState {
   disconnectVps: (serverId: string) => Promise<void>
   /** Apply a status pushed from the main process. */
   setVpsStatus: (status: VpsConnectionState) => void
+  /** Refresh the list of currently-connected server ids. */
+  refreshVpsConnected: () => Promise<void>
+  /** Connect a server in the background without changing the chat-header selection. */
+  ensureVpsConnected: (serverId: string) => Promise<void>
   setPlanMode: (value: boolean) => void
   setApprovalMode: (mode: ApprovalMode) => Promise<void>
   setPlanModeDefault: (value: boolean) => Promise<void>
@@ -420,6 +456,7 @@ interface AppState {
   setShowJobsPanelAlways: (value: boolean) => void
   /** v2.6.3: toggle raw tool rows (persisted). */
   setShowRawToolRows: (value: boolean) => void
+  setShowContextWarning: (value: boolean) => void
   /** Apply (and persist) an Electron zoom level, clamped to a safe range (T5.3). */
   applyZoom: (level: number) => void
   zoomIn: () => void
@@ -493,6 +530,16 @@ interface AppState {
   addRemoteProject: (name: string, path: string, vpsId: string) => Promise<void>
   removeProject: (id: string) => Promise<void>
   openProject: (id: string) => Promise<void>
+  /** Open a project without offering to transfer the open chat. */
+  switchProject: (id: string) => Promise<void>
+  /** Apply the chosen chat transfer and switch to the pending project. */
+  completeProjectSwitch: (
+    id: string,
+    choice: ChatTransferChoice,
+    remember?: boolean
+  ) => Promise<void>
+  cancelProjectSwitch: () => void
+  setChatTransferPreference: (preference: ChatTransferPreference) => void
   updateProjectPath: (id: string, path: string) => Promise<void>
   updateProjectMetadata: (id: string, patch: ProjectMetadataPatch) => Promise<void>
   searchVpsProject: (name: string) => Promise<string[]>
@@ -548,6 +595,8 @@ export const useStore = create<AppState>((set, get) => ({
   customProviders: [],
   onboarding: null,
   migrationOpen: false,
+  pendingProjectSwitch: null,
+  chatTransferPreference: readChatTransferPreference(),
 
   locale: detectLocale(),
   sidebarCollapsed: false,
@@ -560,6 +609,7 @@ export const useStore = create<AppState>((set, get) => ({
   vpsServerId: undefined,
   vpsServers: [],
   vpsStatus: { status: 'disconnected' },
+  vpsConnected: [],
   diagnostic: null,
   fullAccessExpiresAt: null,
   planMode: false,
@@ -589,6 +639,7 @@ export const useStore = create<AppState>((set, get) => ({
   jobsPanelOpen: false,
   showJobsPanelAlways: readShowJobsPanelAlways(),
   showRawToolRows: readShowRawToolRows(),
+  showContextWarning: readShowContextWarning(),
   zoomLevel: readZoomLevel(),
   shortcutsOpen: false,
 
@@ -658,16 +709,37 @@ export const useStore = create<AppState>((set, get) => ({
         window.api.vps.list(),
         window.api.vps.status()
       ])
-      set({ vpsServers: servers, vpsStatus: status })
+      // Fetch the connected set independently: it is additive information, so a
+      // failure here must not wipe the server list or the connection status.
+      let connected: string[] = status.status === 'connected' && status.serverId ? [status.serverId] : []
+      try {
+        connected = await window.api.vps.connected()
+      } catch {
+        // Older bridge or transient failure: fall back to the single status.
+      }
+      set({ vpsServers: servers, vpsStatus: status, vpsConnected: connected })
     } catch {
-      set({ vpsServers: [], vpsStatus: { status: 'disconnected' } })
+      set({ vpsServers: [], vpsStatus: { status: 'disconnected' }, vpsConnected: [] })
     }
   },
-  async connectVps(serverId) {
-    set({ vpsStatus: { status: 'connecting', serverId } })
+  async refreshVpsConnected() {
+    try {
+      set({ vpsConnected: await window.api.vps.connected() })
+    } catch {
+      // Leave the last known list: a transient failure must not flip every
+      // project to "Not connected".
+    }
+  },
+  /**
+   * v2.6.4: background connect for keepalive / other projects. Unlike
+   * `connectVps`, this never moves the chat-header selection, so bringing a
+   * second project's host up does not yank the user's current choice.
+   */
+  async ensureVpsConnected(serverId) {
+    if (get().vpsConnected.includes(serverId)) return
     try {
       const status = await window.api.vps.connect(serverId)
-      set({ vpsStatus: status, ...(status.status === 'connected' ? { vpsServerId: serverId } : {}) })
+      set({ vpsStatus: status })
     } catch (error) {
       set({
         vpsStatus: {
@@ -677,10 +749,29 @@ export const useStore = create<AppState>((set, get) => ({
         }
       })
     }
+    await get().refreshVpsConnected()
+  },
+  async connectVps(serverId) {
+    set({ vpsStatus: { status: 'connecting', serverId } })
+    try {
+      const status = await window.api.vps.connect(serverId)
+      set({ vpsStatus: status, ...(status.status === 'connected' ? { vpsServerId: serverId } : {}) })
+      await get().refreshVpsConnected()
+    } catch (error) {
+      set({
+        vpsStatus: {
+          status: 'error',
+          serverId,
+          error: error instanceof Error ? error.message : String(error)
+        }
+      })
+      await get().refreshVpsConnected()
+    }
   },
   async disconnectVps(serverId) {
     const status = await window.api.vps.disconnect(serverId)
     set({ vpsStatus: status })
+    await get().refreshVpsConnected()
   },
   setVpsStatus: (status) => set({ vpsStatus: status }),
   toggleTerminal: () => set({ terminalOpen: !get().terminalOpen }),
@@ -848,6 +939,14 @@ export const useStore = create<AppState>((set, get) => ({
     set({ showRawToolRows: value })
     try {
       globalThis.localStorage?.setItem(RAW_TOOL_ROWS_KEY, value ? '1' : '0')
+    } catch {
+      // Persisting the preference is best-effort.
+    }
+  },
+  setShowContextWarning(value) {
+    set({ showContextWarning: value })
+    try {
+      globalThis.localStorage?.setItem(CONTEXT_WARNING_KEY, value ? '1' : '0')
     } catch {
       // Persisting the preference is best-effort.
     }
@@ -1552,9 +1651,63 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   async openProject(id) {
+    const current = get().settings?.activeProjectId
+    if (id === current) {
+      await get().refreshFiles('.')
+      await get().refreshGoals()
+      return
+    }
+    // v2.6.4 Fix D: don't silently leave an open conversation behind. Decide
+    // (or ask) how the chat relates to the project being opened.
+    const plan = planChatTransfer(
+      get().chatTransferPreference,
+      isConversationActive(get().messages)
+    )
+    if (plan.prompt) {
+      set({ pendingProjectSwitch: id })
+      return
+    }
+    if (!plan.transfer) {
+      await get().switchProject(id)
+      return
+    }
+    await get().completeProjectSwitch(id, plan.choice)
+  },
+
+  async switchProject(id) {
     set({ settings: await window.api.projects.open(id) })
     await get().refreshFiles('.')
     await get().refreshGoals()
+  },
+
+  async completeProjectSwitch(id, choice, remember = false) {
+    if (remember) {
+      writeChatTransferPreference(choice)
+      set({ chatTransferPreference: choice })
+    }
+    // Persist under the current project first so the chat is never lost.
+    await get().persistChat()
+    const chatId = get().activeChatId
+    await get().switchProject(id)
+    set({ pendingProjectSwitch: null })
+
+    if (choice !== 'new' && chatId) {
+      // Link the *same* chat (id + full history) into the new project so it
+      // appears in that project's list rather than being copied.
+      await window.api.chats.linkProject(chatId, id)
+      await get().refreshChats()
+    }
+    if (choice !== 'link') {
+      get().newSession()
+      rememberChatId(get().sessionId)
+    }
+  },
+
+  cancelProjectSwitch: () => set({ pendingProjectSwitch: null }),
+
+  setChatTransferPreference(preference) {
+    writeChatTransferPreference(preference)
+    set({ chatTransferPreference: preference })
   },
 
   async updateProjectPath(id, path) {
@@ -1600,9 +1753,10 @@ export function subscribeToEvents(): void {
   const offFiles = window.api.events.on('files:changed', () => {
     void useStore.getState().refreshFiles()
   })
-  const offVps = window.api.events.on('vps:status', (status) =>
+  const offVps = window.api.events.on('vps:status', (status) => {
     useStore.getState().setVpsStatus(status)
-  )
+    void useStore.getState().refreshVpsConnected()
+  })
   const offDiagnostic = window.api.events.on('diagnostic:status', (diagnostic) =>
     useStore.setState({ diagnostic })
   )

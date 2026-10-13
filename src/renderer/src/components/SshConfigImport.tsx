@@ -63,7 +63,7 @@ export default function SshConfigImport(): JSX.Element {
 
       {hosts ? (
         hosts.length === 0 ? (
-          <p className="text-[11px] text-neutral-600">{t('settings.sshImportEmpty')}</p>
+          <p className="text-2xs text-neutral-600">{t('settings.sshImportEmpty')}</p>
         ) : (
           <ul className="flex flex-col gap-1.5">
             {hosts.map((host) => (
@@ -73,7 +73,7 @@ export default function SshConfigImport(): JSX.Element {
               >
                 <div className="min-w-0 text-xs">
                   <p className="truncate text-neutral-200">{host.alias}</p>
-                  <p className="truncate text-[10px] text-neutral-500" dir="ltr">
+                  <p className="truncate text-3xs text-neutral-500" dir="ltr">
                     {host.user ? `${host.user}@` : ''}
                     {host.hostName}
                     {host.port ? `:${host.port}` : ''}
@@ -84,7 +84,7 @@ export default function SshConfigImport(): JSX.Element {
                   <button
                     type="button"
                     onClick={() => void add(host)}
-                    className="rounded bg-accent px-2 py-1 text-[11px] text-white hover:bg-accent-hover"
+                    className="rounded bg-accent px-2 py-1 text-2xs text-white hover:bg-accent-hover"
                   >
                     {t('settings.sshImportAdd')}
                   </button>

@@ -51,7 +51,7 @@ export default function GitStatusPill(): JSX.Element | null {
 
   return (
     <span
-      className="flex shrink-0 items-center gap-1 text-[10px] text-neutral-500"
+      className="flex shrink-0 items-center gap-1 text-3xs text-neutral-500"
       title={formatGitStatusLabel(status)}
     >
       <GitBranch className="h-3 w-3" />

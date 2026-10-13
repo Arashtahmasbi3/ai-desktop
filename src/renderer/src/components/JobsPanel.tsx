@@ -35,7 +35,7 @@ export default function JobsPanel(): JSX.Element | null {
       className="flex flex-col gap-2 border-b border-border bg-bg-secondary/60 px-3 py-2"
     >
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-text-tertiary">
+        <div className="flex items-center gap-1.5 text-2xs font-medium uppercase tracking-wide text-text-tertiary">
           {jobs.length > 0 ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
           {t('jobs.panelTitle', { count: jobs.length })}
         </div>
@@ -50,7 +50,7 @@ export default function JobsPanel(): JSX.Element | null {
         </button>
       </div>
       {jobs.length === 0 ? (
-        <p className="text-[11px] text-neutral-600">{t('jobs.empty')}</p>
+        <p className="text-2xs text-neutral-600">{t('jobs.empty')}</p>
       ) : (
         jobs.map((job) => <JobCard key={job.id} job={job} onKill={kill} />)
       )}
