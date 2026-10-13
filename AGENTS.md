@@ -51,7 +51,7 @@ fails, a tool is missing, or the budget ran out — ask rather than guess).
 
 ## Status
 
-**v2.6.4 Sprint — Critical Bugs + Multi-Project UX + Design Polish, in progress on `feature/v2.6.4-critical-fixes`.** Fix A–B (VPS pairing/keepalive) and Fix D–F (chat transfer, opt-in context warning, shared type scale) are complete; see the v2.6.4 sprint section at the end of this file. Full suite green (221 files, 1724 passed | 1 skipped). (2026-10-05)
+**v2.6.4 Sprint — Critical Bugs + Multi-Project UX + Design Polish, in progress on `feature/v2.6.4-critical-fixes`.** Fix A–F all complete (tool-call pairing, per-server VPS state, multi-connection keepalive + shell isolation, chat transfer, opt-in context warning, shared type scale); see the v2.6.4 sprint section at the end of this file. Full suite green (221 files, 1724 passed | 1 skipped). (2026-10-13)
 
 **v2.4 Sprint — phases A–E complete; version bumped to 2.4.0. A.1 jobs, A.2 preflight, A.3 success verification, B.1 db migration, B.2 docker transfer, B.3 checksum verify, C.1 project users, C.2 project SSH key, C.3 worktrees, D.1 scaffolding. Branch: feature/v2.4-full-compliance.** (2026-10-05)
 
@@ -847,6 +847,17 @@ Autonomous decisions logged per the sprint's golden rule (`[AUTO-DECISION]`, no 
 
 Branch `feature/v2.6.4-critical-fixes`.
 
+### Fix B — Per-server VPS connection state (`eddc2b0`)
+- `[DECISION v2.6.4]` The connected-server set is exposed over IPC (`vps:connected`) and every UI surface derives each project's indicator from that set, so a global status change on one host no longer flips another project to "Not connected". The run's routing host and tool host are reconciled to the same reachable server.
+- Files: `src/core/agent/vps-resolver.ts`, `src/main/agent-service.ts`, `src/main/ssh/ssh-manager.ts` (`serverStates`/`states()`), `src/main/vps-ipc.ts`, `src/renderer/src/lib/connection-status.ts`, `vps-state.ts`, `store.ts`.
+- Tests: `test/main/ssh-manager.test.ts`, `test/renderer/connection-status.test.tsx`, `test/security/vps-resolver.test.ts`.
+
+### Fix C — Multi-connection: every remote project stays connected (`c152554`)
+- `[DECISION v2.6.4]` `SshManager` owns a `Map<serverId, ConnectionEntry>`, so every remote project's host can be connected at once; `disconnect(serverId)` only drops its own server. A terminal panel closing/unmounting calls `closeTerminal(serverId, sessionId)` — never `disconnect` — so it tears down only its own shell (a stale session id is ignored rather than closing the wrong shell). A startup keepalive (`App.tsx`, every 30s) brings up **every** remote project's host via `ensureVpsConnected`, which never moves the chat-header selection. `openProject`/`switchProject` never call `disconnect`.
+  - Why: the user's model is "each project = independent context", so switching projects must be instant and must not interrupt another project's running work.
+- Files: `src/main/ssh/ssh-manager.ts`, `src/main/vps-ipc.ts`, `src/preload/index.ts` + `index.d.ts`, `src/renderer/src/App.tsx`, `components/Vps/VpsTerminal.tsx`, `lib/vps-state.ts`, `store.ts`.
+- Tests: `test/main/ssh-manager.test.ts` (`multi-connection (v2.6.4)`: keep every server connected, second server connects without disturbing the first, closing a terminal keeps the connection up), `test/renderer/vps-state.test.ts` (`remoteVpsIds`).
+
 ### Fix D — Chat transfer on project switch
 - `[DECISION v2.6.4]` Switching to another project no longer silently orphans the open chat. When the current session has at least one user message we prompt with `ProjectSwitchDialog` (link / move / keep+new); an empty session switches silently. `ChatStore.linkProject` re-points a chat at the new `workspaceId` **in place** (same file, id, title and full message history), rather than copying it — the backend used to duplicate history on a project change.
   - Why link-not-copy: a copy would fork the conversation and double the stored history; re-pointing keeps one canonical transcript while letting the chat "belong" to the new project.
@@ -867,4 +878,4 @@ Branch `feature/v2.6.4-critical-fixes`.
 - Files: `tailwind.config.js`, all renderer components using the dense sizes; `test/renderer/tool-card-compact.test.tsx` assertions updated. Commit `65df132`.
 
 ### Sprint status
-- Fix A (`92205f0`), Fix B (`fix(vps): keep every project's connection up and close only its shell`), Fix D (`e24fa95`), Fix E (`4eb963f`), Fix F (`65df132`) complete. Full suite: 221 files, 1724 passed | 1 skipped; builds green.
+- Fix A (`92205f0`), Fix B (`eddc2b0`), Fix C (`c152554`), Fix D (`e24fa95`), Fix E (`4eb963f`), Polish F (`65df132`) complete. Full suite: 221 files, 1724 passed | 1 skipped; builds green.
