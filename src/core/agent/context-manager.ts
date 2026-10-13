@@ -1,4 +1,5 @@
 import type { ChatMessage, ToolCall } from '@shared/types'
+import { sanitizeToolPairs } from './tool-pair-sanitizer'
 
 export interface ContextManagerOptions {
   systemPrompt: string
@@ -368,6 +369,8 @@ export class ContextManager {
       messages.push({ role: 'system', content: `[compacted-history-summary]\n${this.summary}` })
     }
     messages.push(...this.trimmedHistory())
-    return messages
+    // Final guard at the provider boundary: never send an assistant tool_calls
+    // turn without a matching tool response (DeepSeek/OpenAI reject it with 400).
+    return sanitizeToolPairs(messages)
   }
 }
