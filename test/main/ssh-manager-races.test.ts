@@ -95,7 +95,8 @@ beforeEach(async () => {
     audit,
     rateLimiter: new RateLimiter(1000, 60_000, () => now),
     now: () => now,
-    readKeyFile: async () => Buffer.from('PRIVATE KEY')
+    readKeyFile: async () =>
+      Buffer.from('-----BEGIN OPENSSH PRIVATE KEY-----\nfake-key-body\n-----END OPENSSH PRIVATE KEY-----')
   })
 })
 

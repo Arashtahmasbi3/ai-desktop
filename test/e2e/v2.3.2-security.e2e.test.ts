@@ -59,7 +59,8 @@ function makeManager(): { manager: SshManager; store: VpsServerStore; audit: Aud
     backend: new FakeBackend(),
     audit,
     rateLimiter: new RateLimiter(100, 60_000),
-    readKeyFile: async () => Buffer.from('PRIVATE KEY')
+    readKeyFile: async () =>
+      Buffer.from('-----BEGIN OPENSSH PRIVATE KEY-----\nfake-key-body\n-----END OPENSSH PRIVATE KEY-----')
   })
   return { manager, store, audit }
 }

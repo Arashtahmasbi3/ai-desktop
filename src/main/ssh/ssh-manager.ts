@@ -39,6 +39,24 @@ function sameConnectionState(a: VpsConnectionState, b: VpsConnectionState): bool
   )
 }
 
+/** Upper bound on a private key file we are willing to hand to ssh2 (v2.6.5). */
+const MAX_PRIVATE_KEY_BYTES = 256 * 1024
+
+/** Absolute POSIX or Windows path (v2.6.5). */
+function isAbsolutePath(value: string): boolean {
+  return value.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(value) || value.startsWith('\\\\')
+}
+
+/**
+ * A real private key always carries a PEM header — OpenSSH keys included
+ * (`-----BEGIN OPENSSH PRIVATE KEY-----`). Anything else is refused so a
+ * renderer-supplied path cannot turn the SSH layer into a file probe (v2.6.5).
+ */
+function looksLikePrivateKey(content: Buffer): boolean {
+  const head = content.toString('utf8', 0, Math.min(content.length, 8192))
+  return /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/.test(head)
+}
+
 export interface SshManagerOptions {
   store: VpsServerStore
   backend: SshBackend
@@ -195,10 +213,27 @@ export class SshManager {
       if (!server.privateKeyPath) {
         return this.blocked(serverId, 'No private key configured — connection blocked.')
       }
+      // v2.6.5: the stored path is a renderer-supplied string that used to be fed
+      // straight to `fs.readFile` and then to ssh2 as key material, so it could
+      // point at any readable file. Require an absolute path and only hand over a
+      // file that really looks like a private key, of a sane size.
+      const keyPath = server.privateKeyPath.trim()
+      if (!isAbsolutePath(keyPath) || /[\u0000\n\r]/.test(keyPath)) {
+        return this.blocked(serverId, `Private key path must be absolute: ${keyPath}`)
+      }
       try {
-        privateKey = await this.readKeyFile(server.privateKeyPath)
+        privateKey = await this.readKeyFile(keyPath)
       } catch {
-        return this.blocked(serverId, `Private key not found: ${server.privateKeyPath}`)
+        return this.blocked(serverId, `Private key not found: ${keyPath}`)
+      }
+      if (privateKey.length === 0 || privateKey.length > MAX_PRIVATE_KEY_BYTES) {
+        return this.blocked(serverId, `Private key file is empty or too large: ${keyPath}`)
+      }
+      if (!looksLikePrivateKey(privateKey)) {
+        return this.blocked(
+          serverId,
+          `Refusing to use a file that is not an SSH private key: ${keyPath}`
+        )
       }
     } else if (!password) {
       return this.blocked(serverId, 'No password stored — connection blocked.')
