@@ -19,6 +19,11 @@ DeepSeek API, VPS servers (SSH), GitHub (Git), and your local files.
 > POSIX shell on Windows (Git for Windows' `bash.exe`). Without one it falls back to `cmd.exe`,
 > where those commands cannot run — install Git for Windows or use Docker.
 >
+> **Updates:** the app ships without an auto-updater (`publish: null`, no `electron-updater`
+> dependency), so a new version means downloading a fresh installer from the Releases page.
+> Enabling in-app updates needs an update server (or a GitHub Releases publish provider) and a
+> signed build first — see `KNOWN_ISSUES.md`.
+>
 > v2.3 adds a Codex-style workspace (redesigned sidebar, composer and Settings), an approval
 > system that learns (remembered tools, inline full-access toggle), a file-changes panel with
 > diff review, chat templates, an in-chat code block runner, session fork, voice input,

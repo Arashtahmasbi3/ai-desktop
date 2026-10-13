@@ -28,6 +28,17 @@ interface ConnectionEntry {
   lastActivity: number
 }
 
+/** True when two states describe the same connection situation (v2.6.5). */
+function sameConnectionState(a: VpsConnectionState, b: VpsConnectionState): boolean {
+  return (
+    a.status === b.status &&
+    a.serverId === b.serverId &&
+    a.fingerprint === b.fingerprint &&
+    a.pendingFingerprint === b.pendingFingerprint &&
+    (a.error ?? '') === (b.error ?? '')
+  )
+}
+
 export interface SshManagerOptions {
   store: VpsServerStore
   backend: SshBackend
@@ -121,9 +132,14 @@ export class SshManager {
   }
 
   private setState(next: VpsConnectionState): VpsConnectionState {
+    const previous = next.serverId ? this.serverStates.get(next.serverId) : undefined
     this.state = next
     if (next.serverId) this.serverStates.set(next.serverId, { ...next })
-    this.onStatus?.(this.getState())
+    // v2.6.5: emit only on a real transition. Every call used to emit `vps:status`,
+    // and the renderer answers each event with an extra `vps:connected` invoke, so
+    // a repeated identical state (e.g. a keepalive re-reporting "connected") cost a
+    // full IPC round-trip for nothing.
+    if (!previous || !sameConnectionState(previous, next)) this.onStatus?.(this.getState())
     return this.getState()
   }
 

@@ -7,6 +7,85 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **The renderer sandbox is on.** `sandbox: false` ran the process that renders model output
+  unsandboxed; the preload only needs `contextBridge`, `ipcRenderer` and `webUtils`.
+- **The main window can no longer navigate away from the bundled renderer.** There was no
+  `will-navigate`/`will-redirect` guard, so one click on a link in agent output replaced the
+  app with a foreign page that still owned the `window.api` preload bridge. `shell.openExternal`
+  is limited to http(s) too (the webview policy already was).
+- **The local terminal passes the same guards as every remote command.** `shell:exec` had no
+  deny list, no approval and no audit entry, so a compromised renderer had an unrestricted
+  shell with `cwd` set to the project.
+- **Remote path containment matches what executes.** `containPath` validated a path and then
+  sent the raw request through SFTP, which resolves a relative path against `$HOME` — so
+  `remote_write_file { path: '.bashrc' }` was checked as `<root>/.bashrc` and wrote
+  `$HOME/.bashrc`. Project-scoped commands also run from the project root now (an ssh2 `exec`
+  starts in the login directory), and a `..` segment is refused outright.
+- **Tool classification fails closed.** Anything not on an explicit read allow-list is a write,
+  so `db_migrate`, `migrate_project`, `scaffold_project`, `project_user_*` and `worktree_*`
+  can no longer be auto-approved in `auto-write` mode or skip the plan gate.
+- **The sudo gate is mandatory.** `sudo useradd` / `sudo userdel -r` ran with no approval when
+  the optional hook was not wired.
+- **Plan trust is bound to the approved step.** Auto-approval matched the action *id* only while
+  `planHash` was never compared, so a later turn reusing an id was approved for a different
+  tool or arguments.
+- **The deny list covers power commands in command position** (`sudo reboot`,
+  `systemctl poweroff`, `/sbin/reboot`), absolute-path shell pipelines, and `mount` no longer
+  takes the always-allowed shortcut.
+- **Redaction covers `sk-proj-*`/`sk-svcacct-*`, Google `AIza*`, Groq, HuggingFace and xAI
+  keys**, and secret system paths are matched after resolving dot segments.
+- **Loops, daemons and secrets:** the SSE reader cancels its body, the GitHub client has a
+  timeout and reports rate limits, `FileService` refuses a junction that leaves the project,
+  the Docker image reference cannot become a flag, and the CSP gains `object-src`/`base-uri`/
+  `frame-ancestors`/`form-action`.
+
+### Fixed
+
+- **The Windows local sandbox could not run a single agent command.** It used `cmd.exe`, which
+  knows none of the POSIX tools the agent writes, so every command "succeeded" with empty
+  output. It now prefers Git for Windows' `bash.exe` and reports the `cmd` dialect when there
+  is no POSIX shell. This is why 17 tests failed on Windows and passed on Linux.
+- **The audit log silently stopped being written** while leaving 822 temp files (361.8 MB in
+  four days) on disk; every atomic write now uses a unique temp name, retries the Windows
+  sharing violation, always unlinks the temp, serialises concurrent saves, and sweeps existing
+  leftovers. A failed audit write is reported instead of swallowed.
+- **`goal-store` destroyed every stored goal** after any read error, because the failure was
+  reported as "no goals" and then written straight back.
+- **Run freshness is measured from the last patch activity**, not the run start, so a run
+  longer than 30 minutes no longer has all of its patches pre-expired.
+- **Success claims require a real verification command.** `run_command("test -d x")` and
+  `echo test-ok` no longer unlock "done".
+- **LLM streaming keeps its timeout and abort wiring for the whole body**, so a stalled
+  provider cannot hang a run and Stop actually cancels a stream.
+- **SSH:** concurrent connects are coalesced (they leaked a connection), re-opening a terminal
+  closes the previous shell, a per-server state no longer overwrites another host's status, and
+  an open project's host stays connected instead of being reaped and reconnected every ~30 min.
+- **Agent loop:** a `..`-free command, an unpaired tool result after a preflight note, a
+  lifetime (not windowed) repeat counter, a planner alternative that dropped a planned step, an
+  audit chain that could never verify again after one torn line, pinned context hints that
+  defeated the character budget, an unquoted project root in crash probes, and a byte cap that
+  split surrogate pairs.
+- **`normalizeProjectPath` keeps POSIX paths POSIX**, and the sandbox resolves against the path
+  dialect of its root, so `/tmp/x` is no longer rewritten as `C:\tmp\x` on Windows.
+
+### Added
+
+- CI (`.github/workflows/ci.yml`) running `typecheck`, `test` and `build` on **both**
+  ubuntu-latest and windows-latest; the repository had no CI at all.
+- `LICENSE` (MIT) — `package.json` claimed MIT with no licence file in the tree.
+- Tests for the real SSH transport (`ssh2-backend.ts`, previously only the fake was exercised),
+  plus coverage for the Windows shell, atomic writes, containment, plan binding, redaction and
+  the renderer defects fixed in this release.
+
+### Changed
+
+- The unversioned `KNOWN_ISSUES.md`, `TESTING_GUIDE.md` and `FINAL_REPORT.md` are v1.0.0
+  artifacts and now say so at the top; the README status line is current.
+- `dependencies` holds exactly one entry (`ssh2`); the renderer libraries moved to
+  `devDependencies`, matching the documented packaging invariant.
+
 ## [2.6.4] — 2026-10-13
 
 Release v2.6.4 "Multi-Project & Polish" fixes a resumed-conversation crash, keeps
