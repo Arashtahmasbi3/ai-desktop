@@ -68,7 +68,9 @@
     "recents": "Recents",
     "local": "local",
     "policyMismatch": "Project policy differs from the host policy",
-    "navGoals": "Goals"
+    "navGoals": "Goals",
+    "newChatInProject": "New chat in this project",
+    "chatsInProject": "{{count}} chats"
   },
   "chat": {
     "placeholder": "Do anything",

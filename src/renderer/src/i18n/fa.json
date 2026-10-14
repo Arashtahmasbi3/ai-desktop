@@ -68,7 +68,9 @@
     "recents": "اخیر",
     "local": "محلی",
     "policyMismatch": "سیاست پروژه با سیاست میزبان تفاوت دارد",
-    "navGoals": "اهداف"
+    "navGoals": "اهداف",
+    "newChatInProject": "چت جدید در این پروژه",
+    "chatsInProject": "{{count}} چت"
   },
   "chat": {
     "placeholder": "هر کاری انجام بده",

@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Copy,
   Download,
+  FolderOpen,
   FolderTree,
   GitFork,
   Globe,
@@ -24,6 +25,7 @@ import {
   User
 } from 'lucide-react'
 import type { ChatSummary } from '@shared/chat'
+import { groupChatsByProject } from '@shared/chat'
 import type { HostPolicy } from '@shared/vps'
 import type { ProjectRecord } from '@shared/ui'
 import { basename, useStore, type ViewId } from '../store'
@@ -93,6 +95,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
   const chats = useStore((state) => state.chats)
   const activeChatId = useStore((state) => state.activeChatId)
   const loadSession = useStore((state) => state.loadSession)
+  const startChatInProject = useStore((state) => state.startChatInProject)
   const renameChat = useStore((state) => state.renameChat)
   const deleteChat = useStore((state) => state.deleteChat)
   const duplicateChat = useStore((state) => state.duplicateChat)
@@ -151,6 +154,17 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
   )
   const projects = settings?.projects ?? []
   const activeProject = projects.find((project) => project.id === settings?.activeProjectId)
+  // v2.8.0: the history is grouped under its project again (see the Recents block).
+  const chatGroups = useMemo(
+    () =>
+      groupChatsByProject(
+        filtered,
+        projects.map((project) => project.id)
+      ),
+    [filtered, projects]
+  )
+  const projectNameFor = (projectId: string): string | undefined =>
+    projects.find((project) => project.id === projectId)?.name
   const serverName = (serverId?: string): string | undefined =>
     servers.find((server) => server.id === serverId)?.name
 
@@ -577,7 +591,41 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
           ) : filtered.length === 0 ? (
             <p className="px-2 py-3 text-2xs text-fg-muted">{t('palette.noResults')}</p>
           ) : (
-            filtered.map((chat) => (
+            /*
+             * v2.8.0: group the history under its project again.
+             *
+             * `groupChatsByProject` was written for this in v2.2 and then orphaned by
+             * the v2.3 sidebar redesign, which made Recents one flat, project-blind
+             * list — so chats bound to a project looked like a single pile. Reported:
+             * "after creating a project I should be able to create chats under each
+             * project, with tidy, organised grouping."
+             */
+            chatGroups.map((group) => (
+              <div key={group.projectId ?? '__unassigned'}>
+                <p className="mt-2 flex items-center gap-1 px-2 py-1 text-3xs font-semibold uppercase tracking-wide text-fg-muted">
+                  <FolderOpen className="h-3 w-3 shrink-0" />
+                  <span className="truncate">
+                    {group.projectId
+                      ? (projectNameFor(group.projectId) ?? t('sidebar.noProject'))
+                      : t('sidebar.noProject')}
+                  </span>
+                  <span className="ms-auto shrink-0 font-normal text-fg-subtle">
+                    {group.chats.length}
+                  </span>
+                  {group.projectId ? (
+                    <button
+                      type="button"
+                      data-testid={`project-new-chat-${group.projectId}`}
+                      onClick={() => void startChatInProject(group.projectId!)}
+                      title={t('sidebar.newChatInProject')}
+                      aria-label={t('sidebar.newChatInProject')}
+                      className="shrink-0 rounded p-0.5 text-fg-muted hover:bg-bg-tertiary hover:text-fg"
+                    >
+                      <Plus className="h-3 w-3" />
+                    </button>
+                  ) : null}
+                </p>
+                {group.chats.map((chat) => (
               <div key={chat.id} className="group relative">
                 <button
                   type="button"
@@ -668,6 +716,8 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                     </div>
                   </>
                 ) : null}
+              </div>
+                ))}
               </div>
             ))
           )}

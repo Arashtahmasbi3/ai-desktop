@@ -589,6 +589,15 @@ interface AppState {
   openProject: (id: string) => Promise<void>
   /** Open a project without offering to transfer the open chat. */
   switchProject: (id: string, keepChat?: boolean) => Promise<void>
+  /**
+   * v2.8.0: start a brand-new chat bound to `id`, without the transfer dialog.
+   *
+   * This is the per-project "new chat" affordance in the sidebar. It deliberately
+   * calls `switchProject` directly rather than `openProject` — the latter would run
+   * the chat-transfer decision, which makes no sense when the user is asking for a
+   * *new* conversation under a specific project.
+   */
+  startChatInProject: (id: string) => Promise<void>
   /** Apply the chosen chat transfer and switch to the pending project. */
   completeProjectSwitch: (
     id: string,
@@ -1846,6 +1855,23 @@ export const useStore = create<AppState>((set, get) => ({
     await get().refreshFiles('.')
     await get().refreshGoals()
     await get().refreshMemory()
+  },
+
+  /**
+   * v2.8.0: the sidebar's per-project "+" — switch to `id` and start an empty chat
+   * there. No transfer dialog: the user asked for a new conversation under a
+   * specific project, so there is nothing to decide about the previous one (it is
+   * already filed under its own project by the autosave).
+   */
+  async startChatInProject(id) {
+    if (get().settings?.activeProjectId !== id) {
+      await get().switchProject(id, false)
+    } else {
+      // Same project: a project switch is what normally resets the chat slices, so
+      // reset them here too or the new "chat" would inherit the open conversation.
+      set({ ...chatScopedReset() })
+    }
+    get().newSession()
   },
 
   async completeProjectSwitch(id, choice, remember = false) {
