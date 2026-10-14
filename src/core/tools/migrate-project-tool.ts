@@ -10,6 +10,9 @@ export const MIGRATE_PROJECT_TOOL: ToolDefinition = {
   description:
     'Copy a project directory from one saved VPS to another using rsync over SSH. ' +
     'The source server must be connected; the target is reached from it. ' +
+    'The target can be a saved server (target_vps_id) OR a raw host (target_host) ' +
+    'when the destination is not saved yet — the source must already be able to ' +
+    'authenticate to it with a key, and the transfer fails fast if it cannot. ' +
     'Files are only added or updated — the destination is never deleted.',
   parameters: {
     type: 'object',
@@ -17,6 +20,17 @@ export const MIGRATE_PROJECT_TOOL: ToolDefinition = {
       source_vps_id: { type: 'string', description: 'Id of the source VPS (from the saved server list)' },
       source_path: { type: 'string', description: 'Absolute project path on the source VPS' },
       target_vps_id: { type: 'string', description: 'Id of the target VPS (from the saved server list)' },
+      target_host: {
+        type: 'string',
+        description:
+          'Hostname or IP of a target that is not saved yet. Use instead of target_vps_id; ' +
+          'the source server must already have key access to it.'
+      },
+      target_user: {
+        type: 'string',
+        description: 'SSH user for target_host (defaults to the source server user)'
+      },
+      target_port: { type: 'number', description: 'SSH port for target_host (default 22)' },
       target_path: { type: 'string', description: 'Absolute destination path on the target VPS' },
       dry_run: {
         type: 'boolean',
@@ -28,7 +42,7 @@ export const MIGRATE_PROJECT_TOOL: ToolDefinition = {
           'After transferring, hash every file on both sides and fail on mismatch (default true).'
       }
     },
-    required: ['source_vps_id', 'source_path', 'target_vps_id', 'target_path'],
+    required: ['source_vps_id', 'source_path', 'target_path'],
     additionalProperties: false
   }
 }
@@ -68,6 +82,41 @@ export interface RsyncPlan {
 
 function fail(content: string, blocked = false): MigrateProjectResult {
   return { ok: false, content, ...(blocked ? { blocked } : {}) }
+}
+
+/** A hostname or literal IPv4/IPv6, optionally with a leading user is NOT allowed. */
+const TARGET_HOST_RE = /^[A-Za-z0-9._:-]+$/
+
+/**
+ * Build a transfer target from a raw host (v2.8.0).
+ *
+ * Only the shape of the host is validated here; reachability is the source's problem
+ * and `BatchMode=yes` fails fast when the source cannot authenticate. The username
+ * defaults to the source's own, because a same-provider migration is almost always
+ * root→root, and a wrong guess fails loudly rather than writing somewhere surprising.
+ */
+function resolveRawTarget(
+  host: string,
+  args: Record<string, unknown>,
+  sourceId: string,
+  source: ServerConnection | undefined
+): ServerConnection | undefined {
+  if (!host || CONTROL_CHARS.test(host) || SHELL_METACHARACTERS.test(host)) return undefined
+  // Reject anything option-shaped so it can never be read as an rsync/ssh flag.
+  if (host.startsWith('-')) return undefined
+  if (!TARGET_HOST_RE.test(host)) return undefined
+
+  const user = String(args.target_user ?? '').trim() || source?.username
+  if (!user || !USERNAME_RE.test(user)) return undefined
+
+  const portRaw = args.target_port
+  const port = portRaw === undefined || portRaw === null || portRaw === '' ? 22 : Number(portRaw)
+  if (!Number.isInteger(port) || port < 1 || port > 65535) return undefined
+
+  // `sourceId` is deliberately unused: the caller keeps it for the exec calls, and
+  // naming it here documents that the target is reached *from* that server.
+  void sourceId
+  return { host, port, username: user }
 }
 
 /** Control characters (NUL, newlines, tabs, ...) are never valid in a path. */
@@ -254,6 +303,12 @@ export function formatMigrationPlan(
 /**
  * Guarded entry point for the agent. Validates both server ids, denies unsafe
  * paths, then runs the rsync command on the source server.
+ *
+ * v2.8.0: the target may also be a **raw host**. The transfer runs *on the source*
+ * with `BatchMode=yes`, so the target never needed to be a saved server on this
+ * machine — only reachable from the source by key. Requiring it to be saved first
+ * dead-ended the user ("migrate this project to 212.16.86.23" produced "that is just
+ * an IP; add it in Settings first"). A saved id still wins when both are given.
  */
 export async function executeMigrateProject(
   deps: MigrateProjectDeps,
@@ -261,10 +316,13 @@ export async function executeMigrateProject(
 ): Promise<MigrateProjectResult> {
   const sourceId = String(args.source_vps_id ?? '').trim()
   const targetId = String(args.target_vps_id ?? '').trim()
+  const rawHost = String(args.target_host ?? '').trim()
   const connected = deps.connectedServers()
 
   if (!sourceId) return fail(`source_vps_id is required. Connected: ${connected.join(', ') || 'none'}`)
-  if (!targetId) return fail('target_vps_id is required.')
+  if (!targetId && !rawHost) {
+    return fail('A target is required: pass target_vps_id for a saved server, or target_host.')
+  }
   if (!connected.includes(sourceId)) {
     return fail(`Source server ${sourceId} is not connected. Connect it first.`)
   }
@@ -280,10 +338,12 @@ export async function executeMigrateProject(
   const sourcePath = sourceCheck.path!
   const targetPath = targetCheck.path!
 
-  const target = await deps.resolveServer(targetId)
-  if (!target) return fail(`Unknown target server ${targetId}.`)
+  const target = targetId
+    ? await deps.resolveServer(targetId)
+    : resolveRawTarget(rawHost, args, sourceId, await deps.resolveServer(sourceId))
+  if (!target) return fail(`Unknown target server ${targetId || rawHost}.`)
   if (!USERNAME_RE.test(target.username)) {
-    return fail(`Target server ${targetId} has an unsafe username.`)
+    return fail(`Target server ${targetId || rawHost} has an unsafe username.`)
   }
 
   const command = buildRsyncCommand(sourcePath, target, targetPath)

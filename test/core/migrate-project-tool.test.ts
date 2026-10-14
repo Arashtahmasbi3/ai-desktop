@@ -73,14 +73,21 @@ const ARGS = {
 }
 
 describe('MIGRATE_PROJECT_TOOL', () => {
-  it('declares the four required server/path parameters', () => {
+  it('requires the paths, and a target supplied either by id or by host', () => {
+    // v2.8.0: `target_vps_id` is no longer *required* — a raw `target_host` is an
+    // accepted alternative, because the transfer runs on the source server and the
+    // destination never had to be saved here. Requiring it dead-ended the user.
     expect(MIGRATE_PROJECT_TOOL.name).toBe('migrate_project')
     expect(MIGRATE_PROJECT_TOOL.parameters.required).toEqual([
       'source_vps_id',
       'source_path',
-      'target_vps_id',
       'target_path'
     ])
+    const properties = MIGRATE_PROJECT_TOOL.parameters.properties as Record<string, unknown>
+    expect(properties.target_vps_id).toBeDefined()
+    expect(properties.target_host).toBeDefined()
+    expect(properties.target_user).toBeDefined()
+    expect(properties.target_port).toBeDefined()
   })
 })
 
@@ -216,6 +223,127 @@ describe('executeMigrateProject', () => {
     expect(result.ok).toBe(false)
     expect(result.content).toMatch(/Unknown target server/)
     expect(deps.execCalls).toHaveLength(0)
+  })
+
+  /**
+   * v2.8.0: the reported dead end — "migrate this project to 212.16.86.23" answered
+   * with "that is just an IP; add it as a saved server first". The transfer runs on the
+   * source server with `BatchMode=yes`, so the destination only has to be reachable
+   * *from there*; it never had to be saved on this machine.
+   */
+  describe('a target that is not a saved server (v2.8.0)', () => {
+    it('accepts a raw host and runs the transfer from the source', async () => {
+      const deps = fakeSsh({ servers: { 'srv-1': { host: 'src.example.com', port: 22, username: 'root' } } })
+      const result = await executeMigrateProject(deps, {
+        source_vps_id: 'srv-1',
+        source_path: '/var/www/app',
+        target_host: '212.16.86.23',
+        target_path: '/srv/app'
+      })
+
+      expect(result.ok).toBe(true)
+      const command = deps.execCalls.map((call) => call.command).join('\n')
+      expect(command).toContain('root@212.16.86.23:/srv/app')
+      // Still a dry-run first, and still no --delete.
+      expect(command).toContain('--dry-run')
+      expect(command).not.toContain('--delete')
+    })
+
+    it('honours target_user and target_port', async () => {
+      const deps = fakeSsh({
+        servers: { 'srv-1': { host: 'src.example.com', port: 22, username: 'deploy' } }
+      })
+      await executeMigrateProject(deps, {
+        source_vps_id: 'srv-1',
+        source_path: '/var/www/app',
+        target_host: '212.16.86.23',
+        target_user: 'ubuntu',
+        target_port: 2222,
+        target_path: '/srv/app'
+      })
+
+      const command = deps.execCalls.map((call) => call.command).join('\n')
+      expect(command).toContain('ubuntu@212.16.86.23')
+      expect(command).toContain('-p 2222')
+    })
+
+    it('defaults the user to the source server user', async () => {
+      const deps = fakeSsh({
+        servers: { 'srv-1': { host: 'src.example.com', port: 22, username: 'deploy' } }
+      })
+      await executeMigrateProject(deps, {
+        source_vps_id: 'srv-1',
+        source_path: '/var/www/app',
+        target_host: 'target.example.com',
+        target_path: '/srv/app'
+      })
+      expect(deps.execCalls.map((c) => c.command).join('\n')).toContain('deploy@target.example.com')
+    })
+
+    it('refuses a host that could be read as a flag or carries shell characters', async () => {
+      for (const target_host of ['-oProxyCommand=x', 'evil; rm -rf /', 'bad host', 'a$(whoami)b']) {
+        const deps = fakeSsh({
+          servers: { 'srv-1': { host: 'src.example.com', port: 22, username: 'root' } }
+        })
+        const result = await executeMigrateProject(deps, {
+          source_vps_id: 'srv-1',
+          source_path: '/var/www/app',
+          target_host,
+          target_path: '/srv/app'
+        })
+        expect(result.ok, target_host).toBe(false)
+        expect(deps.execCalls, target_host).toHaveLength(0)
+      }
+    })
+
+    it('refuses an unsafe target_user and an out-of-range port', async () => {
+      const unsafeUser = await executeMigrateProject(
+        fakeSsh({ servers: { 'srv-1': { host: 's', port: 22, username: 'root' } } }),
+        {
+          source_vps_id: 'srv-1',
+          source_path: '/var/www/app',
+          target_host: 'h.example.com',
+          target_user: 'root; rm -rf /',
+          target_path: '/srv/app'
+        }
+      )
+      expect(unsafeUser.ok).toBe(false)
+
+      const badPort = await executeMigrateProject(
+        fakeSsh({ servers: { 'srv-1': { host: 's', port: 22, username: 'root' } } }),
+        {
+          source_vps_id: 'srv-1',
+          source_path: '/var/www/app',
+          target_host: 'h.example.com',
+          target_port: 70000,
+          target_path: '/srv/app'
+        }
+      )
+      expect(badPort.ok).toBe(false)
+    })
+
+    it('still prefers a saved target id when one is given', async () => {
+      const deps = fakeSsh()
+      const result = await executeMigrateProject(deps, {
+        ...ARGS,
+        target_host: 'ignored.example.com'
+      })
+      expect(result.ok).toBe(true)
+      // TARGET is the saved srv-2 in the fake; the host is not used when an id is given.
+      const command = deps.execCalls.map((c) => c.command).join('\n')
+      expect(command).toContain('deploy@10.0.0.9')
+      expect(command).not.toContain('ignored.example.com')
+    })
+
+    it('asks for a target when neither id nor host is given', async () => {
+      const result = await executeMigrateProject(fakeSsh(), {
+        source_vps_id: 'srv-1',
+        source_path: '/var/www/app',
+        target_path: '/srv/app'
+      })
+      expect(result.ok).toBe(false)
+      expect(result.content).toMatch(/target_vps_id|target_host/)
+    })
   })
 
   it('rejects paths with control characters without touching the shell', async () => {
