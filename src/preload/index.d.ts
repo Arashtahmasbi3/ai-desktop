@@ -189,6 +189,8 @@ export interface Api {
     respondApproval(id: string, answer: boolean | ApprovalOutcome): Promise<boolean>
     respondPlan(id: string, decision: PlanDecision): Promise<boolean>
     respondPreflight(id: string, choice: PreflightChoice): Promise<boolean>
+    /** v2.8.0: answer a mid-run question from the agent. */
+    respondQuestion(id: string, answer: string | null): Promise<boolean>
     stopPlan(runId?: string): Promise<boolean>
     approvalHistory(): Promise<ApprovalHistoryEntry[]>
     approvedCommands(): Promise<ApprovedCommandView[]>

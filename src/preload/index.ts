@@ -239,6 +239,9 @@ export const api = {
       invoke('agent:respondApproval', id, answer),
     respondPlan: (id: string, decision: PlanDecision): Promise<boolean> =>
       invoke('agent:respondPlan', id, decision),
+    /** v2.8.0: answer a mid-run question from the agent. */
+    respondQuestion: (id: string, answer: string | null): Promise<boolean> =>
+      invoke('agent:respondQuestion', id, answer),
     respondPreflight: (id: string, choice: PreflightChoice): Promise<boolean> =>
       invoke('agent:respondPreflight', id, choice),
     stopPlan: (runId?: string): Promise<boolean> => invoke('agent:stopPlan', runId),

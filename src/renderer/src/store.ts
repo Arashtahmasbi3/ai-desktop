@@ -12,6 +12,7 @@ import { DEFAULT_SELECTION, resolveSelection } from '@shared/selection'
 import type { ApprovalMode, ApprovalOutcome } from '@shared/approval'
 import type { ApprovedPlan, PlanDecision } from '@shared/plan'
 import type { PreflightChoice, PreflightRequestView } from '@shared/preflight'
+import type { AgentQuestionView } from '@shared/ui'
 import type { TaskPlan } from '@shared/task-plan'
 import type { Goal } from '@shared/goal'
 import type { ResolvedGoal } from '@core/agent/goal-store'
@@ -396,6 +397,8 @@ interface AppState {
   pendingPlan: PlanRequest | null
   /** Preflight block awaiting an explicit, per-action answer (v2.6.3, T3.2). */
   pendingPreflight: PreflightRequestView | null
+  /** v2.8.0: a question the agent is waiting on mid-run. */
+  pendingQuestion: AgentQuestionView | null
   /** A plan the user trusted for 30 minutes; its steps skip approval (v2.5.5). */
   activePlan: ApprovedPlan | null
   /**
@@ -498,6 +501,8 @@ interface AppState {
   respondPlan: (decision: PlanDecision) => void
   /** Answer a preflight block; the drawer closes and main resolves the run. */
   respondPreflight: (choice: PreflightChoice) => void
+  /** v2.8.0: answer the agent's mid-run question. */
+  respondQuestion: (answer: string | null) => Promise<void>
   stopPlan: () => void
   rememberApprovalTool: (tool: string) => Promise<void>
   dismissApprovalSuggestion: () => void
@@ -725,6 +730,7 @@ export const useStore = create<AppState>((set, get) => ({
   pendingApproval: null,
   pendingPlan: null,
   pendingPreflight: null,
+  pendingQuestion: null,
   activePlan: null,
   taskPlan: null,
   taskPlans: {},
@@ -1030,6 +1036,24 @@ export const useStore = create<AppState>((set, get) => ({
     }
     set({ pendingPreflight: null })
   },
+  /**
+   * v2.8.0: answer a mid-run question. The run is already awaiting this answer, so
+   * success resumes the *same* run — no new message, no new run, same sandbox.
+   */
+  async respondQuestion(answer) {
+    const pending = get().pendingQuestion
+    if (!pending) return
+    try {
+      await window.api.agent.respondQuestion(pending.id, answer)
+    } catch (error) {
+      get().pushToast(
+        'error',
+        `${i18n.t('toast.actionFailed')} ${error instanceof Error ? error.message : String(error)}`
+      )
+      return
+    }
+    set({ pendingQuestion: null })
+  },
   stopPlan() {
     set({ activePlan: null })
     void window.api.agent.stopPlan()
@@ -1293,6 +1317,7 @@ export const useStore = create<AppState>((set, get) => ({
           pendingApproval: null,
           pendingPlan: null,
           pendingPreflight: null,
+          pendingQuestion: null,
           activePlan: null,
           taskPlan: null,
           taskPaused: false,
@@ -1310,6 +1335,12 @@ export const useStore = create<AppState>((set, get) => ({
         break
       case 'plan:request':
         set({ pendingPlan: event.request })
+        break
+      case 'question:request':
+        set({ pendingQuestion: event.request })
+        break
+      case 'question:resolved':
+        if (get().pendingQuestion?.id === event.id) set({ pendingQuestion: null })
         break
       case 'preflight:request':
         set({ pendingPreflight: event.request })

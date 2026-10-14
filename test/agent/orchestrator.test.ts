@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -453,8 +453,7 @@ describe('AgentOrchestrator context and sessions (Stage 5)', () => {
     await manager.dispose()
   })
 
-  it('stops after consecutive steps whose actions all fail', async () => {
-    const manager = createLocalManager(base)
+  it('stops after consecutive steps whose actions all fail', async () => {    const manager = createLocalManager(base)
     const failing = (): ReturnType<typeof toolCall> =>
       toolCall('run_command', { command: 'exit 1' })
     const adapter = new ScriptedAdapter('deepseek', [
@@ -475,6 +474,94 @@ describe('AgentOrchestrator context and sessions (Stage 5)', () => {
     expect(result.stop?.reason).toBe('failure_streak')
     expect(result.warnings.some((w) => w.kind === 'failure_streak')).toBe(true)
     await manager.dispose()
+  })
+
+  /**
+   * v2.8.0 — "the assistant should ask me questions on the spot and keep going, not stop
+   * completely." Before this, the model's only way to ask was to end the turn with no
+   * tool calls, which finished the run: the answer arrived as a brand-new run with a
+   * fresh step budget and a destroyed sandbox.
+   */
+  describe('ask_user (v2.8.0)', () => {
+    it('pauses for the answer and continues the SAME run', async () => {
+      const manager = createLocalManager(base)
+      const adapter = new ScriptedAdapter('deepseek', [
+        { toolCalls: [toolCall('ask_user', { question: 'Which file?', options: ['a.ts'] })] },
+        { content: 'used a.ts' }
+      ])
+      const seen: { prompt: string; options?: string[] }[] = []
+      const gate = vi.fn(async (question: { prompt: string; options?: string[] }) => {
+        seen.push(question)
+        return 'a.ts'
+      })
+      const orchestrator = new AgentOrchestrator({
+        sandbox: manager,
+        providers: [entry(adapter)],
+        questionGate: gate
+      })
+
+      const result = await orchestrator.run('do the thing')
+
+      expect(gate).toHaveBeenCalledTimes(1)
+      expect(seen[0]).toEqual({ prompt: 'Which file?', options: ['a.ts'] })
+
+      // The answer reached the model as the tool's result on the very next call, and
+      // the run ended normally rather than as `needs_input`.
+      const secondCall = JSON.stringify(adapter.calls[1]?.messages ?? [])
+      expect(secondCall).toContain('a.ts')
+      expect(secondCall).toContain('ask_user')
+      expect(result.status).toBe('completed')
+      expect(result.steps).toHaveLength(2)
+      await manager.dispose()
+    })
+
+    it('tells the model to use its own judgement when nobody answers', async () => {
+      const manager = createLocalManager(base)
+      const adapter = new ScriptedAdapter('deepseek', [
+        { toolCalls: [toolCall('ask_user', { question: 'Which file?' })] },
+        { content: 'assumed b.ts' }
+      ])
+      const orchestrator = new AgentOrchestrator({
+        sandbox: manager,
+        providers: [entry(adapter)],
+        questionGate: async () => null
+      })
+
+      const result = await orchestrator.run('do the thing')
+
+      expect(JSON.stringify(adapter.calls[1]?.messages ?? [])).toContain('did not answer')
+      expect(result.status).toBe('completed')
+      await manager.dispose()
+    })
+
+    it('does not offer ask_user when no gate is wired', async () => {
+      const manager = createLocalManager(base)
+      const adapter = new ScriptedAdapter('deepseek', [{ content: 'done' }])
+      const orchestrator = new AgentOrchestrator({ sandbox: manager, providers: [entry(adapter)] })
+
+      await orchestrator.run('do the thing')
+
+      const offered = (adapter.calls[0]?.tools ?? []).map((tool) => tool.name)
+      expect(offered).not.toContain('ask_user')
+      await manager.dispose()
+    })
+
+    it('offers ask_user alongside the sandbox tools when a gate is wired', async () => {
+      const manager = createLocalManager(base)
+      const adapter = new ScriptedAdapter('deepseek', [{ content: 'done' }])
+      const orchestrator = new AgentOrchestrator({
+        sandbox: manager,
+        providers: [entry(adapter)],
+        questionGate: async () => 'x'
+      })
+
+      await orchestrator.run('do the thing')
+
+      const offered = (adapter.calls[0]?.tools ?? []).map((tool) => tool.name)
+      expect(offered).toContain('ask_user')
+      expect(offered).toContain('read_file')
+      await manager.dispose()
+    })
   })
 
   it('stops a run that exceeds its turn time budget', async () => {

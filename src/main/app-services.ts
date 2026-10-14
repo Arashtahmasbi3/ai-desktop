@@ -18,6 +18,7 @@ import { AgentService } from './agent-service'
 import { ApprovalBroker } from './approval-broker'
 import { PlanBroker } from './plan-broker'
 import { PreflightBroker } from './preflight-broker'
+import { QuestionBroker } from './question-broker'
 import { SessionProfileService } from './session-profile-service'
 import { FileService } from './file-service'
 import { ChatStore } from './chat-store'
@@ -93,6 +94,8 @@ export class AppServices {
   readonly approvals: ApprovalBroker
   readonly plans: PlanBroker
   readonly preflights: PreflightBroker
+  /** v2.8.0: mid-run questions from the model. */
+  readonly questions: QuestionBroker
   readonly approvedCommands: ApprovedCommands
   /** Run -> project binding for patch isolation (v2.5, P0-1). */
   readonly runs = new RunStore()
@@ -152,6 +155,12 @@ export class AppServices {
     this.preflights = new PreflightBroker({
       emit: (event: AgentEvent) => this.emit('agent:event', event)
     })
+    // v2.8.0: the model can ask the user a question mid-run and continue. Unlike the
+    // gates above this is not fail-closed — an unanswered question resolves `null` and
+    // the run carries on with the model's own judgement.
+    this.questions = new QuestionBroker({
+      emit: (event: AgentEvent) => this.emit('agent:event', event)
+    })
     this.sessionProfile = new SessionProfileService(this.persistence, {
       onChanged: (state) => this.emit('session:changed', state)
     })
@@ -185,6 +194,10 @@ export class AppServices {
           ...(await this.approvalContext())
         }),
       cancelPreflights: () => this.preflights.cancelAll(),
+      // v2.8.0: mid-run questions. Not fail-closed — an unanswered question returns
+      // null and the agent proceeds on its own judgement instead of hanging.
+      requestQuestion: (runId, question) => this.questions.ask(runId, question),
+      cancelQuestions: () => this.questions.cancelAll(),
       approvedCommands: this.approvedCommands,
       files: this.files,
       runStore: this.runs,

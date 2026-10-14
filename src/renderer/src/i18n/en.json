@@ -243,7 +243,11 @@
     "toolNoRetry": "No automatic retry",
     "liveStarting": "Starting {{tool}}…",
     "activitySummary": "Ran {{commands}} commands, read {{files}} files, edited {{edits}} files",
-    "activitySummaryEmpty": "No tool activity yet"
+    "activitySummaryEmpty": "No tool activity yet",
+    "questionPlaceholder": "Type your answer…",
+    "questionSend": "Answer",
+    "questionSkip": "You decide",
+    "questionSkipHint": "Continue without an answer — the agent will use its own judgement"
   },
   "vpsSelector": {
     "label": "VPS",

@@ -35,6 +35,7 @@ import type { DiagnosticPolicy } from '@core/remote/diagnostic-policy'
 import { createReadScopePolicy, mergeReadPolicies } from '@core/remote/diagnostic-policy'
 import { preflight, preflightActionFor, type PreflightResult, type PreflightTier } from '@core/agent/preflight'
 import { extractPreflightReason } from '@core/agent/preflight-override'
+import type { AgentQuestion } from '@core/agent/question'
 import type { PreflightChoice, PreflightPromptTier } from '@shared/preflight'
 import { buildWorkspaceSystemHint } from '@core/agent/workspace-prompt'
 import type { RemoteWorkspaceInfo } from '@shared/workspace-info'
@@ -387,6 +388,14 @@ export interface AgentServiceOptions {
   ) => Promise<PreflightChoice>
   /** Cancel any outstanding preflight requests (e.g. the user aborted). */
   cancelPreflights?: () => void
+  /**
+   * v2.8.0: ask the user a question mid-run and wait for the answer. Resolves `null`
+   * when nobody answers, so the run continues on the model's own judgement. Absent
+   * means `ask_user` is never offered to the model.
+   */
+  requestQuestion?: (runId: string, question: AgentQuestion) => Promise<string | null>
+  /** Answer any outstanding question as unanswered (e.g. the user aborted). */
+  cancelQuestions?: () => void
   /** Learned approvals that suppress future prompts (Sprint v2.3, B.3). */
   approvedCommands?: ApprovedCommands
   /** Optional: enables chat review of agent edits (apply/reject). */
@@ -474,6 +483,8 @@ export class AgentService {
     context: { attempt: number }
   ) => Promise<PreflightChoice>
   private readonly cancelPreflights?: () => void
+  private readonly requestQuestion?: (runId: string, question: AgentQuestion) => Promise<string | null>
+  private readonly cancelQuestions?: () => void
   private readonly approvedCommands?: ApprovedCommands
   private readonly files?: ProjectFiles
   private readonly runStore: RunStore
@@ -510,6 +521,8 @@ export class AgentService {
     this.requestPlan = options.requestPlan
     this.cancelPlans = options.cancelPlans
     this.requestPreflight = options.requestPreflight
+    this.requestQuestion = options.requestQuestion
+    this.cancelQuestions = options.cancelQuestions
     this.cancelPreflights = options.cancelPreflights
     if (options.approvedCommands) this.approvedCommands = options.approvedCommands
     if (options.files) this.files = options.files
@@ -1004,6 +1017,14 @@ export class AgentService {
       ...(planGate ? { planGate, planApproval: approvalMode } : {}),
       ...(preflightGate ? { preflightGate } : {}),
       ...(preflightOverride ? { preflightOverride } : {}),
+      // v2.8.0: let the model ask a question and keep going. Wired only when a broker
+      // exists, so a headless caller never advertises a tool nobody can answer.
+      ...(this.requestQuestion
+        ? {
+            questionGate: (question: AgentQuestion, context: { runId: string; step: number }) =>
+              this.requestQuestion!(context.runId, question)
+          }
+        : {}),
       // v2.5.3: report the live diagnostic posture so the system prompt matches
       // the containment rules the remote tools will actually apply this run.
       diagnosticMode: () => Boolean(this.getDiagnosticPolicy?.()),
@@ -1078,6 +1099,9 @@ export class AgentService {
     this.cancelApprovals?.()
     this.cancelPlans?.()
     this.cancelPreflights?.()
+    // v2.8.0: an aborted run must not leave the agent waiting on an answer nobody
+    // will give — the outstanding questions resolve as unanswered.
+    this.cancelQuestions?.()
   }
   /** Root-scoped file IO for the run store, or undefined when files are disabled. */
   private fileIO(): RunFileIO | undefined {

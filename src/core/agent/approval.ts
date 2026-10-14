@@ -26,7 +26,10 @@ const READ_TOOLS = new Set([
   'remote_grep',
   'remote_git_status',
   'diagnose_crash',
-  'worktree_list'
+  'worktree_list',
+  // v2.8.0: asking the user a question touches nothing, so it must never raise an
+  // approval prompt — the question *is* the interaction.
+  'ask_user'
 ])
 
 const SHELL_TOOLS = new Set(['run_command', 'remote_shell'])

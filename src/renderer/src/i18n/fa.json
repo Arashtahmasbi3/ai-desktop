@@ -243,7 +243,11 @@
     "toolNoRetry": "تلاش مجدد خودکار انجام نشد",
     "liveStarting": "شروع {{tool}}…",
     "activitySummary": "{{commands}} دستور اجرا شد، {{files}} فایل خوانده شد، {{edits}} فایل تغییر کرد",
-    "activitySummaryEmpty": "هنوز فعالیتی ثبت نشده"
+    "activitySummaryEmpty": "هنوز فعالیتی ثبت نشده",
+    "questionPlaceholder": "پاسخ خود را بنویسید…",
+    "questionSend": "پاسخ",
+    "questionSkip": "خودت تصمیم بگیر",
+    "questionSkipHint": "بدون پاسخ ادامه بده — خودش با تشخیص خودش پیش می‌رود"
   },
   "vpsSelector": {
     "label": "VPS",

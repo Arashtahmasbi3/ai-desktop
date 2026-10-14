@@ -258,6 +258,20 @@ export interface PreflightNotice {
   at: number
 }
 
+/**
+ * A question the agent asks mid-run (v2.8.0). Answering it resumes the *same* run, so
+ * this is not a decision gate like approval/plan/preflight — the run is not otherwise
+ * blocked, it is waiting on the answer.
+ */
+export interface AgentQuestionView {
+  id: string
+  runId: string
+  prompt: string
+  options?: string[]
+  /** After this the run continues with `null` (no answer) instead of hanging. */
+  timeoutMs: number
+}
+
 export type AgentEvent =
   | { type: 'run:start'; runId: string; task: string; at: number }
   | { type: 'tool:result'; runId: string; result: ToolResultView; at: number }
@@ -287,6 +301,8 @@ export type AgentEvent =
    * `preflight:resolved` already worked this way.
    */
   | { type: 'approval:resolved'; id: string; approved: boolean; at: number }
+  | { type: 'question:request'; request: AgentQuestionView; at: number }
+  | { type: 'question:resolved'; id: string; answered: boolean; at: number }
   | { type: 'approval:suggestion'; tool: string; count: number }
   | { type: 'plan:request'; request: PlanRequest }
   | { type: 'plan:resolved'; id: string; decision: PlanDecision; at: number }

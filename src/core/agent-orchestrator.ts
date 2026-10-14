@@ -70,6 +70,7 @@ import {
 import type { PreflightChoice } from '@shared/preflight'
 import { PREFLIGHT_RETRY_DELAY_MS } from '@shared/preflight'
 import { verifySuccess, type ToolCallRecord } from './agent/success-verifier'
+import { ASK_USER_TOOL, formatQuestionAnswer, parseQuestion, type AgentQuestion } from './agent/question'
 import { buildTraceDecision } from './agent/trace-decision'
 
 /** A file that an agent `write_file` action changed during a run. */
@@ -185,6 +186,14 @@ export interface AgentOrchestratorOptions {
   ) => Promise<PreflightChoice>
   /** Delay before a critical retry re-runs the check (default 5s). */
   preflightRetryDelayMs?: number
+  /**
+   * Let the model ask the user a question mid-run (v2.8.0). Consulted when the model
+   * calls `ask_user`; the returned answer is appended as that tool's result and the
+   * same run continues — same sandbox, same step budget. `null` means nobody answered,
+   * and the model is told to proceed on its own judgement. Absent means `ask_user` is
+   * never offered to the model at all.
+   */
+  questionGate?: (question: AgentQuestion, context: { runId: string; step: number }) => Promise<string | null>
   /**
    * Enforcement (v2.4, A.3). When true, a final answer that claims success is only
    * accepted if a verification-shaped tool call (test/build/health) recently passed.
@@ -550,6 +559,11 @@ export class AgentOrchestrator {
     context: { attempt: number }
   ) => Promise<PreflightChoice>
   private readonly preflightRetryDelayMs: number
+  /** v2.8.0: mid-run questions. Absent means `ask_user` is not offered. */
+  private readonly questionGate?: (
+    question: AgentQuestion,
+    context: { runId: string; step: number }
+  ) => Promise<string | null>
   private readonly enforceSuccessVerification: boolean
   private readonly diagnosticMode?: () => boolean
   private readonly remoteContext?: RemotePromptContext
@@ -599,6 +613,7 @@ export class AgentOrchestrator {
     this.onToolResult = options.onToolResult
     this.preflightGate = options.preflightGate
     this.preflightOverride = options.preflightOverride
+    this.questionGate = options.questionGate
     this.preflightRetryDelayMs = options.preflightRetryDelayMs ?? PREFLIGHT_RETRY_DELAY_MS
     this.enforceSuccessVerification = options.enforceSuccessVerification ?? false
     this.diagnosticMode = options.diagnosticMode
@@ -676,7 +691,17 @@ export class AgentOrchestrator {
 
     const executor = this.buildExecutor(sandboxId)
     // Plan Mode exposes no tools so the model can only describe what it would do.
-    const tools = this.planMode ? [] : this.tools
+    //
+    // v2.8.0: `ask_user` is offered only when a question gate is wired, and it is
+    // handled by this loop rather than by the sandbox executor. It is also available
+    // in Plan Mode, where asking is most useful ("which of these should I plan for?").
+    const tools = this.planMode
+      ? this.questionGate
+        ? [ASK_USER_TOOL]
+        : []
+      : this.questionGate
+        ? [...this.tools, ASK_USER_TOOL]
+        : this.tools
     // Per-run state so sequential or concurrent `run()` calls never share loop state.
     const loopDetector = new LoopDetector(this.loopPolicy, {
       findAlternative: (toolName, args, error) => findAlternatives(toolName, args, error)
@@ -945,6 +970,46 @@ export class AgentOrchestrator {
           }
           actions[actionIndex] = routed.action
           const action = routed.action
+
+          /*
+           * v2.8.0: the model can ask the user a question without ending the run.
+           *
+           * Handled here, before the loop guard and before the sandbox executor: a
+           * question is not a tool the sandbox runs, and it must not be blocked by the
+           * repeated-call guard (asking twice is normal). Awaiting the answer keeps the
+           * same sandbox, context and step budget alive — before this, the only way to
+           * ask was to end the turn with no tool calls, so the user's reply started a
+           * brand-new run instead of resuming the work.
+           */
+          if (action.name === 'ask_user' && this.questionGate) {
+            const question = parseQuestion(action.arguments)
+            const answer = question
+              ? await this.questionGate(question, { runId, step: index })
+              : null
+            const content = formatQuestionAnswer(answer)
+            this.log('info', 'agent.question', runId, {
+              step: index,
+              answered: answer !== null
+            })
+            const asked: AgentToolResult = {
+              actionId: action.id,
+              name: action.name,
+              ok: true,
+              output: content,
+              attempts: 1,
+              durationMs: 0
+            }
+            observations.push(asked)
+            context.appendToolResult({
+              toolCallId: action.id,
+              name: action.name,
+              content
+            })
+            // Waiting on a human is not a stall, and a question repeated across steps
+            // is not a loop: give the run its budget back.
+            loopDetector.markProgress()
+            continue
+          }
 
           // Fuzzy loop guard: catch the same tool name repeated even when its
           // arguments change every call (e.g. remote_shell with new commands).

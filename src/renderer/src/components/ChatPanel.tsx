@@ -26,6 +26,7 @@ import LoopStopCard from './LoopStopCard'
 import ApprovalDialog from './ApprovalDialog'
 import PreflightOverrideDialog from './PreflightOverrideDialog'
 import PlanCard from './PlanCard'
+import QuestionCard from './QuestionCard'
 import TaskTracker from './TaskTracker'
 import ExecutionBar from './ExecutionBar'
 import ProgressTimeline from './ProgressTimeline'
@@ -583,6 +584,8 @@ export default function ChatPanel(): JSX.Element {
       <TaskTracker />
       <PlanCard />
       <ApprovalDialog />
+      {/* v2.8.0: the agent asks and keeps going; answering resumes the same run. */}
+      <QuestionCard />
       <PreflightOverrideDialog />
       {contextCard ? (
         <ContextPreviewCard
