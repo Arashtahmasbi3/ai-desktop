@@ -61,6 +61,34 @@ async function persisted(): Promise<Goal[]> {
   return store.list(PROJECT)
 }
 
+/**
+ * Poll the real store until `check` passes.
+ *
+ * v2.8.0: this file talks to a **real** `GoalStore` over a real temp directory, and
+ * every write goes through `writeFileAtomic` — unique temp file, a retried rename with
+ * backoff for the Windows sharing violation, and a per-target promise chain. Under a
+ * full parallel suite the disk is busy enough that the default 1s `waitFor` window
+ * occasionally expired, which is what made "marks a goal achieved and deletes it" flake
+ * (it passed in isolation, and 3 of 4 full runs). The wait is the test's, not the app's,
+ * so it gets a budget that reflects real I/O instead of being loosened into vagueness:
+ * it still fails if the write never lands.
+ */
+async function waitForPersisted(
+  check: (goals: Goal[]) => void,
+  description: string
+): Promise<void> {
+  await waitFor(
+    async () => {
+      const goals = await persisted()
+      // A bare `goals[0].status` would throw a TypeError on an empty list, which reads
+      // as a mystery failure rather than "the write has not landed yet".
+      expect(goals, description).toBeDefined()
+      check(goals)
+    },
+    { timeout: 10_000, interval: 25 }
+  )
+}
+
 beforeAll(async () => {
   await i18n.changeLanguage('en')
 })
@@ -114,7 +142,9 @@ describe('GoalPanel (v2.6.2 T4.4)', () => {
       kind: 'resolved',
       goalId: goals[0].id
     })
-    expect(screen.getByText('0/2')).toBeDefined()
+    // Same reasoning as the achieved case below: the previous `await` was a store
+    // read, so give React a chance to commit before querying the DOM.
+    expect(await screen.findByText('0/2')).toBeDefined()
   })
 
   it('ticks a criterion and updates progress from the persisted goal', async () => {
@@ -156,8 +186,19 @@ describe('GoalPanel (v2.6.2 T4.4)', () => {
         goalId: goalB?.id
       })
     )
+
+    /*
+     * Re-query the card instead of reusing the node captured above: when the panel
+     * re-renders after the pin, React can replace that `<li>`, and a detached node
+     * makes `within(...)` fail intermittently. Waiting for the re-render here also
+     * makes the negative assertion below meaningful — otherwise it could pass simply
+     * because nothing had been committed yet.
+     */
+    await waitFor(() => {
+      const card = screen.getByText('Goal B').closest('li')
+      expect(within(card as HTMLElement).getByText('next run')).toBeDefined()
+    })
     expect(screen.queryByText(/More than one goal is active/)).toBeNull()
-    expect(within(cardB as HTMLElement).getByText('next run')).toBeDefined()
   })
 
   it('marks a goal achieved and deletes it', async () => {
@@ -166,17 +207,24 @@ describe('GoalPanel (v2.6.2 T4.4)', () => {
     await addGoal('Goal A', 'a1')
 
     fireEvent.click(screen.getByRole('button', { name: 'Mark achieved' }))
-    await waitFor(async () => {
-      const [goal] = await persisted()
-      expect(goal.status).toBe('achieved')
-    })
-    expect(screen.getByText('achieved')).toBeDefined()
+    await waitForPersisted((goals) => {
+      expect(goals[0]?.status).toBe('achieved')
+    }, 'the achieved status reaches disk')
+    // Render, don't peek: `waitForPersisted` waits on the *file*, which can land
+    // before React commits the store-driven re-render. A bare `getByText` here raced
+    // that commit and was the actual cause of this test flaking under load (the
+    // `Boom`/"build failed" noise in the log is the ui-hardening ErrorBoundary test,
+    // not this one).
+    expect(await screen.findByText('achieved')).toBeDefined()
 
     // U-4: deleting a goal (and its run links) now asks for confirmation.
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
     fireEvent.click(screen.getByRole('button', { name: 'Delete goal' }))
     expect(confirm).toHaveBeenCalled()
-    await waitFor(async () => expect(await persisted()).toHaveLength(0))
+    await waitForPersisted(
+      (goals) => expect(goals).toHaveLength(0),
+      'the deletion reaches disk'
+    )
     expect(await screen.findByText('No goals yet')).toBeDefined()
 
     // A declined confirmation keeps the goal.
