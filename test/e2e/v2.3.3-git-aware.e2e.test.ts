@@ -67,15 +67,21 @@ describe('D.1 git-aware integration', () => {
     expect(executed.some((c) => c.includes('git commit'))).toBe(true)
   })
 
-  it('4. after git fails twice the loop switches to ls', async () => {
+  it('4. a git call that failed twice is refused, and another command still runs', async () => {
     const detector = new LoopDetector()
-    // Two failed git attempts, as the orchestrator would observe them.
+    // Two failed git attempts, as the orchestrator would observe them — note the
+    // same arguments on `afterToolCall` as on `beforeToolCall`, which is what the
+    // orchestrator passes (v2.8.0 keys the failure on the call, not the tool).
     for (let i = 0; i < 2; i += 1) {
       detector.beforeToolCall('remote_shell', { command: 'git status' })
-      detector.afterToolCall('remote_shell', { ok: false })
+      detector.afterToolCall('remote_shell', { ok: false }, { command: 'git status' })
     }
-    expect(detector.beforeToolCall('remote_shell', { command: 'git log' }).action).toBe('block')
-    // The model falls back to listing the directory instead.
+    // The exact failing call is refused, so the model stops retrying it.
+    expect(detector.beforeToolCall('remote_shell', { command: 'git status' }).action).toBe('block')
+    // But a *different* command is not collateral damage: blacklisting the whole
+    // `remote_shell` tool is what wedged runs ("stuck and cannot continue").
+    expect(detector.beforeToolCall('remote_shell', { command: 'git log' }).allow).toBe(true)
+    // The model can also fall back to another tool entirely.
     const ls = detector.beforeToolCall('remote_list_dir', { path: '.' })
     expect(ls.allow).toBe(true)
   })

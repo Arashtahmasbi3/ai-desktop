@@ -1155,6 +1155,11 @@ export class AgentOrchestrator {
           (result, index) =>
             result.ok && !attemptedBefore.has(actions[index]?.signature ?? '')
         )
+        // Every `!ok` observation counts, including a call the loop guard refused:
+        // a step whose only action was refused achieved nothing, so it belongs in the
+        // failure streak. (Leaving refusals out let a run spiral on refused calls
+        // with nothing to bound it — the per-call block is lifted by `markProgress`,
+        // so it is no longer permanent, which was the real wedge.)
         const failures = observations.filter((result) => !result.ok).length
         const reasoningSignature = assistantText ? assistantText.trim().slice(0, 200) : undefined
         const reflection = this.reflect(actions, observations, productive)
@@ -1245,6 +1250,19 @@ export class AgentOrchestrator {
           })
         }
       }
+    }
+
+    // v2.8.0: `max_steps` used to be a silent dead end. The loop simply ran out of
+    // iterations, `status` stayed 'max_steps' with `message: null` and no stop info,
+    // so `run:end` carried nothing to show: no answer, no message, no loop card —
+    // the chat just went idle and the user was left wondering whether it was still
+    // working. Give it the same voice as every other stop.
+    if (status === 'max_steps' && !stopInfo) {
+      stopInfo = this.buildStopInfo('no_progress', steps)
+      message =
+        `Stopped after the ${this.maxSteps}-step budget without finishing. ` +
+        'Tell me how to continue, or raise the step budget.'
+      this.log('warn', 'loop.max_steps', runId, { steps: steps.length, maxSteps: this.maxSteps })
     }
 
     const result = this.finish(

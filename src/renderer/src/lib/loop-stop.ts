@@ -59,7 +59,12 @@ export function buildLoopStopModel(stop: LoopStopInfo): LoopStopModel {
     reason: stop.reason,
     hintKey: HINT_KEY[stop.reason] ?? 'chat.loopStopHintNoProgress',
     emphasis: EMPHASIS[stop.reason] ?? 'correct',
-    allowContinue: stop.reason !== 'failure_streak',
+    // v2.8.0: Continue is offered for every stop reason. `failure_streak` used to be
+    // excluded, and it was both the most common stop and the one whose only enabled
+    // action was... nothing: the card's primary button was disabled and the user had
+    // to work out that typing a message was the way on. Continue starts a fresh run
+    // with the conversation's context, which is exactly the escape the user needs.
+    allowContinue: true,
     ...(lastAction ? { lastAction } : {}),
     ...(lastCommand ? { lastCommand } : {}),
     ...(serverId ? { serverId } : {}),

@@ -123,6 +123,52 @@ describe('LoopDetector', () => {
     expect(result.stop).toBe(false)
   })
 
+  it('a productive step with one failing action does NOT extend the streak (v2.8.0)', () => {
+    // The regression behind "sometimes it still gets stuck in a loop and cannot
+    // continue": `failures` counts every `!ok` observation, so red test → fix → red
+    // test → fix scored as three consecutive failure steps and killed the run. The
+    // policy's own doc says "steps whose actions ALL failed"; ordinary debugging
+    // (and TDD) must not be mistaken for a stuck run.
+    const detector = new LoopDetector({
+      repeatedActionThreshold: 100,
+      noProgressThreshold: 100,
+      failureThreshold: 3
+    })
+
+    let stopped = false
+    for (let step = 0; step < 6; step += 1) {
+      // Each step writes a file successfully and then sees a red command. The
+      // commands differ per step on purpose: repeating one identical command IS a
+      // loop and is caught by the repeat detector, which is not what this covers.
+      const result = detector.observe({
+        signatures: [`write_file:{"path":"f${step}"}`, `run_command:{"command":"step ${step}"}`],
+        productive: true,
+        failures: 1
+      })
+      stopped = stopped || result.stop
+    }
+
+    expect(stopped).toBe(false)
+    expect(detector.noProgressSteps).toBe(0)
+  })
+
+  it('still stops when every action in the step failed', () => {
+    const detector = new LoopDetector({
+      repeatedActionThreshold: 100,
+      noProgressThreshold: 100,
+      failureThreshold: 3
+    })
+
+    const first = detector.observe({ signatures: ['a'], productive: false, failures: 1 })
+    const second = detector.observe({ signatures: ['b'], productive: false, failures: 1 })
+    const third = detector.observe({ signatures: ['c'], productive: false, failures: 1 })
+
+    expect(first.stop).toBe(false)
+    expect(second.stop).toBe(false)
+    expect(third.stop).toBe(true)
+    expect(third.stopReason).toBe('failure_streak')
+  })
+
   it('stops when the same reasoning repeats without a new action', () => {
     const detector = new LoopDetector({
       repeatedActionThreshold: 100,

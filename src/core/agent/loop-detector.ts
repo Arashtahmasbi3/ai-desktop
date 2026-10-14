@@ -298,9 +298,15 @@ export class LoopDetector {
     return [...this.recentCalls]
   }
 
-  /** Tools taken out of rotation after repeated failures (A.3). */
+  /**
+   * Tools taken out of rotation after repeated failures (A.3).
+   *
+   * v2.8.0: the block is per call, so this reports the tool names of the blocked
+   * calls (the call hash is `${toolName}:${arguments}`) rather than a tool that is
+   * switched off entirely.
+   */
   get blockedToolNames(): string[] {
-    return [...this.blockedTools]
+    return [...new Set([...this.blockedTools].map((callKey) => callKey.split(':')[0] ?? callKey))]
   }
 
   /** Paths policy refused this run, retries of which are now skipped (Fix 5). */
@@ -350,10 +356,10 @@ export class LoopDetector {
     const alternative = this.alternativeFor(toolName, args)
     if (alternative && !this.redirectedCallKeys.has(callKey)) {
       this.redirectedCallKeys.add(callKey)
-      // The alternative may reuse the same tool with a different argument, so
-      // lift the tool's failure block for this one attempt.
-      this.blockedTools.delete(toolName)
-      this.toolFailureCount.delete(toolName)
+      // The alternative may reuse the same tool with different arguments, so lift
+      // this call's failure block for the retry (v2.8.0: per call, not per tool).
+      this.blockedTools.delete(callKey)
+      this.toolFailureCount.delete(callKey)
       this.toolFailureStreak = 0
       return {
         allow: false,
@@ -460,15 +466,21 @@ export class LoopDetector {
 
     const count = this.recentCallKeys.filter((key) => key === callKey).length
 
-    // A.3: a tool that already failed twice is skipped, not fatal — the model is
-    // told to use an alternative and the run continues.
-    if (this.blockedTools.has(toolName)) {
+    // A.3: a call that already failed twice is skipped, not fatal — the model is
+    // told to try something else and the run continues.
+    //
+    // v2.8.0: keyed on the *call hash*, not the tool name. Two failures of
+    // `run_command` with two different commands used to blacklist `run_command`
+    // for the rest of the run, and because a blocked call never executes it could
+    // never succeed — so the block could never be lifted. The failure is a
+    // property of the call, not of the tool.
+    if (this.blockedTools.has(callKey)) {
       return this.blockedDecision(
         toolName,
         args,
         callKey,
-        `Tool "${toolName}" failed ${blockedThreshold()} times in this session. ` +
-          'Use an alternative tool instead.',
+        `This exact ${toolName} call failed ${blockedThreshold()} times in this session. ` +
+          'Change the arguments or use another tool.',
         count
       )
     }
@@ -568,6 +580,9 @@ export class LoopDetector {
     result: { ok: boolean; blocked?: boolean; error?: string },
     args?: unknown
   ): void {
+    // v2.8.0: failures are tracked per *call* (tool + arguments), not per tool, so a
+    // tool that failed on one command is not blacklisted for every other command.
+    const callKey = computeLoopHash(toolName, args)
     this.recentCalls.push({ toolName, ok: result.ok, at: this.now() })
     if (this.recentCalls.length > GUARD_WINDOW_SIZE) this.recentCalls.shift()
 
@@ -577,9 +592,9 @@ export class LoopDetector {
 
     if (result.ok) {
       this.toolFailureStreak = 0
-      // A success proves the tool works again, so forget its earlier failures.
-      this.toolFailureCount.delete(toolName)
-      this.blockedTools.delete(toolName)
+      // A success proves this call works, so forget its earlier failures.
+      this.toolFailureCount.delete(callKey)
+      this.blockedTools.delete(callKey)
     } else if (result.blocked === true) {
       // A policy refusal is not a broken tool: remember the refused target so the
       // model does not retry it (Fix 5), but do not count it toward the failure
@@ -590,9 +605,9 @@ export class LoopDetector {
       if (command) this.blockedCommands.add(command)
     } else {
       this.toolFailureStreak += 1
-      const failures = (this.toolFailureCount.get(toolName) ?? 0) + 1
-      this.toolFailureCount.set(toolName, failures)
-      if (failures >= blockedThreshold()) this.blockedTools.add(toolName)
+      const failures = (this.toolFailureCount.get(callKey) ?? 0) + 1
+      this.toolFailureCount.set(callKey, failures)
+      if (failures >= blockedThreshold()) this.blockedTools.add(callKey)
       if (this.toolFailureStreak >= FAIL_THRESHOLD) {
         this.guardStopped = true
         this.guardStopReason = 'failure_streak'
@@ -617,6 +632,12 @@ export class LoopDetector {
     this.warnedCallKeys.clear()
     this.guardStopped = false
     this.guardStopReason = undefined
+    // v2.8.0: real progress restores the budget for calls that failed earlier. The
+    // per-call block used to be permanent for the whole run and could never be
+    // lifted (a blocked call never executes, so it can never succeed), which is
+    // what wedged runs that had already started making progress again.
+    this.toolFailureCount.clear()
+    this.blockedTools.clear()
   }
 
   // ---------------------------------------------------------------------------
@@ -679,7 +700,14 @@ export class LoopDetector {
       }
 
       // --- Failure streak -----------------------------------------------------
-      if ((observation.failures ?? 0) > 0) {
+      // A step is only a *failure* step when it made no progress. `failures`
+      // counts every `!ok` observation, so a red test plus a successful edit was
+      // scored as a failure — and red→edit→red→edit→red, which is just ordinary
+      // debugging (or TDD), stopped the run after three steps. The policy's own
+      // doc says "steps whose actions all failed"; this now matches it.
+      if (observation.productive) {
+        this.consecutiveFailures = 0
+      } else if ((observation.failures ?? 0) > 0) {
         this.consecutiveFailures += 1
       } else {
         this.consecutiveFailures = 0

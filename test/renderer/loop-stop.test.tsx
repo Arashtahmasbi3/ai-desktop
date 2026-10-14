@@ -30,9 +30,14 @@ describe('P5 buildLoopStopModel', () => {
     })
   })
 
-  it('2. discourages continuing after a failure streak', () => {
-    expect(buildLoopStopModel(stop({ reason: 'failure_streak' })).allowContinue).toBe(false)
+  it('2. offers Continue for every stop reason, including a failure streak', () => {
+    // v2.8.0: `failure_streak` was the one reason whose primary action was disabled
+    // — and it was also the most common stop, so the card offered nothing the user
+    // could click. Continue starts a fresh run carrying the conversation's context.
+    expect(buildLoopStopModel(stop({ reason: 'failure_streak' })).allowContinue).toBe(true)
     expect(buildLoopStopModel(stop({ reason: 'no_progress' })).allowContinue).toBe(true)
+    expect(buildLoopStopModel(stop({ reason: 'repeated_action' })).allowContinue).toBe(true)
+    expect(buildLoopStopModel(stop({ reason: 'turn_timeout' })).allowContinue).toBe(true)
   })
 
   it('3. extracts the stuck command and VPS host from the last action', () => {
@@ -55,7 +60,7 @@ describe('P5 LoopStopCard context', () => {
     expect(screen.getByText('Continue').closest('button')?.className).not.toContain('ring-2')
   })
 
-  it('5. surfaces the stuck VPS command and disables continue after failures', () => {
+  it('5. surfaces the stuck VPS command and keeps Continue usable after failures', () => {
     render(
       <LoopStopCard
         stop={stop({
@@ -72,6 +77,7 @@ describe('P5 LoopStopCard context', () => {
     expect(screen.getByText('VPS')).toBeDefined()
     expect(screen.getByText(/Several steps failed/)).toBeDefined()
     const continueButton = screen.getByText('Continue').closest('button') as HTMLButtonElement
-    expect(continueButton.disabled).toBe(true)
+    // v2.8.0: it was disabled here, which left the user with no way forward.
+    expect(continueButton.disabled).toBe(false)
   })
 })

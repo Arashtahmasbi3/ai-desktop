@@ -211,22 +211,51 @@ describe('LoopDetector — per-tool-call guard', () => {
 })
 
 /**
- * Sprint v2.3.3 — Task A.3: a tool that fails twice in a session is taken out of
- * rotation so the model tries an alternative instead of retrying it.
+ * Sprint v2.3.3 — Task A.3: a call that fails twice is taken out of rotation so the
+ * model tries something else instead of retrying it.
+ *
+ * v2.8.0: the block is keyed on the *call* (tool + arguments), not the tool. Keying
+ * it on the tool name meant two red commands blacklisted `run_command` for the rest
+ * of the run, and because a blocked call never executes it could never succeed — so
+ * the block could never be lifted and the run wedged. Reported by the user as
+ * "sometimes it still gets stuck in a loop and cannot continue".
  */
-describe('LoopDetector — per-tool failure blocking (A.3)', () => {
-  it('1. blocks a tool after it fails twice', () => {
+describe('LoopDetector — per-call failure blocking (A.3)', () => {
+  it('1. blocks the exact call that failed twice', () => {
     const detector = new LoopDetector()
     detector.beforeToolCall('remote_shell', { command: 'git status' })
-    detector.afterToolCall('remote_shell', { ok: false })
-    detector.beforeToolCall('remote_shell', { command: 'git log' })
-    detector.afterToolCall('remote_shell', { ok: false })
+    detector.afterToolCall('remote_shell', { ok: false }, { command: 'git status' })
+    detector.beforeToolCall('remote_shell', { command: 'git status' })
+    detector.afterToolCall('remote_shell', { ok: false }, { command: 'git status' })
 
     expect(detector.blockedToolNames).toContain('remote_shell')
-    const decision = detector.beforeToolCall('remote_shell', { command: 'git diff' })
+    const decision = detector.beforeToolCall('remote_shell', { command: 'git status' })
     expect(decision.allow).toBe(false)
     expect(decision.action).toBe('block')
-    expect(decision.reason).toContain('alternative')
+    expect(decision.reason).toMatch(/failed 2 times/)
+  })
+
+  it('1b. a DIFFERENT command from the same tool is still allowed', () => {
+    // The regression: two failing commands used to blacklist `remote_shell`
+    // entirely, which is how a normal debugging loop got wedged.
+    const detector = new LoopDetector()
+    detector.afterToolCall('remote_shell', { ok: false }, { command: 'git status' })
+    detector.afterToolCall('remote_shell', { ok: false }, { command: 'git log' })
+
+    const other = detector.beforeToolCall('remote_shell', { command: 'npm run build' })
+    expect(other.allow).toBe(true)
+  })
+
+  it('1c. real progress lifts the block, so a run cannot wedge permanently', () => {
+    const detector = new LoopDetector()
+    detector.afterToolCall('remote_shell', { ok: false }, { command: 'git status' })
+    detector.afterToolCall('remote_shell', { ok: false }, { command: 'git status' })
+    expect(detector.beforeToolCall('remote_shell', { command: 'git status' }).action).toBe('block')
+
+    // The model writes a file successfully — that is progress, and the tool is
+    // usable again. Without this the block was permanent for the whole run.
+    detector.markProgress()
+    expect(detector.beforeToolCall('remote_shell', { command: 'git status' }).allow).toBe(true)
   })
 
   it('2. lets the model fall back to another tool (read_file)', () => {
