@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Plug, PlugZap, Plus, RefreshCw, ShieldAlert, Trash2 } from 'lucide-react'
 import type { AuditEntryView, VpsConnectionState, VpsServerView } from '@shared/vps'
+import { useStore } from '../../store'
+import { vpsStateFor } from '../../lib/vps-state'
 import RemoteFileExplorer from './RemoteFileExplorer'
 import VpsForm from './VpsForm'
 import VpsTerminal from './VpsTerminal'
@@ -27,12 +29,26 @@ export default function VpsPanel(): JSX.Element {
   const [activeId, setActiveId] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [tab, setTab] = useState<Tab>('terminal')
-  const [status, setStatus] = useState<VpsConnectionState>({ status: 'disconnected' })
   const [audit, setAudit] = useState<AuditEntryView[]>([])
   const [error, setError] = useState<string | null>(null)
   const [healthOpen, setHealthOpen] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [connectingId, setConnectingId] = useState<string | null>(null)
+
+  /*
+   * v2.8.0: the connection state of the selected server comes from the store's
+   * per-server data, not from a local single slot.
+   *
+   * This panel used to keep one `status` and overwrite it on every `vps:status`
+   * event, so with two servers up it named whichever changed last and every other
+   * row rendered "Connect" again while its socket was still open — the reported
+   * "connect one, the other gets disconnected". No connection was ever dropped.
+   */
+  const vpsStates = useStore((state) => state.vpsStates)
+  const vpsConnected = useStore((state) => state.vpsConnected)
+  const vpsStatus = useStore((state) => state.vpsStatus)
+  const ensureVpsConnected = useStore((state) => state.ensureVpsConnected)
+  const disconnectVps = useStore((state) => state.disconnectVps)
 
   const refresh = useCallback(async (): Promise<void> => {
     // U-12: an in-flight flag, so double-clicking Refresh cannot fire two lists.
@@ -68,8 +84,9 @@ export default function VpsPanel(): JSX.Element {
   useEffect(() => {
     void refresh()
     void refreshAudit()
-    const off = window.api.events.on('vps:status', (next) => {
-      setStatus(next)
+    // The store owns the connection state now; this listener only keeps the audit
+    // trail current while the panel is open.
+    const off = window.api.events.on('vps:status', () => {
       void refreshAudit()
     })
     return off
@@ -82,9 +99,14 @@ export default function VpsPanel(): JSX.Element {
     setActiveId(id)
     setError(null)
     try {
-      const next = await window.api.vps.connect(id)
-      setStatus(next)
-      if (next.status === 'error' && !next.pendingFingerprint) setError(next.error ?? 'Connection failed')
+      // `ensureVpsConnected` deliberately does not move the chat-header selection,
+      // so connecting here cannot yank the user's chosen host.
+      await ensureVpsConnected(id)
+      const state = useStore.getState()
+      const next = vpsStateFor(id, state.vpsStates, state.vpsConnected, state.vpsStatus)
+      if (next.status === 'error' && !next.pendingFingerprint) {
+        setError(next.error ?? 'Connection failed')
+      }
     } catch (cause) {
       setError(text(cause))
     } finally {
@@ -98,7 +120,7 @@ export default function VpsPanel(): JSX.Element {
   }
 
   const disconnect = async (id: string): Promise<void> => {
-    setStatus(await window.api.vps.disconnect(id))
+    await disconnectVps(id)
   }
 
   const remove = async (id: string, name: string): Promise<void> => {
@@ -110,7 +132,8 @@ export default function VpsPanel(): JSX.Element {
     await refresh()
   }
 
-  const connected = status.status === 'connected' && status.serverId === activeId
+  const status = vpsStateFor(activeId, vpsStates, vpsConnected, vpsStatus)
+  const connected = Boolean(activeId) && status.status === 'connected'
 
   return (
     <div className="flex h-full min-h-0 flex-1">
@@ -217,7 +240,7 @@ export default function VpsPanel(): JSX.Element {
                 ) : (
                   <button
                     onClick={() => void connect(activeId)}
-                    className="flex items-center gap-1 rounded bg-accent-solid px-2 py-1 text-xs font-medium text-black"
+                    className="flex items-center gap-1 rounded bg-accent-solid px-2 py-1 text-xs font-medium text-accent-fg"
                   >
                     <PlugZap className="h-3.5 w-3.5" /> Connect
                   </button>

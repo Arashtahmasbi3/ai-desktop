@@ -13,7 +13,9 @@ export default function ProjectsSection(): JSX.Element {
   const addRemoteProject = useStore((state) => state.addRemoteProject)
   const pushToast = useStore((state) => state.pushToast)
   const servers = useStore((state) => state.vpsServers)
-  const vpsStatus = useStore((state) => state.vpsStatus)
+  // v2.8.0: this only needs *a* connected server as a sensible default discovery
+  // target; the connected set is the honest source now that several can be up.
+  const vpsConnectedServers = useStore((state) => state.vpsConnected)
 
   const [projectName, setProjectName] = useState('')
   const [projectPath, setProjectPath] = useState('')
@@ -24,7 +26,7 @@ export default function ProjectsSection(): JSX.Element {
   // v2.3.3 (B.1): offer git setup for a freshly added non-repo remote project.
   const [gitSetupFor, setGitSetupFor] = useState<{ serverId: string; path: string } | null>(null)
 
-  const connectedId = vpsStatus.status === 'connected' ? vpsStatus.serverId : undefined
+  const connectedId = vpsConnectedServers[0]
   const targetVpsId = remoteVpsId || connectedId || ''
 
   const browse = async (): Promise<void> => {

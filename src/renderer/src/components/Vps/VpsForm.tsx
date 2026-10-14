@@ -132,7 +132,7 @@ export default function VpsForm({ onSaved, onClose }: VpsFormProps): JSX.Element
       <button
         type="submit"
         disabled={busy}
-        className="flex items-center justify-center gap-2 rounded-md bg-accent-solid px-3 py-2 text-sm font-medium text-black disabled:opacity-50"
+        className="flex items-center justify-center gap-2 rounded-md bg-accent-solid px-3 py-2 text-sm font-medium text-accent-fg disabled:opacity-50"
       >
         <Plus className="h-4 w-4" />
         {busy ? 'Saving…' : 'Add server'}

@@ -117,9 +117,9 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
   const [projectsOpen, setProjectsOpen] = useState(true)
   const [searchingId, setSearchingId] = useState<string | null>(null)
   const servers = useStore((state) => state.vpsServers)
-  const vpsStatus = useStore((state) => state.vpsStatus)
+  // v2.8.0: the connected *set*, so more than one project can show a live dot.
+  const vpsConnectedServers = useStore((state) => state.vpsConnected)
   const refreshVps = useStore((state) => state.refreshVps)
-  const vpsConnectedId = vpsStatus.status === 'connected' ? (vpsStatus.serverId ?? null) : null
   const [vpsSearch, setVpsSearch] = useState<{
     id: string
     serverId: string
@@ -157,7 +157,9 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
   const projectState = (project: ProjectRecord): DotState => {
     if (project.exists === false) return 'missing'
     if (project.type === 'remote') {
-      return project.vpsId === vpsConnectedId ? 'connected' : 'disconnected'
+      return project.vpsId && vpsConnectedServers.includes(project.vpsId)
+        ? 'connected'
+        : 'disconnected'
     }
     return 'connected'
   }

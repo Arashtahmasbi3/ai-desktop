@@ -94,7 +94,7 @@ export default function RemoteFileExplorer({ serverId }: { serverId: string }): 
           <button
             onClick={() => void save()}
             disabled={busy}
-            className="ml-auto flex items-center gap-1 rounded bg-accent-solid px-2 py-1 text-xs font-medium text-black disabled:opacity-50"
+            className="ml-auto flex items-center gap-1 rounded bg-accent-solid px-2 py-1 text-xs font-medium text-accent-fg disabled:opacity-50"
           >
             <Save className="h-3.5 w-3.5" /> Save
           </button>

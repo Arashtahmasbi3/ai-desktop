@@ -1,10 +1,12 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import {
+  keepAliveIds,
   readLastVpsId,
   remoteVpsIds,
   resolveReconnectId,
   vpsIndicator,
   vpsServerName,
+  vpsStateFor,
   VPS_RECONNECT_KEY
 } from '../../src/renderer/src/lib/vps-state'
 import type { VpsConnectionState, VpsServerView } from '@shared/vps'
@@ -107,6 +109,52 @@ describe('single connection state derivation (Task A.4)', () => {
   })
 })
 
+/**
+ * v2.8.0 — "when I connect three servers, only one stays connected and every connect
+ * drops another". No socket was ever closed: the UI read the single `vpsStatus` slot,
+ * which every `vps:status` event overwrites, so each newly connected server made the
+ * previous one render as disconnected.
+ */
+describe('vpsStateFor (v2.8.0 per-server connection state)', () => {
+  const globalA: VpsConnectionState = { status: 'connected', serverId: 'a' }
+
+  it('reports a server that is connected even when the global slot names another', () => {
+    const states: Record<string, VpsConnectionState> = {
+      a: { status: 'connected', serverId: 'a' },
+      b: { status: 'connected', serverId: 'b' }
+    }
+    // The exact reported case: b connected last, so the slot says b — a must still
+    // read as connected.
+    expect(vpsStateFor('a', states, ['a', 'b'], { status: 'connected', serverId: 'b' }).status).toBe(
+      'connected'
+    )
+    expect(vpsStateFor('b', states, ['a', 'b'], { status: 'connected', serverId: 'b' }).status).toBe(
+      'connected'
+    )
+  })
+
+  it('trusts the connected set over a stale per-server error', () => {
+    const states: Record<string, VpsConnectionState> = {
+      a: { status: 'error', serverId: 'a', error: 'stale' }
+    }
+    expect(vpsStateFor('a', states, ['a'], globalA).status).toBe('connected')
+  })
+
+  it('falls back to the per-server state, then to disconnected for a foreign slot', () => {
+    expect(vpsStateFor('c', { c: { status: 'connecting', serverId: 'c' } }, [], globalA).status).toBe(
+      'connecting'
+    )
+    // The slot is about `a`, so it says nothing about `c`.
+    expect(vpsStateFor('c', {}, [], globalA).status).toBe('disconnected')
+    // An unknown id with the slot naming it is still that server's state.
+    expect(vpsStateFor('a', {}, [], globalA).status).toBe('connected')
+  })
+
+  it('with no active server, falls back to the global slot', () => {
+    expect(vpsStateFor(null, {}, ['a'], globalA).status).toBe('connected')
+  })
+})
+
 describe('remoteVpsIds (v2.6.4 multi-connection)', () => {
   it('collects every remote project server plus an explicit selection, deduped', () => {
     const projects = [
@@ -122,5 +170,32 @@ describe('remoteVpsIds (v2.6.4 multi-connection)', () => {
   it('returns just the explicit selection when there are no remote projects', () => {
     expect(remoteVpsIds([{ type: 'local' }], 'srv-header')).toEqual(['srv-header'])
     expect(remoteVpsIds([], undefined)).toEqual([])
+  })
+})
+
+/**
+ * v2.8.0 — the second half of the multi-VPS report: "the others need reconnecting".
+ * The main process reaps an idle connection after 30 minutes, and the renderer only
+ * sent keep-alives for remote-project hosts and the header selection, so a server
+ * connected by hand in the Servers view was genuinely torn down.
+ */
+describe('keepAliveIds (v2.8.0)', () => {
+  it('includes every connected server, not just the project hosts and the selection', () => {
+    const projects = [{ type: 'remote', vpsId: 'srv-a' }]
+    const ids = keepAliveIds(projects, 'srv-header', ['srv-a', 'srv-manual', 'srv-header'])
+
+    expect(ids).toContain('srv-a')
+    expect(ids).toContain('srv-header')
+    // The one that used to be dropped and reaped.
+    expect(ids).toContain('srv-manual')
+  })
+
+  it('is deduped and tolerates an empty connected set', () => {
+    const projects = [
+      { type: 'remote', vpsId: 'srv-a' },
+      { type: 'remote', vpsId: 'srv-a' }
+    ]
+    expect(keepAliveIds(projects, 'srv-a', ['srv-a'])).toEqual(['srv-a'])
+    expect(keepAliveIds(projects, undefined, [])).toEqual(['srv-a'])
   })
 })

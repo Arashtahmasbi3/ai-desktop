@@ -24,7 +24,7 @@ import Titlebar from './components/Titlebar'
 import WorkspacePanel from './components/WorkspacePanel'
 import ToastHost from './components/ToastHost'
 import { basename, subscribeToEvents, useStore } from './store'
-import { readLastVpsId, remoteVpsIds, resolveReconnectId } from './lib/vps-state'
+import { keepAliveIds, readLastVpsId, remoteVpsIds, resolveReconnectId } from './lib/vps-state'
 import { topmostEscapeTarget } from './lib/escape'
 import { resolveLayout } from './lib/layout'
 
@@ -98,7 +98,11 @@ export default function App(): JSX.Element {
 
     const keepalive = async (): Promise<void> => {
       const { vpsServerId, vpsConnected, settings, ensureVpsConnected } = useStore.getState()
-      for (const id of remoteVpsIds(settings?.projects ?? [], vpsServerId)) {
+      // v2.8.0: keep every connected server alive, not only the remote-project hosts
+      // and the header selection. A server connected by hand in the Servers view got
+      // no keep-alive and was really reaped after 30 minutes — the other half of "the
+      // others need reconnecting".
+      for (const id of keepAliveIds(settings?.projects ?? [], vpsServerId, vpsConnected)) {
         // `ensureVpsConnected` is a no-op when already connected, so this keeps
         // every remote project's host up without touching the selection.
         if (vpsConnected.includes(id)) {

@@ -69,7 +69,7 @@ export default function ChatPanel(): JSX.Element {
   const newSession = useStore((state) => state.newSession)
   const projectMissing = useStore((state) => state.projectMissing)
   const settings = useStore((state) => state.settings)
-  const vpsStatus = useStore((state) => state.vpsStatus)
+  const vpsConnectedServers = useStore((state) => state.vpsConnected)
   const connectVps = useStore((state) => state.connectVps)
   const addProject = useStore((state) => state.addProject)
   const showContextBeforeSend = useStore((state) => state.showContextBeforeSend)
@@ -105,11 +105,13 @@ export default function ChatPanel(): JSX.Element {
   const activeProject = settings?.projects.find(
     (project) => project.id === settings.activeProjectId
   )
+  // v2.8.0: ask the connected *set*, not the single status slot. With two servers
+  // up the slot named whichever changed last, so a remote project whose host was
+  // perfectly connected showed the red "disconnected — Reconnect" banner.
   const vpsConnected = Boolean(
     activeProject?.type === 'remote' &&
       activeProject.vpsId &&
-      vpsStatus.status === 'connected' &&
-      vpsStatus.serverId === activeProject.vpsId
+      vpsConnectedServers.includes(activeProject.vpsId)
   )
   const wsStatus = workspaceStatus({
     project: activeProject

@@ -10,7 +10,9 @@ import { useStore } from '../store'
  */
 export default function GitStatusPill(): JSX.Element | null {
   const settings = useStore((state) => state.settings)
-  const vpsStatus = useStore((state) => state.vpsStatus)
+  // v2.8.0: the connected set, not the single status slot — with two servers up the
+  // slot named whichever changed last and this pill hid for a connected host.
+  const vpsConnectedServers = useStore((state) => state.vpsConnected)
   const [status, setStatus] = useState<RemoteGitStatus | null>(null)
 
   const activeProject = settings?.projects.find(
@@ -19,8 +21,7 @@ export default function GitStatusPill(): JSX.Element | null {
   const connected = Boolean(
     activeProject?.type === 'remote' &&
       activeProject.vpsId &&
-      vpsStatus.status === 'connected' &&
-      vpsStatus.serverId === activeProject.vpsId
+      vpsConnectedServers.includes(activeProject.vpsId)
   )
   const serverId = activeProject?.vpsId
   const path = activeProject?.path
