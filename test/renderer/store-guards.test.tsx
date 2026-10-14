@@ -80,6 +80,37 @@ describe('decision gates wait for main (U-5)', () => {
     expect(useStore.getState().pendingPlan).not.toBeNull()
   })
 
+  /**
+   * v2.8.0: the broker had no `approval:resolved`, so a fail-closed timeout (2 minutes)
+   * denied the action while the modal stayed on screen offering Approve — a button that
+   * could no longer do anything, until `run:end` happened to clear it.
+   */
+  it('closes the approval dialog when main reports it was settled', () => {
+    useStore.setState({ pendingApproval: approval() })
+
+    useStore.getState().applyEvent({
+      type: 'approval:resolved',
+      id: 'ap-1',
+      approved: false,
+      at: 1
+    })
+
+    expect(useStore.getState().pendingApproval).toBeNull()
+  })
+
+  it('ignores a resolution for a different request', () => {
+    useStore.setState({ pendingApproval: approval() })
+
+    useStore.getState().applyEvent({
+      type: 'approval:resolved',
+      id: 'someone-elses-id',
+      approved: true,
+      at: 1
+    })
+
+    expect(useStore.getState().pendingApproval).not.toBeNull()
+  })
+
   it('keeps the preflight dialog open when the reply fails', async () => {
     ;(window as unknown as { api: unknown }).api = {
       agent: { respondPreflight: vi.fn(async () => Promise.reject(new Error('nope'))) }

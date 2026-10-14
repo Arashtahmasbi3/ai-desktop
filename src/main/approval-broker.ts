@@ -125,6 +125,12 @@ export class ApprovalBroker {
       if (this.past.length > this.historyLimit) this.past.length = this.historyLimit
     }
     settle(outcome)
+    // v2.8.0: tell the renderer the dialog is settled, so it disappears the moment the
+    // decision is made — including the fail-closed timeout and an abort, which
+    // previously left a dead Approve button on screen until `run:end`.
+    if (request) {
+      this.emit({ type: 'approval:resolved', id, approved: outcome.approved, at: this.now() })
+    }
     return true
   }
 

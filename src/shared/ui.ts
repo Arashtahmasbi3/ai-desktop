@@ -279,6 +279,14 @@ export type AgentEvent =
     }
   | { type: 'log'; entry: AgentLogEntry }
   | { type: 'approval:request'; request: ApprovalRequest }
+  /**
+   * v2.8.0: emitted when an approval is settled, including the fail-closed timeout.
+   * Without it the dialog stayed on screen after the decision had already been made —
+   * a 2-minute timeout denies the action while the modal still offers Approve, so the
+   * user clicks a button that can no longer do anything. `plan:resolved` and
+   * `preflight:resolved` already worked this way.
+   */
+  | { type: 'approval:resolved'; id: string; approved: boolean; at: number }
   | { type: 'approval:suggestion'; tool: string; count: number }
   | { type: 'plan:request'; request: PlanRequest }
   | { type: 'plan:resolved'; id: string; decision: PlanDecision; at: number }

@@ -111,6 +111,82 @@ describe('ApprovalBroker', () => {
     await expect(promise).resolves.toEqual({ approved: true, remember: 'tool' })
   })
 
+  /**
+   * v2.8.0: the broker settled the promise but told the renderer nothing, so a denied
+   * or timed-out approval left its dialog on screen with a button that could no longer
+   * do anything. `plan:resolved` and `preflight:resolved` already worked this way.
+   */
+  describe('notifies the renderer when an approval is settled (v2.8.0)', () => {
+    it('emits approval:resolved when the user answers', async () => {
+      const events: AgentEvent[] = []
+      const broker = new ApprovalBroker({ emit: (event) => events.push(event), now: () => 42 })
+      const promise = broker.request('run-1', action('run_command', { command: 'npm test' }))
+      const request = events[0]
+      if (request.type !== 'approval:request') throw new Error('unreachable')
+
+      broker.resolve(request.request.id, true)
+      await promise
+
+      const resolved = events.find((event) => event.type === 'approval:resolved')
+      expect(resolved).toEqual({
+        type: 'approval:resolved',
+        id: request.request.id,
+        approved: true,
+        at: 42
+      })
+    })
+
+    it('emits a denial when the answer is no', async () => {
+      const events: AgentEvent[] = []
+      const broker = new ApprovalBroker({ emit: (event) => events.push(event) })
+      const promise = broker.request('run-1', action('run_command', { command: 'rm -rf /' }))
+      const request = events[0]
+      if (request.type !== 'approval:request') throw new Error('unreachable')
+
+      broker.resolve(request.request.id, false)
+      await promise
+
+      expect(events.find((event) => event.type === 'approval:resolved')).toMatchObject({
+        approved: false
+      })
+    })
+
+    it('emits a fail-closed denial when the timeout fires', async () => {
+      const events: AgentEvent[] = []
+      const broker = new ApprovalBroker({ emit: (event) => events.push(event), timeoutMs: 1 })
+      const promise = broker.request('run-1', action('run_command', { command: 'npm test' }))
+      const request = events[0]
+      if (request.type !== 'approval:request') throw new Error('unreachable')
+
+      await promise // resolves denied on its own
+
+      expect(events.find((event) => event.type === 'approval:resolved')).toMatchObject({
+        id: request.request.id,
+        approved: false
+      })
+    })
+
+    it('emits one denial per request when the run is aborted', async () => {
+      const events: AgentEvent[] = []
+      const broker = new ApprovalBroker({ emit: (event) => events.push(event) })
+      broker.request('run-1', action('run_command', { command: 'a' }))
+      broker.request('run-1', action('run_command', { command: 'b' }))
+
+      broker.cancelAll()
+
+      const resolved = events.filter((event) => event.type === 'approval:resolved')
+      expect(resolved).toHaveLength(2)
+      expect(resolved.every((event) => event.approved === false)).toBe(true)
+    })
+
+    it('emits nothing for an unknown id', () => {
+      const events: AgentEvent[] = []
+      const broker = new ApprovalBroker({ emit: (event) => events.push(event) })
+      expect(broker.resolve('approval-999', true)).toBe(false)
+      expect(events).toEqual([])
+    })
+  })
+
   it('records approvals in history, newest first', async () => {
     const events: AgentEvent[] = []
     const broker = new ApprovalBroker({

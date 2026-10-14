@@ -1303,6 +1303,11 @@ export const useStore = create<AppState>((set, get) => ({
       case 'approval:request':
         set({ pendingApproval: event.request })
         break
+      case 'approval:resolved':
+        // v2.8.0: the dialog closes as soon as the decision is made, instead of
+        // lingering with a dead Approve button after a timeout denied the action.
+        if (get().pendingApproval?.id === event.id) set({ pendingApproval: null })
+        break
       case 'plan:request':
         set({ pendingPlan: event.request })
         break
