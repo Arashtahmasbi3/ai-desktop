@@ -60,6 +60,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The status bar claimed "Agent: running" next to "worker: idle".** With no worker report
+  it defaulted to online — an unfounded claim — and with a live worker the two labels still
+  read as a contradiction. Unknown now shows as `Agent: —`, and a live agent service reads
+  `Agent: ready` while the worker's own state says whether anything is actually running.
 - **The theme option labels were raw i18n keys** (`settings.themelight`) instead of
   "Light" / "Dark" / "System" — caught by the new `theme-controls` test.
 - **Contrast:** light `fg-subtle` metadata was 3.25:1 and the dark accent was 4.24:1 on

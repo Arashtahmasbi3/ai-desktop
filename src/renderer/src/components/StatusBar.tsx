@@ -4,8 +4,10 @@ import { nextApprovalMode } from '@shared/approval'
 import { useStore } from '../store'
 import { CONNECTION_TONE_CLASS, useConnectionStatus } from '../lib/connection-status'
 
-function Dot({ ok }: { ok: boolean }): JSX.Element {
-  return <span className={`h-1.5 w-1.5 rounded-full ${ok ? 'bg-success' : 'bg-bg-tertiary'}`} />
+/** `ok: null` renders the neutral "unknown" dot (v2.7.0). */
+function Dot({ ok }: { ok: boolean | null }): JSX.Element {
+  const tone = ok === null ? 'bg-fg-subtle' : ok ? 'bg-success' : 'bg-bg-tertiary'
+  return <span className={`h-1.5 w-1.5 rounded-full ${tone}`} />
 }
 
 export default function StatusBar(): JSX.Element {
@@ -27,7 +29,12 @@ export default function StatusBar(): JSX.Element {
   const approvalMode = useStore((state) => state.settings?.approvalMode ?? 'ask')
   const connection = useConnectionStatus()
 
-  const online = worker?.online ?? true
+  // v2.7.0: `worker` is null until the background worker reports in. Defaulting to
+  // "online" made the bar claim "Agent: running" next to "worker: idle" before
+  // anything had reported — three claims, one of them unfounded. Unknown is now
+  // shown as unknown.
+  const known = worker !== null && worker !== undefined
+  const online = worker?.online ?? false
   const agentAddress = remote?.enabled ? `${remote.host}:${remote.port}` : null
 
   return (
@@ -38,20 +45,26 @@ export default function StatusBar(): JSX.Element {
           {ready ? t('statusBar.ready') : t('common.loading')}
         </span>
         <span
-          className={`flex items-center gap-1 ${online ? 'text-fg-muted' : 'text-danger'}`}
+          className={`flex items-center gap-1 ${!known ? 'text-fg-subtle' : online ? 'text-fg-muted' : 'text-danger'}`}
           title={
-            online
-              ? agentAddress
-                ? t('statusBar.agentTitleRunningRemote', {
-                    state: worker?.state ?? 'online',
-                    address: agentAddress
-                  })
-                : t('statusBar.agentTitleRunning', { state: worker?.state ?? 'online' })
-              : t('statusBar.agentTitleIdle')
+            !known
+              ? t('statusBar.agentTitleUnknown')
+              : online
+                ? agentAddress
+                  ? t('statusBar.agentTitleRunningRemote', {
+                      state: worker?.state ?? 'online',
+                      address: agentAddress
+                    })
+                  : t('statusBar.agentTitleRunning', { state: worker?.state ?? 'online' })
+                : t('statusBar.agentTitleIdle')
           }
         >
-          <Dot ok={online} />
-          {online ? t('statusBar.agentRunning') : t('statusBar.agentIdle')}
+          <Dot ok={known ? online : null} />
+          {!known
+            ? t('statusBar.agentUnknown')
+            : online
+              ? t('statusBar.agentRunning')
+              : t('statusBar.agentIdle')}
         </span>
         <span className="flex items-center gap-1" title={t('statusBar.workerTitle')}>
           <Cpu className="h-3 w-3" />

@@ -38,17 +38,34 @@ beforeEach(() => {
   })
 })
 
+describe('StatusBar agent status — unknown is not "running"', () => {
+  it('says so when no worker status has been reported yet', () => {
+    // v2.7.0: `worker: null` used to default to online, so the bar claimed
+    // "Agent: running" beside "worker: idle" before anything had reported in.
+    useStore.setState({ worker: null })
+    render(<StatusBar />)
+
+    const status = screen.getByText(/Agent: —/)
+    expect(status).toBeTruthy()
+    expect(status.getAttribute('title')).toContain('No agent status')
+    expect(screen.queryByText(/Agent: running/)).toBeNull()
+  })
+})
+
 /** Task 1.3 - clearer remote/agent status in the status bar. */
 describe('Task 1.3 - StatusBar agent status', () => {
-  it('1. worker.online → "Agent: running" with the worker address tooltip', () => {
+  it('1. worker.online → "Agent: ready" with the worker address tooltip', () => {
     useStore.setState({
       worker: worker(true),
       remote: { enabled: true, host: '127.0.0.1', port: 4321, clients: 0 }
     })
     render(<StatusBar />)
-    const status = screen.getByText(/Agent: running/)
+    // v2.7.0: "Agent: running" sat beside "worker: idle" and read as a
+    // contradiction; the service being up is "ready", the worker state says
+    // whether anything is actually running.
+    const status = screen.getByText(/Agent: ready/)
     expect(status).toBeTruthy()
-    expect(status.getAttribute('title')).toContain('Agent running')
+    expect(status.getAttribute('title')).toContain('Agent service is up')
     expect(status.getAttribute('title')).toContain('127.0.0.1:4321')
     // The remote toggle is kept alongside the new agent indicator.
     expect(screen.getByText(/remote:/)).toBeTruthy()

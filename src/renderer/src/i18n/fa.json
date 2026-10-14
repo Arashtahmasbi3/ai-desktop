@@ -757,10 +757,10 @@
   },
   "statusBar": {
     "ready": "آماده",
-    "agentRunning": "عامل: در حال اجرا",
+    "agentRunning": "ایجنت: آماده",
     "agentIdle": "عامل: متوقف",
-    "agentTitleRunning": "عامل در حال اجراست · کارگر {{state}}",
-    "agentTitleRunningRemote": "عامل در حال اجراست · کارگر {{state}} · {{address}}",
+    "agentTitleRunning": "سرویس ایجنت بالاست · worker {{state}}",
+    "agentTitleRunningRemote": "سرویس ایجنت بالاست · worker {{state}} · {{address}}",
     "agentTitleIdle": "عامل اجرا نمی‌شود — کارگر پس‌زمینه آفلاین است",
     "workerTitle": "کارگر پس‌زمینه",
     "worker": "کارگر: {{state}}",
@@ -772,7 +772,9 @@
     "toggleOnline": "تغییر آنلاین/آفلاین (کارها در صف می‌مانند)",
     "toggleRemote": "روشن/خاموش کردن دسترسی از راه دور روی localhost",
     "remote": "ریموت: {{target}}",
-    "remoteOff": "خاموش"
+    "remoteOff": "خاموش",
+    "agentUnknown": "ایجنت: —",
+    "agentTitleUnknown": "هنوز وضعیتی از ایجنت گزارش نشده است."
   },
   "fileExplorer": {
     "noProjects": "هیچ پروژه‌ای اضافه نشده. از Settings یک پوشهٔ پروژه اضافه کنید یا یک پوشه را روی پنجره رها کنید.",

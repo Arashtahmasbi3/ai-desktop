@@ -51,6 +51,17 @@ fails, a tool is missing, or the budget ran out — ask rather than guess).
 
 ## Status
 
+**v2.7.0 released — light theme, UI/UX hardening and the full audit fix set.** Merged
+`audit/fixes-v2.6.5` into `master` (`e2cce3d`, `--no-ff`), tag `v2.7.0`. 244 test files /
+1941 tests pass, typecheck and production build green. Windows artifacts built **natively on
+Windows** (`npm run build:win`, exit 0, no Wine needed): `AI Desktop Setup 2.7.0.exe`
+(107.3 MB), `AI Desktop 2.7.0 Portable.exe` (107 MB), `SHA256SUMS.txt`. The light theme is a
+default-on change: every colour is now a CSS variable and 82 files moved off theme-blind
+palette utilities, with a contract test that recomputes the WCAG contrast of both palettes.
+The application window was verified live over CDP in both themes (isolated `APPDATA`, so the
+user's real settings/VPS records were never touched). See the v2.7.0 section at the end of
+this file. (2026-10-14)
+
 **v2.6.4 released — Multi-Project & Polish.** Released 2026-10-13. Merged `feature/v2.6.4-critical-fixes` into `master` (`8e12e9e`, `--no-ff`), tag `v2.6.4`. Full suite green (221 files, 1724 passed | 1 skipped, Docker-conditional); Windows artifacts published: https://github.com/Arashtahmasbi3/ai-desktop/releases/tag/v2.6.4. Ready for user testing on Windows. See the v2.6.4 sprint section at the end of this file. (2026-10-13)
 
 **v2.4 Sprint — phases A–E complete; version bumped to 2.4.0. A.1 jobs, A.2 preflight, A.3 success verification, B.1 db migration, B.2 docker transfer, B.3 checksum verify, C.1 project users, C.2 project SSH key, C.3 worktrees, D.1 scaffolding. Branch: feature/v2.4-full-compliance.** (2026-10-05)
@@ -103,7 +114,7 @@ fails, a tool is missing, or the budget ran out — ask rather than guess).
 
 - Electron 44 + electron-vite 5 + Vite 7
 - React 18 + TypeScript 5 (strict)
-- Tailwind CSS 3 (dark theme)
+- Tailwind CSS 3 (light + dark themes via CSS variables)
 - Zustand 5 (state) + lucide-react (icons) + react-markdown
 - Vitest (tests) + electron-builder (NSIS packaging)
 
@@ -230,8 +241,19 @@ test/                    Vitest tests (adapters use a mocked fetch boundary)
   (`SafeStorageCipher` = Electron `safeStorage` in the app) inside `persistence.ts`, which also
   owns the AppData path (`resolveUserDataDir`) and settings migration. Both stores migrate old
   payloads forward and re-save so legacy plaintext is scrubbed.
-- UI: dark theme only. Use the Tailwind theme tokens `bg-bg-primary` `#0a0a0a`,
-  `bg-bg-secondary` `#141414`, `bg-bg-tertiary` `#1e1e1e`, `border-border`, `text-accent`.
+- UI: **light ("day") theme by default, dark theme, or `system`** (v2.7.0). Every colour
+  is a CSS variable in `src/renderer/src/assets/main.css` (`:root` = light, `.dark` =
+  dark) exposed through Tailwind in `tailwind.config.js`. Use the **semantic tokens
+  only**: surfaces `bg-bg-primary` / `bg-bg-secondary` / `bg-bg-tertiary` /
+  `bg-bg-elevated`, lines `border-border` / `border-border-strong`, text `text-fg-strong`
+  / `text-fg` / `text-fg-muted` / `text-fg-subtle`, states `danger` / `warning` /
+  `success` / `info`, brand `accent` (text/borders/tints) and `accent-solid` (filled
+  buttons that carry `accent-fg`). A bare Tailwind palette class (`text-neutral-500`,
+  `bg-red-500/10`, ...) is a **bug** — it is a fixed hex value and is therefore wrong in
+  one of the two themes; `test/renderer/theme-tokens.test.ts` fails the build on one, and
+  also recomputes the WCAG contrast of both palettes (text ≥ 4.5:1 on every surface).
+  The theme lives in `src/renderer/src/lib/theme.ts`, is applied before React mounts in
+  `main.tsx`, and is switched from the titlebar menu or Settings → General.
 - Menus/labels in English; chat content is RTL (`dir="rtl"`), font Vazirmatn.
 - Keep the Content-Security-Policy in `src/renderer/index.html` in sync with any new
   external resource (fonts, network calls to the DeepSeek API, etc.).

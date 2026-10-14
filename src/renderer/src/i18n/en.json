@@ -757,10 +757,10 @@
   },
   "statusBar": {
     "ready": "Ready",
-    "agentRunning": "Agent: running",
+    "agentRunning": "Agent: ready",
     "agentIdle": "Agent: not running",
-    "agentTitleRunning": "Agent running · worker {{state}}",
-    "agentTitleRunningRemote": "Agent running · worker {{state}} · {{address}}",
+    "agentTitleRunning": "Agent service is up · worker {{state}}",
+    "agentTitleRunningRemote": "Agent service is up · worker {{state}} · {{address}}",
     "agentTitleIdle": "Agent not running — the background worker is offline",
     "workerTitle": "Background worker",
     "worker": "worker: {{state}}",
@@ -772,7 +772,9 @@
     "toggleOnline": "Toggle online/offline (queues work while offline)",
     "toggleRemote": "Toggle localhost remote access",
     "remote": "remote: {{target}}",
-    "remoteOff": "off"
+    "remoteOff": "off",
+    "agentUnknown": "Agent: —",
+    "agentTitleUnknown": "No agent status has been reported yet."
   },
   "fileExplorer": {
     "noProjects": "No project added yet. Add a project folder from Settings, or drop a folder onto the window.",
