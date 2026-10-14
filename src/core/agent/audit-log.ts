@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs'
-import { dirname } from 'node:path'
 import { redact } from './redact'
+import { sweepStaleTempFiles, writeFileAtomic } from '@core/atomic-write'
 
 export type AuditEventType =
   | 'connect'
@@ -26,17 +26,26 @@ export interface AuditLogOptions {
   now?: () => Date
   /** Keep only the most recent N entries on disk. */
   maxEntries?: number
+  /**
+   * Receives write failures (v2.6.5). The trail is a security record, so a
+   * failed persist must be visible instead of swallowed: previously the only
+   * `catch {}` in the whole atomic-write family hid the fact that the audit log
+   * had stopped being written while 822 temp files piled up on disk.
+   */
+  onError?: (error: unknown) => void
 }
 
 /**
  * Append-only JSON audit log for every remote command. Records are written to
  * disk atomically; if writing fails the in-memory trail is still kept so the
- * guard does not block real work.
+ * guard does not block real work, but the failure is reported through
+ * {@link AuditLogOptions.onError}.
  */
 export class AuditLog {
   private readonly file: string
   private readonly now: () => Date
   private readonly maxEntries: number
+  private readonly onError?: (error: unknown) => void
   private entries_: AuditEntry[] = []
   private loaded = false
 
@@ -44,10 +53,13 @@ export class AuditLog {
     this.file = options.file
     this.now = options.now ?? (() => new Date())
     this.maxEntries = options.maxEntries ?? 2000
+    this.onError = options.onError
   }
 
   async load(): Promise<void> {
     if (this.loaded) return
+    // Clear temp files orphaned by the pre-v2.6.5 writer before reading.
+    await sweepStaleTempFiles(this.file).catch(() => 0)
     try {
       const raw = JSON.parse(await fs.readFile(this.file, 'utf8')) as unknown
       if (Array.isArray(raw)) {
@@ -80,12 +92,10 @@ export class AuditLog {
 
   private async persist(): Promise<void> {
     try {
-      await fs.mkdir(dirname(this.file), { recursive: true })
-      const tmp = `${this.file}.${process.pid}.${Date.now()}.tmp`
-      await fs.writeFile(tmp, `${JSON.stringify(this.entries_, null, 2)}\n`, 'utf8')
-      await fs.rename(tmp, this.file)
-    } catch {
-      // Audit writes must never break the operation they describe.
+      await writeFileAtomic(this.file, `${JSON.stringify(this.entries_, null, 2)}\n`)
+    } catch (error) {
+      // Never break the operation the entry describes, but never hide it either.
+      this.onError?.(error)
     }
   }
 

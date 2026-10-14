@@ -23,22 +23,22 @@ export default function ApprovedCommandsSection(): JSX.Element {
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-border bg-bg-primary p-3">
       <div>
-        <p className="flex items-center gap-1.5 text-xs font-medium text-neutral-200">
-          <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+        <p className="flex items-center gap-1.5 text-xs font-medium text-fg">
+          <ShieldCheck className="h-3.5 w-3.5 text-success" />
           {t('settings.approvedCommands')}
         </p>
-        <p className="mt-0.5 text-2xs text-neutral-500">
+        <p className="mt-0.5 text-2xs text-fg-muted">
           {t('settings.approvedCommandsHint')}
         </p>
       </div>
       {items.length === 0 ? (
-        <p className="text-2xs text-neutral-600">{t('settings.approvedCommandsEmpty')}</p>
+        <p className="text-2xs text-fg-subtle">{t('settings.approvedCommandsEmpty')}</p>
       ) : (
         <ul className="flex flex-col gap-1">
           {items.map((item) => (
             <li
               key={item.id}
-              className="flex items-center justify-between gap-2 rounded border border-border bg-bg-secondary px-2 py-1 text-2xs text-neutral-300"
+              className="flex items-center justify-between gap-2 rounded border border-border bg-bg-secondary px-2 py-1 text-2xs text-fg"
             >
               <span className="truncate" dir="ltr">
                 {item.label}
@@ -48,7 +48,7 @@ export default function ApprovedCommandsSection(): JSX.Element {
                 onClick={() => {
                   void window.api.agent.revokeApprovedCommand(item.id).then(refresh)
                 }}
-                className="shrink-0 rounded px-1.5 py-0.5 text-neutral-500 hover:bg-bg-tertiary hover:text-red-400"
+                className="shrink-0 rounded px-1.5 py-0.5 text-fg-muted hover:bg-bg-tertiary hover:text-danger"
               >
                 {t('settings.revoke')}
               </button>

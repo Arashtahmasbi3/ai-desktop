@@ -10,7 +10,14 @@ export const REDACTION_PATTERNS: ReadonlyArray<{ name: string; pattern: RegExp }
     pattern: /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]+?-----END [A-Z0-9 ]*PRIVATE KEY-----/g
   },
   { name: 'anthropic-key', pattern: /sk-ant-[A-Za-z0-9_-]{16,}/g },
-  { name: 'openai-key', pattern: /sk-[A-Za-z0-9]{16,}/g },
+  // v2.6.5: `sk-[A-Za-z0-9]{16,}` could not match the modern prefixed forms —
+  // the `-` right after `sk-` stopped the class — so `sk-proj-…` and
+  // `sk-svcacct-…` keys were written to the JSONL log and shown in the UI as-is.
+  { name: 'openai-key', pattern: /sk-[A-Za-z0-9_-]{16,}/g },
+  { name: 'google-key', pattern: /AIza[0-9A-Za-z_-]{30,}/g },
+  { name: 'groq-key', pattern: /gsk_[A-Za-z0-9]{20,}/g },
+  { name: 'huggingface-token', pattern: /hf_[A-Za-z0-9]{20,}/g },
+  { name: 'xai-key', pattern: /xai-[A-Za-z0-9]{20,}/g },
   { name: 'github-pat', pattern: /gh[pousr]_[A-Za-z0-9]{20,}/g },
   { name: 'github-fine-grained', pattern: /github_pat_[A-Za-z0-9_]{20,}/g },
   { name: 'aws-access-key', pattern: /AKIA[0-9A-Z]{16}/g },

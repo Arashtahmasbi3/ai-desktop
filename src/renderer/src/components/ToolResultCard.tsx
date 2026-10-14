@@ -54,7 +54,7 @@ export default function ToolResultCard(props: ToolCallView): JSX.Element {
   return (
     <div
       className={`flex max-w-[min(52rem,88%)] flex-col overflow-hidden rounded-xl border bg-bg-secondary ${
-        ok ? 'border-border' : 'border-red-500/40'
+        ok ? 'border-border' : 'border-danger/40'
       }`}
       dir="ltr"
     >
@@ -67,15 +67,15 @@ export default function ToolResultCard(props: ToolCallView): JSX.Element {
         aria-label={`${name} ${ok ? 'ok' : 'error'}`}
       >
         <StatusIcon
-          className={`h-3.5 w-3.5 shrink-0 ${ok ? 'text-emerald-400' : 'text-red-400'}`}
+          className={`h-3.5 w-3.5 shrink-0 ${ok ? 'text-success' : 'text-danger'}`}
         />
-        <span className="shrink-0 font-mono text-[13px] text-neutral-200">{name}</span>
-        <span className={`shrink-0 text-3xs ${ok ? 'text-emerald-400' : 'text-red-400'}`}>
+        <span className="shrink-0 font-mono text-[13px] text-fg">{name}</span>
+        <span className={`shrink-0 text-3xs ${ok ? 'text-success' : 'text-danger'}`}>
           {ok ? t('chat.toolOk') : t('chat.toolError')}
         </span>
         {primary ? (
           <span
-            className="min-w-0 flex-1 truncate font-mono text-[13px] text-neutral-500"
+            className="min-w-0 flex-1 truncate font-mono text-[13px] text-fg-muted"
             title={primary}
           >
             {primary}
@@ -84,23 +84,23 @@ export default function ToolResultCard(props: ToolCallView): JSX.Element {
           <span className="flex-1" />
         )}
         {code ? (
-          <span className="shrink-0 rounded bg-bg-primary px-1 font-mono text-3xs text-neutral-500">
+          <span className="shrink-0 rounded bg-bg-primary px-1 font-mono text-3xs text-fg-muted">
             {code}
           </span>
         ) : null}
         {exitCode !== undefined ? (
           <span
             className={`shrink-0 rounded px-1 font-mono text-3xs ${
-              exitCode === 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
+              exitCode === 0 ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'
             }`}
             title={t('chat.toolExit')}
           >
             exit {exitCode}
           </span>
         ) : null}
-        {seconds ? <span className="shrink-0 text-3xs text-neutral-600">{seconds}</span> : null}
+        {seconds ? <span className="shrink-0 text-3xs text-fg-subtle">{seconds}</span> : null}
         {hasBody ? (
-          <span className="shrink-0 text-neutral-500">
+          <span className="shrink-0 text-fg-muted">
             {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
           </span>
         ) : null}
@@ -110,17 +110,17 @@ export default function ToolResultCard(props: ToolCallView): JSX.Element {
         <div className="flex flex-col gap-2 border-t border-border px-3 py-2">
           {error ? (
             <div>
-              <p className="mb-0.5 text-3xs uppercase tracking-wide text-red-400">
+              <p className="mb-0.5 text-3xs uppercase tracking-wide text-danger">
                 {t('chat.toolCause')}
               </p>
-              <pre className="whitespace-pre-wrap break-words font-mono text-2xs text-red-300">
+              <pre className="whitespace-pre-wrap break-words font-mono text-2xs text-danger">
                 {error}
               </pre>
             </div>
           ) : null}
 
           {recovery ? (
-            <p className="flex items-center gap-1 text-2xs text-neutral-400">
+            <p className="flex items-center gap-1 text-2xs text-fg-muted">
               <RotateCcw className="h-3 w-3 shrink-0" />
               {recovery.decision === 'retry'
                 ? recovery.recovered
@@ -131,23 +131,23 @@ export default function ToolResultCard(props: ToolCallView): JSX.Element {
           ) : null}
 
           {serverId || cwd || (command && path) ? (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-2xs text-neutral-400">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-2xs text-fg-muted">
               {serverId ? (
                 <span className="flex items-center gap-1">
-                  <Server className="h-3 w-3 shrink-0 text-sky-400" />
-                  {t('chat.toolServer')}: <span className="font-mono text-neutral-300">{serverId}</span>
+                  <Server className="h-3 w-3 shrink-0 text-info" />
+                  {t('chat.toolServer')}: <span className="font-mono text-fg">{serverId}</span>
                 </span>
               ) : null}
               {cwd ? (
                 <span className="flex items-center gap-1">
                   <CornerDownRight className="h-3 w-3 shrink-0" />
-                  {t('chat.toolCwd')}: <span className="font-mono text-neutral-300">{cwd}</span>
+                  {t('chat.toolCwd')}: <span className="font-mono text-fg">{cwd}</span>
                 </span>
               ) : null}
               {command && path ? (
                 <span className="flex items-center gap-1">
                   <FileText className="h-3 w-3 shrink-0" />
-                  {t('chat.toolPath')}: <span className="font-mono text-neutral-300">{path}</span>
+                  {t('chat.toolPath')}: <span className="font-mono text-fg">{path}</span>
                 </span>
               ) : null}
             </div>
@@ -155,10 +155,10 @@ export default function ToolResultCard(props: ToolCallView): JSX.Element {
 
           {stdout ? (
             <div>
-              <p className="mb-0.5 text-3xs uppercase tracking-wide text-neutral-500">
+              <p className="mb-0.5 text-3xs uppercase tracking-wide text-fg-muted">
                 {t('chat.toolStdout')}
               </p>
-              <pre className="max-h-56 overflow-auto rounded bg-bg-primary px-2 py-1.5 font-mono text-2xs whitespace-pre-wrap text-neutral-300">
+              <pre className="max-h-56 overflow-auto rounded bg-bg-primary px-2 py-1.5 font-mono text-2xs whitespace-pre-wrap text-fg">
                 {stdout}
               </pre>
             </div>
@@ -166,21 +166,21 @@ export default function ToolResultCard(props: ToolCallView): JSX.Element {
 
           {stderr ? (
             <div>
-              <p className="mb-0.5 text-3xs uppercase tracking-wide text-amber-400">
+              <p className="mb-0.5 text-3xs uppercase tracking-wide text-warning">
                 {t('chat.toolStderr')}
               </p>
-              <pre className="max-h-40 overflow-auto rounded bg-bg-primary px-2 py-1.5 font-mono text-2xs whitespace-pre-wrap text-amber-200/90">
+              <pre className="max-h-40 overflow-auto rounded bg-bg-primary px-2 py-1.5 font-mono text-2xs whitespace-pre-wrap text-warning/90">
                 {stderr}
               </pre>
             </div>
           ) : null}
 
           {attempts !== undefined && attempts > 1 ? (
-            <p className="text-3xs text-neutral-500">{t('chat.toolAttempts', { count: attempts })}</p>
+            <p className="text-3xs text-fg-muted">{t('chat.toolAttempts', { count: attempts })}</p>
           ) : null}
 
           {legacyDetail ? (
-            <pre className="max-h-48 overflow-auto font-mono text-2xs whitespace-pre-wrap text-neutral-400">
+            <pre className="max-h-48 overflow-auto font-mono text-2xs whitespace-pre-wrap text-fg-muted">
               {legacyDetail}
             </pre>
           ) : null}

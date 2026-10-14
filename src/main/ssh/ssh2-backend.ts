@@ -69,7 +69,15 @@ function entryType(mode: number): SftpEntry['type'] {
   return 'file'
 }
 
-class Ssh2Connection implements SshConnection {
+/**
+ * One connection over an `ssh2` client.
+ *
+ * Exported for tests (v2.6.5): this is the real SSH transport — every exec,
+ * timeout, stream and SFTP call in the app goes through it — and it had no test
+ * at all, because only the `FakeBackend` in `test/main/ssh-manager.test.ts` was
+ * exercised.
+ */
+export class Ssh2Connection implements SshConnection {
   private readonly client: Ssh2Client
   private sftpSession?: Ssh2Sftp
 

@@ -142,6 +142,48 @@ describe('Task 4.1 - task planner', () => {
     expect(done.status).toBe('failed')
   })
 
+  it('B-10: an alternative is inserted and never drops the next planned step', async () => {
+    const executed: string[] = []
+    const { planner } = makePlanner(
+      [
+        JSON.stringify({
+          steps: [
+            { description: 'check pm2', toolName: 'remote_shell', args: { command: 'pm2 list' } },
+            { description: 'read the log', toolName: 'remote_read_file', args: { path: 'app.log' } }
+          ]
+        }),
+        'alternative',
+        JSON.stringify({
+          description: 'use systemd',
+          toolName: 'remote_shell',
+          args: { command: 'systemctl status' }
+        })
+      ],
+      {
+        execute: async (_tool, args) => {
+          const marker = String(args.command ?? args.path ?? '')
+          executed.push(marker)
+          return marker === 'pm2 list' ? fail('pm2: not found') : ok()
+        }
+      }
+    )
+    const plan = await planner.createPlan('diagnose the crash', CONTEXT)
+    const done = await planner.executePlan(plan, CONTEXT)
+
+    // The alternative sits *between* the failing step and the planned one.
+    expect(done.steps.map((step) => step.description)).toEqual([
+      'check pm2',
+      'use systemd',
+      'read the log'
+    ])
+    expect(done.steps.map((step) => step.number)).toEqual([1, 2, 3])
+    expect(done.steps[1].alternativeFor).toBe(done.steps[0].id)
+    // The planned step still ran instead of silently disappearing.
+    expect(done.steps[2].status).toBe('done')
+    expect(executed).toEqual(['pm2 list', 'systemctl status', 'app.log'])
+    expect(done.status).toBe('completed')
+  })
+
   it('7. completing a plan emits step and complete events', async () => {
     const { planner, events } = makePlanner([
       JSON.stringify({ steps: [{ description: 'one', toolName: 'remote_shell', args: {} }] })

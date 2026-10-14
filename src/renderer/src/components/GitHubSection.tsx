@@ -3,7 +3,7 @@ import { Check, ExternalLink, GitFork, Loader2, LogOut } from 'lucide-react'
 import type { GitHubAuthStatus, GitHubDeviceCode } from '@shared/github'
 
 const inputClass =
-  'w-full rounded border border-border bg-bg-secondary px-2 py-1.5 text-xs text-neutral-200 outline-none focus:border-accent/50'
+  'w-full rounded border border-border bg-bg-secondary px-2 py-1.5 text-xs text-fg outline-none focus:border-accent/50'
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
@@ -93,20 +93,20 @@ export default function GitHubSection(): JSX.Element {
 
   return (
     <section className="mt-6">
-      <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
+      <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
         <GitFork className="h-3.5 w-3.5" /> GitHub
       </h3>
 
       {status?.connected ? (
         <div className="flex items-center justify-between rounded border border-border bg-bg-secondary px-3 py-2 text-xs">
-          <span className="flex items-center gap-2 text-neutral-200">
-            <Check className="h-3.5 w-3.5 text-emerald-400" />
+          <span className="flex items-center gap-2 text-fg">
+            <Check className="h-3.5 w-3.5 text-success" />
             Connected as <span className="text-accent">@{status.user?.login ?? 'unknown'}</span>
           </span>
           <button
             type="button"
             onClick={() => void disconnect()}
-            className="flex items-center gap-1 rounded px-2 py-1 text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200"
+            className="flex items-center gap-1 rounded px-2 py-1 text-fg-muted hover:bg-bg-tertiary hover:text-fg"
           >
             <LogOut className="h-3 w-3" /> Disconnect
           </button>
@@ -118,7 +118,7 @@ export default function GitHubSection(): JSX.Element {
                 type="button"
                 onClick={() => setMode('device')}
                 className={`flex-1 rounded-md px-2 py-1 transition ${
-                  mode === 'device' ? 'bg-bg-tertiary text-neutral-100' : 'text-neutral-500'
+                  mode === 'device' ? 'bg-bg-tertiary text-fg-strong' : 'text-fg-muted'
                 }`}
               >
                 Device flow
@@ -127,7 +127,7 @@ export default function GitHubSection(): JSX.Element {
                 type="button"
                 onClick={() => setMode('token')}
                 className={`flex-1 rounded-md px-2 py-1 transition ${
-                  mode === 'token' ? 'bg-bg-tertiary text-neutral-100' : 'text-neutral-500'
+                  mode === 'token' ? 'bg-bg-tertiary text-fg-strong' : 'text-fg-muted'
                 }`}
               >
                 Access token
@@ -136,7 +136,7 @@ export default function GitHubSection(): JSX.Element {
 
             {mode === 'device' ? (
               <>
-                <p className="text-2xs leading-relaxed text-neutral-500">
+                <p className="text-2xs leading-relaxed text-fg-muted">
                   Create a GitHub OAuth App with Device Flow enabled, paste its client ID, then
                   approve the code on github.com. The token is stored encrypted and never leaves the
                   main process.
@@ -160,7 +160,7 @@ export default function GitHubSection(): JSX.Element {
                   type="button"
                   onClick={() => void connect()}
                   disabled={busy}
-                  className="flex items-center gap-1 rounded bg-accent px-3 py-1.5 text-xs text-white hover:bg-accent-hover disabled:opacity-40"
+                  className="flex items-center gap-1 rounded bg-accent-solid px-3 py-1.5 text-xs text-white hover:bg-accent-solid-hover disabled:opacity-40"
                 >
                   {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <GitFork className="h-3 w-3" />}
                   Connect GitHub
@@ -168,7 +168,7 @@ export default function GitHubSection(): JSX.Element {
               </>
             ) : (
               <>
-                <p className="text-2xs leading-relaxed text-neutral-500">
+                <p className="text-2xs leading-relaxed text-fg-muted">
                   Fastest option: create a Personal Access Token with the <code>repo</code> and{' '}
                   <code>read:user</code> scopes and paste it here. Stored encrypted on this machine.
                 </p>
@@ -193,7 +193,7 @@ export default function GitHubSection(): JSX.Element {
                   type="button"
                   onClick={() => void connectToken()}
                   disabled={busy || token.trim() === ''}
-                  className="flex items-center gap-1 rounded bg-accent px-3 py-1.5 text-xs text-white hover:bg-accent-hover disabled:opacity-40"
+                  className="flex items-center gap-1 rounded bg-accent-solid px-3 py-1.5 text-xs text-white hover:bg-accent-solid-hover disabled:opacity-40"
                 >
                   {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <GitFork className="h-3 w-3" />}
                   Connect with token
@@ -204,8 +204,8 @@ export default function GitHubSection(): JSX.Element {
         )}
 
       {device ? (
-        <div className="mt-2 rounded border border-accent/40 bg-accent/10 p-3 text-xs text-neutral-200">
-          <p className="mb-1 text-neutral-400">Enter this code on GitHub:</p>
+        <div className="mt-2 rounded border border-accent/40 bg-accent-solid/10 p-3 text-xs text-fg">
+          <p className="mb-1 text-fg-muted">Enter this code on GitHub:</p>
           <p className="mb-2 font-mono text-base tracking-widest text-accent">{device.userCode}</p>
           <a
             href={device.verificationUri}
@@ -215,14 +215,14 @@ export default function GitHubSection(): JSX.Element {
           >
             {device.verificationUri} <ExternalLink className="h-3 w-3" />
           </a>
-          <p className="mt-2 flex items-center gap-1 text-neutral-500">
+          <p className="mt-2 flex items-center gap-1 text-fg-muted">
             <Loader2 className="h-3 w-3 animate-spin" /> Waiting for authorisation…
           </p>
         </div>
       ) : null}
 
       {error ? (
-        <p className="mt-2 rounded bg-red-500/10 px-2 py-1 text-2xs text-red-300">{error}</p>
+        <p className="mt-2 rounded bg-danger/10 px-2 py-1 text-2xs text-danger">{error}</p>
       ) : null}
     </section>
   )

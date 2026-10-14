@@ -16,11 +16,11 @@ import { TRACE_PHASES } from '@shared/trace'
 
 /** Colour + icon per phase, matching the dark timeline palette. */
 const PHASE_STYLE: Record<TracePhase, { icon: typeof Eye; className: string }> = {
-  planning: { icon: Search, className: 'text-sky-400 border-sky-500/30 bg-sky-500/10' },
-  inspecting: { icon: Eye, className: 'text-cyan-400 border-cyan-500/30 bg-cyan-500/10' },
-  executing: { icon: SquareTerminal, className: 'text-violet-400 border-violet-500/30 bg-violet-500/10' },
-  verifying: { icon: Pencil, className: 'text-amber-400 border-amber-500/30 bg-amber-500/10' },
-  done: { icon: FileOutput, className: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10' }
+  planning: { icon: Search, className: 'text-info border-info/30 bg-info/10' },
+  inspecting: { icon: Eye, className: 'text-info border-info/30 bg-info/10' },
+  executing: { icon: SquareTerminal, className: 'text-accent border-accent/30 bg-accent-solid/10' },
+  verifying: { icon: Pencil, className: 'text-warning border-warning/30 bg-warning/10' },
+  done: { icon: FileOutput, className: 'text-success border-success/30 bg-success/10' }
 }
 
 export interface DecisionCardProps {
@@ -81,25 +81,25 @@ export default function DecisionCard({ decision, compact, onExplain }: DecisionC
         className={`flex w-full items-center gap-2 text-left ${compact ? 'px-2 py-1' : 'px-2.5 py-2'}`}
       >
         {open ? (
-          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-neutral-500" />
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-fg-muted" />
         ) : (
-          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-neutral-500" />
+          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-fg-muted" />
         )}
         <span className={`flex items-center gap-1 rounded border px-1.5 py-0.5 text-3xs ${style.className}`}>
           <Icon className="h-3 w-3" />
           {t(`trace.phase${decision.phase[0].toUpperCase()}${decision.phase.slice(1)}`)}
         </span>
-        <span className="min-w-0 flex-1 truncate text-2xs text-neutral-300">
+        <span className="min-w-0 flex-1 truncate text-2xs text-fg">
           {decision.intent.summary}
         </span>
         {decision.outcome ? (
           <span
             className={`shrink-0 text-3xs ${
               decision.outcome === 'ok'
-                ? 'text-emerald-400'
+                ? 'text-success'
                 : decision.outcome === 'failed'
-                  ? 'text-red-400'
-                  : 'text-amber-400'
+                  ? 'text-danger'
+                  : 'text-warning'
             }`}
           >
             {t(`trace.outcome${decision.outcome[0].toUpperCase()}${decision.outcome.slice(1)}`)}
@@ -110,33 +110,33 @@ export default function DecisionCard({ decision, compact, onExplain }: DecisionC
       {open ? (
         <div className="space-y-2 border-t border-border px-2.5 py-2">
           <section>
-            <h4 className="text-3xs font-semibold uppercase tracking-wide text-neutral-500">
+            <h4 className="text-3xs font-semibold uppercase tracking-wide text-fg-muted">
               {t('trace.intent')}
             </h4>
-            <p className="mt-0.5 text-2xs leading-snug text-neutral-300">{decision.intent.summary}</p>
+            <p className="mt-0.5 text-2xs leading-snug text-fg">{decision.intent.summary}</p>
             {decision.intent.rationale ? (
-              <p className="mt-1 text-2xs leading-snug text-neutral-400">
-                <span className="text-neutral-500">{t('trace.assessment')}: </span>
+              <p className="mt-1 text-2xs leading-snug text-fg-muted">
+                <span className="text-fg-muted">{t('trace.assessment')}: </span>
                 {decision.intent.rationale}
               </p>
             ) : null}
           </section>
 
           <section>
-            <h4 className="text-3xs font-semibold uppercase tracking-wide text-neutral-500">
+            <h4 className="text-3xs font-semibold uppercase tracking-wide text-fg-muted">
               {t('trace.evidence')}
             </h4>
             {decision.evidence.length === 0 ? (
-              <p className="mt-0.5 text-2xs text-neutral-500">{t('trace.noEvidence')}</p>
+              <p className="mt-0.5 text-2xs text-fg-muted">{t('trace.noEvidence')}</p>
             ) : (
               <ul className="mt-0.5 space-y-1">
                 {decision.evidence.map((item, index) => (
                   <li key={`${item.hash ?? item.ref}-${index}`} className="text-2xs leading-snug">
-                    <span className="text-neutral-400">{evidenceLabel(item)}</span>
-                    <span className="mx-1 text-neutral-600">·</span>
-                    <code className="text-neutral-300">{item.lines ?? item.summary}</code>
+                    <span className="text-fg-muted">{evidenceLabel(item)}</span>
+                    <span className="mx-1 text-fg-subtle">·</span>
+                    <code className="text-fg">{item.lines ?? item.summary}</code>
                     {item.kind === 'output' ? (
-                      <span className="ml-1 text-3xs text-neutral-500">
+                      <span className="ml-1 text-3xs text-fg-muted">
                         {t('trace.viewOutput')}
                       </span>
                     ) : null}
@@ -147,17 +147,17 @@ export default function DecisionCard({ decision, compact, onExplain }: DecisionC
           </section>
 
           <section>
-            <h4 className="text-3xs font-semibold uppercase tracking-wide text-neutral-500">
+            <h4 className="text-3xs font-semibold uppercase tracking-wide text-fg-muted">
               {t('trace.decision')}
             </h4>
-            <p className="mt-0.5 text-2xs leading-snug text-neutral-300">{decision.decision}</p>
+            <p className="mt-0.5 text-2xs leading-snug text-fg">{decision.decision}</p>
           </section>
 
           <button
             type="button"
             onClick={() => void askWhy()}
             disabled={loading}
-            className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-3xs text-neutral-300 hover:border-accent hover:text-accent disabled:opacity-50"
+            className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-3xs text-fg hover:border-accent hover:text-accent disabled:opacity-50"
           >
             {loading ? (
               <Loader2 className="h-3 w-3 animate-spin" />
@@ -167,16 +167,16 @@ export default function DecisionCard({ decision, compact, onExplain }: DecisionC
             {t('trace.askWhy')}
           </button>
 
-          {failed ? <p className="text-3xs text-red-400">{t('trace.askWhyFailed')}</p> : null}
+          {failed ? <p className="text-3xs text-danger">{t('trace.askWhyFailed')}</p> : null}
 
           {explanation ? (
             <div className="rounded border border-border/70 bg-bg-tertiary/40 p-2">
-              <p className="text-3xs font-semibold uppercase tracking-wide text-neutral-500">
+              <p className="text-3xs font-semibold uppercase tracking-wide text-fg-muted">
                 {t('trace.why')}
               </p>
               <ul className="mt-1 space-y-0.5">
                 {explanation.reasoning.map((line) => (
-                  <li key={line} className="text-2xs leading-snug text-neutral-300">
+                  <li key={line} className="text-2xs leading-snug text-fg">
                     • {line}
                   </li>
                 ))}

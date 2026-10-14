@@ -1,7 +1,9 @@
+import { existsSync } from 'node:fs'
 import type { SandboxManager } from '@shared/sandbox'
 import type { ToolCall, ToolDefinition } from '@shared/types'
 import type { AgentAction, AgentToolResult, ToolErrorCode } from '@shared/agent'
 import { SandboxError, normalizeSandboxPath } from '@core/sandbox'
+import { listCommandFor, resolveSandboxShell } from '@core/sandbox/shell'
 import { findSecretPathsInCommand, inspectSecretPath } from '@shared/secret-paths'
 
 export interface ToolExecOptions {
@@ -15,6 +17,15 @@ export interface ToolExecutor {
 }
 
 const DEFAULT_COMMAND_TIMEOUT_MS = 60_000
+
+/**
+ * `list_dir` must speak the dialect of the shell the sandbox actually runs
+ * (v2.6.5). Picking it from `process.platform` sent `dir /b` into a POSIX shell
+ * as soon as the Windows sandbox moved to Git Bash.
+ */
+const LOCAL_LIST_COMMAND = listCommandFor(
+  resolveSandboxShell(process.platform, process.env, existsSync)
+)
 
 /** Tools exposed to the model. They map 1:1 onto SandboxManager capabilities. */
 export const SANDBOX_TOOLS: ToolDefinition[] = [
@@ -257,7 +268,7 @@ export class SandboxToolExecutor implements ToolExecutor {
         )
       }
     }
-    const command = process.platform === 'win32' ? 'dir /b' : 'ls -la'
+    const command = LOCAL_LIST_COMMAND
     const result = await this.sandbox.executeCommand(this.sandboxId, command, {
       cwd,
       timeoutMs: this.defaultTimeoutMs

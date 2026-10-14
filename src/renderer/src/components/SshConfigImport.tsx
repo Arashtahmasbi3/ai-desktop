@@ -55,7 +55,7 @@ export default function SshConfigImport(): JSX.Element {
         type="button"
         onClick={() => void load()}
         disabled={busy}
-        className="flex w-fit items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-neutral-300 hover:bg-bg-tertiary disabled:opacity-50"
+        className="flex w-fit items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-fg hover:bg-bg-tertiary disabled:opacity-50"
       >
         <Download className="h-3.5 w-3.5" />
         {t('settings.sshImport')}
@@ -63,7 +63,7 @@ export default function SshConfigImport(): JSX.Element {
 
       {hosts ? (
         hosts.length === 0 ? (
-          <p className="text-2xs text-neutral-600">{t('settings.sshImportEmpty')}</p>
+          <p className="text-2xs text-fg-subtle">{t('settings.sshImportEmpty')}</p>
         ) : (
           <ul className="flex flex-col gap-1.5">
             {hosts.map((host) => (
@@ -72,8 +72,8 @@ export default function SshConfigImport(): JSX.Element {
                 className="flex items-center justify-between gap-3 rounded-lg border border-border bg-bg-primary px-3 py-2"
               >
                 <div className="min-w-0 text-xs">
-                  <p className="truncate text-neutral-200">{host.alias}</p>
-                  <p className="truncate text-3xs text-neutral-500" dir="ltr">
+                  <p className="truncate text-fg">{host.alias}</p>
+                  <p className="truncate text-3xs text-fg-muted" dir="ltr">
                     {host.user ? `${host.user}@` : ''}
                     {host.hostName}
                     {host.port ? `:${host.port}` : ''}
@@ -84,7 +84,7 @@ export default function SshConfigImport(): JSX.Element {
                   <button
                     type="button"
                     onClick={() => void add(host)}
-                    className="rounded bg-accent px-2 py-1 text-2xs text-white hover:bg-accent-hover"
+                    className="rounded bg-accent-solid px-2 py-1 text-2xs text-white hover:bg-accent-solid-hover"
                   >
                     {t('settings.sshImportAdd')}
                   </button>
@@ -93,7 +93,7 @@ export default function SshConfigImport(): JSX.Element {
                     onClick={() => skip(host.alias)}
                     title={t('settings.sshImportSkip')}
                     aria-label={t('settings.sshImportSkip')}
-                    className="rounded p-1 text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300"
+                    className="rounded p-1 text-fg-muted hover:bg-bg-tertiary hover:text-fg"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>

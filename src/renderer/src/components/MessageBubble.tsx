@@ -29,10 +29,10 @@ const ROLE_LABEL: Record<ChatMessage['role'], string> = {
 
 function Avatar({ role }: { role: ChatMessage['role'] }): JSX.Element {
   const map = {
-    user: { icon: User, className: 'bg-accent/20 text-accent' },
-    assistant: { icon: Bot, className: 'bg-bg-tertiary text-emerald-400' },
-    tool: { icon: Bot, className: 'bg-bg-tertiary text-sky-400' },
-    system: { icon: AlertTriangle, className: 'bg-amber-500/15 text-amber-400' }
+    user: { icon: User, className: 'bg-accent-solid/20 text-accent' },
+    assistant: { icon: Bot, className: 'bg-bg-tertiary text-success' },
+    tool: { icon: Bot, className: 'bg-bg-tertiary text-info' },
+    system: { icon: AlertTriangle, className: 'bg-warning/15 text-warning' }
   }[role]
   const Icon = map.icon
   return (
@@ -58,7 +58,7 @@ export default function MessageBubble({ message }: { message: ChatMessage }): JS
         {message.toolCall ? (
           <ToolResultCard {...message.toolCall} />
         ) : (
-          <span className="rounded-full border border-border bg-bg-secondary px-2.5 py-1 font-mono text-2xs text-sky-300">
+          <span className="rounded-full border border-border bg-bg-secondary px-2.5 py-1 font-mono text-2xs text-info">
             {message.content}
           </span>
         )}
@@ -67,10 +67,20 @@ export default function MessageBubble({ message }: { message: ChatMessage }): JS
   }
 
   const copy = (): void => {
-    void navigator.clipboard.writeText(message.content).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1200)
-    })
+    // U-5: a clipboard write can be refused (insecure context, no permission).
+    // It used to fail silently — the copy button simply did nothing.
+    const clipboard = navigator.clipboard
+    if (!clipboard?.writeText) {
+      useStore.getState().pushToast('error', t('toast.copyFailed'))
+      return
+    }
+    void clipboard
+      .writeText(message.content)
+      .then(() => {
+        setCopied(true)
+        setTimeout(() => setCopied(false), 1200)
+      })
+      .catch(() => useStore.getState().pushToast('error', t('toast.copyFailed')))
   }
 
   return (
@@ -81,25 +91,25 @@ export default function MessageBubble({ message }: { message: ChatMessage }): JS
           isUser ? 'items-end' : 'items-start'
         }`}
       >
-        <span className="mb-0.5 px-1 text-3xs uppercase tracking-wide text-neutral-500">
+        <span className="mb-0.5 px-1 text-3xs uppercase tracking-wide text-fg-muted">
           {t(ROLE_LABEL[message.role])}
         </span>
         <div
           dir="auto"
           className={`chat-markdown w-full rounded-xl px-3 py-2 text-sm leading-relaxed ${
-            isUser ? 'bg-accent/20 text-neutral-100' : 'bg-bg-tertiary text-neutral-200'
-          } ${message.role === 'system' ? 'border border-amber-500/30' : ''}`}
+            isUser ? 'bg-accent-solid/20 text-fg-strong' : 'bg-bg-tertiary text-fg'
+          } ${message.role === 'system' ? 'border border-warning/30' : ''}`}
         >
           <ReactMarkdown components={MARKDOWN_COMPONENTS}>{message.content}</ReactMarkdown>
         </div>
         <div className="mt-0.5 flex items-center gap-2 px-1">
           {message.role === 'assistant' && message.model ? (
-            <span className="font-mono text-3xs text-neutral-600" dir="ltr">
+            <span className="font-mono text-3xs text-fg-muted" dir="ltr">
               {message.model}
             </span>
           ) : null}
           {message.usedRemote ? (
-            <span className="flex items-center gap-0.5 text-3xs text-sky-400">
+            <span className="flex items-center gap-0.5 text-3xs text-info">
               <Server className="h-2.5 w-2.5" />
               {t('chat.usedRemote')}
             </span>
@@ -109,8 +119,10 @@ export default function MessageBubble({ message }: { message: ChatMessage }): JS
             onClick={copy}
             title={t('toast.copied')}
             aria-label={t('common.export')}
-            className={`flex items-center gap-0.5 text-3xs text-neutral-600 transition hover:text-neutral-300 ${
-              copied ? '' : 'opacity-0 group-hover:opacity-100'
+            className={`flex items-center gap-0.5 text-3xs text-fg-muted transition hover:text-fg ${
+              copied
+                ? ''
+                : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100 group-focus-within:opacity-100'
             }`}
           >
             {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
@@ -122,7 +134,7 @@ export default function MessageBubble({ message }: { message: ChatMessage }): JS
               onClick={() => void forkChat(activeChatId, message.id)}
               title={t('chat.forkFrom')}
               aria-label={t('chat.forkFrom')}
-              className="flex items-center gap-0.5 text-3xs text-neutral-600 opacity-0 transition hover:text-neutral-300 group-hover:opacity-100"
+              className="flex items-center gap-0.5 text-3xs text-fg-muted opacity-0 transition hover:text-fg focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
             >
               <GitFork className="h-3 w-3" />
             </button>

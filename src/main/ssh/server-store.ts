@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs'
-import { dirname } from 'node:path'
 import { randomUUID } from 'node:crypto'
+import { writeFileAtomic } from '@core/atomic-write'
 import type { SecretCipher } from '@core/agent/persistence'
 import { coerceHostPolicy } from '@core/remote/host-policy'
 import type { HostPolicy, VpsServer, VpsServerInput, VpsServerView } from '@shared/vps'
@@ -91,10 +91,7 @@ export class VpsServerStore {
 
   private async persist(): Promise<void> {
     const payload: VpsFile = { version: VPS_SCHEMA_VERSION, servers: this.servers }
-    await fs.mkdir(dirname(this.file), { recursive: true })
-    const tmp = `${this.file}.${process.pid}.${Date.now()}.tmp`
-    await fs.writeFile(tmp, `${JSON.stringify(payload, null, 2)}\n`, 'utf8')
-    await fs.rename(tmp, this.file)
+    await writeFileAtomic(this.file, `${JSON.stringify(payload, null, 2)}\n`)
   }
 
   private toView(server: StoredVpsServer): VpsServerView {

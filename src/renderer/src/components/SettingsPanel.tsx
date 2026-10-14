@@ -9,6 +9,7 @@ import {
   KeyRound,
   Languages,
   MemoryStick,
+  Palette,
   Plug,
   Server,
   Settings2,
@@ -17,6 +18,8 @@ import {
   X
 } from 'lucide-react'
 import { SUPPORTED_LOCALES } from '../i18n/locale'
+import { THEMES, themeLabelKey } from '../lib/theme'
+import ThemeIcon from './ThemeIcon'
 import { useStore } from '../store'
 import ProvidersSection from './ProvidersSection'
 import ProjectsSection from './ProjectsSection'
@@ -94,6 +97,8 @@ export default function SettingsPanel(): JSX.Element | null {
   const open = useStore((state) => state.settingsOpen)
   const close = useStore((state) => state.closeSettings)
   const locale = useStore((state) => state.locale)
+  const theme = useStore((state) => state.theme)
+  const setTheme = useStore((state) => state.setTheme)
   const setLocale = useStore((state) => state.setLocale)
   const showContextBeforeSend = useStore((state) => state.showContextBeforeSend)
   const setShowContextBeforeSend = useStore((state) => state.setShowContextBeforeSend)
@@ -122,16 +127,17 @@ export default function SettingsPanel(): JSX.Element | null {
       maxWidth="min(58rem, 92vw)"
       maxHeight="min(85vh, 44rem)"
       ariaLabel={t('settings.title')}
+      closeOnBackdrop
     >
       <div className="flex h-[min(85vh,44rem)] max-h-full flex-col overflow-hidden">
         <div className="flex h-11 shrink-0 items-center justify-between border-b border-border px-4">
-          <h2 className="text-sm font-semibold text-neutral-100">{t('settings.title')}</h2>
+          <h2 className="text-sm font-semibold text-fg-strong">{t('settings.title')}</h2>
           <button
             type="button"
             onClick={close}
             title={`${t('common.close')} (Esc)`}
             aria-label={t('common.close')}
-            className="rounded p-1 text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-200"
+            className="rounded p-1 text-fg-muted hover:bg-bg-tertiary hover:text-fg"
           >
             <X className="h-4 w-4" />
           </button>
@@ -145,7 +151,7 @@ export default function SettingsPanel(): JSX.Element | null {
             {NAV_GROUPS.map((group, groupIndex) => (
               <div key={group.labelKey ?? `group-${groupIndex}`} className="flex flex-col gap-0.5">
                 {group.labelKey ? (
-                  <span className="px-2.5 pb-0.5 pt-2 text-3xs font-semibold uppercase tracking-wide text-neutral-600">
+                  <span className="px-2.5 pb-0.5 pt-2 text-3xs font-semibold uppercase tracking-wide text-fg-subtle">
                     {t(group.labelKey)}
                   </span>
                 ) : null}
@@ -158,8 +164,8 @@ export default function SettingsPanel(): JSX.Element | null {
                       onClick={() => setTab(item.id)}
                       className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition ${
                         tab === item.id
-                          ? 'bg-accent/15 text-accent'
-                          : 'text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200'
+                          ? 'bg-accent-solid/15 text-accent'
+                          : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
                       }`}
                     >
                       <Icon className="h-3.5 w-3.5" />
@@ -174,14 +180,54 @@ export default function SettingsPanel(): JSX.Element | null {
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
             {tab === 'general' ? (
               <section className="flex flex-col gap-4">
-                <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
+                {/*
+                  v2.7.0: the theme is a labelled, three-way choice with an explicit
+                  hint, so "which theme am I on?" is never a guess. It sits above the
+                  language because it is the setting a new user reaches for first.
+                */}
+                <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
+                  <Palette className="h-3.5 w-3.5" />
+                  {t('settings.theme')}
+                </h3>
+                <div className="rounded-xl border border-border bg-bg-primary p-3">
+                  <p className="text-xs text-fg-muted">{t('settings.themeHint')}</p>
+                  <div
+                    role="radiogroup"
+                    aria-label={t('settings.theme')}
+                    className="mt-2 grid grid-cols-3 gap-2"
+                  >
+                    {THEMES.map((option) => {
+                      const active = theme === option
+                      return (
+                        <button
+                          key={option}
+                          type="button"
+                          role="radio"
+                          aria-checked={active}
+                          data-testid={`settings-theme-${option}`}
+                          onClick={() => setTheme(option)}
+                          className={`flex items-center justify-center gap-2 rounded-lg border px-2 py-2 text-xs transition ${
+                            active
+                              ? 'border-accent bg-accent-solid/10 text-fg-strong'
+                              : 'border-border text-fg-muted hover:bg-bg-tertiary hover:text-fg'
+                          }`}
+                        >
+                          <ThemeIcon preference={option} className="h-3.5 w-3.5" />
+                          {t(themeLabelKey(option))}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
                   <Languages className="h-3.5 w-3.5" />
                   {t('common.language')}
                 </h3>
                 <div className="rounded-xl border border-border bg-bg-primary p-3">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-sm text-neutral-200">{t('settings.languageHint')}</p>
+                      <p className="text-sm text-fg">{t('settings.languageHint')}</p>
                     </div>
                     <select
                       value={locale}
@@ -189,7 +235,7 @@ export default function SettingsPanel(): JSX.Element | null {
                         setLocale(event.target.value === 'fa' ? 'fa' : 'en')
                       }
                       aria-label={t('common.language')}
-                      className="rounded border border-border bg-bg-secondary px-2 py-1 text-xs text-neutral-200 outline-none focus:border-accent/50"
+                      className="rounded border border-border bg-bg-secondary px-2 py-1 text-xs text-fg outline-none focus:border-accent/50"
                     >
                       {SUPPORTED_LOCALES.map((option) => (
                         <option key={option} value={option}>
@@ -198,7 +244,7 @@ export default function SettingsPanel(): JSX.Element | null {
                       ))}
                     </select>
                   </div>
-                  <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs text-neutral-300">
+                  <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs text-fg">
                     <input
                       type="checkbox"
                       checked={showContextBeforeSend}
@@ -207,7 +253,7 @@ export default function SettingsPanel(): JSX.Element | null {
                     />
                     {t('settings.showContextBeforeSend')}
                   </label>
-                  <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs text-neutral-300">
+                  <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs text-fg">
                     <input
                       type="checkbox"
                       checked={showJobsPanelAlways}
@@ -216,7 +262,7 @@ export default function SettingsPanel(): JSX.Element | null {
                     />
                     {t('settings.showJobsPanelAlways')}
                   </label>
-                  <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs text-neutral-300">
+                  <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs text-fg">
                     <input
                       type="checkbox"
                       checked={showRawToolRows}
@@ -225,12 +271,12 @@ export default function SettingsPanel(): JSX.Element | null {
                     />
                     <span>
                       {t('settings.showRawToolRows')}
-                      <span className="mt-0.5 block text-3xs text-neutral-500">
+                      <span className="mt-0.5 block text-3xs text-fg-muted">
                         {t('settings.showRawToolRowsHint')}
                       </span>
                     </span>
                   </label>
-                  <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs text-neutral-300">
+                  <label className="mt-3 flex cursor-pointer items-center gap-2 text-xs text-fg">
                     <input
                       type="checkbox"
                       checked={showContextWarning}
@@ -239,15 +285,15 @@ export default function SettingsPanel(): JSX.Element | null {
                     />
                     <span>
                       {t('settings.showContextWarning')}
-                      <span className="mt-0.5 block text-3xs text-neutral-500">
+                      <span className="mt-0.5 block text-3xs text-fg-muted">
                         {t('settings.showContextWarningHint')}
                       </span>
                     </span>
                   </label>
                   <div className="mt-3 flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-xs text-neutral-300">{t('settings.chatOnProjectSwitch')}</p>
-                      <p className="mt-0.5 text-3xs text-neutral-500">
+                      <p className="text-xs text-fg">{t('settings.chatOnProjectSwitch')}</p>
+                      <p className="mt-0.5 text-3xs text-fg-muted">
                         {t('settings.chatOnProjectSwitchHint')}
                       </p>
                     </div>
@@ -259,7 +305,7 @@ export default function SettingsPanel(): JSX.Element | null {
                         )
                       }
                       aria-label={t('settings.chatOnProjectSwitch')}
-                      className="shrink-0 rounded border border-border bg-bg-secondary px-2 py-1 text-xs text-neutral-200 outline-none focus:border-accent/50"
+                      className="shrink-0 rounded border border-border bg-bg-secondary px-2 py-1 text-xs text-fg outline-none focus:border-accent/50"
                     >
                       <option value="ask">{t('projectSwitch.ask')}</option>
                       <option value="link">{t('projectSwitch.link')}</option>

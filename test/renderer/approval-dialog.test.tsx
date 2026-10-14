@@ -114,8 +114,10 @@ describe('Task 2.3 - clearer approval dialog', () => {
     })
     render(<ApprovalDialog />)
 
-    expect(screen.getByText('npm').className).toContain('text-red-400')
-    expect(screen.getByText('chmod').className).toContain('text-red-400')
+    // v2.7.0: the destructive highlight is the semantic `danger` token, which
+    // resolves per theme instead of a fixed red tuned for a dark background.
+    expect(screen.getByText('npm').className).toContain('text-danger')
+    expect(screen.getByText('chmod').className).toContain('text-danger')
   })
 })
 

@@ -1,5 +1,6 @@
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
+import { writeFileAtomic } from '@core/atomic-write'
 import type { ChatMessage } from '@shared/types'
 import type { AgentRunResult, AgentStatus } from '@shared/agent'
 
@@ -121,9 +122,7 @@ export class FileSessionStore implements SessionStore {
     await fs.mkdir(this.dir, { recursive: true })
     const payload: AgentSession = { ...session, id, version: SESSION_SCHEMA_VERSION }
     const file = this.fileFor(id)
-    const tmp = `${file}.${process.pid}.${Date.now()}.tmp`
-    await fs.writeFile(tmp, `${JSON.stringify(payload, null, 2)}\n`, 'utf8')
-    await fs.rename(tmp, file)
+    await writeFileAtomic(file, `${JSON.stringify(payload, null, 2)}\n`)
   }
 
   async load(id: string): Promise<AgentSession | null> {

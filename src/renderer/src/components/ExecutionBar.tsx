@@ -45,7 +45,7 @@ function DiagnosticBadge(): JSX.Element | null {
       title={`${t('settings.diagnosticOn')}${
         minutes > 0 ? ` · ${t('settings.diagnosticRemaining', { minutes })}` : ''
       }`}
-      className="flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-3xs font-medium text-amber-300"
+      className="flex items-center gap-1 rounded-full border border-warning/40 bg-warning/10 px-1.5 py-0.5 text-3xs font-medium text-warning"
     >
       <Activity className="h-3 w-3" />
       {t('settings.diagnosticTitle')}
@@ -65,9 +65,9 @@ function useCountdown(target: number | null): number {
 }
 
 const APPROVAL_TONE = {
-  ask: 'border-sky-500/40 bg-sky-500/10 text-sky-300',
-  'auto-write': 'border-border bg-bg-tertiary text-neutral-300',
-  full: 'border-amber-500/50 bg-amber-500/15 text-amber-300'
+  ask: 'border-info/40 bg-info/10 text-info',
+  'auto-write': 'border-border bg-bg-tertiary text-fg',
+  full: 'border-warning/50 bg-warning/15 text-warning'
 } as const
 
 export default function ExecutionBar({
@@ -121,7 +121,7 @@ export default function ExecutionBar({
 
   const iconButton = (active: boolean): string =>
     `flex h-5 w-5 shrink-0 items-center justify-center rounded transition ${
-      active ? 'bg-accent/20 text-accent' : 'text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300'
+      active ? 'bg-accent-solid/20 text-accent' : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
     }`
 
   return (
@@ -142,20 +142,20 @@ export default function ExecutionBar({
         </button>
         <span
           data-testid="exec-project"
-          className="max-w-[10rem] truncate font-medium text-neutral-200"
+          className="max-w-[10rem] truncate font-medium text-fg"
           title={projectName}
         >
           {projectName}
         </span>
-        <span className="shrink-0 text-neutral-700">/</span>
-        <span data-testid="exec-server" className="max-w-[9rem] truncate text-neutral-400" title={serverName}>
+        <span className="shrink-0 text-fg-subtle">/</span>
+        <span data-testid="exec-server" className="max-w-[9rem] truncate text-fg-muted" title={serverName}>
           {serverName}
         </span>
-        <span className="shrink-0 text-neutral-700">/</span>
+        <span className="shrink-0 text-fg-subtle">/</span>
         <span
           data-testid="exec-path"
           dir="ltr"
-          className="min-w-0 flex-1 truncate font-mono text-3xs text-neutral-500"
+          className="min-w-0 flex-1 truncate font-mono text-3xs text-fg-muted"
           title={path}
         >
           {path}
@@ -166,9 +166,12 @@ export default function ExecutionBar({
           <VpsSelector />
           <button
             type="button"
-            onClick={() => newSession()}
+            onClick={() => {
+              // U-4: `newSession` wipes messages, logs, decisions and pending diffs.
+              if (window.confirm(t('common.clearChatConfirm'))) newSession()
+            }}
             title={t('chat.clear')}
-            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300"
+            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-fg-muted hover:bg-bg-tertiary hover:text-fg"
           >
             <Trash2 className="h-3 w-3" />
             <span className="hidden sm:inline">{t('chat.clear')}</span>
@@ -180,7 +183,7 @@ export default function ExecutionBar({
       <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
         <span className="flex min-w-0 items-center gap-2">
           <GitStatusPill />
-          <span className="text-neutral-700">·</span>
+          <span className="text-fg-subtle">·</span>
           <span
             data-testid="exec-connection"
             data-connection={connection.kind}
@@ -192,7 +195,7 @@ export default function ExecutionBar({
             <ConnectionIcon className="h-3 w-3 shrink-0" />
             <span className="truncate">{t(connection.labelKey)}</span>
           </span>
-          <span className="text-neutral-700">·</span>
+          <span className="text-fg-subtle">·</span>
           <button
             type="button"
             data-testid="exec-approval"
@@ -216,7 +219,7 @@ export default function ExecutionBar({
             onClick={() => setPlanMode(!planMode)}
             title={t('chat.planModeHint')}
             className={`flex items-center gap-1 rounded px-1.5 py-0.5 transition ${
-              planMode ? 'bg-accent/20 text-accent' : 'text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300'
+              planMode ? 'bg-accent-solid/20 text-accent' : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
             }`}
           >
             <ShieldAlert className="h-3 w-3" />
@@ -246,7 +249,7 @@ export default function ExecutionBar({
               data-testid="exec-stop"
               onClick={abort}
               title={t('chat.stop')}
-              className="flex items-center gap-1 rounded bg-red-500/20 px-1.5 py-0.5 text-red-400 hover:bg-red-500/30"
+              className="flex items-center gap-1 rounded bg-danger/20 px-1.5 py-0.5 text-danger hover:bg-danger/30"
             >
               <Square className="h-3 w-3" />
               {t('chat.stop')}

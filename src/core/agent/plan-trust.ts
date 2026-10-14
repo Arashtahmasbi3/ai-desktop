@@ -99,6 +99,21 @@ export function parsePlanScope(raw: unknown): PlanScope | null {
   return scope
 }
 
+/**
+ * Parse the per-step tool+argument bindings (v2.6.5). Returns `null` when the
+ * field is absent or malformed; such a record predates the binding fix, so it is
+ * reported as legacy and the user is asked to re-approve.
+ */
+export function parseStepFingerprints(raw: unknown): Record<string, string> | null {
+  if (!isRecord(raw)) return null
+  const out: Record<string, string> = {}
+  for (const [key, value] of Object.entries(raw)) {
+    if (typeof value !== 'string' || value.length === 0) return null
+    out[key] = value
+  }
+  return Object.keys(out).length > 0 ? out : null
+}
+
 type ParsedPlanTrust =
   | { kind: 'none' }
   | { kind: 'legacy' }
@@ -116,7 +131,14 @@ function parsePlanTrustDetailed(raw: unknown): ParsedPlanTrust {
   const scope = parsePlanScope(raw.scope)
   // A structurally valid record with no usable scope is a pre-v2.6.2 trust.
   if (!scope) return { kind: 'legacy' }
-  return { kind: 'plan', plan: { id, runId, stepIds, approvedAt, expiresAt, scope } }
+  // v2.6.5: an id-only trust predates the per-step binding and can never be
+  // auto-approved, so it takes the legacy path (the user re-approves).
+  const stepFingerprints = parseStepFingerprints(raw.stepFingerprints)
+  if (!stepFingerprints) return { kind: 'legacy' }
+  return {
+    kind: 'plan',
+    plan: { id, runId, stepIds, approvedAt, expiresAt, scope, stepFingerprints }
+  }
 }
 
 /**

@@ -70,9 +70,9 @@ function exportChat(chat: { id: string; title: string }): void {
 type DotState = 'connected' | 'disconnected' | 'missing'
 
 function dotClass(state: DotState): string {
-  if (state === 'connected') return 'bg-emerald-500'
-  if (state === 'missing') return 'bg-amber-500'
-  return 'bg-red-500'
+  if (state === 'connected') return 'bg-success'
+  if (state === 'missing') return 'bg-warning'
+  return 'bg-danger'
 }
 
 export interface SidebarProps {
@@ -241,20 +241,20 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
               onClick={() => setView(item.id)}
               className={`relative flex h-9 w-9 items-center justify-center rounded-lg transition ${
                 active
-                  ? 'bg-accent/20 text-accent'
-                  : 'text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300'
+                  ? 'bg-accent-solid/20 text-accent'
+                  : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
               }`}
             >
               <Icon className="h-4 w-4" />
               {item.id === 'tasks' && runningJobs > 0 ? (
                 <span
                   data-testid="sidebar-jobs-badge-collapsed"
-                  className="absolute -right-1 -top-1 min-w-[14px] rounded-full bg-accent px-1 text-center text-4xs font-semibold leading-3.5 text-bg-primary"
+                  className="absolute -right-1 -top-1 min-w-[14px] rounded-full bg-accent-solid px-1 text-center text-4xs font-semibold leading-3.5 text-bg-primary"
                 >
                   {runningJobs}
                 </span>
               ) : item.id === 'tasks' && (worker?.active ?? 0) > 0 ? (
-                <span className="absolute right-1 top-1 h-1.5 w-1.5 animate-pulse rounded-full bg-sky-400" />
+                <span className="absolute right-1 top-1 h-1.5 w-1.5 animate-pulse rounded-full bg-info" />
               ) : null}
             </button>
           )
@@ -268,8 +268,8 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
           onClick={() => setSidebarPinned(!sidebarPinned)}
           className={`mt-auto flex h-9 w-9 items-center justify-center rounded-lg ${
             sidebarPinned
-              ? 'bg-accent/15 text-accent'
-              : 'text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300'
+              ? 'bg-accent-solid/15 text-accent'
+              : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
           }`}
         >
           <Pin className="h-4 w-4" />
@@ -279,7 +279,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
           title={t('common.settings')}
           aria-label={t('common.settings')}
           onClick={openSettings}
-          className="flex h-9 w-9 items-center justify-center rounded-lg text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300"
+          className="flex h-9 w-9 items-center justify-center rounded-lg text-fg-muted hover:bg-bg-tertiary hover:text-fg"
         >
           <Settings2 className="h-4 w-4" />
         </button>
@@ -299,14 +299,14 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
             onClick={() => setWorkspaceOpen((open) => !open)}
             className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-bg-tertiary"
           >
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-accent/15 text-accent">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-accent-solid/15 text-accent">
               <FolderTree className="h-3.5 w-3.5" />
             </span>
-            <span className="min-w-0 flex-1 truncate text-xs font-medium text-neutral-200">
+            <span className="min-w-0 flex-1 truncate text-xs font-medium text-fg">
               {activeProject?.name ?? 'AI Desktop'}
             </span>
             <GitStatusPill />
-            <ChevronDown className="h-3.5 w-3.5 shrink-0 text-neutral-500" />
+            <ChevronDown className="h-3.5 w-3.5 shrink-0 text-fg-muted" />
           </button>
           {workspaceOpen ? (
             <>
@@ -324,7 +324,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                       setWorkspaceOpen(false)
                       void openProject(project.id)
                     }}
-                    className="block w-full truncate px-3 py-1.5 text-left text-neutral-300 hover:bg-bg-tertiary"
+                    className="block w-full truncate px-3 py-1.5 text-left text-fg hover:bg-bg-tertiary"
                   >
                     {project.name}
                   </button>
@@ -338,7 +338,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
           <button
             type="button"
             onClick={() => newSession()}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border bg-bg-primary px-2 py-1.5 text-xs font-medium text-neutral-200 transition hover:border-accent/50 hover:bg-bg-tertiary"
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border bg-bg-primary px-2 py-1.5 text-xs font-medium text-fg transition hover:border-accent/50 hover:bg-bg-tertiary"
           >
             <Plus className="h-3.5 w-3.5" />
             {t('sidebar.newChat')}
@@ -356,18 +356,18 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                 setView('tasks')
               }
             }}
-            className="relative flex h-7 w-7 items-center justify-center rounded-lg text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300"
+            className="relative flex h-7 w-7 items-center justify-center rounded-lg text-fg-muted hover:bg-bg-tertiary hover:text-fg"
           >
             <Bell className="h-3.5 w-3.5" />
             {runningJobs > 0 ? (
               <span
                 data-testid="sidebar-jobs-badge"
-                className="absolute -right-1 -top-1 min-w-[14px] rounded-full bg-accent px-1 text-center text-4xs font-semibold leading-3.5 text-bg-primary"
+                className="absolute -right-1 -top-1 min-w-[14px] rounded-full bg-accent-solid px-1 text-center text-4xs font-semibold leading-3.5 text-bg-primary"
               >
                 {runningJobs}
               </span>
             ) : (worker?.active ?? 0) > 0 ? (
-              <span className="absolute right-1 top-1 h-1.5 w-1.5 animate-pulse rounded-full bg-sky-400" />
+              <span className="absolute right-1 top-1 h-1.5 w-1.5 animate-pulse rounded-full bg-info" />
             ) : null}
           </button>
           <button
@@ -379,8 +379,8 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
             onClick={() => setSidebarPinned(!sidebarPinned)}
             className={`flex h-7 w-7 items-center justify-center rounded-lg ${
               sidebarPinned
-                ? 'bg-accent/15 text-accent'
-                : 'text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300'
+                ? 'bg-accent-solid/15 text-accent'
+                : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
             }`}
           >
             <Pin className="h-3.5 w-3.5" />
@@ -388,16 +388,16 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
         </div>
 
         <label className="flex items-center gap-1.5 rounded-lg border border-border bg-bg-primary px-2 py-1.5 focus-within:border-accent/50">
-          <Search className="h-3.5 w-3.5 text-neutral-500" />
+          <Search className="h-3.5 w-3.5 text-fg-muted" />
           <input
             ref={searchRef}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={t('common.search')}
             aria-label={t('common.search')}
-            className="w-full bg-transparent text-xs text-neutral-200 outline-none placeholder:text-neutral-600"
+            className="w-full bg-transparent text-xs text-fg outline-none placeholder:text-fg-muted"
           />
-          <kbd className="shrink-0 rounded border border-border px-1 text-4xs text-neutral-600">
+          <kbd className="shrink-0 rounded border border-border px-1 text-4xs text-fg-muted">
             Ctrl ⇧ K
           </kbd>
         </label>
@@ -409,7 +409,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
             type="button"
             onClick={() => setProjectsOpen((open) => !open)}
             aria-expanded={projectsOpen}
-            className="flex w-full items-center gap-1 px-2 py-1 text-3xs font-semibold uppercase tracking-wide text-neutral-500 hover:text-neutral-300"
+            className="flex w-full items-center gap-1 px-2 py-1 text-3xs font-semibold uppercase tracking-wide text-fg-muted hover:text-fg"
           >
             {projectsOpen ? (
               <ChevronDown className="h-3 w-3 shrink-0" />
@@ -419,7 +419,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
             {t('sidebar.projects')}
           </button>
           {projectsOpen && projects.length === 0 ? (
-            <p className="px-2 py-1 text-2xs text-neutral-600">{t('settings.noProjects')}</p>
+            <p className="px-2 py-1 text-2xs text-fg-muted">{t('settings.noProjects')}</p>
           ) : projectsOpen ? (
             projects.map((project) => {
               const state = projectState(project)
@@ -433,8 +433,8 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                       onClick={() => void openProject(project.id)}
                       className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left transition ${
                         project.id === settings?.activeProjectId
-                          ? 'bg-accent/15 text-neutral-100'
-                          : 'text-neutral-300 hover:bg-bg-tertiary'
+                          ? 'bg-accent-solid/15 text-fg-strong'
+                          : 'text-fg hover:bg-bg-tertiary'
                       }`}
                     >
                       <span className="min-w-0 flex-1">
@@ -449,16 +449,16 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                           )}
                         />
                         {project.type === 'remote' && !project.vpsId ? (
-                          <span className="block truncate text-3xs text-amber-400/90">
-                            ⚠ VPS را انتخاب کنید
+                          <span className="block truncate text-3xs text-warning/90">
+                            {`⚠ ${t('sidebar.remoteNoVps')}`}
                           </span>
                         ) : state === 'missing' ? (
-                          <span className="block truncate text-3xs text-amber-400/90">
+                          <span className="block truncate text-3xs text-warning/90">
                             {project.osMismatch ? t('sidebar.osMismatch') : t('sidebar.missingPath')}
                           </span>
                         ) : (
                           <span
-                            className="block truncate text-3xs text-neutral-600"
+                            className="block truncate text-3xs text-fg-muted"
                             dir="ltr"
                           >
                             {basename(project.path)}
@@ -470,7 +470,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                       <span
                         data-testid="project-chat-count"
                         title={t('sidebar.chatCount', { count: chatCount })}
-                        className="shrink-0 rounded bg-bg-primary px-1.5 py-0.5 text-3xs text-neutral-500 group-hover:hidden"
+                        className="shrink-0 rounded bg-bg-primary px-1.5 py-0.5 text-3xs text-fg-muted group-hover:hidden group-focus-within:hidden"
                       >
                         {chatCount}
                       </span>
@@ -481,7 +481,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                       onClick={() =>
                         setProjectMenuFor(projectMenuFor === project.id ? null : project.id)
                       }
-                      className="hidden shrink-0 rounded p-1 text-neutral-500 hover:bg-bg-primary hover:text-neutral-200 group-hover:block"
+                      className="hidden shrink-0 rounded p-1 text-fg-muted hover:bg-bg-primary hover:text-fg focus-visible:block group-hover:block group-focus-within:block"
                     >
                       <MoreHorizontal className="h-3.5 w-3.5" />
                     </button>
@@ -505,7 +505,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                             setProjectMenuFor(null)
                             void locate(project.id)
                           }}
-                          className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-neutral-300 hover:bg-bg-tertiary"
+                          className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-fg hover:bg-bg-tertiary"
                         >
                           <MapPin className="h-3 w-3" />
                           {t('sidebar.locate')}
@@ -516,7 +516,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                             role="menuitem"
                             disabled={searchingId === project.id}
                             onClick={() => void searchOnVps(project)}
-                            className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-neutral-300 hover:bg-bg-tertiary disabled:opacity-40"
+                            className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-fg hover:bg-bg-tertiary disabled:opacity-40"
                           >
                             <Server className="h-3 w-3" />
                             {t('sidebar.searchOnVps')}
@@ -531,7 +531,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                               void removeProject(project.id)
                             }
                           }}
-                          className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-red-400 hover:bg-bg-tertiary"
+                          className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-danger hover:bg-bg-tertiary"
                         >
                           <Trash2 className="h-3 w-3" />
                           {t('common.remove')}
@@ -542,7 +542,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
 
                   {vpsSearch?.id === project.id ? (
                     <div className="ml-2 mt-0.5 rounded-lg border border-border bg-bg-primary p-1">
-                      <p className="px-1 py-0.5 text-3xs text-neutral-500">
+                      <p className="px-1 py-0.5 text-3xs text-fg-muted">
                         {t('vps.found', { count: vpsSearch.paths.length })}
                       </p>
                       {vpsSearch.paths.map((remotePath) => (
@@ -551,7 +551,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                           type="button"
                           dir="ltr"
                           onClick={() => void addFoundRemote(project.name, remotePath)}
-                          className="block w-full truncate rounded px-1.5 py-1 text-left text-2xs text-neutral-300 hover:bg-bg-tertiary"
+                          className="block w-full truncate rounded px-1.5 py-1 text-left text-2xs text-fg hover:bg-bg-tertiary"
                         >
                           {remotePath}
                         </button>
@@ -565,15 +565,15 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
         </section>
 
         <section>
-          <h3 className="px-2 py-1 text-3xs font-semibold uppercase tracking-wide text-neutral-500">
+          <h3 className="px-2 py-1 text-3xs font-semibold uppercase tracking-wide text-fg-muted">
             {t('sidebar.recents')}
           </h3>
           {chats.length === 0 ? (
-            <p className="px-2 py-3 text-2xs leading-relaxed text-neutral-600">
+            <p className="px-2 py-3 text-2xs leading-relaxed text-fg-muted">
               {t('sidebar.emptyChats')}
             </p>
           ) : filtered.length === 0 ? (
-            <p className="px-2 py-3 text-2xs text-neutral-600">{t('palette.noResults')}</p>
+            <p className="px-2 py-3 text-2xs text-fg-muted">{t('palette.noResults')}</p>
           ) : (
             filtered.map((chat) => (
               <div key={chat.id} className="group relative">
@@ -582,13 +582,13 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                   onClick={() => void loadSession(chat.id)}
                   className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition ${
                     activeChatId === chat.id
-                      ? 'bg-accent/15 text-neutral-100'
-                      : 'text-neutral-300 hover:bg-bg-tertiary'
+                      ? 'bg-accent-solid/15 text-fg-strong'
+                      : 'text-fg hover:bg-bg-tertiary'
                   }`}
                 >
-                  <MessageSquare className="h-3.5 w-3.5 shrink-0 text-neutral-500" />
+                  <MessageSquare className="h-3.5 w-3.5 shrink-0 text-fg-muted" />
                   <span className="min-w-0 flex-1 truncate text-xs">{chat.title}</span>
-                  <span className="shrink-0 text-3xs text-neutral-600">
+                  <span className="shrink-0 text-3xs text-fg-muted">
                     {relativeTime(chat.updatedAt)}
                   </span>
                   <span
@@ -605,7 +605,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                         setChatMenuFor(chat.id)
                       }
                     }}
-                    className="hidden shrink-0 rounded p-0.5 text-neutral-500 hover:bg-bg-primary hover:text-neutral-200 group-hover:block"
+                    className="hidden shrink-0 rounded p-0.5 text-fg-muted hover:bg-bg-primary hover:text-fg focus-visible:block group-hover:block group-focus-within:block"
                   >
                     <MoreHorizontal className="h-3.5 w-3.5" />
                   </span>
@@ -626,7 +626,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                         type="button"
                         role="menuitem"
                         onClick={() => onRename(chat)}
-                        className="block w-full px-3 py-1.5 text-left text-neutral-300 hover:bg-bg-tertiary"
+                        className="block w-full px-3 py-1.5 text-left text-fg hover:bg-bg-tertiary"
                       >
                         {t('common.rename')}
                       </button>
@@ -637,7 +637,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                           setChatMenuFor(null)
                           void duplicateChat(chat.id)
                         }}
-                        className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-neutral-300 hover:bg-bg-tertiary"
+                        className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-fg hover:bg-bg-tertiary"
                       >
                         <Copy className="h-3 w-3" />
                         {t('common.duplicate')}
@@ -649,7 +649,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                           setChatMenuFor(null)
                           exportChat(chat)
                         }}
-                        className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-neutral-300 hover:bg-bg-tertiary"
+                        className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-fg hover:bg-bg-tertiary"
                       >
                         <Download className="h-3 w-3" />
                         {t('common.export')}
@@ -658,7 +658,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                         type="button"
                         role="menuitem"
                         onClick={() => onDelete(chat)}
-                        className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-red-400 hover:bg-bg-tertiary"
+                        className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-danger hover:bg-bg-tertiary"
                       >
                         <Trash2 className="h-3 w-3" />
                         {t('common.delete')}
@@ -677,7 +677,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
           <button
             type="button"
             onClick={() => setView('files')}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-2xs text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200"
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-2xs text-fg-muted hover:bg-bg-tertiary hover:text-fg"
           >
             <FolderTree className="h-3 w-3" />
             {t('sidebar.navWorkspace')}
@@ -685,7 +685,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
           <button
             type="button"
             onClick={openSettings}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-2xs text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200"
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-2xs text-fg-muted hover:bg-bg-tertiary hover:text-fg"
           >
             <Plug className="h-3 w-3" />
             Plugins
@@ -695,16 +695,16 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
             title={`${t('common.settings')} (Ctrl+,)`}
             aria-label={t('common.settings')}
             onClick={openSettings}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300"
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-fg-muted hover:bg-bg-tertiary hover:text-fg"
           >
             <Settings2 className="h-3.5 w-3.5" />
           </button>
         </div>
         <div className="flex items-center gap-2 px-1">
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-bg-tertiary text-neutral-300">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-bg-tertiary text-fg">
             <User className="h-3 w-3" />
           </span>
-          <span className="text-xs text-neutral-400">{t('sidebar.user')}</span>
+          <span className="text-xs text-fg-muted">{t('sidebar.user')}</span>
         </div>
       </div>
     </nav>

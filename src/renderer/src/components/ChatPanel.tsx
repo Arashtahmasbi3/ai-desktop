@@ -131,16 +131,16 @@ export default function ChatPanel(): JSX.Element {
   }
   const statusTone =
     wsStatus.tone === 'error'
-      ? 'border-red-500/30 bg-red-500/10 text-red-300'
+      ? 'border-danger/30 bg-danger/10 text-danger'
       : wsStatus.tone === 'warning'
-        ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
-        : 'border-border bg-bg-tertiary text-neutral-300'
+        ? 'border-warning/30 bg-warning/10 text-warning'
+        : 'border-border bg-bg-tertiary text-fg'
   const statusActionTone =
     wsStatus.tone === 'error'
-      ? 'border-red-500/40 text-red-200 hover:bg-red-500/15'
+      ? 'border-danger/40 text-danger hover:bg-danger/15'
       : wsStatus.tone === 'warning'
-        ? 'border-amber-500/40 text-amber-200 hover:bg-amber-500/15'
-        : 'border-border text-neutral-300 hover:bg-bg-secondary'
+        ? 'border-warning/40 text-warning hover:bg-warning/15'
+        : 'border-border text-fg hover:bg-bg-secondary'
 
   const commands = useMemo<SlashCommand[]>(
     () => [
@@ -324,16 +324,16 @@ export default function ChatPanel(): JSX.Element {
 
         {messages.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent/15">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-solid/15">
               <Bot className="h-7 w-7 text-accent" />
             </div>
             <div>
-              <h1 className="text-lg font-semibold text-neutral-100">
+              <h1 className="text-lg font-semibold text-fg-strong">
                 {activeProject
                   ? t('chat.emptyTitleProject', { project: activeProject.name })
                   : t('chat.emptyTitle')}
               </h1>
-              <p className="mt-1 max-w-md text-sm text-neutral-400">{t('chat.emptyBody')}</p>
+              <p className="mt-1 max-w-md text-sm text-fg-muted">{t('chat.emptyBody')}</p>
             </div>
             <div className="grid max-w-lg grid-cols-1 gap-2 sm:grid-cols-2">
               {SUGGESTION_KEYS.map((key) => (
@@ -341,7 +341,7 @@ export default function ChatPanel(): JSX.Element {
                   key={key}
                   type="button"
                   onClick={() => void send(t(key))}
-                  className="rounded-lg border border-border bg-bg-secondary px-3 py-2 text-start text-xs text-neutral-300 transition hover:border-accent/50 hover:bg-bg-tertiary"
+                  className="rounded-lg border border-border bg-bg-secondary px-3 py-2 text-start text-xs text-fg transition hover:border-accent/50 hover:bg-bg-tertiary"
                 >
                   {t(key)}
                 </button>
@@ -380,7 +380,7 @@ export default function ChatPanel(): JSX.Element {
           type="button"
           onClick={scrollToBottom}
           aria-label={t('chat.typing')}
-          className="absolute bottom-36 left-1/2 flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-full border border-border bg-bg-secondary text-neutral-300 shadow-lg hover:bg-bg-tertiary"
+          className="absolute bottom-36 left-1/2 flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-full border border-border bg-bg-secondary text-fg shadow-lg hover:bg-bg-tertiary"
         >
           <ArrowDown className="h-4 w-4" />
         </button>
@@ -399,7 +399,7 @@ export default function ChatPanel(): JSX.Element {
       ) : null}
 
       {warnings.length > 0 ? (
-        <div className="mx-3 mb-2 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-2xs text-amber-300">
+        <div className="mx-3 mb-2 flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-2xs text-warning">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <div className="flex flex-col gap-0.5">
             {warnings.map((warning, index) => (
@@ -418,7 +418,7 @@ export default function ChatPanel(): JSX.Element {
           className="mx-auto w-full px-4"
         >
         {approvalSuggestion ? (
-          <div className="mx-3 mb-1 flex items-center justify-between gap-2 rounded-lg border border-accent/40 bg-accent/10 px-2 py-1.5 text-2xs text-neutral-200">
+          <div className="mx-3 mb-1 flex items-center justify-between gap-2 rounded-lg border border-accent/40 bg-accent-solid/10 px-2 py-1.5 text-2xs text-fg">
             <span>
               {t('chat.rememberSuggestion', { tool: approvalSuggestion.tool })}
             </span>
@@ -426,14 +426,14 @@ export default function ChatPanel(): JSX.Element {
               <button
                 type="button"
                 onClick={() => dismissApprovalSuggestion()}
-                className="rounded border border-border px-1.5 py-0.5 text-neutral-400 hover:bg-bg-tertiary"
+                className="rounded border border-border px-1.5 py-0.5 text-fg-muted hover:bg-bg-tertiary"
               >
                 {t('common.cancel')}
               </button>
               <button
                 type="button"
                 onClick={() => void rememberApprovalTool(approvalSuggestion.tool)}
-                className="rounded bg-accent px-1.5 py-0.5 font-medium text-white hover:bg-accent-hover"
+                className="rounded bg-accent-solid px-1.5 py-0.5 font-medium text-white hover:bg-accent-solid-hover"
               >
                 {t('chat.approvalAlways')}
               </button>
@@ -447,7 +447,7 @@ export default function ChatPanel(): JSX.Element {
             {attached.map((path) => (
               <span
                 key={path}
-                className="flex items-center gap-1 rounded border border-border bg-bg-primary px-2 py-0.5 text-3xs text-neutral-400"
+                className="flex items-center gap-1 rounded border border-border bg-bg-primary px-2 py-0.5 text-3xs text-fg-muted"
               >
                 <span className="max-w-[14rem] truncate" dir="ltr">
                   {basename(path)}
@@ -456,7 +456,7 @@ export default function ChatPanel(): JSX.Element {
                   type="button"
                   onClick={() => setAttached((current) => current.filter((item) => item !== path))}
                   aria-label={t('common.remove')}
-                  className="text-neutral-600 hover:text-red-400"
+                  className="text-fg-subtle hover:text-danger"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -477,11 +477,11 @@ export default function ChatPanel(): JSX.Element {
                   }}
                   onMouseEnter={() => setCommandIndex(index)}
                   className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs transition ${
-                    index === commandIndex ? 'bg-bg-tertiary text-neutral-100' : 'text-neutral-400'
+                    index === commandIndex ? 'bg-bg-tertiary text-fg-strong' : 'text-fg-muted'
                   }`}
                 >
                   <span className="font-mono text-accent">/{command.id}</span>
-                  <span className="truncate text-neutral-500">{t(command.descKey)}</span>
+                  <span className="truncate text-fg-muted">{t(command.descKey)}</span>
                 </button>
               ))}
             </div>
@@ -494,7 +494,7 @@ export default function ChatPanel(): JSX.Element {
               onClick={() => void attach()}
               title={t('chat.attach')}
               aria-label={t('chat.attach')}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-fg-muted hover:bg-bg-tertiary hover:text-fg"
             >
               <Paperclip className="h-4 w-4" />
             </button>
@@ -512,7 +512,7 @@ export default function ChatPanel(): JSX.Element {
               rows={1}
               dir={dir}
               placeholder={t('chat.placeholder')}
-              className="max-h-[200px] min-h-[2.25rem] flex-1 resize-none bg-transparent px-1 py-1.5 text-sm text-neutral-100 outline-none placeholder:text-neutral-600"
+              className="max-h-[200px] min-h-[2.25rem] flex-1 resize-none bg-transparent px-1 py-1.5 text-sm text-fg-strong outline-none placeholder:text-fg-subtle"
             />
             <span className="shrink-0">
               <ModelSwitcher />
@@ -523,7 +523,7 @@ export default function ChatPanel(): JSX.Element {
                 onClick={abort}
                 title={`${t('chat.stop')} (Shift+Esc)`}
                 aria-label={`${t('chat.stop')} (Shift+Esc)`}
-                className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                className="flex h-8 w-8 items-center justify-center rounded-lg bg-danger/20 text-danger hover:bg-danger/30"
               >
                 <Square className="h-4 w-4" />
               </button>
@@ -536,8 +536,8 @@ export default function ChatPanel(): JSX.Element {
                 aria-label={t('chat.send')}
                 className={`flex h-8 w-8 items-center justify-center rounded-lg text-white transition ${
                   input.trim() || attached.length > 0
-                    ? 'bg-accent hover:bg-accent-hover'
-                    : 'bg-bg-tertiary text-neutral-500'
+                    ? 'bg-accent-solid hover:bg-accent-solid-hover'
+                    : 'bg-bg-tertiary text-fg-muted'
                 } disabled:cursor-not-allowed`}
               >
                 <Send className="h-4 w-4" />
@@ -556,7 +556,7 @@ export default function ChatPanel(): JSX.Element {
                   )
                 }
                 title={t('chat.viewContext')}
-                className="flex items-center gap-1 rounded-lg px-1.5 py-0.5 text-3xs text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300"
+                className="flex items-center gap-1 rounded-lg px-1.5 py-0.5 text-3xs text-fg-muted hover:bg-bg-tertiary hover:text-fg"
               >
                 <Eye className="h-3 w-3" />
                 {t('chat.viewContext')}
@@ -572,7 +572,7 @@ export default function ChatPanel(): JSX.Element {
             ) : null}
           </div>
         </div>
-        <div className="mt-1.5 flex items-center justify-between px-1 text-3xs text-neutral-600">
+        <div className="mt-1.5 flex items-center justify-between px-1 text-3xs text-fg-subtle">
           <span>Enter = {t('chat.send')} · Shift+Enter = ↵ · Ctrl+Enter = {t('chat.send')}</span>
         </div>
         </div>

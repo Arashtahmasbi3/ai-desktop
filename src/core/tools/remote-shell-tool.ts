@@ -2,6 +2,7 @@ import type { ToolDefinition } from '@shared/types'
 import type { VpsExecResult } from '@shared/vps'
 import { checkDenyList } from '@core/agent/deny-list'
 import { enforceCommandPaths } from '@core/remote/path-guard'
+import { shellQuote } from '@core/sandbox/paths'
 import { findSecretPathsInCommand } from '@shared/secret-paths'
 import type { DiagnosticPolicy } from '@core/remote/diagnostic-policy'
 
@@ -86,10 +87,12 @@ export interface RemoteShellResult {
 }
 
 /** Rejects its promise after `ms`, carrying the timeout marker. */
-function timeoutAfter(ms: number, command: string): Promise<never> {
-  return new Promise((_resolve, reject) => {
-    setTimeout(() => reject({ remoteTimeout: true, ms, command }), ms)
+function timeoutAfter(ms: number, command: string): { promise: Promise<never>; cancel: () => void } {
+  let timer: ReturnType<typeof setTimeout>
+  const promise = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject({ remoteTimeout: true, ms, command }), ms)
   })
+  return { promise, cancel: () => clearTimeout(timer) }
 }
 
 function isTimeout(error: unknown): error is { remoteTimeout: true; ms: number } {
@@ -144,10 +147,17 @@ export async function executeRemoteShell(
   if (denial.blocked) {
     return { ok: false, blocked: true, content: `Blocked by policy: ${denial.reason}`, ...target }
   }
+  // v2.6.5: the containment reasoning above assumes the project root is the
+  // working directory, but an ssh2 `exec` request starts in the login directory
+  // (`$HOME`). Run every project-scoped command from the root so the premise is
+  // actually true and a relative path cannot resolve outside the project.
+  const effective = deps.projectRoot
+    ? `cd ${shellQuote(deps.projectRoot)} && ${command}`
+    : command
   // Long commands are detached so closing the app no longer kills the work.
   if (deps.jobs?.shouldRunAsJob(command)) {
     try {
-      const job = await deps.jobs.startLongJob(serverId, command)
+      const job = await deps.jobs.startLongJob(serverId, effective)
       return {
         ok: true,
         jobId: job.id,
@@ -161,8 +171,11 @@ export async function executeRemoteShell(
   }
   const timeoutMs = getCommandTimeout(command)
   let result: VpsExecResult
+  // v2.6.5: keep the handle so a fast command does not leave a timer armed for
+  // up to 30 minutes (MIGRATION_TIMEOUT_MS) after the run has already finished.
+  const timeout = timeoutAfter(timeoutMs, command)
   try {
-    result = await Promise.race([deps.exec(serverId, command, timeoutMs), timeoutAfter(timeoutMs, command)])
+    result = await Promise.race([deps.exec(serverId, effective, timeoutMs), timeout.promise])
   } catch (error) {
     if (isTimeout(error)) {
       return {
@@ -174,6 +187,8 @@ export async function executeRemoteShell(
     }
     const message = error instanceof Error ? error.message : String(error)
     return { ok: false, content: `remote_shell failed: ${message}`, ...target }
+  } finally {
+    timeout.cancel()
   }
   // A real command ran, so its streams/exit code are always carried — even when
   // policy stopped it, so the user can see exactly what the host did.

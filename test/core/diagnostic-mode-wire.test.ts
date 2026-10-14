@@ -55,7 +55,9 @@ describe('Diagnostic Mode wiring - remote shell', () => {
     )
     const result = await runShell(runtime, 'cat /etc/os-release')
     expect(result.ok).toBe(true)
-    expect(calls.map((c) => c.command)).toContain('cat /etc/os-release')
+    // v2.6.5: the command is run from the project root so a relative path cannot
+    // resolve against the login directory.
+    expect(calls.map((c) => c.command)).toContain(`cd '${ROOT}' && cat /etc/os-release`)
   })
 
   it('still refuses a write to a system path while diagnostic is active', async () => {

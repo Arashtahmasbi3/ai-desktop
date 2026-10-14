@@ -1,5 +1,5 @@
 import { promises as fs } from 'node:fs'
-import { dirname } from 'node:path'
+import { writeFileAtomic } from '@core/atomic-write'
 import type { OnboardingStatus } from '@shared/onboarding'
 
 export const ONBOARDING_SCHEMA_VERSION = 1
@@ -69,9 +69,6 @@ export class OnboardingStore {
       version: ONBOARDING_SCHEMA_VERSION,
       ...(this.status.completedAt ? { completedAt: this.status.completedAt } : {})
     }
-    await fs.mkdir(dirname(this.file), { recursive: true })
-    const tmp = `${this.file}.${process.pid}.${Date.now()}.tmp`
-    await fs.writeFile(tmp, `${JSON.stringify(payload, null, 2)}\n`, 'utf8')
-    await fs.rename(tmp, this.file)
+    await writeFileAtomic(this.file, `${JSON.stringify(payload, null, 2)}\n`)
   }
 }

@@ -1,7 +1,8 @@
 import { promises as fs } from 'node:fs'
 import { randomUUID } from 'node:crypto'
-import { dirname, isAbsolute, join, normalize, resolve } from 'node:path'
+import { isAbsolute, join, normalize, posix, resolve } from 'node:path'
 import { homedir } from 'node:os'
+import { writeFileAtomic } from '@core/atomic-write'
 import type { ProviderId } from '@shared/types'
 import { isWindowsAbsolutePath } from '@shared/paths'
 import { coerceApprovalMode, type ApprovalMode } from '@shared/approval'
@@ -114,6 +115,16 @@ export function normalizeProjectPath(path: string): string {
   const windowsAbsolute = isWindowsAbsolutePath(trimmed)
   if (!windowsAbsolute && !isAbsolute(trimmed)) {
     throw new Error(`Project path must be absolute: ${trimmed}`)
+  }
+  // v2.6.5: a POSIX path stays POSIX on every platform. `resolve()` on Windows
+  // rewrote `/home/me/project` as `C:\home\me\project`, which corrupted stored
+  // project records and broke the POSIX round-trip that migrateProjectRecord
+  // relies on to detect a remote project.
+  if (!windowsAbsolute && posix.isAbsolute(trimmed)) {
+    const normalizedPosix = posix.normalize(trimmed)
+    // `posix.normalize` keeps a trailing slash; the Windows branch drops it, so
+    // drop it here too and keep the two forms interchangeable.
+    return normalizedPosix.length > 1 ? normalizedPosix.replace(/\/+$/, '') : normalizedPosix
   }
   const normalized = normalize(trimmed)
   if (windowsAbsolute) {
@@ -402,7 +413,10 @@ export class Persistence {
     this.loaded = true
     // A migrated payload removed nothing sensitive on disk yet; rewrite it so
     // legacy plaintext keys (and any schema drift) are replaced by ciphertext.
-    if (storedVersion !== SETTINGS_SCHEMA_VERSION) {
+    // B-14: only an *older* payload is migrated forward. A file written by a
+    // newer (future/beta) build is left untouched — rewriting it would silently
+    // drop the fields this build does not know about.
+    if (storedVersion < SETTINGS_SCHEMA_VERSION) {
       await this.persist()
     }
     return this.settings
@@ -411,10 +425,7 @@ export class Persistence {
   private async persist(): Promise<void> {
     this.settings.version = SETTINGS_SCHEMA_VERSION
     this.settings.updatedAt = this.now()
-    await fs.mkdir(dirname(this.file), { recursive: true })
-    const tmp = `${this.file}.${process.pid}.${Date.now()}.tmp`
-    await fs.writeFile(tmp, `${JSON.stringify(this.settings, null, 2)}\n`, 'utf8')
-    await fs.rename(tmp, this.file)
+    await writeFileAtomic(this.file, `${JSON.stringify(this.settings, null, 2)}\n`)
   }
 
   getSettings(): AppSettings {

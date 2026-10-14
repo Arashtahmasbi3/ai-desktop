@@ -1,5 +1,5 @@
 import { promises as fs } from 'node:fs'
-import { dirname } from 'node:path'
+import { writeFileAtomic } from '@core/atomic-write'
 import type { ApprovedCommandView } from '@shared/approval'
 import {
   canRememberTool,
@@ -128,10 +128,7 @@ export class ApprovedCommands {
   }
 
   private async persist(): Promise<void> {
-    await fs.mkdir(dirname(this.file), { recursive: true })
-    const tmp = `${this.file}.${process.pid}.${Date.now()}.tmp`
-    await fs.writeFile(tmp, `${JSON.stringify(this.data, null, 2)}\n`, 'utf8')
-    await fs.rename(tmp, this.file)
+    await writeFileAtomic(this.file, `${JSON.stringify(this.data, null, 2)}\n`)
   }
 
   /**

@@ -88,7 +88,9 @@ export function planV24Tools(host: V24ToolHost, enabledTools?: string[]): V24Wir
   if (userTools.length > 0) {
     const deps = {
       exec,
-      ...(host.requestSudoApproval ? { approveSudo: host.requestSudoApproval } : {}),
+      // v2.6.5: the sudo gate is mandatory in the manager, so a host without the
+      // hook must deny outright instead of letting `sudo useradd` run unapproved.
+      approveSudo: host.requestSudoApproval ?? (async () => false),
       ...(audit ? { audit } : {})
     }
     extraTools.push(...userTools)

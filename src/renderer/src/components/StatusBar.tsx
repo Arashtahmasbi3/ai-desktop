@@ -5,7 +5,7 @@ import { useStore } from '../store'
 import { CONNECTION_TONE_CLASS, useConnectionStatus } from '../lib/connection-status'
 
 function Dot({ ok }: { ok: boolean }): JSX.Element {
-  return <span className={`h-1.5 w-1.5 rounded-full ${ok ? 'bg-emerald-500' : 'bg-neutral-600'}`} />
+  return <span className={`h-1.5 w-1.5 rounded-full ${ok ? 'bg-success' : 'bg-bg-tertiary'}`} />
 }
 
 export default function StatusBar(): JSX.Element {
@@ -31,32 +31,37 @@ export default function StatusBar(): JSX.Element {
   const agentAddress = remote?.enabled ? `${remote.host}:${remote.port}` : null
 
   return (
-    <footer className="flex h-7 shrink-0 items-center justify-between border-t border-border bg-bg-secondary px-3 text-2xs text-neutral-400">
+    <footer className="flex h-7 shrink-0 items-center justify-between border-t border-border bg-bg-secondary px-3 text-2xs text-fg-muted">
       <div className="flex items-center gap-3">
         <span className="flex items-center gap-1">
           <Dot ok={ready} />
-          {ready ? 'Ready' : t('common.loading')}
+          {ready ? t('statusBar.ready') : t('common.loading')}
         </span>
         <span
-          className={`flex items-center gap-1 ${online ? 'text-neutral-400' : 'text-red-400'}`}
+          className={`flex items-center gap-1 ${online ? 'text-fg-muted' : 'text-danger'}`}
           title={
             online
-              ? `Agent running · worker ${worker?.state ?? 'online'}${agentAddress ? ` · ${agentAddress}` : ''}`
-              : 'Agent not running — the background worker is offline'
+              ? agentAddress
+                ? t('statusBar.agentTitleRunningRemote', {
+                    state: worker?.state ?? 'online',
+                    address: agentAddress
+                  })
+                : t('statusBar.agentTitleRunning', { state: worker?.state ?? 'online' })
+              : t('statusBar.agentTitleIdle')
           }
         >
           <Dot ok={online} />
-          Agent: {online ? 'running' : 'not running'}
+          {online ? t('statusBar.agentRunning') : t('statusBar.agentIdle')}
         </span>
-        <span className="flex items-center gap-1" title="Background worker">
+        <span className="flex items-center gap-1" title={t('statusBar.workerTitle')}>
           <Cpu className="h-3 w-3" />
-          worker: {worker?.state ?? 'n/a'}
+          {t('statusBar.worker', { state: worker?.state ?? 'n/a' })}
           {worker && worker.active + worker.queued > 0
-            ? ` (${worker.active} running, ${worker.queued} queued)`
+            ? ` ${t('statusBar.workerQueue', { active: worker.active, queued: worker.queued })}`
             : ''}
         </span>
         {worker ? (
-          <span className="flex items-center gap-1" title="Effective concurrency from CPU/RAM limits">
+          <span className="flex items-center gap-1" title={t('statusBar.limitsTitle')}>
             <HardDrive className="h-3 w-3" />
             {worker.cpuCores}cpu / {worker.memoryMb}MB
           </span>
@@ -73,14 +78,16 @@ export default function StatusBar(): JSX.Element {
           title={t('settings.approvalMode')}
           className={`flex items-center gap-1 rounded px-1.5 py-0.5 ${
             approvalMode === 'full'
-              ? 'text-red-400 hover:bg-bg-tertiary'
-              : 'hover:bg-bg-tertiary hover:text-neutral-200'
+              ? 'text-danger hover:bg-bg-tertiary'
+              : 'hover:bg-bg-tertiary hover:text-fg'
           }`}
         >
           {approvalMode === 'full' ? <Zap className="h-3 w-3" /> : <ShieldCheck className="h-3 w-3" />}
           {approvalMode}
         </button>
-        <span className="text-neutral-600">session {effectiveSessionId.slice(0, 8)}</span>
+        <span className="text-fg-muted" dir="ltr">
+          {t('statusBar.session', { id: effectiveSessionId.slice(0, 8) })}
+        </span>
         <span
           data-connection={connection.kind}
           className={`flex items-center gap-1 ${CONNECTION_TONE_CLASS[connection.tone]}`}
@@ -97,7 +104,7 @@ export default function StatusBar(): JSX.Element {
           )}
           <span>{t(connection.labelKey)}</span>
           {connection.detail ? (
-            <span className="max-w-[12rem] truncate text-neutral-500">· {connection.detail}</span>
+            <span className="max-w-[12rem] truncate text-fg-muted">· {connection.detail}</span>
           ) : null}
         </span>
       </div>
@@ -107,7 +114,7 @@ export default function StatusBar(): JSX.Element {
           type="button"
           onClick={() => setLocale(locale === 'fa' ? 'en' : 'fa')}
           title={t('common.language')}
-          className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-bg-tertiary hover:text-neutral-200"
+          className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-bg-tertiary hover:text-fg"
         >
           <Languages className="h-3 w-3" />
           {locale}
@@ -115,20 +122,22 @@ export default function StatusBar(): JSX.Element {
         <button
           type="button"
           onClick={() => void setOnline(!online)}
-          title="Toggle online/offline (queues work while offline)"
-          className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-bg-tertiary hover:text-neutral-200"
+          title={t('statusBar.toggleOnline')}
+          className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-bg-tertiary hover:text-fg"
         >
-          {online ? <Wifi className="h-3 w-3 text-emerald-500" /> : <WifiOff className="h-3 w-3 text-amber-500" />}
-          {online ? 'online' : 'offline'}
+          {online ? <Wifi className="h-3 w-3 text-success" /> : <WifiOff className="h-3 w-3 text-warning" />}
+          {online ? t('statusBar.online') : t('statusBar.offline')}
         </button>
         <button
           type="button"
           onClick={() => void toggleRemote()}
-          title="Toggle localhost remote access"
-          className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-bg-tertiary hover:text-neutral-200"
+          title={t('statusBar.toggleRemote')}
+          className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-bg-tertiary hover:text-fg"
         >
           <Server className="h-3 w-3" />
-          remote: {remote?.enabled ? `${remote.host}:${remote.port}` : 'off'}
+          {t('statusBar.remote', {
+            target: remote?.enabled ? `${remote.host}:${remote.port}` : t('statusBar.remoteOff')
+          })}
         </button>
       </div>
     </footer>

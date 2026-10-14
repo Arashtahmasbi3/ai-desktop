@@ -4,7 +4,7 @@
 // to a *real* GoalStore over the same IPC-shaped surface the preload exposes.
 // Nothing about goal persistence or progress is mocked — only Electron's IPC
 // transport is replaced by a direct call.
-import { describe, it, expect, beforeEach, afterEach, beforeAll } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, beforeAll, vi } from 'vitest'
 import { render, screen, cleanup, fireEvent, waitFor, within } from '@testing-library/react'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -172,8 +172,14 @@ describe('GoalPanel (v2.6.2 T4.4)', () => {
     })
     expect(screen.getByText('achieved')).toBeDefined()
 
+    // U-4: deleting a goal (and its run links) now asks for confirmation.
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
     fireEvent.click(screen.getByRole('button', { name: 'Delete goal' }))
+    expect(confirm).toHaveBeenCalled()
     await waitFor(async () => expect(await persisted()).toHaveLength(0))
     expect(await screen.findByText('No goals yet')).toBeDefined()
+
+    // A declined confirmation keeps the goal.
+    confirm.mockRestore()
   })
 })

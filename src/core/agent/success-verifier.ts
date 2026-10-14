@@ -37,9 +37,25 @@ export interface SuccessVerification {
   reason?: string
 }
 
-/** True when a tool name (or the command it ran) looks like a verification step. */
+/**
+ * Commands that genuinely verify something (v2.6.5).
+ *
+ * The old check was `/test|health|verify|build/i` against `toolName + command`,
+ * so `run_command("test -d node_modules")` - a plain existence probe - unlocked a
+ * "done" claim. Only a recognised runner or an explicit health/verify probe counts
+ * now.
+ */
+const VERIFICATION_COMMAND =
+  /(^|[\s;&|])(?:(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:test|build|lint|typecheck|check|verify|healthcheck|health-check)\b|(?:npx\s+)?(?:vitest|jest|mocha|ava|pytest|tox|tsc|eslint)\b|go\s+(?:test|build|vet)\b|cargo\s+(?:test|build|check)\b|make\s+(?:test|check|build|verify)\b|(?:gradle|mvn|dotnet)\b[^\n]*(?:test|check|verify|build)\b|systemctl\s+(?:is-active|status)\b|curl\b[^\n]*\/health\b)/i
+
+/** Tools whose *name* is itself a verification step. */
+const VERIFICATION_TOOL_NAME = /^(?:run_)?(?:tests?|verify(?:_|$)|health(?:_|$)|build(?:_|$))/i
+
+/** True when a tool call looks like a real verification step. */
 export function isVerificationTool(toolName: string, command?: string): boolean {
-  return /test|health|verify|build/i.test(`${toolName} ${command ?? ''}`)
+  if (VERIFICATION_TOOL_NAME.test(toolName)) return true
+  if (!command) return false
+  return VERIFICATION_COMMAND.test(command)
 }
 
 /** True when the response text asserts success. */

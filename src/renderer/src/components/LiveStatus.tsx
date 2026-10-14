@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Brain,
@@ -79,11 +80,11 @@ export default function LiveStatus(): JSX.Element | null {
   const decisions = useStore((state) => state.decisions)
   const messages = useStore((state) => state.messages)
 
-  if (!running) return null
-
-  const latest = decisions[decisions.length - 1]
-  let status: Status | undefined
-  if (latest) {
+  // U-11: this scans the whole message list, so memoize it instead of redoing
+  // the walk on every unrelated store update.
+  const status = useMemo(() => {
+    const latest = decisions[decisions.length - 1]
+    if (!latest) return undefined
     const step = stepOf(latest)
     const tool =
       step === undefined
@@ -94,14 +95,17 @@ export default function LiveStatus(): JSX.Element | null {
               message.runId === latest.runId &&
               message.toolCall?.step === step
           )?.toolCall?.name
-    status = statusFor(latest.phase, tool)
-  }
+    return statusFor(latest.phase, tool)
+  }, [decisions, messages])
+
+  if (!running) return null
+
   const Icon = status?.icon
 
   return (
     <div
       data-testid="live-status"
-      className="flex items-center justify-end gap-2 px-4 text-xs text-neutral-400"
+      className="flex items-center justify-end gap-2 px-4 text-xs text-fg-muted"
     >
       {Icon ? (
         <Icon className="h-3.5 w-3.5 shrink-0 text-accent" />

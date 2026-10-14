@@ -47,12 +47,24 @@ export const CRASH_PROBES: DiagnosisProbe[] = [
 
 const PROJECT_ROOT_TOKEN = '{{ROOT}}'
 
+/**
+ * POSIX single-quote a value for safe embedding in a shell command (B-18). The
+ * project root is user-controlled (it may contain spaces, quotes or
+ * metacharacters), so an unquoted substitution would let a root such as
+ * `/srv/my app` — or `/srv/it's` — break the probe command apart. Same rule as
+ * `src/core/agent/preflight.ts`.
+ */
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`
+}
+
 /** Resolve the project probes against the active project root. */
 export function buildCrashProbes(projectRoot?: string): DiagnosisProbe[] {
   const root = (projectRoot && projectRoot.trim() ? projectRoot.trim() : '.').replace(/\/+$/, '') || '/'
+  const quoted = shellQuote(root)
   return CRASH_PROBES.map((probe) => ({
     ...probe,
-    command: probe.command.split(PROJECT_ROOT_TOKEN).join(root)
+    command: probe.command.split(PROJECT_ROOT_TOKEN).join(quoted)
   }))
 }
 

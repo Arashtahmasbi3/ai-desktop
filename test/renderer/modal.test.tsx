@@ -71,13 +71,27 @@ describe('v2.6.0 A.1 - Modal primitive', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
-  it('5. closes on a backdrop click but not on a panel click', () => {
+  it('5. closes on a backdrop click only when the dialog opts in (U-14)', () => {
     const { onClose } = renderModal()
     const panel = screen.getByRole('dialog')
     fireEvent.mouseDown(screen.getByTestId('content'))
     expect(onClose).not.toHaveBeenCalled()
+    // A stray backdrop click must not answer a dialog by default.
     fireEvent.mouseDown(panel.parentElement as HTMLElement)
-    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(onClose).not.toHaveBeenCalled()
+
+    cleanup()
+    const optedIn = vi.fn()
+    render(
+      <Modal open onClose={optedIn} closeOnBackdrop ariaLabel="opt-in">
+        <div data-testid="content">Body</div>
+      </Modal>
+    )
+    const optedPanel = screen.getByRole('dialog')
+    fireEvent.mouseDown(screen.getByTestId('content'))
+    expect(optedIn).not.toHaveBeenCalled()
+    fireEvent.mouseDown(optedPanel.parentElement as HTMLElement)
+    expect(optedIn).toHaveBeenCalledTimes(1)
   })
 
   it('6. locks body scroll while open and restores it on unmount', () => {

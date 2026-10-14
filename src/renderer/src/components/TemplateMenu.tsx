@@ -39,7 +39,7 @@ export default function TemplateMenu({ currentInput, onPick }: TemplateMenuProps
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="flex items-center gap-1.5 rounded-lg border border-border bg-bg-secondary px-3 py-1.5 text-xs text-neutral-300 transition hover:border-accent/50 hover:bg-bg-tertiary"
+        className="flex items-center gap-1.5 rounded-lg border border-border bg-bg-secondary px-3 py-1.5 text-xs text-fg transition hover:border-accent/50 hover:bg-bg-tertiary"
       >
         <LayoutTemplate className="h-3.5 w-3.5 text-accent" />
         {t('chat.templates')}
@@ -53,7 +53,7 @@ export default function TemplateMenu({ currentInput, onPick }: TemplateMenuProps
                 key={template.id}
                 type="button"
                 onClick={() => pick(template.prompt)}
-                className="block w-full px-3 py-1.5 text-left text-neutral-300 hover:bg-bg-tertiary"
+                className="block w-full px-3 py-1.5 text-left text-fg hover:bg-bg-tertiary"
               >
                 {t(template.labelKey)}
               </button>
@@ -65,7 +65,7 @@ export default function TemplateMenu({ currentInput, onPick }: TemplateMenuProps
                     <button
                       type="button"
                       onClick={() => pick(template.prompt)}
-                      className="block flex-1 truncate px-3 py-1.5 text-left text-neutral-300 hover:bg-bg-tertiary"
+                      className="block flex-1 truncate px-3 py-1.5 text-left text-fg hover:bg-bg-tertiary"
                     >
                       {template.label}
                     </button>
@@ -73,7 +73,7 @@ export default function TemplateMenu({ currentInput, onPick }: TemplateMenuProps
                       type="button"
                       aria-label={t('common.remove')}
                       onClick={() => setUserTemplates(removeUserTemplate(template.id))}
-                      className="mr-1 hidden rounded p-1 text-neutral-600 hover:text-red-400 group-hover:block"
+                      className="mr-1 hidden rounded p-1 text-fg-muted hover:text-danger focus-visible:block group-hover:block group-focus-within:block"
                     >
                       <Trash2 className="h-3 w-3" />
                     </button>

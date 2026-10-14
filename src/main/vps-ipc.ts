@@ -144,6 +144,15 @@ export function registerVpsIpc(services: AppServices): () => void {
     ['vps:save', (input: VpsServerInput) => services.vpsServers.save(input)],
     ['vps:remove', (id: string) => services.vpsServers.remove(id)],
     ['vps:status', () => services.vps.getState()],
+    // v2.6.5: refresh the idle stamp for a host an open project depends on, so the
+    // 30-minute watchdog does not reap it and force a reconnect.
+    [
+      'vps:keepAlive',
+      (id: string) => {
+        services.vps.markActive(id)
+        return services.vps.getState()
+      }
+    ],
     ['vps:connected', () => services.vps.connectedServers()],
     ['vps:connect', (id: string) => services.vps.connect(id)],
     ['vps:disconnect', (id: string) => services.vps.disconnect(id)],

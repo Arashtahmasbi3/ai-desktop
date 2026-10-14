@@ -61,7 +61,7 @@ export default function VpsTerminal({ serverId }: { serverId: string }): JSX.Ele
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {error ? <p className="p-2 text-xs text-red-400">{error}</p> : null}
+      {error ? <p className="p-2 text-xs text-danger">{error}</p> : null}
       <div ref={containerRef} className="min-h-0 flex-1 overflow-hidden bg-[#0a0a0a] p-1" />
     </div>
   )

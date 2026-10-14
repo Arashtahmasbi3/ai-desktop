@@ -90,7 +90,9 @@ async function makeManager(rateLimit = 100): Promise<void> {
     audit,
     rateLimiter: new RateLimiter(rateLimit, 60_000, () => now),
     now: () => now,
-    readKeyFile: async () => Buffer.from('PRIVATE KEY')
+    // v2.6.5: the real reader is now required to return key-shaped material.
+    readKeyFile: async () =>
+      Buffer.from('-----BEGIN OPENSSH PRIVATE KEY-----\nfake-key-body\n-----END OPENSSH PRIVATE KEY-----')
   })
 }
 

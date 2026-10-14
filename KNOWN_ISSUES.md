@@ -1,33 +1,37 @@
-# Known Issues & Limitations — AI Desktop v1.0.0
+﻿> ⚠️ **SUPERSEDED — this document describes v1.0.0 only.** The application is now at
+> **v2.6.4**; see `AGENTS.md` (Status) and `CHANGELOG.md` for the current state, and the
+> versioned `*_v2.3.x.md` documents for later testing guides. Kept for history; do not treat
+> its counts, feature list or limitations as current.
+# Known Issues & Limitations â€” AI Desktop v1.0.0
 
 This document lists the known limitations of the **v1.0.0 pre-release**. None of these are
-surprises — they are tracked here so testers know what to expect. See
+surprises â€” they are tracked here so testers know what to expect. See
 [`TESTING_GUIDE.md`](./TESTING_GUIDE.md) for how to validate the build and
 [`FINAL_REPORT.md`](./FINAL_REPORT.md) for full verification details.
 
-Severity key: **⚠️ Expected** (by design / environment), **ℹ️ Limitation** (planned for a
-future release), **🐞 Bug** (unintended, please report).
+Severity key: **âš ï¸ Expected** (by design / environment), **â„¹ï¸ Limitation** (planned for a
+future release), **ðŸž Bug** (unintended, please report).
 
 ---
 
-## 1. No code signing → SmartScreen warning ⚠️
+## 1. No code signing â†’ SmartScreen warning âš ï¸
 
 The installer and portable executable are **not code-signed** (no signing certificate is
 configured for this build).
 
 - **Symptom:** Windows shows *"Windows protected your PC"* / SmartScreen may also delay or
   warn on first run. Some antivirus engines may flag an unknown publisher.
-- **Impact:** Cosmetic/friction only — the binaries are the ones we built (verify the SHA-256,
+- **Impact:** Cosmetic/friction only â€” the binaries are the ones we built (verify the SHA-256,
   see the testing guide).
-- **Workaround:** Click **More info → Run anyway**.
+- **Workaround:** Click **More info â†’ Run anyway**.
 - **Fix (maintainers):** provide a code-signing certificate; the build signs automatically when
   `CSC_LINK` / `CSC_KEY_PASSWORD` (or an OS certificate) are set. No code change required.
 
 ---
 
-## 2. An API key is required ⚠️
+## 2. An API key is required âš ï¸
 
-AI Desktop has **no bundled models** — it calls a hosted provider.
+AI Desktop has **no bundled models** â€” it calls a hosted provider.
 
 - **Symptom:** Chat does nothing / shows an auth error until a key is set.
 - **Requirements:** a valid **DeepSeek** API key (primary), or an **OpenAI**, **Anthropic**, or
@@ -38,7 +42,7 @@ AI Desktop has **no bundled models** — it calls a hosted provider.
 
 ---
 
-## 3. Docker is optional for the sandbox ⚠️
+## 3. Docker is optional for the sandbox âš ï¸
 
 Code execution prefers a **Docker** sandbox but has a **local fallback**.
 
@@ -47,13 +51,13 @@ Code execution prefers a **Docker** sandbox but has a **local fallback**.
 - **Without Docker:** the app transparently falls back to the **local** sandbox and still runs
   commands.
 - **Impact / caution:** the local fallback runs with your user's privileges and is **less
-  isolated** — only run code you trust. Prefer Docker for untrusted code.
+  isolated** â€” only run code you trust. Prefer Docker for untrusted code.
 - **Automated tests:** the Docker integration test is skipped when no Docker daemon is present
   (that's the one skipped test in the suite).
 
 ---
 
-## 4. Clean-machine install not yet verified 🐞 → please test
+## 4. Clean-machine install not yet verified ðŸž â†’ please test
 
 Packaging and the installer were verified **structurally** (valid NSIS3 build, uninstaller,
 UAC/dir dialogs, correct payload), but installing and running on a genuine clean Windows
@@ -65,7 +69,7 @@ machine has **not** been confirmed by the team yet.
 
 ---
 
-## 5. SSH/VPS and GitHub/Git are agent-driven, not UI features ℹ️
+## 5. SSH/VPS and GitHub/Git are agent-driven, not UI features â„¹ï¸
 
 The assistant can work with remote VPSes (SSH), GitHub (Git) and local files **through its
 tool layer**, but there are no dedicated UI panels for them yet.
@@ -76,7 +80,7 @@ tool layer**, but there are no dedicated UI panels for them yet.
 
 ---
 
-## 6. Remote-access server is localhost-only ℹ️
+## 6. Remote-access server is localhost-only â„¹ï¸
 
 A background server exposes local tooling over the loopback interface.
 
@@ -86,7 +90,7 @@ A background server exposes local tooling over the loopback interface.
 
 ---
 
-## 7. Renderer ships as a single JS chunk ℹ️
+## 7. Renderer ships as a single JS chunk â„¹ï¸
 
 The renderer bundle is one ~321 KB minified chunk (plus ~25 KB CSS); there is no
 code-splitting.
@@ -96,7 +100,7 @@ code-splitting.
 
 ---
 
-## 8. Windows-target builds on Linux/macOS need 32-bit Wine ⚠️
+## 8. Windows-target builds on Linux/macOS need 32-bit Wine âš ï¸
 
 Only relevant to **maintainers** cross-building the Windows installer off Windows.
 
@@ -109,7 +113,7 @@ Only relevant to **maintainers** cross-building the Windows installer off Window
 
 ---
 
-## 9. Other notes ℹ️
+## 9. Other notes â„¹ï¸
 
 - **User data is kept on uninstall** (`deleteAppDataOnUninstall: false`) so a reinstall keeps
   your settings/projects. To fully reset, delete `%APPDATA%\AI Desktop` manually.

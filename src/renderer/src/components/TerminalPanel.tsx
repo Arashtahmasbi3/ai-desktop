@@ -4,10 +4,10 @@ import { Terminal, Trash2, X } from 'lucide-react'
 import { useStore } from '../store'
 
 const LINE_CLASS: Record<string, string> = {
-  command: 'text-neutral-200',
-  stdout: 'text-neutral-400',
-  stderr: 'text-red-400',
-  info: 'text-neutral-500'
+  command: 'text-fg',
+  stdout: 'text-fg-muted',
+  stderr: 'text-danger',
+  info: 'text-fg-muted'
 }
 
 /** A one-shot local shell under the chat, scoped to the active project. */
@@ -63,7 +63,7 @@ export default function TerminalPanel(): JSX.Element {
 
   return (
     <div className="flex h-56 shrink-0 flex-col border-t border-border bg-bg-primary">
-      <div className="flex h-7 shrink-0 items-center justify-between border-b border-border px-3 text-2xs text-neutral-500">
+      <div className="flex h-7 shrink-0 items-center justify-between border-b border-border px-3 text-2xs text-fg-muted">
         <span className="flex items-center gap-1.5">
           <Terminal className="h-3.5 w-3.5" />
           {t('chat.terminalTitle')}
@@ -71,10 +71,15 @@ export default function TerminalPanel(): JSX.Element {
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={() => useStore.setState({ terminalLines: [] })}
+            onClick={() => {
+              // U-4: wiping the scrollback was a single unconfirmed click.
+              if (window.confirm(t('common.clearTerminalConfirm'))) {
+                useStore.setState({ terminalLines: [] })
+              }
+            }}
             title={t('common.clear')}
             aria-label={t('common.clear')}
-            className="rounded p-1 hover:bg-bg-tertiary hover:text-neutral-300"
+            className="rounded p-1 hover:bg-bg-tertiary hover:text-fg"
           >
             <Trash2 className="h-3 w-3" />
           </button>
@@ -83,7 +88,7 @@ export default function TerminalPanel(): JSX.Element {
             onClick={toggle}
             title={t('common.close')}
             aria-label={t('common.close')}
-            className="rounded p-1 hover:bg-bg-tertiary hover:text-neutral-300"
+            className="rounded p-1 hover:bg-bg-tertiary hover:text-fg"
           >
             <X className="h-3 w-3" />
           </button>
@@ -105,7 +110,7 @@ export default function TerminalPanel(): JSX.Element {
           dir="ltr"
           spellCheck={false}
           placeholder={t('chat.terminalPlaceholder')}
-          className="flex-1 bg-transparent text-neutral-100 outline-none placeholder:text-neutral-600"
+          className="flex-1 bg-transparent text-fg-strong outline-none placeholder:text-fg-subtle"
         />
       </div>
     </div>

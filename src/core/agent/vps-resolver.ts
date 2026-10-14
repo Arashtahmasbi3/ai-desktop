@@ -105,6 +105,31 @@ export interface RunServer {
   connected: boolean
   /** True when the header's request was dropped because it was not connected. */
   reconciled: boolean
+  /**
+   * B-11: explanation of a reconciliation, meant for the run's system hint (and
+   * the UI). `reconciled` alone was a dead flag no caller read, so dropping the
+   * user's chat-header selection happened silently; a run that swaps or loses its
+   * host must say so.
+   */
+  warning?: string
+}
+
+/** B-11: the note that makes a dropped header selection visible. */
+function reconciliationWarning(
+  requested: string,
+  serverId: string | undefined,
+  connected: boolean
+): string {
+  if (serverId && connected) {
+    return `Requested VPS "${requested}" is not connected; using the project's server "${serverId}" instead.`
+  }
+  if (serverId) {
+    return (
+      `Requested VPS "${requested}" is not connected, and neither is the project's ` +
+      `server "${serverId}". Tell the user to reconnect a VPS before relying on remote work.`
+    )
+  }
+  return `Requested VPS "${requested}" is not connected; continuing without a VPS.`
 }
 
 /**
@@ -121,9 +146,14 @@ export function reconcileRunServer(ctx: RunServerContext): RunServer {
       ? ctx.requestedVpsId
       : undefined
   const serverId = requested ?? ctx.projectVpsId
+  const connected = Boolean(serverId && ctx.connectedServers.includes(serverId))
+  const reconciled = Boolean(ctx.requestedVpsId && !requested)
   return {
     serverId,
-    connected: Boolean(serverId && ctx.connectedServers.includes(serverId)),
-    reconciled: Boolean(ctx.requestedVpsId && !requested)
+    connected,
+    reconciled,
+    ...(reconciled && ctx.requestedVpsId
+      ? { warning: reconciliationWarning(ctx.requestedVpsId, serverId, connected) }
+      : {})
   }
 }

@@ -1,8 +1,10 @@
 import { app, shell, BrowserWindow } from 'electron'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { AppServices } from './app-services'
 import { registerIpc } from './ipc'
 import { installWebviewPolicy } from './webview-policy'
+import { isAllowedUrl, isAppWindowNavigationAllowed } from '@shared/url'
 
 const isDev = !app.isPackaged
 
@@ -21,7 +23,11 @@ function createWindow(): BrowserWindow {
     backgroundColor: '#0d0d0d',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false,
+      // v2.6.5: the renderer sandbox is on. The preload only uses `contextBridge`,
+      // `ipcRenderer` and `webUtils` (no Node built-ins), so there is no reason to
+      // run an unsandboxed renderer — and it is the process that renders model
+      // output. `contextIsolation` + `nodeIntegration: false` stay as they were.
+      sandbox: true,
       contextIsolation: true,
       nodeIntegration: false,
       webviewTag: true
@@ -37,8 +43,32 @@ function createWindow(): BrowserWindow {
   })
 
   window.webContents.setWindowOpenHandler((details) => {
-    void shell.openExternal(details.url)
+    // `shell.openExternal` hands the URL to the OS, so only plain web pages may
+    // ever reach it — never file:, ms-msdt:, javascript: or other schemes whose
+    // handlers can execute local code.
+    if (isAllowedUrl(details.url)) void shell.openExternal(details.url)
     return { action: 'deny' }
+  })
+
+  // The main window owns the `window.api` preload bridge. If it were allowed to
+  // navigate to a foreign document, that document would inherit the bridge and
+  // could drive SSH, the filesystem and stored credentials. Refuse every
+  // navigation away from the bundled renderer.
+  const rendererUrl = process.env['ELECTRON_RENDERER_URL']
+  const rendererHref =
+    isDev && rendererUrl
+      ? rendererUrl
+      : pathToFileURL(join(__dirname, '../renderer/index.html')).toString()
+
+  window.webContents.on('will-navigate', (event, url) => {
+    if (isAppWindowNavigationAllowed(url, rendererHref)) return
+    event.preventDefault()
+    if (isAllowedUrl(url)) void shell.openExternal(url)
+  })
+
+  window.webContents.on('will-redirect', (event, url) => {
+    if (isAppWindowNavigationAllowed(url, rendererHref)) return
+    event.preventDefault()
   })
 
   // A <webview> must never inherit a preload or Node access from its host.
@@ -48,7 +78,6 @@ function createWindow(): BrowserWindow {
     webPreferences.contextIsolation = true
   })
 
-  const rendererUrl = process.env['ELECTRON_RENDERER_URL']
   if (isDev && rendererUrl) {
     void window.loadURL(rendererUrl)
   } else {

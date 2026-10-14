@@ -168,3 +168,62 @@ describe('LoopDetector', () => {
     expect(result.stop).toBe(false)
   })
 })
+
+/**
+ * B-5 — the step-level repeat counters must be windowed, not lifetime-scoped.
+ * `this.window` used to be dead code while `this.counts` accumulated for the
+ * whole run, so five legitimate re-reads of one file spread over a long run
+ * stopped it, and `markProgress()` did nothing for this layer.
+ */
+describe('LoopDetector — windowed repeat counters (B-5)', () => {
+  it('bounds the signature count by the window instead of the whole run', () => {
+    const detector = new LoopDetector({
+      noProgressThreshold: 100,
+      windowSize: 3,
+      repeatedStopThreshold: 99
+    })
+    for (let i = 0; i < 10; i++) detector.observe({ signatures: ['same'], productive: true })
+
+    expect(detector.signatureCount('same')).toBe(3)
+    expect(detector.windowSize).toBe(3)
+  })
+
+  it('does not stop on re-reads that have left the window', () => {
+    const detector = new LoopDetector({ noProgressThreshold: 100, windowSize: 4 })
+    let stopped = false
+    for (let i = 0; i < 5; i++) {
+      stopped = detector.observe({ signatures: ['read_file:app.log'], productive: true }).stop || stopped
+      for (const filler of ['list_dir:src', 'grep:needle']) {
+        stopped = detector.observe({ signatures: [filler], productive: true }).stop || stopped
+      }
+    }
+
+    expect(stopped).toBe(false)
+    expect(detector.isStopped).toBe(false)
+    expect(detector.signatureCount('read_file:app.log')).toBeLessThanOrEqual(2)
+  })
+
+  it('keeps the step-level window when a successful action credits progress', () => {
+    // `markProgress()` refreshes the *per-call* guard only: a successful action
+    // that keeps repeating is still a loop, so the step-level counter stands.
+    const detector = new LoopDetector({ noProgressThreshold: 100 })
+    for (let i = 0; i < 5; i++) {
+      detector.observe({ signatures: ['read_file:app.log'], productive: true })
+      detector.markProgress()
+    }
+
+    expect(detector.signatureCount('read_file:app.log')).toBe(5)
+    expect(detector.isStopped).toBe(true)
+    expect(detector.stoppedReason).toBe('repeated_action')
+  })
+
+  it('still warns and stops when the same action repeats back-to-back', () => {
+    const detector = new LoopDetector({ noProgressThreshold: 100 })
+    const events = [1, 2, 3, 4, 5].map(() =>
+      detector.observe({ signatures: ['read_file:app.log'], productive: false })
+    )
+    expect(events[2].warnings.map((warning) => warning.kind)).toContain('repeated_action')
+    expect(events[4].stop).toBe(true)
+    expect(events[4].stopReason).toBe('repeated_action')
+  })
+})

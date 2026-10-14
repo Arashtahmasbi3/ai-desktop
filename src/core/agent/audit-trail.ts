@@ -21,7 +21,12 @@ export type AuditResult = 'ok' | 'failed' | 'blocked'
 
 export interface AuditLine {
   seq: number
-  userId: string
+  /**
+   * B-17: absent when the caller did not know the user. The trail stamps its own
+   * (real) user on append, so an unknown user must be *omitted* rather than sent
+   * as `''` — an empty string is not nullish and would override that default.
+   */
+  userId?: string
   ts: string
   projectId: string
   vpsId: string
@@ -50,6 +55,28 @@ export interface AuditLine {
 export const GENESIS_HASH = '0'.repeat(64)
 
 export type { AuditVerifyResult }
+
+/**
+ * B-6: what `load()` had to drop to continue an existing chain. A crash during
+ * `appendFile` can leave a torn (half-written) final line; that is recoverable,
+ * so it is recorded explicitly instead of resetting the chain to seq 0.
+ */
+export interface AuditRecovery {
+  /** 0-based index of the first line that could not be parsed. */
+  line: number
+  /** Sequence number of the last parsed line; the chain continues after it. */
+  seq: number
+}
+
+/**
+ * `verify()` result. Extends the shared shape with the B-6 marker: a torn final
+ * line is a crash artifact rather than tampering, and it is repairable by
+ * dropping that one line, so the break is pinned to a *known* line instead of
+ * cascading into a permanent sequence gap.
+ */
+export interface AuditVerifyOutcome extends AuditVerifyResult {
+  repairable?: boolean
+}
 
 export interface AuditTrailOptions {
   file: string
@@ -85,7 +112,8 @@ export function chainHash(prevHash: string, line: Omit<AuditLine, 'hash'>): stri
  * Note: `TraceDecision` records what happened, not the approval flow, so the
  * only approval states we can assert here are `blocked` (policy refused the
  * action) and `not_required`. `auto`/`approved`/`denied` are reserved for a later
- * milestone that pipes the approval broker's outcome into the decision.
+ * milestone that pipes the approval broker's outcome into the decision. The user
+ * is deliberately left out (B-17): the trail stamps the real one on append.
  */
 export function auditLineFromDecision(
   decision: TraceDecision,
@@ -102,7 +130,6 @@ export function auditLineFromDecision(
         ? 'blocked'
         : 'failed'
   return {
-    userId: '',
     ts: new Date(decision.at).toISOString(),
     projectId: context.projectId,
     vpsId: context.vpsId ?? '',
@@ -139,7 +166,6 @@ export function auditLineFromPreflightOverride(input: {
 }): Omit<AuditLine, 'seq' | 'prevHash' | 'hash'> {
   const approved = input.choice === 'proceed'
   return {
-    userId: '',
     ts: new Date(input.at ?? Date.now()).toISOString(),
     projectId: input.projectId,
     vpsId: input.vpsId ?? '',
@@ -174,6 +200,14 @@ export class AuditTrail {
   private loaded = false
   private lastSeq = 0
   private lastHash = GENESIS_HASH
+  /** Set when `load()` had to skip a torn tail instead of reading it (B-6). */
+  private recoveryInfo: AuditRecovery | undefined
+  /**
+   * B-6: the file did not end with a newline when it was loaded (a half-written
+   * line). The next append must start its own line, otherwise it is glued to the
+   * torn bytes and never verifies as a line at all.
+   */
+  private needsSeparator = false
   /**
    * Serializes appends. Decision sinks fire-and-forget, so without this the
    * concurrent calls would all read the same `lastSeq` and duplicate sequence
@@ -190,6 +224,15 @@ export class AuditTrail {
 
   get path(): string {
     return this.file
+  }
+
+  /**
+   * B-6: the torn tail `load()` recovered from, if any. Callers (and the UI) can
+   * use it to report "the chain continued after line N", and `verify()` pins the
+   * break to the same line so the file can be repaired by dropping it.
+   */
+  get recovery(): AuditRecovery | undefined {
+    return this.recoveryInfo
   }
 
   /** Append one line, returning it with its assigned seq and hash. */
@@ -240,14 +283,16 @@ export class AuditTrail {
     }
     line.hash = chainHash(line.prevHash, stripHash(line))
     await fs.mkdir(dirname(this.file), { recursive: true })
-    await fs.appendFile(this.file, `${JSON.stringify(line)}\n`, 'utf8')
+    const separator = this.needsSeparator ? '\n' : ''
+    this.needsSeparator = false
+    await fs.appendFile(this.file, `${separator}${JSON.stringify(line)}\n`, 'utf8')
     this.lastSeq = line.seq
     this.lastHash = line.hash
     return line
   }
 
   /** Recompute the chain and report the first broken line, if any. */
-  async verify(): Promise<AuditVerifyResult> {
+  async verify(): Promise<AuditVerifyOutcome> {
     const raw = await fs.readFile(this.file, 'utf8').catch((error: NodeJS.ErrnoException) => {
       if (error.code === 'ENOENT') return ''
       throw error
@@ -255,11 +300,22 @@ export class AuditTrail {
     const lines = raw.split('\n').filter((line) => line.trim().length > 0)
     let prevHash = GENESIS_HASH
     for (let index = 0; index < lines.length; index += 1) {
-      let parsed: AuditLine
-      try {
-        parsed = JSON.parse(lines[index]) as AuditLine
-      } catch {
-        return { ok: false, brokenAt: index, lines: lines.length, reason: 'unparseable line' }
+      const parsed = parseAuditLine(lines[index])
+      if (!parsed) {
+        return {
+          ok: false,
+          brokenAt: index,
+          lines: lines.length,
+          reason: 'unparseable line',
+          // B-6: a torn *final* line is a half-written append, not tampering. The
+          // lines before it are intact and the chain continues from the last good
+          // hash, so dropping that one line repairs the file. The same holds for
+          // the line `load()` already recovered from, even after it was followed
+          // by further (valid) appends.
+          ...(index === lines.length - 1 || this.recoveryInfo?.line === index
+            ? { repairable: true }
+            : {})
+        }
       }
       if (parsed.seq !== index + 1) {
         return { ok: false, brokenAt: index, lines: lines.length, reason: 'sequence gap' }
@@ -276,7 +332,16 @@ export class AuditTrail {
     return { ok: true, lines: lines.length }
   }
 
-  /** Load the tail of an existing chain so appends continue it. */
+  /**
+   * Load the tail of an existing chain so appends continue it.
+   *
+   * B-6: the last line is not necessarily usable. A crash can leave a torn
+   * (half-written) line at the end; treating that as "nothing was loaded" reset
+   * `lastSeq`/`lastHash` to the genesis values, so the next append wrote `seq: 1`
+   * after existing lines and `verify()` reported a sequence gap for ever. Walk
+   * back to the last line that actually parses and continue from *that* one,
+   * recording the torn tail so the recovery is visible.
+   */
   private async load(): Promise<void> {
     if (this.loaded) return
     this.loaded = true
@@ -284,15 +349,32 @@ export class AuditTrail {
       if (error.code === 'ENOENT') return ''
       throw error
     })
-    const last = raw.split('\n').filter((line) => line.trim().length > 0).pop()
-    if (!last) return
-    try {
-      const parsed = JSON.parse(last) as AuditLine
+    const lines = raw.split('\n').filter((line) => line.trim().length > 0)
+    this.needsSeparator = raw.length > 0 && !raw.endsWith('\n')
+    for (let index = lines.length - 1; index >= 0; index -= 1) {
+      const parsed = parseAuditLine(lines[index])
+      if (!parsed) continue
       this.lastSeq = parsed.seq
       this.lastHash = parsed.hash
-    } catch {
-      // A corrupt tail must not stop the run; verify() will surface it.
+      if (index < lines.length - 1) this.recoveryInfo = { line: index + 1, seq: parsed.seq }
+      return
     }
+    // Nothing usable at all: keep the genesis anchor, but say so explicitly.
+    if (lines.length > 0) this.recoveryInfo = { line: 0, seq: 0 }
+  }
+}
+
+/** Parse one stored line, rejecting anything that is not a chain line (B-6). */
+function parseAuditLine(text: string): AuditLine | null {
+  try {
+    const parsed: unknown = JSON.parse(text)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+    const line = parsed as AuditLine
+    if (typeof line.seq !== 'number' || !Number.isFinite(line.seq)) return null
+    if (typeof line.prevHash !== 'string' || typeof line.hash !== 'string') return null
+    return line
+  } catch {
+    return null
   }
 }
 

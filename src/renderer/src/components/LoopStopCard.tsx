@@ -31,16 +31,16 @@ export default function LoopStopCard({ stop, onContinue, onCorrect, onStop }: Pr
   const model = buildLoopStopModel(stop)
   const [showRecent, setShowRecent] = useState(false)
   const emphasisClass = (action: LoopStopAction): string =>
-    model.emphasis === action ? 'ring-2 ring-amber-400/70' : ''
+    model.emphasis === action ? 'ring-2 ring-warning/70' : ''
 
   return (
-    <div className="mx-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-start">
+    <div className="mx-4 rounded-xl border border-warning/40 bg-warning/10 p-3 text-start">
       <div className="flex items-start gap-2">
-        <AlertOctagon className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
+        <AlertOctagon className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold text-amber-200">{t('chat.loopStopTitle')}</p>
-          <p className="mt-1 text-2xs leading-relaxed text-amber-100/90">{stop.message}</p>
-          <p className="mt-1 flex items-start gap-1 text-2xs leading-relaxed text-amber-200/90">
+          <p className="text-xs font-semibold text-warning">{t('chat.loopStopTitle')}</p>
+          <p className="mt-1 text-2xs leading-relaxed text-warning/90">{stop.message}</p>
+          <p className="mt-1 flex items-start gap-1 text-2xs leading-relaxed text-warning/90">
             <Lightbulb className="mt-0.5 h-3 w-3 shrink-0" />
             {t(model.hintKey)}
           </p>
@@ -52,7 +52,7 @@ export default function LoopStopCard({ stop, onContinue, onCorrect, onStop }: Pr
               type="button"
               onClick={onContinue}
               disabled={!model.allowContinue}
-              className={`flex items-center gap-1 whitespace-nowrap rounded-lg bg-accent px-2.5 py-1 text-2xs font-medium text-white hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40 ${emphasisClass('continue')}`}
+              className={`flex items-center gap-1 whitespace-nowrap rounded-lg bg-accent-solid px-2.5 py-1 text-2xs font-medium text-white hover:bg-accent-solid-hover disabled:cursor-not-allowed disabled:opacity-40 ${emphasisClass('continue')}`}
             >
               <RotateCcw className="h-3 w-3" />
               {t('chat.loopStopContinue')}
@@ -60,7 +60,7 @@ export default function LoopStopCard({ stop, onContinue, onCorrect, onStop }: Pr
             <button
               type="button"
               onClick={onCorrect}
-              className={`flex items-center gap-1 whitespace-nowrap rounded-lg border border-border px-2.5 py-1 text-2xs text-neutral-200 hover:bg-bg-tertiary ${emphasisClass('correct')}`}
+              className={`flex items-center gap-1 whitespace-nowrap rounded-lg border border-border px-2.5 py-1 text-2xs text-fg hover:bg-bg-tertiary ${emphasisClass('correct')}`}
             >
               <CornerDownRight className="h-3 w-3" />
               {t('chat.loopStopCorrect')}
@@ -68,7 +68,7 @@ export default function LoopStopCard({ stop, onContinue, onCorrect, onStop }: Pr
             <button
               type="button"
               onClick={onStop}
-              className={`flex items-center gap-1 whitespace-nowrap rounded-lg border border-border px-2.5 py-1 text-2xs text-neutral-300 hover:bg-bg-tertiary ${emphasisClass('stop')}`}
+              className={`flex items-center gap-1 whitespace-nowrap rounded-lg border border-border px-2.5 py-1 text-2xs text-fg hover:bg-bg-tertiary ${emphasisClass('stop')}`}
             >
               <XOctagon className="h-3 w-3" />
               {t('chat.loopStopStop')}
@@ -76,12 +76,12 @@ export default function LoopStopCard({ stop, onContinue, onCorrect, onStop }: Pr
           </div>
 
           {model.lastAction ? (
-            <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-3xs text-amber-100/80">
-              <span className="uppercase tracking-wide text-amber-300/70">
+            <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-3xs text-warning/80">
+              <span className="uppercase tracking-wide text-warning/70">
                 {t('chat.loopStopStuckOn')}
               </span>
               {model.onRemote ? (
-                <span className="flex items-center gap-1 rounded bg-amber-500/20 px-1 py-0.5">
+                <span className="flex items-center gap-1 rounded bg-warning/20 px-1 py-0.5">
                   <Server className="h-3 w-3" />
                   {t('chat.loopStopRemote')}
                   {model.serverId ? <span className="font-mono">{model.serverId}</span> : null}
@@ -101,7 +101,7 @@ export default function LoopStopCard({ stop, onContinue, onCorrect, onStop }: Pr
                 type="button"
                 onClick={() => setShowRecent((value) => !value)}
                 aria-expanded={showRecent}
-                className="flex items-center gap-1 text-3xs uppercase tracking-wide text-amber-300/70 hover:text-amber-200"
+                className="flex items-center gap-1 text-3xs uppercase tracking-wide text-warning/70 hover:text-warning"
               >
                 {showRecent ? (
                   <ChevronDown className="h-3 w-3" />
@@ -116,7 +116,7 @@ export default function LoopStopCard({ stop, onContinue, onCorrect, onStop }: Pr
                     <li
                       key={`${action}-${index}`}
                       dir="ltr"
-                      className="truncate font-mono text-3xs text-amber-100/80"
+                      className="truncate font-mono text-3xs text-warning/80"
                     >
                       <CornerDownRight className="mr-1 inline h-3 w-3" />
                       {action}

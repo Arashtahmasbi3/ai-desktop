@@ -31,7 +31,7 @@ export default function SettingsPlugins(): JSX.Element {
 
   return (
     <section className="flex flex-col gap-3">
-      <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
+      <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
         <Plug className="h-3.5 w-3.5" />
         {t('settings.plugins')}
       </h3>
@@ -44,8 +44,8 @@ export default function SettingsPlugins(): JSX.Element {
             onClick={() => setTab(item.id)}
             className={`rounded-lg px-2.5 py-1 text-xs transition ${
               tab === item.id
-                ? 'bg-accent/15 text-accent'
-                : 'text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200'
+                ? 'bg-accent-solid/15 text-accent'
+                : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
             }`}
           >
             {t(item.labelKey)}
@@ -54,18 +54,18 @@ export default function SettingsPlugins(): JSX.Element {
       </div>
 
       <label className="flex items-center gap-2 rounded-lg border border-border bg-bg-primary px-2 py-1.5">
-        <Search className="h-3.5 w-3.5 text-neutral-500" />
+        <Search className="h-3.5 w-3.5 text-fg-muted" />
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder={t('settings.searchDirectory')}
-          className="flex-1 bg-transparent text-xs text-neutral-200 outline-none"
+          className="flex-1 bg-transparent text-xs text-fg outline-none"
         />
       </label>
 
       <div className="flex flex-col gap-2">
         {entries.length === 0 ? (
-          <p className="text-2xs text-neutral-600">{t('settings.noMatches')}</p>
+          <p className="text-2xs text-fg-subtle">{t('settings.noMatches')}</p>
         ) : (
           entries.map((entry) => {
             const active =
@@ -76,8 +76,8 @@ export default function SettingsPlugins(): JSX.Element {
                 className="flex items-center justify-between gap-3 rounded-xl border border-border bg-bg-primary p-3"
               >
                 <div className="min-w-0">
-                  <p className="text-sm text-neutral-200">{entry.name}</p>
-                  <p className="mt-0.5 text-2xs text-neutral-500">{entry.description}</p>
+                  <p className="text-sm text-fg">{entry.name}</p>
+                  <p className="mt-0.5 text-2xs text-fg-muted">{entry.description}</p>
                 </div>
                 <button
                   type="button"
@@ -86,7 +86,7 @@ export default function SettingsPlugins(): JSX.Element {
                   aria-label={entry.name}
                   onClick={() => toggle(entry.id)}
                   className={`relative h-4 w-8 shrink-0 rounded-full transition ${
-                    active ? 'bg-accent' : 'bg-bg-tertiary'
+                    active ? 'bg-accent-solid' : 'bg-bg-tertiary'
                   }`}
                 >
                   <span
@@ -101,7 +101,7 @@ export default function SettingsPlugins(): JSX.Element {
         )}
       </div>
 
-      <p className="text-2xs text-neutral-600">{t('settings.browseDirectoryHint')}</p>
+      <p className="text-2xs text-fg-subtle">{t('settings.browseDirectoryHint')}</p>
     </section>
   )
 }

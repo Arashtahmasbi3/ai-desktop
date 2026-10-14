@@ -95,11 +95,15 @@ describe('v2.6.2 T5.5 - modal centering and overflow', () => {
     expect(overlay().className).toContain('items-center')
     expect(overlay().className).toContain('justify-center')
     const dialog = panel()
-    expectCappedPanel(dialog)
+    // U-17: Onboarding now renders through the shared Modal primitive, which caps
+    // the panel with an inline max-height instead of a `max-h-[...]` class.
+    expect(dialog.className).toContain('overflow-hidden')
+    expect(dialog.style.maxHeight).toBe('calc(100vh - 2rem)')
 
     const body = dialog.querySelector<HTMLElement>('.overflow-y-auto')
     expect(body?.className).toContain('flex-1')
-    const footer = dialog.lastElementChild as HTMLElement
+    const column = dialog.firstElementChild as HTMLElement
+    const footer = column.lastElementChild as HTMLElement
     expect(footer.className).toContain('shrink-0')
     expect(footer.contains(body as Node)).toBe(false)
   })

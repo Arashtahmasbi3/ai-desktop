@@ -27,8 +27,10 @@ export const ALWAYS_ALLOWED_COMMANDS = new Set([
   'systemctl',
   // Utils
   'which', 'whereis', 'env', 'printenv',
-  // Disk
-  'lsblk', 'mount'
+  // Disk (v2.6.5: `mount` was removed — `mount -o remount,rw /` carries no
+  // metacharacter, so it skipped the whole P0-2 path scan and could remount the
+  // root filesystem read-write.)
+  'lsblk'
 ])
 
 /**
@@ -108,7 +110,7 @@ export const READ_ONLY_BASE_COMMANDS = new Set([
   'readlink', 'realpath', 'strings', 'blkid', 'du',
   // System introspection
   'uname', 'hostname', 'uptime', 'whoami', 'id', 'pwd', 'date',
-  'free', 'df', 'lscpu', 'lsmem', 'nproc', 'lsblk', 'mount',
+  'free', 'df', 'lscpu', 'lsmem', 'nproc', 'lsblk',
   'ps', 'top', 'htop', 'pgrep', 'ss', 'netstat', 'ip', 'ifconfig', 'ping',
   // Text / lookups
   'echo', 'printf', 'true', 'false', 'which', 'whereis', 'env', 'printenv',

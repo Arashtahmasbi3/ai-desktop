@@ -65,6 +65,27 @@ function withTimeout(timeoutMs: number, external?: AbortSignal): TimeoutHandle {
   }
 }
 
+/** Translate a low-level fetch failure into a typed adapter error. */
+function translateFetchError(
+  error: unknown,
+  options: HttpCallOptions,
+  handle: TimeoutHandle
+): Error {
+  if (options.signal?.aborted) {
+    return new AbortError(`${options.provider} request aborted`, { provider: options.provider })
+  }
+  if (handle.didTimeout()) {
+    return new TimeoutError(`${options.provider} request timed out after ${options.timeoutMs}ms`, {
+      provider: options.provider
+    })
+  }
+  const message = error instanceof Error ? error.message : String(error)
+  return new NetworkError(`${options.provider} network error: ${message}`, {
+    provider: options.provider,
+    cause: error
+  })
+}
+
 /** Perform a fetch, translating low-level failures into typed errors. */
 async function doFetch(
   url: string,
@@ -75,20 +96,7 @@ async function doFetch(
   try {
     return await options.fetchImpl(url, { ...init, signal: handle.signal })
   } catch (error) {
-    if (options.signal?.aborted) {
-      throw new AbortError(`${options.provider} request aborted`, { provider: options.provider })
-    }
-    if (handle.didTimeout()) {
-      throw new TimeoutError(
-        `${options.provider} request timed out after ${options.timeoutMs}ms`,
-        { provider: options.provider }
-      )
-    }
-    const message = error instanceof Error ? error.message : String(error)
-    throw new NetworkError(`${options.provider} network error: ${message}`, {
-      provider: options.provider,
-      cause: error
-    })
+    throw translateFetchError(error, options, handle)
   } finally {
     handle.cleanup()
   }
@@ -140,13 +148,67 @@ export async function httpJson(
   throw lastError
 }
 
-/** Open a streaming response (no retry — the caller owns the stream lifetime). */
+/**
+ * Open a streaming response (no retry — the caller owns the stream lifetime).
+ *
+ * v2.6.5: the timeout and the caller's abort signal used to be detached as soon
+ * as the response *headers* arrived (`doFetch`'s `finally { cleanup() }`), so a
+ * provider that sent headers and then stalled hung the agent run forever, and the
+ * Stop button could not cancel an in-flight stream — tokens kept arriving and
+ * being billed. Both stay wired for the whole body lifetime now, and the body is
+ * wrapped so the timer is always cleared and a cancel aborts the underlying
+ * request.
+ */
 export async function httpStream(
   url: string,
   init: RequestInit,
   options: HttpCallOptions
 ): Promise<Response> {
-  const response = await doFetch(url, init, options)
-  await throwForBadStatus(response, options.provider)
-  return response
+  const handle = withTimeout(options.timeoutMs, options.signal)
+  let response: Response
+  try {
+    response = await options.fetchImpl(url, { ...init, signal: handle.signal })
+  } catch (error) {
+    handle.cleanup()
+    throw translateFetchError(error, options, handle)
+  }
+  try {
+    await throwForBadStatus(response, options.provider)
+  } catch (error) {
+    handle.cleanup()
+    throw error
+  }
+  if (!response.body) {
+    handle.cleanup()
+    return response
+  }
+
+  const reader = response.body.getReader()
+  const body = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      try {
+        const { done, value } = await reader.read()
+        if (done) {
+          handle.cleanup()
+          controller.close()
+          return
+        }
+        controller.enqueue(value)
+      } catch (error) {
+        handle.cleanup()
+        controller.error(error)
+      }
+    },
+    async cancel(reason) {
+      // The consumer (or an abort) stopped early: release the timer and the
+      // underlying connection so the request is really cancelled.
+      handle.cleanup()
+      await reader.cancel(reason).catch(() => undefined)
+    }
+  })
+  return new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers
+  })
 }

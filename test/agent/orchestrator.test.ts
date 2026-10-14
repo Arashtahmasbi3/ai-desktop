@@ -928,7 +928,17 @@ describe('success verification (v2.4 A.3)', () => {
   it('accepts a success claim backed by a passing verification command', async () => {
     const manager = createLocalManager(base)
     const adapter = new ScriptedAdapter('deepseek', [
-      { toolCalls: [toolCall('run_command', { command: 'echo test-ok' })] },
+      {
+        toolCalls: [
+          toolCall('write_file', {
+            path: 'package.json',
+            content: '{"name":"verify-fixture","scripts":{"build":"exit 0"}}'
+          })
+        ]
+      },
+      // v2.6.5: the verification check now requires a real runner, so a plain
+      // `echo test-ok` no longer counts as "the tests passed".
+      { toolCalls: [toolCall('run_command', { command: 'npm run build' })] },
       { content: 'All done.' }
     ])
     const orchestrator = new AgentOrchestrator({
@@ -941,6 +951,28 @@ describe('success verification (v2.4 A.3)', () => {
 
     expect(result.status).toBe('completed')
     expect(result.finalAnswer).toBe('All done.')
+    await manager.dispose()
+  })
+
+  it('does not accept an existence probe as verification', async () => {
+    const manager = createLocalManager(base)
+    const adapter = new ScriptedAdapter('deepseek', [
+      { toolCalls: [toolCall('run_command', { command: 'test -d .' })] },
+      { content: 'All done.' },
+      { content: 'nothing further to report' }
+    ])
+    const orchestrator = new AgentOrchestrator({
+      sandbox: manager,
+      providers: [entry(adapter)],
+      enforceSuccessVerification: true
+    })
+
+    const result = await orchestrator.run('run the tests')
+
+    // `test -d .` is not a verification step, so the claim is nudged away and the
+    // answer the user sees is the follow-up, not the unverified "All done.".
+    expect(adapter.calls.length).toBe(3)
+    expect(result.finalAnswer).not.toBe('All done.')
     await manager.dispose()
   })
 

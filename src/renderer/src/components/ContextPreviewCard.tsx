@@ -24,53 +24,53 @@ export default function ContextPreviewCard({
   const [expanded, setExpanded] = useState(false)
 
   return (
-    <Modal open onClose={onClose} maxWidth="28rem" ariaLabel={t('chat.contextTitle')}>
+    <Modal open onClose={onClose} maxWidth="28rem" ariaLabel={t('chat.contextTitle')} closeOnBackdrop>
       <header className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
-        <h2 className="text-sm font-semibold text-neutral-100">{t('chat.contextTitle')}</h2>
+        <h2 className="text-sm font-semibold text-fg-strong">{t('chat.contextTitle')}</h2>
         <button
           type="button"
           onClick={onClose}
           title={t('common.close')}
           aria-label={t('common.close')}
-          className="rounded-lg p-1 text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-200"
+          className="rounded-lg p-1 text-fg-muted hover:bg-bg-tertiary hover:text-fg"
         >
           <X className="h-4 w-4" />
         </button>
       </header>
 
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3 text-xs text-neutral-300">
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3 text-xs text-fg">
         <div className="flex items-center justify-between">
-          <span className="text-neutral-500">{t('chat.contextProvider')}</span>
-          <span className="text-neutral-200" dir="ltr">
+          <span className="text-fg-muted">{t('chat.contextProvider')}</span>
+          <span className="text-fg" dir="ltr">
             {preview.provider} · {preview.model}
           </span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-neutral-500">{t('chat.contextTokens')}</span>
-          <span className="font-mono text-neutral-200" dir="ltr">
+          <span className="text-fg-muted">{t('chat.contextTokens')}</span>
+          <span className="font-mono text-fg" dir="ltr">
             ≈ {preview.tokens.toLocaleString('en-US')}
           </span>
         </div>
 
         <div>
-          <p className="mb-1 font-medium text-neutral-200">{t('chat.contextIncluded')}</p>
+          <p className="mb-1 font-medium text-fg">{t('chat.contextIncluded')}</p>
           <ul className="space-y-0.5">
             {preview.included.map((section) => (
               <li key={section.key} className="flex justify-between gap-3">
                 <span className="truncate">• {section.label}</span>
-                <span className="shrink-0 font-mono text-neutral-500">{section.tokens}</span>
+                <span className="shrink-0 font-mono text-fg-muted">{section.tokens}</span>
               </li>
             ))}
-            {preview.included.length === 0 ? <li className="text-neutral-600">—</li> : null}
+            {preview.included.length === 0 ? <li className="text-fg-subtle">—</li> : null}
           </ul>
         </div>
 
         {preview.blockedFiles.length > 0 ? (
           <div>
-            <p className="mb-1 font-medium text-amber-400">{t('chat.contextWithheld')}</p>
+            <p className="mb-1 font-medium text-warning">{t('chat.contextWithheld')}</p>
             <ul className="space-y-0.5">
               {preview.blockedFiles.map((file) => (
-                <li key={file} className="truncate font-mono text-3xs text-amber-300/80" dir="ltr">
+                <li key={file} className="truncate font-mono text-3xs text-warning/80" dir="ltr">
                   • {file}
                 </li>
               ))}
@@ -79,8 +79,8 @@ export default function ContextPreviewCard({
         ) : null}
 
         <div>
-          <p className="mb-1 font-medium text-neutral-200">{t('chat.contextExcluded')}</p>
-          <ul className="space-y-0.5 text-neutral-500">
+          <p className="mb-1 font-medium text-fg">{t('chat.contextExcluded')}</p>
+          <ul className="space-y-0.5 text-fg-muted">
             {preview.excluded.map((item) => (
               <li key={item}>• {item}</li>
             ))}
@@ -90,7 +90,7 @@ export default function ContextPreviewCard({
         {expanded ? (
           <pre
             dir="ltr"
-            className="max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-bg-primary p-2 text-left font-mono text-3xs text-neutral-400"
+            className="max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-bg-primary p-2 text-left font-mono text-3xs text-fg-muted"
           >
             {formatContextPreview(preview)}
           </pre>
@@ -101,7 +101,7 @@ export default function ContextPreviewCard({
         <button
           type="button"
           onClick={() => setExpanded((value) => !value)}
-          className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200"
+          className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-fg-muted hover:bg-bg-tertiary hover:text-fg"
         >
           {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
           {expanded ? t('chat.contextCollapse') : t('chat.contextExpand')}
@@ -110,14 +110,14 @@ export default function ContextPreviewCard({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg px-3 py-1.5 text-xs text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200"
+            className="rounded-lg px-3 py-1.5 text-xs text-fg-muted hover:bg-bg-tertiary hover:text-fg"
           >
             {t('common.cancel')}
           </button>
           <button
             type="button"
             onClick={onSend}
-            className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs text-white hover:bg-accent-hover"
+            className="flex items-center gap-1.5 rounded-lg bg-accent-solid px-3 py-1.5 text-xs text-white hover:bg-accent-solid-hover"
           >
             <Send className="h-3.5 w-3.5" />
             {t('chat.contextSendAnyway')}

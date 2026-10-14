@@ -1,4 +1,8 @@
-# Testing Guide — AI Desktop v1.0.0
+﻿> ⚠️ **SUPERSEDED — this document describes v1.0.0 only.** The application is now at
+> **v2.6.4**; see `AGENTS.md` (Status) and `CHANGELOG.md` for the current state, and the
+> versioned `*_v2.3.x.md` documents for later testing guides. Kept for history; do not treat
+> its counts, feature list or limitations as current.
+# Testing Guide â€” AI Desktop v1.0.0
 
 This guide walks through validating the `v1.0.0` **pre-release** on a **clean Windows machine**
 before we promote it to a full release. It is aimed at the volunteer testers running the VM.
@@ -6,7 +10,7 @@ before we promote it to a full release. It is aimed at the volunteer testers run
 - **Build under test:** `v1.0.0` (pre-release)
 - **Release page:** https://github.com/Arashtahmasbi3/ai-desktop/releases/tag/v1.0.0
 - **Target OS:** Windows 10 (1909+) or Windows 11, 64-bit
-- **Time needed:** ~20–30 minutes
+- **Time needed:** ~20â€“30 minutes
 - **Known limitations:** see [`KNOWN_ISSUES.md`](./KNOWN_ISSUES.md)
 
 > **Start from a truly clean VM.** Ideally a fresh Windows install or a snapshot with no prior
@@ -56,10 +60,10 @@ foreach ($f in $expected.Keys) {
 
 ---
 
-## 2. Installer — setup
+## 2. Installer â€” setup
 
 - [ ] Run `AI Desktop Setup 1.0.0.exe`.
-- [ ] Windows SmartScreen appears (expected — unsigned build). Click **More info → Run anyway**.
+- [ ] Windows SmartScreen appears (expected â€” unsigned build). Click **More info â†’ Run anyway**.
 - [ ] The NSIS wizard opens with the **AI Desktop** icon in the header.
 - [ ] The license/choose-directory page appears and the install path is **editable**
       (`allowToChangeInstallationDirectory`). Choose a custom path, e.g. `C:\Tools\AI Desktop`.
@@ -92,7 +96,7 @@ elevation prompt (UAC)?
 - [ ] Run `AI Desktop 1.0.0 Portable.exe` from a folder (e.g. Downloads or a USB stick).
 - [ ] It launches **without installing** and reuses/applies the same dark UI.
 - [ ] Confirm it does not require admin rights.
-- [ ] (Optional) Move the exe to a different folder and run it again — it should still work.
+- [ ] (Optional) Move the exe to a different folder and run it again â€” it should still work.
 
 ---
 
@@ -100,20 +104,20 @@ elevation prompt (UAC)?
 
 - [ ] Open **Settings** (gear icon).
 - [ ] DeepSeek section: paste a valid **API key**, click **Save**.
-- [ ] Relaunch the app and reopen Settings — the key persists and is stored encrypted
+- [ ] Relaunch the app and reopen Settings â€” the key persists and is stored encrypted
       (never plaintext in `%APPDATA%\AI Desktop`). Optionally check the file on disk.
 - [ ] Model dropdown lists the provider's models; selecting one updates `activeModel`.
-- [ ] Send a simple message (e.g. *"سلام، یک تابع فیبوناچی پایتون بنویس"*).
+- [ ] Send a simple message (e.g. *"Ø³Ù„Ø§Ù…ØŒ ÛŒÚ© ØªØ§Ø¨Ø¹ ÙÛŒØ¨ÙˆÙ†Ø§Ú†ÛŒ Ù¾Ø§ÛŒØªÙˆÙ† Ø¨Ù†ÙˆÛŒØ³"*).
 - [ ] The reply **streams** token-by-token in the chat; Markdown/code renders correctly and
       the assistant message is left-aligned while the user message is right-aligned (RTL).
 - [ ] **Enter** sends; **Shift+Enter** inserts a newline.
-- [ ] The "typing…" indicator shows while a response is streaming, and it auto-scrolls.
+- [ ] The "typingâ€¦" indicator shows while a response is streaming, and it auto-scrolls.
 
 ---
 
 ## 7. Projects & local files
 
-- [ ] In Settings → **Projects**, add a project: name + a real local folder path.
+- [ ] In Settings â†’ **Projects**, add a project: name + a real local folder path.
 - [ ] The project appears in the list; the explorer shows its files.
 - [ ] Open a file in the code viewer; make a small edit and confirm a **diff** is shown.
 - [ ] Ask the assistant to read/write a file inside the project and confirm the change lands
@@ -139,10 +143,10 @@ elevation prompt (UAC)?
 
 ## 9. Uninstall (installer build only)
 
-- [ ] Settings → Apps → **AI Desktop** → **Uninstall** (or the Start Menu uninstaller).
+- [ ] Settings â†’ Apps â†’ **AI Desktop** â†’ **Uninstall** (or the Start Menu uninstaller).
 - [ ] The app folder (including a custom install path) is removed.
 - [ ] Desktop and Start Menu shortcuts are removed.
-- [ ] User data is **kept** by default (`deleteAppDataOnUninstall: false`) — confirm
+- [ ] User data is **kept** by default (`deleteAppDataOnUninstall: false`) â€” confirm
       `%APPDATA%\AI Desktop` still exists and contains your encrypted settings, so a reinstall
       keeps your API key/projects.
 - [ ] Reinstall and confirm your settings/projects are restored.
@@ -152,13 +156,13 @@ elevation prompt (UAC)?
 
 ## 10. Error & edge cases
 
-- [ ] Launch with **no network** → app opens; a chat request fails gracefully with a clear
+- [ ] Launch with **no network** â†’ app opens; a chat request fails gracefully with a clear
       error (no crash, no infinite spinner).
-- [ ] Use an **invalid API key** → an auth error is shown; the app falls back / reports clearly.
-- [ ] Rapidly send several messages → no UI freeze, no duplicate responses.
-- [ ] Resize the window / maximize → layout stays correct.
-- [ ] Leave the app open for a while and background/foreground it → no crash, memory stable.
-- [ ] Close and reopen the app → previous session/transcript is restored (resume).
+- [ ] Use an **invalid API key** â†’ an auth error is shown; the app falls back / reports clearly.
+- [ ] Rapidly send several messages â†’ no UI freeze, no duplicate responses.
+- [ ] Resize the window / maximize â†’ layout stays correct.
+- [ ] Leave the app open for a while and background/foreground it â†’ no crash, memory stable.
+- [ ] Close and reopen the app â†’ previous session/transcript is restored (resume).
 
 ---
 
@@ -217,7 +221,7 @@ Copy the block below into a new GitHub issue
 ### Logs
 <!--
 Where to find them:
-- Renderer console: Ctrl+Shift+I → Console (dev builds)
+- Renderer console: Ctrl+Shift+I â†’ Console (dev builds)
 - App data: %APPDATA%\AI Desktop (do NOT paste API keys)
 Paste any error text below:
 -->
@@ -231,7 +235,7 @@ Paste any error text below:
 <!-- Workarounds tried, frequency (always/intermittent), etc. -->
 ```
 
-**⚠️ Never paste API keys, tokens or secrets** in an issue or its logs.
+**âš ï¸ Never paste API keys, tokens or secrets** in an issue or its logs.
 
 ---
 
@@ -244,4 +248,4 @@ When your pass is complete, reply with:
 3. Overall verdict: **installable & runnable / blocked**, and whether you'd recommend promoting
    `v1.0.0` from pre-release to a full release.
 
-Thank you for testing! 🙏
+Thank you for testing! ðŸ™

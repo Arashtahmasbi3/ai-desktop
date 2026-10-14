@@ -33,11 +33,11 @@ export default function SettingsBrowser(): JSX.Element {
 
   return (
     <section className="flex flex-col gap-3">
-      <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
+      <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
         <Globe className="h-3.5 w-3.5" />
         {t('settings.browser')}
       </h3>
-      <p className="text-2xs text-neutral-500">{t('settings.browserHint')}</p>
+      <p className="text-2xs text-fg-muted">{t('settings.browserHint')}</p>
 
       <div className="flex items-center gap-2">
         <input
@@ -48,13 +48,13 @@ export default function SettingsBrowser(): JSX.Element {
           }}
           placeholder={t('settings.websitePlaceholder')}
           dir="ltr"
-          className="flex-1 rounded border border-border bg-bg-primary px-2 py-1 text-xs text-neutral-200 outline-none focus:border-accent/50"
+          className="flex-1 rounded border border-border bg-bg-primary px-2 py-1 text-xs text-fg outline-none focus:border-accent/50"
         />
         <button
           type="button"
           onClick={add}
           disabled={!host.trim()}
-          className="flex items-center gap-1 rounded bg-accent px-3 py-1 text-xs text-white hover:bg-accent-hover disabled:opacity-40"
+          className="flex items-center gap-1 rounded bg-accent-solid px-3 py-1 text-xs text-white hover:bg-accent-solid-hover disabled:opacity-40"
         >
           <Plus className="h-3.5 w-3.5" />
           {t('common.add')}
@@ -62,7 +62,7 @@ export default function SettingsBrowser(): JSX.Element {
       </div>
 
       {permissions.length === 0 ? (
-        <p className="text-2xs text-neutral-600">{t('settings.noPermissions')}</p>
+        <p className="text-2xs text-fg-subtle">{t('settings.noPermissions')}</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {permissions.map((entry) => (
@@ -70,7 +70,7 @@ export default function SettingsBrowser(): JSX.Element {
               key={entry.host}
               className="flex items-center justify-between gap-2 rounded-xl border border-border bg-bg-primary px-3 py-2"
             >
-              <span className="truncate text-xs text-neutral-200" dir="ltr">
+              <span className="truncate text-xs text-fg" dir="ltr">
                 {entry.host}
               </span>
               <div className="flex items-center gap-2">
@@ -86,7 +86,7 @@ export default function SettingsBrowser(): JSX.Element {
                     )
                   }
                   aria-label={entry.host}
-                  className="rounded border border-border bg-bg-secondary px-2 py-0.5 text-2xs text-neutral-200 outline-none focus:border-accent/50"
+                  className="rounded border border-border bg-bg-secondary px-2 py-0.5 text-2xs text-fg outline-none focus:border-accent/50"
                 >
                   {DECISIONS.map((decision) => (
                     <option key={decision} value={decision}>
@@ -99,7 +99,7 @@ export default function SettingsBrowser(): JSX.Element {
                   onClick={() => update(permissions.filter((item) => item.host !== entry.host))}
                   title={t('common.remove')}
                   aria-label={t('common.remove')}
-                  className="rounded border border-border p-1 text-neutral-500 hover:bg-bg-tertiary hover:text-red-400"
+                  className="rounded border border-border p-1 text-fg-muted hover:bg-bg-tertiary hover:text-danger"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>

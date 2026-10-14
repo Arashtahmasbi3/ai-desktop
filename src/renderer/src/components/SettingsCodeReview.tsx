@@ -52,32 +52,32 @@ export default function SettingsCodeReview(): JSX.Element {
 
   return (
     <section className="flex flex-col gap-3">
-      <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
+      <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
         <GitFork className="h-3.5 w-3.5" />
         {t('settings.codeReview')}
       </h3>
-      <p className="text-2xs text-neutral-500">{t('settings.codeReviewHint')}</p>
+      <p className="text-2xs text-fg-muted">{t('settings.codeReviewHint')}</p>
 
       {loading ? (
-        <p className="flex items-center gap-2 text-2xs text-neutral-500">
+        <p className="flex items-center gap-2 text-2xs text-fg-muted">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
           {t('common.loading')}
         </p>
       ) : !connected ? (
-        <p className="text-2xs text-neutral-600">{t('settings.codeReviewNoAuth')}</p>
+        <p className="text-2xs text-fg-subtle">{t('settings.codeReviewNoAuth')}</p>
       ) : (
         <>
           <label className="flex items-center gap-2 rounded-lg border border-border bg-bg-primary px-2 py-1.5">
-            <Search className="h-3.5 w-3.5 text-neutral-500" />
+            <Search className="h-3.5 w-3.5 text-fg-muted" />
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={t('settings.searchRepos')}
-              className="flex-1 bg-transparent text-xs text-neutral-200 outline-none"
+              className="flex-1 bg-transparent text-xs text-fg outline-none"
             />
           </label>
           {filtered.length === 0 ? (
-            <p className="text-2xs text-neutral-600">{t('settings.noRepos')}</p>
+            <p className="text-2xs text-fg-subtle">{t('settings.noRepos')}</p>
           ) : (
             <ul className="flex flex-col gap-2">
               {filtered.map((repo) => {
@@ -88,10 +88,10 @@ export default function SettingsCodeReview(): JSX.Element {
                     key={repo.fullName}
                     className="flex items-center justify-between gap-3 rounded-xl border border-border bg-bg-primary px-3 py-2"
                   >
-                    <span className="min-w-0 truncate text-xs text-neutral-200" dir="ltr">
+                    <span className="min-w-0 truncate text-xs text-fg" dir="ltr">
                       {repo.fullName}
                     </span>
-                    <label className="flex shrink-0 cursor-pointer items-center gap-2 text-2xs text-neutral-400">
+                    <label className="flex shrink-0 cursor-pointer items-center gap-2 text-2xs text-fg-muted">
                       <input
                         type="checkbox"
                         checked={active}

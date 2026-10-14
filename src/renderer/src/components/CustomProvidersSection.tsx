@@ -4,7 +4,7 @@ import type { CustomProviderTestResult } from '@shared/types'
 import { useStore } from '../store'
 
 const fieldClass =
-  'rounded border border-border bg-bg-primary px-2 py-1 text-xs text-neutral-200 outline-none focus:border-accent/50'
+  'rounded border border-border bg-bg-primary px-2 py-1 text-xs text-fg outline-none focus:border-accent/50'
 
 /**
  * Settings section for user-defined OpenAI-compatible endpoints ("Other").
@@ -88,7 +88,7 @@ export default function CustomProvidersSection(): JSX.Element {
 
   return (
     <section className="mt-6">
-      <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
+      <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
         <Plug className="h-3.5 w-3.5" />
         Custom providers (OpenAI-compatible)
       </h3>
@@ -141,7 +141,7 @@ export default function CustomProvidersSection(): JSX.Element {
             type="button"
             disabled={busy || !label.trim() || !baseUrl.trim() || !model.trim()}
             onClick={() => void submit('save')}
-            className="rounded bg-accent px-3 py-1 text-xs text-white hover:bg-accent-hover disabled:opacity-40"
+            className="rounded bg-accent-solid px-3 py-1 text-xs text-white hover:bg-accent-solid-hover disabled:opacity-40"
           >
             {editingId ? 'Update' : 'Add provider'}
           </button>
@@ -149,7 +149,7 @@ export default function CustomProvidersSection(): JSX.Element {
             type="button"
             disabled={busy || !baseUrl.trim() || !model.trim()}
             onClick={() => void submit('test')}
-            className="rounded border border-border px-3 py-1 text-xs text-neutral-300 hover:bg-bg-tertiary disabled:opacity-40"
+            className="rounded border border-border px-3 py-1 text-xs text-fg hover:bg-bg-tertiary disabled:opacity-40"
           >
             Test connection
           </button>
@@ -157,7 +157,7 @@ export default function CustomProvidersSection(): JSX.Element {
             <button
               type="button"
               onClick={resetForm}
-              className="flex items-center gap-1 rounded px-2 py-1 text-xs text-neutral-500 hover:text-neutral-300"
+              className="flex items-center gap-1 rounded px-2 py-1 text-xs text-fg-muted hover:text-fg"
             >
               <X className="h-3 w-3" />
               Cancel edit
@@ -168,20 +168,20 @@ export default function CustomProvidersSection(): JSX.Element {
             <span
               className={`flex items-center gap-1 rounded px-2 py-0.5 text-2xs ${
                 result.ok
-                  ? 'bg-emerald-500/15 text-emerald-400'
-                  : 'bg-red-500/15 text-red-400'
+                  ? 'bg-success/15 text-success'
+                  : 'bg-danger/15 text-danger'
               }`}
             >
               {result.ok ? <Check className="h-3 w-3" /> : null}
               {result.ok ? `OK (${result.latencyMs} ms)` : (result.message ?? 'Failed')}
             </span>
           ) : null}
-          {error ? <span className="text-2xs text-red-400">{error}</span> : null}
+          {error ? <span className="text-2xs text-danger">{error}</span> : null}
         </div>
       </div>
 
       {customProviders.length === 0 ? (
-        <p className="mt-2 text-xs text-neutral-600">No custom providers yet.</p>
+        <p className="mt-2 text-xs text-fg-subtle">No custom providers yet.</p>
       ) : (
         <div className="mt-2 overflow-hidden rounded-xl border border-border">
           {customProviders.map((provider) => (
@@ -194,16 +194,16 @@ export default function CustomProvidersSection(): JSX.Element {
                 onClick={() => startEdit(provider.id)}
                 className="min-w-0 flex-1 text-left"
               >
-                <span className="text-neutral-200">{provider.label}</span>
-                <span className="ml-2 font-mono text-3xs text-neutral-500" dir="ltr">
+                <span className="text-fg">{provider.label}</span>
+                <span className="ml-2 font-mono text-3xs text-fg-muted" dir="ltr">
                   {provider.model} · {provider.baseUrl}
                 </span>
                 {provider.hasApiKey ? (
-                  <span className="ml-2 rounded bg-emerald-500/15 px-1.5 py-0.5 text-3xs text-emerald-400">
+                  <span className="ml-2 rounded bg-success/15 px-1.5 py-0.5 text-3xs text-success">
                     key saved
                   </span>
                 ) : (
-                  <span className="ml-2 rounded bg-bg-tertiary px-1.5 py-0.5 text-3xs text-neutral-500">
+                  <span className="ml-2 rounded bg-bg-tertiary px-1.5 py-0.5 text-3xs text-fg-muted">
                     no key
                   </span>
                 )}
@@ -211,7 +211,7 @@ export default function CustomProvidersSection(): JSX.Element {
               <button
                 type="button"
                 onClick={() => void removeCustomProvider(provider.id)}
-                className="rounded p-1 text-neutral-500 hover:bg-bg-tertiary hover:text-red-400"
+                className="rounded p-1 text-fg-muted hover:bg-bg-tertiary hover:text-danger"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>

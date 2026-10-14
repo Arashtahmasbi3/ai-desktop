@@ -127,11 +127,11 @@ export default function CommandPalette(): JSX.Element | null {
           onKeyDown={onKeyDown}
           placeholder={t('palette.placeholder')}
           aria-label={t('palette.placeholder')}
-          className="w-full border-b border-border bg-transparent px-4 py-3 text-sm text-neutral-100 outline-none placeholder:text-neutral-600"
+          className="w-full border-b border-border bg-transparent px-4 py-3 text-sm text-fg-strong outline-none placeholder:text-fg-subtle"
         />
         <div className="max-h-80 overflow-y-auto py-1">
           {filtered.length === 0 ? (
-            <p className="px-4 py-3 text-xs text-neutral-600">{t('palette.noResults')}</p>
+            <p className="px-4 py-3 text-xs text-fg-subtle">{t('palette.noResults')}</p>
           ) : (
             filtered.map((command, position) => {
               const Icon = command.icon
@@ -143,11 +143,11 @@ export default function CommandPalette(): JSX.Element | null {
                   onClick={() => run(command)}
                   className={`flex w-full items-center gap-2 px-4 py-2 text-left text-xs ${
                     position === index
-                      ? 'bg-accent/15 text-neutral-100'
-                      : 'text-neutral-300 hover:bg-bg-tertiary'
+                      ? 'bg-accent-solid/15 text-fg-strong'
+                      : 'text-fg hover:bg-bg-tertiary'
                   }`}
                 >
-                  <Icon className="h-3.5 w-3.5 text-neutral-500" />
+                  <Icon className="h-3.5 w-3.5 text-fg-muted" />
                   {command.label}
                 </button>
               )

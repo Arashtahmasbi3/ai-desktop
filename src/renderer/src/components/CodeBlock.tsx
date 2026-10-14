@@ -88,16 +88,16 @@ export default function CodeBlock({ code, language }: CodeBlockProps): JSX.Eleme
       onKeyDown={onKeyDown}
       className="my-2 overflow-hidden rounded-lg border border-border bg-bg-primary"
     >
-      <div className="flex items-center gap-2 border-b border-border px-2 py-1 text-3xs text-neutral-500">
+      <div className="flex items-center gap-2 border-b border-border px-2 py-1 text-3xs text-fg-muted">
         <Terminal className="h-3 w-3" />
         <span className="font-mono">{LANGUAGE_LABEL[normalized] ?? language ?? 'text'}</span>
         <span className="flex-1" />
         <button
           type="button"
           onClick={() => void copy()}
-          className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-bg-tertiary hover:text-neutral-200"
+          className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-bg-tertiary hover:text-fg"
         >
-          {copied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+          {copied ? <Check className="h-3 w-3 text-success" /> : <Copy className="h-3 w-3" />}
           {copied ? t('chat.copied') : t('chat.copy')}
         </button>
         {canRun ? (
@@ -106,7 +106,7 @@ export default function CodeBlock({ code, language }: CodeBlockProps): JSX.Eleme
             onClick={() => void run()}
             disabled={running}
             title={t('chat.runHint')}
-            className="flex items-center gap-1 rounded bg-accent/15 px-1.5 py-0.5 text-accent hover:bg-accent/25 disabled:opacity-50"
+            className="flex items-center gap-1 rounded bg-accent-solid/15 px-1.5 py-0.5 text-accent hover:bg-accent-solid/25 disabled:opacity-50"
           >
             {running ? (
               <Square className="h-3 w-3 animate-pulse" />
@@ -119,7 +119,7 @@ export default function CodeBlock({ code, language }: CodeBlockProps): JSX.Eleme
       </div>
 
       <pre className="overflow-auto p-3 text-xs leading-relaxed">
-        <code dir="ltr" className="font-mono text-neutral-200">
+        <code dir="ltr" className="font-mono text-fg">
           {code}
         </code>
       </pre>
@@ -129,14 +129,14 @@ export default function CodeBlock({ code, language }: CodeBlockProps): JSX.Eleme
           <button
             type="button"
             onClick={() => setShowOutput((value) => !value)}
-            className="flex w-full items-center gap-1.5 px-2 py-1 text-3xs text-neutral-500 hover:text-neutral-300"
+            className="flex w-full items-center gap-1.5 px-2 py-1 text-3xs text-fg-muted hover:text-fg"
           >
             <ChevronDown
               className={`h-3 w-3 transition ${showOutput ? '' : '-rotate-90'}`}
             />
             {t('chat.output')}
             <span
-              className={`font-mono ${result.exitCode === 0 ? 'text-emerald-400' : 'text-red-400'}`}
+              className={`font-mono ${result.exitCode === 0 ? 'text-success' : 'text-danger'}`}
             >
               exit {result.exitCode}
             </span>
@@ -144,17 +144,17 @@ export default function CodeBlock({ code, language }: CodeBlockProps): JSX.Eleme
           {showOutput ? (
             <pre className="max-h-64 overflow-auto bg-black/40 p-2 text-2xs leading-relaxed">
               {result.stdout ? (
-                <code dir="ltr" className="block whitespace-pre-wrap text-neutral-300">
+                <code dir="ltr" className="block whitespace-pre-wrap text-fg">
                   {result.stdout}
                 </code>
               ) : null}
               {result.stderr ? (
-                <code dir="ltr" className="block whitespace-pre-wrap text-red-400">
+                <code dir="ltr" className="block whitespace-pre-wrap text-danger">
                   {result.stderr}
                 </code>
               ) : null}
               {!result.stdout && !result.stderr ? (
-                <code className="text-neutral-600">{t('chat.noOutput')}</code>
+                <code className="text-fg-subtle">{t('chat.noOutput')}</code>
               ) : null}
             </pre>
           ) : null}

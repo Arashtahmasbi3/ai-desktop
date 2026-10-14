@@ -230,6 +230,10 @@ Plan:`
     plan.status = 'executing'
     plan.updatedAt = this.now()
 
+    // B-10: steps that already produced an alternative, so a step that keeps
+    // failing cannot grow the plan without bound.
+    const alternativeSteps = new Set<string>()
+
     for (let index = 0; index < plan.steps.length; index += 1) {
       if (this.now() > deadline) {
         plan.status = 'failed'
@@ -276,14 +280,30 @@ Plan:`
           this.emit('task:failed', plan)
           return plan
         }
-        if (decision === 'alternative') {
+        if (decision === 'alternative' && !alternativeSteps.has(step.id)) {
           const alternative = await this.generateAlternative(step, result, context)
           if (alternative) {
-            plan.steps[index + 1] = alternative
-            plan.steps[index + 1].number = index + 2
+            // B-10: an alternative is an *additional* step. Writing it over
+            // `steps[index + 1]` (which is what the old `steps[index + 1] = ...`
+            // did whenever a step followed) silently dropped the next planned
+            // step while the plan still reported `completed`. Insert it instead
+            // and renumber so the displayed plan stays 1..N.
+            alternative.number = index + 2
+            plan.steps.splice(index + 1, 0, alternative)
+            for (let i = index + 2; i < plan.steps.length; i += 1) plan.steps[i].number = i + 1
+            alternativeSteps.add(step.id)
           }
         }
       }
+    }
+
+    // B-10: `completed` means every planned step actually ran. A step that is
+    // still `pending` was skipped, so the plan did not finish.
+    if (plan.steps.some((candidate) => candidate.status === 'pending')) {
+      plan.status = 'failed'
+      plan.updatedAt = this.now()
+      this.emit('task:failed', plan)
+      return plan
     }
 
     plan.status = 'completed'

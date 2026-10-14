@@ -67,7 +67,7 @@ export default function ProjectsSection(): JSX.Element {
 
   return (
     <section>
-      <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
+      <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
         <FolderPlus className="h-3.5 w-3.5" />
         {t('settings.projects')}
       </h3>
@@ -77,19 +77,19 @@ export default function ProjectsSection(): JSX.Element {
           value={projectName}
           onChange={(event) => setProjectName(event.target.value)}
           placeholder={t('settings.projectName')}
-          className="w-36 rounded border border-border bg-bg-primary px-2 py-1 text-xs text-neutral-200 outline-none focus:border-accent/50"
+          className="w-36 rounded border border-border bg-bg-primary px-2 py-1 text-xs text-fg outline-none focus:border-accent/50"
         />
         <input
           value={projectPath}
           onChange={(event) => setProjectPath(event.target.value)}
           placeholder={t('settings.projectPath')}
           dir="ltr"
-          className="flex-1 rounded border border-border bg-bg-primary px-2 py-1 font-mono text-xs text-neutral-200 outline-none focus:border-accent/50"
+          className="flex-1 rounded border border-border bg-bg-primary px-2 py-1 font-mono text-xs text-fg outline-none focus:border-accent/50"
         />
         <button
           type="button"
           onClick={() => void browse()}
-          className="rounded border border-border px-2 py-1 text-xs text-neutral-300 hover:bg-bg-tertiary"
+          className="rounded border border-border px-2 py-1 text-xs text-fg hover:bg-bg-tertiary"
         >
           {t('common.browse')}
         </button>
@@ -101,7 +101,7 @@ export default function ProjectsSection(): JSX.Element {
             setProjectName('')
             setProjectPath('')
           }}
-          className="rounded bg-accent px-3 py-1 text-xs text-white hover:bg-accent-hover disabled:opacity-40"
+          className="rounded bg-accent-solid px-3 py-1 text-xs text-white hover:bg-accent-solid-hover disabled:opacity-40"
         >
           {t('common.add')}
         </button>
@@ -112,19 +112,19 @@ export default function ProjectsSection(): JSX.Element {
           value={remoteName}
           onChange={(event) => setRemoteName(event.target.value)}
           placeholder={t('settings.remoteProjectName')}
-          className="w-36 rounded border border-border bg-bg-primary px-2 py-1 text-xs text-neutral-200 outline-none focus:border-accent/50"
+          className="w-36 rounded border border-border bg-bg-primary px-2 py-1 text-xs text-fg outline-none focus:border-accent/50"
         />
         <input
           value={remotePath}
           onChange={(event) => setRemotePath(event.target.value)}
           placeholder={t('settings.remoteProjectPath')}
           dir="ltr"
-          className="flex-1 rounded border border-border bg-bg-primary px-2 py-1 font-mono text-xs text-neutral-200 outline-none focus:border-accent/50"
+          className="flex-1 rounded border border-border bg-bg-primary px-2 py-1 font-mono text-xs text-fg outline-none focus:border-accent/50"
         />
         <select
           value={remoteVpsId}
           onChange={(event) => setRemoteVpsId(event.target.value)}
-          className="max-w-[9rem] rounded border border-border bg-bg-primary px-2 py-1 text-xs text-neutral-300"
+          className="max-w-[9rem] rounded border border-border bg-bg-primary px-2 py-1 text-xs text-fg"
         >
           <option value="">
             {connectedId ? t('settings.remoteActiveServer') : t('settings.remotePickServer')}
@@ -140,7 +140,7 @@ export default function ProjectsSection(): JSX.Element {
           onClick={() => void discoverRemote()}
           disabled={discovering}
           title={t('settings.discover')}
-          className="flex items-center gap-1 rounded border border-border px-2 py-1 text-xs text-neutral-300 hover:bg-bg-tertiary disabled:opacity-40"
+          className="flex items-center gap-1 rounded border border-border px-2 py-1 text-xs text-fg hover:bg-bg-tertiary disabled:opacity-40"
         >
           <Search className="h-3 w-3" />
           {t('settings.discover')}
@@ -149,18 +149,18 @@ export default function ProjectsSection(): JSX.Element {
           type="button"
           disabled={!remotePath.trim() || !targetVpsId}
           onClick={() => void addRemote()}
-          className="flex items-center gap-1 rounded bg-accent px-3 py-1 text-xs text-white hover:bg-accent-hover disabled:opacity-40"
+          className="flex items-center gap-1 rounded bg-accent-solid px-3 py-1 text-xs text-white hover:bg-accent-solid-hover disabled:opacity-40"
         >
           <Server className="h-3 w-3" />
           {t('common.add')}
         </button>
       </div>
-      <p className="mb-3 text-2xs leading-relaxed text-neutral-600">
+      <p className="mb-3 text-2xs leading-relaxed text-fg-subtle">
         {t('settings.remoteHint')}
       </p>
 
       {projects.length === 0 ? (
-        <p className="text-xs text-neutral-600">{t('settings.noProjects')}</p>
+        <p className="text-xs text-fg-subtle">{t('settings.noProjects')}</p>
       ) : (
         <div className="overflow-hidden rounded-xl border border-border">
           {projects.map((project) => (

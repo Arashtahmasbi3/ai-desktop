@@ -1,4 +1,4 @@
-import { promises as fs } from 'node:fs'
+import { promises as fs, existsSync } from 'node:fs'
 import { dirname } from 'node:path'
 import type { ExecOptions, ExecResult, SandboxProvider } from '@shared/sandbox'
 import type { CommandRunner } from './command-runner'
@@ -6,12 +6,15 @@ import { ChildProcessRunner } from './command-runner'
 import type { SandboxCreateSpec, SandboxDriver, SandboxHandle } from './driver'
 import { ExecFailedError } from './errors'
 import { resolveInsideWorkspace, resolveWorkspaceDir } from './paths'
+import { resolveSandboxShell, shellDialectMismatch, type SandboxShell } from './shell'
 
 export interface LocalSandboxOptions {
   runner?: CommandRunner
   defaultExecTimeoutMs?: number
   /** Restrict the child environment to a minimal allow-list (default true). */
   restrictEnv?: boolean
+  /** Override the shell (tests, or a user-pinned Git Bash / WSL path). */
+  shell?: SandboxShell
 }
 
 /**
@@ -27,11 +30,13 @@ export class LocalSandboxDriver implements SandboxDriver {
   protected readonly runner: CommandRunner
   protected readonly defaultExecTimeoutMs: number
   private readonly restrictEnv: boolean
+  private readonly shellOverride?: SandboxShell
 
   constructor(options: LocalSandboxOptions = {}) {
     this.runner = options.runner ?? new ChildProcessRunner()
     this.defaultExecTimeoutMs = options.defaultExecTimeoutMs ?? 30_000
     this.restrictEnv = options.restrictEnv ?? true
+    this.shellOverride = options.shell
   }
 
   async isAvailable(): Promise<boolean> {
@@ -50,12 +55,25 @@ export class LocalSandboxDriver implements SandboxDriver {
     }
   }
 
-  protected shellFor(): { file: string; args: (command: string) => string[] } {
-    if (process.platform === 'win32') {
-      return { file: 'cmd.exe', args: (command) => ['/d', '/s', '/c', command] }
+  /**
+   * The shell every command runs in (v2.6.5). POSIX `/bin/sh` on POSIX and the
+   * best available POSIX shell on Windows (Git for Windows' `bash.exe`), because
+   * the agent only ever writes POSIX commands. Resolved once and cached.
+   */
+  protected shellFor(): SandboxShell {
+    if (!this.cachedShell) {
+      this.cachedShell =
+        this.shellOverride ?? resolveSandboxShell(process.platform, process.env, existsSync)
     }
-    return { file: '/bin/sh', args: (command) => ['-c', command] }
+    return this.cachedShell
   }
+
+  /** True when no POSIX shell was found and commands will run under `cmd.exe`. */
+  protected usesNonPosixShell(): boolean {
+    return shellDialectMismatch(this.shellFor())
+  }
+
+  private cachedShell?: SandboxShell
 
   protected buildEnv(handle: SandboxHandle, options: ExecOptions): Record<string, string> {
     const extra = { ...handle.env, ...options.env }
@@ -111,7 +129,12 @@ export class LocalSandboxDriver implements SandboxDriver {
 }
 
 /**
- * Fallback for Windows users without Docker: a `cmd.exe`-backed local sandbox.
+ * Fallback for Windows users without Docker.
+ *
+ * v2.6.5: this used to force `cmd.exe`, which cannot run any of the POSIX
+ * commands the agent writes — every command failed and returned empty output.
+ * It now inherits the POSIX-shell preference from {@link LocalSandboxDriver} and
+ * only ends up on `cmd.exe` when no Git Bash / WSL shell is installed.
  * See {@link LocalSandboxDriver} for the isolation caveats.
  */
 export class WindowsSandboxDriver extends LocalSandboxDriver {
@@ -119,9 +142,5 @@ export class WindowsSandboxDriver extends LocalSandboxDriver {
 
   override async isAvailable(): Promise<boolean> {
     return process.platform === 'win32'
-  }
-
-  protected override shellFor(): { file: string; args: (command: string) => string[] } {
-    return { file: 'cmd.exe', args: (command) => ['/d', '/s', '/c', command] }
   }
 }

@@ -67,8 +67,8 @@ export default function MicButton({ appLanguage, onTranscript }: MicButtonProps)
       aria-label={t('chat.voiceInput')}
       className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition ${
         listening
-          ? 'bg-red-500/20 text-red-400'
-          : 'text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300'
+          ? 'bg-danger/20 text-danger'
+          : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
       }`}
     >
       {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}

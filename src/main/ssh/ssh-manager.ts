@@ -28,6 +28,35 @@ interface ConnectionEntry {
   lastActivity: number
 }
 
+/** True when two states describe the same connection situation (v2.6.5). */
+function sameConnectionState(a: VpsConnectionState, b: VpsConnectionState): boolean {
+  return (
+    a.status === b.status &&
+    a.serverId === b.serverId &&
+    a.fingerprint === b.fingerprint &&
+    a.pendingFingerprint === b.pendingFingerprint &&
+    (a.error ?? '') === (b.error ?? '')
+  )
+}
+
+/** Upper bound on a private key file we are willing to hand to ssh2 (v2.6.5). */
+const MAX_PRIVATE_KEY_BYTES = 256 * 1024
+
+/** Absolute POSIX or Windows path (v2.6.5). */
+function isAbsolutePath(value: string): boolean {
+  return value.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(value) || value.startsWith('\\\\')
+}
+
+/**
+ * A real private key always carries a PEM header — OpenSSH keys included
+ * (`-----BEGIN OPENSSH PRIVATE KEY-----`). Anything else is refused so a
+ * renderer-supplied path cannot turn the SSH layer into a file probe (v2.6.5).
+ */
+function looksLikePrivateKey(content: Buffer): boolean {
+  const head = content.toString('utf8', 0, Math.min(content.length, 8192))
+  return /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/.test(head)
+}
+
 export interface SshManagerOptions {
   store: VpsServerStore
   backend: SshBackend
@@ -58,6 +87,8 @@ export class SshManager {
   private readonly onData?: (sessionId: string, chunk: string) => void
   private readonly readKeyFile: (path: string) => Promise<Buffer>
   private connections = new Map<string, ConnectionEntry>()
+  /** In-flight connect attempts, so two callers cannot open two SSH clients. */
+  private connecting = new Map<string, Promise<VpsConnectionState>>()
   private pendingFingerprints = new Map<string, string>()
   /** Last known state per server, so the UI can reason about each independently. */
   private serverStates = new Map<string, VpsConnectionState>()
@@ -119,10 +150,25 @@ export class SshManager {
   }
 
   private setState(next: VpsConnectionState): VpsConnectionState {
+    const previous = next.serverId ? this.serverStates.get(next.serverId) : undefined
     this.state = next
     if (next.serverId) this.serverStates.set(next.serverId, { ...next })
-    this.onStatus?.(this.getState())
+    // v2.6.5: emit only on a real transition. Every call used to emit `vps:status`,
+    // and the renderer answers each event with an extra `vps:connected` invoke, so
+    // a repeated identical state (e.g. a keepalive re-reporting "connected") cost a
+    // full IPC round-trip for nothing.
+    if (!previous || !sameConnectionState(previous, next)) this.onStatus?.(this.getState())
     return this.getState()
+  }
+
+  /**
+   * Mark a server as recently used so the idle watchdog leaves it alone
+   * (v2.6.5). An open remote project is "in use" even while the agent is idle,
+   * and reaping it produced a reconnect every ~30 minutes plus a brief
+   * "project missing" state in the UI.
+   */
+  markActive(serverId: string): void {
+    this.touch(serverId)
   }
 
   private touch(serverId: string): void {
@@ -130,7 +176,33 @@ export class SshManager {
     if (entry) entry.lastActivity = this.now()
   }
 
+  /**
+   * Connect to a saved server.
+   *
+   * v2.6.5: concurrent attempts for the same server are coalesced. A double-click
+   * on Connect, or the keepalive racing a manual connect, used to open two SSH
+   * clients; the map kept the second and the first was never `end()`ed, leaking
+   * an authenticated connection for the life of the process.
+   */
   async connect(serverId: string): Promise<VpsConnectionState> {
+    const existing = this.connections.get(serverId)
+    if (existing) {
+      const known = this.serverStates.get(serverId)
+      return this.setState(
+        known ? { ...known, status: 'connected' } : { status: 'connected', serverId }
+      )
+    }
+    const inFlight = this.connecting.get(serverId)
+    if (inFlight) return inFlight
+
+    const attempt = this.doConnect(serverId).finally(() => {
+      this.connecting.delete(serverId)
+    })
+    this.connecting.set(serverId, attempt)
+    return attempt
+  }
+
+  private async doConnect(serverId: string): Promise<VpsConnectionState> {
     await this.store.load()
     const decrypted = await this.store.getDecrypted(serverId)
     if (!decrypted) return this.setState({ status: 'error', error: `Unknown server: ${serverId}` })
@@ -141,10 +213,27 @@ export class SshManager {
       if (!server.privateKeyPath) {
         return this.blocked(serverId, 'No private key configured — connection blocked.')
       }
+      // v2.6.5: the stored path is a renderer-supplied string that used to be fed
+      // straight to `fs.readFile` and then to ssh2 as key material, so it could
+      // point at any readable file. Require an absolute path and only hand over a
+      // file that really looks like a private key, of a sane size.
+      const keyPath = server.privateKeyPath.trim()
+      if (!isAbsolutePath(keyPath) || /[\u0000\n\r]/.test(keyPath)) {
+        return this.blocked(serverId, `Private key path must be absolute: ${keyPath}`)
+      }
       try {
-        privateKey = await this.readKeyFile(server.privateKeyPath)
+        privateKey = await this.readKeyFile(keyPath)
       } catch {
-        return this.blocked(serverId, `Private key not found: ${server.privateKeyPath}`)
+        return this.blocked(serverId, `Private key not found: ${keyPath}`)
+      }
+      if (privateKey.length === 0 || privateKey.length > MAX_PRIVATE_KEY_BYTES) {
+        return this.blocked(serverId, `Private key file is empty or too large: ${keyPath}`)
+      }
+      if (!looksLikePrivateKey(privateKey)) {
+        return this.blocked(
+          serverId,
+          `Refusing to use a file that is not an SSH private key: ${keyPath}`
+        )
       }
     } else if (!password) {
       return this.blocked(serverId, 'No password stored — connection blocked.')
@@ -358,6 +447,12 @@ export class SshManager {
         if (current?.terminal?.id === sessionId) current.terminal = undefined
       }
     })
+    // v2.6.5: re-opening a terminal (panel remount, a reconnect) overwrote the
+    // handle and leaked the previous shell channel, whose data listener kept
+    // touching the connection so the idle watchdog never reaped it. Close the old
+    // shell first — its `onClose` clears `entry.terminal` while it still refers to
+    // the previous session, so the assignment below is the last word.
+    entry.terminal?.close()
     entry.terminal = session
     return session.id
   }

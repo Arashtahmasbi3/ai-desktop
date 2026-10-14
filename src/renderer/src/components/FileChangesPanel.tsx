@@ -87,42 +87,45 @@ export default function FileChangesPanel({ changes }: FileChangesPanelProps): JS
     if (confirmWrite(1)) void applyFileChange(id)
   }
 
-  const applyAll = (): void => {
+  // U-5: apply one at a time. Firing every apply at once let several
+  // `set({ fileChanges })` updates race and resurrect an entry that had already
+  // been applied. Reject-all had the same race.
+  const applyAll = async (): Promise<void> => {
     if (!confirmWrite(changes.length)) return
-    for (const change of changes) void applyFileChange(change.id)
+    for (const id of changes.map((change) => change.id)) await applyFileChange(id)
   }
 
-  const rejectAll = (): void => {
-    for (const change of changes) void rejectFileChange(change.id)
+  const rejectAll = async (): Promise<void> => {
+    for (const id of changes.map((change) => change.id)) await rejectFileChange(id)
   }
 
   return (
     <div className="mb-2 flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2 px-1">
-        <p className="flex items-center gap-1.5 text-3xs uppercase tracking-wide text-neutral-500">
+        <p className="flex items-center gap-1.5 text-3xs uppercase tracking-wide text-fg-muted">
           <Layers className="h-3 w-3" />
           {t('chat.changesTitle')}
-          <span className="text-neutral-600">({changes.length})</span>
+          <span className="text-fg-subtle">({changes.length})</span>
         </p>
         <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={() => setReviewId(changes[0]?.id ?? null)}
-            className="rounded border border-border px-2 py-0.5 text-3xs text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200"
+            className="rounded border border-border px-2 py-0.5 text-3xs text-fg-muted hover:bg-bg-tertiary hover:text-fg"
           >
             {t('chat.reviewIndividually')}
           </button>
           <button
             type="button"
-            onClick={rejectAll}
-            className="rounded border border-border px-2 py-0.5 text-3xs text-neutral-400 hover:bg-bg-tertiary hover:text-red-400"
+            onClick={() => void rejectAll()}
+            className="rounded border border-border px-2 py-0.5 text-3xs text-fg-muted hover:bg-bg-tertiary hover:text-danger"
           >
             {t('chat.rejectAll')}
           </button>
           <button
             type="button"
-            onClick={applyAll}
-            className="rounded bg-accent px-2 py-0.5 text-3xs font-medium text-white hover:bg-accent-hover"
+            onClick={() => void applyAll()}
+            className="rounded bg-accent-solid px-2 py-0.5 text-3xs font-medium text-white hover:bg-accent-solid-hover"
           >
             {t('chat.applyAll')}
           </button>
@@ -148,7 +151,7 @@ export default function FileChangesPanel({ changes }: FileChangesPanelProps): JS
                   }
                   aria-expanded={isOpen}
                   aria-label={t('chat.toggleDiff', { path: change.path })}
-                  className="shrink-0 rounded p-0.5 text-neutral-500 hover:bg-bg-primary hover:text-neutral-200"
+                  className="shrink-0 rounded p-0.5 text-fg-muted hover:bg-bg-primary hover:text-fg"
                 >
                   {isOpen ? (
                     <ChevronDown className="h-3.5 w-3.5" />
@@ -159,21 +162,21 @@ export default function FileChangesPanel({ changes }: FileChangesPanelProps): JS
                 <button
                   type="button"
                   onClick={() => setReviewId(change.id)}
-                  className="flex min-w-0 flex-1 items-center gap-2 text-left text-neutral-300 hover:text-neutral-100"
+                  className="flex min-w-0 flex-1 items-center gap-2 text-left text-fg hover:text-fg-strong"
                 >
                   <KindIcon path={change.path} className="h-3.5 w-3.5 shrink-0 text-accent" />
                   <span className="truncate font-mono" dir="ltr">
                     {change.path}
                   </span>
                 </button>
-                <span className="shrink-0 font-mono text-emerald-400">+{stat.added}</span>
-                <span className="shrink-0 font-mono text-red-400">-{stat.removed}</span>
+                <span className="shrink-0 font-mono text-success">+{stat.added}</span>
+                <span className="shrink-0 font-mono text-danger">-{stat.removed}</span>
                 <button
                   type="button"
                   onClick={() => void rejectFileChange(change.id)}
                   title={t('chat.rejectChange')}
                   aria-label={t('chat.rejectChange')}
-                  className="shrink-0 rounded p-0.5 text-neutral-500 hover:bg-bg-primary hover:text-red-400"
+                  className="shrink-0 rounded p-0.5 text-fg-muted hover:bg-bg-primary hover:text-danger"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -182,7 +185,7 @@ export default function FileChangesPanel({ changes }: FileChangesPanelProps): JS
                   onClick={() => apply(change.id)}
                   title={t('chat.applyChange')}
                   aria-label={t('chat.applyChange')}
-                  className="shrink-0 rounded p-0.5 text-neutral-500 hover:bg-bg-primary hover:text-emerald-400"
+                  className="shrink-0 rounded p-0.5 text-fg-muted hover:bg-bg-primary hover:text-success"
                 >
                   <Check className="h-3.5 w-3.5" />
                 </button>
@@ -218,19 +221,20 @@ export default function FileChangesPanel({ changes }: FileChangesPanelProps): JS
         maxWidth="min(64rem, 92vw)"
         maxHeight="calc(100vh - 3rem)"
         ariaLabel={reviewing?.path}
+        closeOnBackdrop
       >
         {reviewing ? (
           <>
             <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
               <KindIcon path={reviewing.path} className="h-3.5 w-3.5 text-accent" />
-              <span className="min-w-0 flex-1 truncate font-mono text-xs text-neutral-200" dir="ltr">
+              <span className="min-w-0 flex-1 truncate font-mono text-xs text-fg" dir="ltr">
                 {reviewing.path}
               </span>
               <button
                 type="button"
                 onClick={() => setReviewId(null)}
                 aria-label={t('common.close')}
-                className="rounded p-1 text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-200"
+                className="rounded p-1 text-fg-muted hover:bg-bg-tertiary hover:text-fg"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -249,7 +253,7 @@ export default function FileChangesPanel({ changes }: FileChangesPanelProps): JS
                   void rejectFileChange(reviewing.id)
                   setReviewId(null)
                 }}
-                className="rounded border border-border px-3 py-1 text-xs text-neutral-300 hover:bg-bg-tertiary hover:text-red-400"
+                className="rounded border border-border px-3 py-1 text-xs text-fg hover:bg-bg-tertiary hover:text-danger"
               >
                 {t('chat.rejectChange')}
               </button>
@@ -261,7 +265,7 @@ export default function FileChangesPanel({ changes }: FileChangesPanelProps): JS
                     setReviewId(null)
                   }
                 }}
-                className="rounded bg-accent px-3 py-1 text-xs font-medium text-white hover:bg-accent-hover"
+                className="rounded bg-accent-solid px-3 py-1 text-xs font-medium text-white hover:bg-accent-solid-hover"
               >
                 {t('chat.applyChange')}
               </button>

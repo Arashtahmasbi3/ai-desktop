@@ -17,6 +17,13 @@ export interface DockerSandboxOptions {
 
 const TMP_SIZE_MB = 64
 const CONTAINER_WORKDIR = '/workspace'
+/** Default sandbox image. */
+const DEFAULT_IMAGE = 'node:20-alpine'
+/**
+ * A conservative Docker image reference. It must not start with `-`, so an
+ * attacker-supplied value can never be read by Docker as another flag.
+ */
+const IMAGE_REFERENCE = /^[a-z0-9][a-z0-9._\-/:@]*$/i
 
 /**
  * Runs commands inside a hardened Docker container:
@@ -94,7 +101,19 @@ export class DockerSandboxDriver implements SandboxDriver {
       args.push('-e', `${key}=${value}`)
     }
 
-    args.push(spec.image ?? 'node:20-alpine')
+    // v2.6.5: the image reference is validated before it reaches argv. It is
+    // pushed after the hardening flags, so a value beginning with `-` would be
+    // parsed by Docker as another flag (e.g. `--network=host`, overriding the
+    // `--network none` set above). `docker-migrate-tool.ts` already validates its
+    // refs this way; this driver did not.
+    const image = spec.image ?? DEFAULT_IMAGE
+    if (!IMAGE_REFERENCE.test(image)) {
+      throw new ExecFailedError(`Invalid sandbox image reference: ${image}`, {
+        provider: this.provider,
+        sandboxId: spec.id
+      })
+    }
+    args.push(image)
     // Keep the container alive without a shell dependency beyond `sh`.
     args.push('sh', '-c', 'trap "exit 0" TERM INT; while true; do sleep 3600 & wait $!; done')
     return args

@@ -20,6 +20,8 @@
     "none": "None",
     "more": "More",
     "clear": "Clear",
+    "clearChatConfirm": "Start a new chat? The current messages, logs and pending file changes will be cleared.",
+    "clearTerminalConfirm": "Clear the terminal history?",
     "duplicate": "Duplicate"
   },
   "titlebar": {
@@ -429,13 +431,21 @@
     "auditVerifying": "Verifying…",
     "auditOk": "Audit chain intact ({{count}} lines).",
     "auditBroken": "Tampering detected at line {{line}}: {{reason}}",
-    "auditError": "Could not verify the audit file."
+    "auditError": "Could not verify the audit file.",
+    "theme": "Theme",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeSystem": "System",
+    "themeHint": "Day theme, dark theme, or follow the system setting.",
+    "themeApplied": "Theme: {{theme}}"
   },
   "toast": {
     "dismiss": "Dismiss",
     "copied": "Copied",
     "saved": "Saved",
-    "failed": "Something went wrong"
+    "failed": "Something went wrong",
+    "actionFailed": "The agent did not receive your answer:",
+    "copyFailed": "Could not copy to the clipboard."
   },
   "palette": {
     "title": "Command palette",
@@ -460,14 +470,36 @@
     "getStarted": "Get started",
     "stepOf": "Step {{current}} of {{total}}",
     "vpsTitle": "VPS & Remote",
-    "vpsBody": "Connect a server over SSH to run remote commands. Pick a connected VPS in the chat header and the assistant can use the remote_shell tool."
+    "vpsBody": "Connect a server over SSH to run remote commands. Pick a connected VPS in the chat header and the assistant can use the remote_shell tool.",
+    "titleWelcome": "Welcome to AI Desktop",
+    "titleConnect": "Connect a provider",
+    "titleProject": "Add your first project",
+    "titleDone": "You are all set",
+    "welcomeBody": "AI Desktop connects an AI assistant to your local files, GitHub and VPS. Pick what you will mostly use it for — we will pre-select a model for you.",
+    "useCaseQuick": "Quick & cheap",
+    "useCaseBalanced": "Balanced",
+    "useCasePowerful": "Most capable",
+    "suggestedModel": "Suggested model: {{model}} — {{reason}}",
+    "keySaved": "A provider key is saved",
+    "noKey": "No provider key yet",
+    "connectBody": "Add a DeepSeek, OpenAI, Anthropic or Gemini key in Settings. You can also add any OpenAI-compatible endpoint under “Custom providers”.",
+    "openSettings": "Open Settings",
+    "projectReady": "A project is available",
+    "noProject": "No project yet",
+    "projectBody": "Projects point the assistant at a folder on your machine. Add one in Settings, or drag a folder onto the window later.",
+    "addProject": "Add a project",
+    "setupComplete": "Setup complete",
+    "doneBody": "Use the model picker in the chat header to switch models any time. Press Ctrl+, to reopen Settings."
   },
   "vps": {
     "notConnected": "Connect a VPS first.",
     "searching": "Searching on the VPS…",
     "noMatches": "No matching folder found on the VPS.",
     "found": "Found {{count}} folder(s).",
-    "noServers": "No VPS configured"
+    "noServers": "No VPS configured",
+    "removeConfirm": "Remove VPS \"{{name}}\"?",
+    "refresh": "Refresh",
+    "addServer": "Add server"
   },
   "slash": {
     "new": "Start a new chat",
@@ -642,6 +674,7 @@
     "achieve": "Mark achieved",
     "abandon": "Abandon",
     "remove": "Delete goal",
+    "removeConfirm": "Delete the goal \"{{title}}\" and its links to past runs?",
     "progress": "{{met}}/{{total}}",
     "linkedRuns": "{{count}} linked runs",
     "footerHint": "Goals persist across chats and restarts.",
@@ -700,5 +733,53 @@
     "zoomOut": "Zoom out",
     "zoomReset": "Reset zoom",
     "emergencyStop": "Emergency stop (halt the running agent)"
+  },
+  "codeViewer": {
+    "empty": "Select a file from the Workspace to view it.",
+    "modified": "modified",
+    "save": "Save",
+    "diff": "Diff",
+    "previewDiff": "Preview diff",
+    "discard": "Discard",
+    "edit": "Edit",
+    "backToEditor": "Back to editor",
+    "close": "Close",
+    "searchPlaceholder": "Search in file…",
+    "unified": "Unified",
+    "split": "Split",
+    "unifiedTitle": "Unified diff",
+    "splitTitle": "Side-by-side diff",
+    "preview": "Preview",
+    "source": "Source",
+    "previewTitle": "Preview markdown",
+    "sourceTitle": "Show source",
+    "unsaved": "Unsaved changes — preview shows a diff against the file on disk."
+  },
+  "statusBar": {
+    "ready": "Ready",
+    "agentRunning": "Agent: running",
+    "agentIdle": "Agent: not running",
+    "agentTitleRunning": "Agent running · worker {{state}}",
+    "agentTitleRunningRemote": "Agent running · worker {{state}} · {{address}}",
+    "agentTitleIdle": "Agent not running — the background worker is offline",
+    "workerTitle": "Background worker",
+    "worker": "worker: {{state}}",
+    "workerQueue": "({{active}} running, {{queued}} queued)",
+    "limitsTitle": "Effective concurrency from CPU/RAM limits",
+    "session": "session {{id}}",
+    "online": "online",
+    "offline": "offline",
+    "toggleOnline": "Toggle online/offline (queues work while offline)",
+    "toggleRemote": "Toggle localhost remote access",
+    "remote": "remote: {{target}}",
+    "remoteOff": "off"
+  },
+  "fileExplorer": {
+    "noProjects": "No project added yet. Add a project folder from Settings, or drop a folder onto the window.",
+    "refresh": "Refresh",
+    "close": "Close",
+    "upOneLevel": "Up one level",
+    "filter": "Filter files…",
+    "empty": "Empty folder."
   }
 }

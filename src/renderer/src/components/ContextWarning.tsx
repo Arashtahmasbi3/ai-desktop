@@ -18,8 +18,8 @@ export default function ContextWarning({
   onCompact: () => void
 }): JSX.Element {
   const { t } = useTranslation()
-  const tone = overBudget ? 'text-red-400' : 'text-amber-400'
-  const dot = overBudget ? 'bg-red-400' : 'bg-amber-400'
+  const tone = overBudget ? 'text-danger' : 'text-warning'
+  const dot = overBudget ? 'bg-danger' : 'bg-warning'
 
   return (
     <div data-testid="context-warning" className="flex items-center gap-1.5">
@@ -35,7 +35,7 @@ export default function ContextWarning({
         type="button"
         onClick={onCompact}
         disabled={running}
-        className="rounded border border-border px-1.5 py-0.5 text-3xs text-neutral-300 hover:bg-bg-tertiary disabled:opacity-40"
+        className="rounded border border-border px-1.5 py-0.5 text-3xs text-fg hover:bg-bg-tertiary disabled:opacity-40"
       >
         {t('chat.compact')}
       </button>

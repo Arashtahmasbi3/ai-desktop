@@ -26,30 +26,30 @@ export default function PolicyWarningBanner({
   return (
     <div
       role="alert"
-      className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2.5 text-amber-200"
+      className="mt-3 rounded-lg border border-warning/40 bg-warning/10 p-2.5 text-warning"
     >
       <p className="flex items-start gap-2 text-[12px] font-medium">
-        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-400" />
+        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
         {t('chat.policyWarningTitle')}
       </p>
-      <p className="mt-1 pl-5 text-2xs text-amber-300/90">
+      <p className="mt-1 pl-5 text-2xs text-warning/90">
         {t('chat.policyWarningMode', { mode: t(MODE_KEY[warning.mode]) })}
       </p>
       {warning.reason ? (
-        <p className="mt-0.5 pl-5 text-2xs text-amber-300/80">{warning.reason}</p>
+        <p className="mt-0.5 pl-5 text-2xs text-warning/80">{warning.reason}</p>
       ) : null}
       <div className="mt-2 flex justify-end gap-2 pl-5">
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-lg border border-border px-3 py-1 text-2xs text-neutral-300 hover:bg-bg-tertiary"
+          className="rounded-lg border border-border px-3 py-1 text-2xs text-fg hover:bg-bg-tertiary"
         >
           {t('chat.policyWarningCancel')}
         </button>
         <button
           type="button"
           onClick={onProceed}
-          className="rounded-lg border border-amber-500/50 px-3 py-1 text-2xs font-medium text-amber-200 hover:bg-amber-500/15"
+          className="rounded-lg border border-warning/50 px-3 py-1 text-2xs font-medium text-warning hover:bg-warning/15"
         >
           {t('chat.policyWarningProceed')}
         </button>

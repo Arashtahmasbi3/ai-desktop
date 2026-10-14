@@ -1,5 +1,5 @@
 import { promises as fs } from 'node:fs'
-import { dirname } from 'node:path'
+import { writeFileAtomic } from '@core/atomic-write'
 import type { SecretCipher } from '@core/agent/persistence'
 import type { FetchLike } from '@shared/types'
 import type {
@@ -89,17 +89,21 @@ export class GitHubService {
     }
     try {
       this.client.setToken(await this.cipher.decrypt(this.state.tokenEnc))
-    } catch {
+      this.lastError = undefined
+    } catch (error) {
+      // v2.6.5: a keyring change used to log the user out silently. The stored
+      // (still encrypted) token is kept — dropping it destroyed the only copy —
+      // and the failure is reported so the UI can ask for a new sign-in instead
+      // of pretending the account was never connected.
       this.client.setToken(undefined)
-      this.state.tokenEnc = undefined
+      this.lastError =
+        'Stored GitHub token could not be decrypted (the OS keyring may have changed). ' +
+        `Sign in again. ${error instanceof Error ? error.message : String(error)}`
     }
   }
 
   private async persist(): Promise<void> {
-    await fs.mkdir(dirname(this.file), { recursive: true })
-    const tmp = `${this.file}.${process.pid}.${Date.now()}.tmp`
-    await fs.writeFile(tmp, `${JSON.stringify(this.state, null, 2)}\n`, 'utf8')
-    await fs.rename(tmp, this.file)
+    await writeFileAtomic(this.file, `${JSON.stringify(this.state, null, 2)}\n`)
   }
 
   private statusFromState(): GitHubAuthStatus {

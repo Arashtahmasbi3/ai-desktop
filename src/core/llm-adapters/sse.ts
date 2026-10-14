@@ -77,6 +77,10 @@ export async function* iterateSSE(response: Response): AsyncGenerator<SSEEvent> 
     const trailing = makeEvent(state)
     if (trailing) yield trailing
   } finally {
+    // v2.6.5: `releaseLock()` alone leaves the body (and its socket) undrained
+    // when the consumer stops early — e.g. an adapter that returns on `[DONE]`.
+    // Cancel first so the connection is actually released.
+    await reader.cancel().catch(() => undefined)
     reader.releaseLock()
   }
 }

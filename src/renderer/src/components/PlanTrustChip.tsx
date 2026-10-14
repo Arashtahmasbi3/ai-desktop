@@ -33,7 +33,7 @@ export default function PlanTrustChip(): JSX.Element | null {
   if (minutes <= 0) return null
 
   return (
-    <span className="flex items-center gap-1 rounded bg-accent/20 px-1.5 py-0.5 text-accent">
+    <span className="flex items-center gap-1 rounded bg-accent-solid/20 px-1.5 py-0.5 text-accent">
       <ClipboardCheck className="h-3 w-3" />
       {t('plan.active')} ({t('plan.activeRemaining', { count: minutes })})
       <button
@@ -41,7 +41,7 @@ export default function PlanTrustChip(): JSX.Element | null {
         onClick={stopPlan}
         title={t('plan.stop')}
         aria-label={t('plan.stop')}
-        className="ml-0.5 rounded p-0.5 hover:bg-accent/30"
+        className="ml-0.5 rounded p-0.5 hover:bg-accent-solid/30"
       >
         <X className="h-3 w-3" />
       </button>

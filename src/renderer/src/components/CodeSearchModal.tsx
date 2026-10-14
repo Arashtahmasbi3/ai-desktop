@@ -48,7 +48,7 @@ export default function CodeSearchModal(): JSX.Element | null {
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center gap-2 border-b border-border px-3 py-2">
-          <Search className="h-4 w-4 shrink-0 text-neutral-500" />
+          <Search className="h-4 w-4 shrink-0 text-fg-muted" />
           <input
             ref={inputRef}
             value={query}
@@ -58,13 +58,13 @@ export default function CodeSearchModal(): JSX.Element | null {
             }}
             placeholder={t('search.placeholder')}
             dir="ltr"
-            className="flex-1 bg-transparent text-sm text-neutral-100 outline-none placeholder:text-neutral-600"
+            className="flex-1 bg-transparent text-sm text-fg-strong outline-none placeholder:text-fg-subtle"
           />
           <button
             type="button"
             onClick={() => setSearchOpen(false)}
             aria-label={t('common.close')}
-            className="rounded p-1 text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300"
+            className="rounded p-1 text-fg-muted hover:bg-bg-tertiary hover:text-fg"
           >
             <X className="h-4 w-4" />
           </button>
@@ -72,9 +72,9 @@ export default function CodeSearchModal(): JSX.Element | null {
 
         <div className="min-h-0 flex-1 overflow-auto">
           {query.trim() === '' ? (
-            <p className="px-3 py-4 text-xs text-neutral-500">{t('search.hint')}</p>
+            <p className="px-3 py-4 text-xs text-fg-muted">{t('search.hint')}</p>
           ) : results.length === 0 ? (
-            <p className="px-3 py-4 text-xs text-neutral-500">{t('search.empty')}</p>
+            <p className="px-3 py-4 text-xs text-fg-muted">{t('search.empty')}</p>
           ) : (
             results.map((match, index) => (
               <button
@@ -87,9 +87,9 @@ export default function CodeSearchModal(): JSX.Element | null {
                 <span className="flex items-center gap-1.5 font-mono text-2xs text-accent">
                   <FileCode2 className="h-3 w-3 shrink-0" />
                   {match.path}
-                  <span className="text-neutral-600">:{match.line}</span>
+                  <span className="text-fg-subtle">:{match.line}</span>
                 </span>
-                <span className="truncate font-mono text-2xs text-neutral-400">{match.text}</span>
+                <span className="truncate font-mono text-2xs text-fg-muted">{match.text}</span>
               </button>
             ))
           )}

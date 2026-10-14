@@ -34,10 +34,10 @@ export interface ConnectionStatus {
 
 /** Tailwind text colour for a tone (paired with an icon + label, never alone). */
 export const CONNECTION_TONE_CLASS: Record<ConnectionTone, string> = {
-  ok: 'text-emerald-400',
-  warn: 'text-amber-400',
-  bad: 'text-red-400',
-  muted: 'text-neutral-500'
+  ok: 'text-success',
+  warn: 'text-warning',
+  bad: 'text-danger',
+  muted: 'text-fg-muted'
 }
 
 export interface ConnectionInput {

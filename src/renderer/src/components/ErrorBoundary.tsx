@@ -10,6 +10,15 @@ interface State {
   error: Error | null
 }
 
+/**
+ * U-16: show the reason, never a stack trace. An IPC or library failure can put
+ * a whole stack into `error.message`; only the first line is shown, capped.
+ */
+function safeMessage(error: Error): string {
+  const first = String(error?.message ?? error).split('\n')[0].trim()
+  return first.length > 300 ? `${first.slice(0, 300)}…` : first
+}
+
 /** Keeps one panel's render error from blanking the whole window. */
 export default class ErrorBoundary extends Component<Props, State> {
   override state: State = { error: null }
@@ -28,17 +37,19 @@ export default class ErrorBoundary extends Component<Props, State> {
 
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
-        <AlertTriangle className="h-8 w-8 text-amber-400" />
+        <AlertTriangle className="h-8 w-8 text-warning" />
         <div>
-          <p className="text-sm text-neutral-200">
+          <p className="text-sm text-fg">
             {this.props.label ?? 'This panel'} crashed while rendering.
           </p>
-          <p className="mt-1 max-w-md font-mono text-2xs text-neutral-500">{error.message}</p>
+          <p className="mt-1 max-w-md font-mono text-2xs text-fg-muted">
+            {safeMessage(error)}
+          </p>
         </div>
         <button
           type="button"
           onClick={() => this.setState({ error: null })}
-          className="flex items-center gap-1 rounded bg-accent px-3 py-1 text-xs text-white hover:bg-accent-hover"
+          className="flex items-center gap-1 rounded bg-accent-solid px-3 py-1 text-xs text-white hover:bg-accent-solid-hover"
         >
           <RotateCw className="h-3 w-3" />
           Retry

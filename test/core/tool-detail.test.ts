@@ -61,6 +61,32 @@ describe('P2 buildToolDetail redacts + caps (v2.5.2)', () => {
     expect(capped.split('\n').length).toBe(TOOL_DETAIL_CAPS.lines + 1)
     expect(capped).toContain('… [truncated]')
   })
+
+  it('B-19: caps by whole code points, never splitting an emoji surrogate pair', () => {
+    const emoji = '🙂' // 4 UTF-8 bytes, 2 UTF-16 units
+    const capped = capText(emoji.repeat(100), 7)
+    const body = capped.replace(/\n… \[truncated\]$/, '')
+
+    expect(capped.endsWith('… [truncated]')).toBe(true)
+    // Byte semantics are unchanged: the kept prefix fits the 7-byte budget...
+    expect(Buffer.byteLength(body, 'utf8')).toBeLessThanOrEqual(7)
+    // ...and it is a whole number of characters (1 emoji = 4 bytes, 2 would be 8).
+    expect(body).toBe(emoji)
+    // No lone surrogate survives anywhere in the output.
+    expect(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(capped)).toBe(false)
+    expect(/(?:^|[^\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(capped)).toBe(false)
+  })
+
+  it('B-19: caps a mixed CJK/emoji stream without splitting a pair', () => {
+    // 漢 = 3 bytes, 🙂 = 4 bytes (2 UTF-16 units): a 10-byte cut used to land in
+    // the middle of the second emoji.
+    const capped = capText(`漢${'🙂'.repeat(50)}`, 10)
+    const body = capped.replace(/\n… \[truncated\]$/, '')
+
+    expect(body).toBe('漢🙂') // 7 bytes; adding the next emoji would need 11
+    expect(Buffer.byteLength(body, 'utf8')).toBeLessThanOrEqual(10)
+    expect(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(capped)).toBe(false)
+  })
 })
 
 describe('P2 orchestrator emits structured tool detail (v2.5.2)', () => {

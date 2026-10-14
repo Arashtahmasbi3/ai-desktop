@@ -22,7 +22,13 @@ export const DENY_RULES: DenyRule[] = [
   {
     id: 'power',
     reason: 'Powering off or rebooting the host is not allowed from the agent.',
-    pattern: /(^|[;&|]\s*)(shutdown|reboot|halt|poweroff)(\s|$)/i
+    // v2.6.5: the keyword must sit in *command position* — at the start, after a
+    // command separator, or right after a privilege/init wrapper. The previous
+    // pattern only matched a bare `reboot`, so `sudo reboot`, `systemctl poweroff`
+    // and `/sbin/reboot` all slipped through, and in `full` approval mode the
+    // deny list is the only guard left.
+    pattern:
+      /(?:^|[;&|]\s*|\b(?:sudo|doas|systemctl|service|init|busctl|nsenter)\s+(?:-\S+\s+)*)(?:\S*\/)?(?:shutdown|reboot|halt|poweroff)\b/i
   },
   { id: 'fork-bomb', reason: 'Fork bombs hang the machine.', pattern: /:\s*\(\s*\)\s*\{[^}]*:[^}]*\}/ },
   { id: 'chmod-root', reason: 'Changing permissions of / recursively is unsafe.', pattern: /chmod\s+(-[a-zA-Z]*\s+)*777\s+\/(\s|$|\*)/i },
@@ -34,7 +40,10 @@ export const DENY_RULES: DenyRule[] = [
   {
     id: 'pipe-to-shell',
     reason: 'Piping a download straight into a shell executes untrusted code.',
-    pattern: /\b(curl|wget)\b[^|;&\n]*\|\s*(sudo\s+)?(bash|sh|zsh)\b/i
+    // v2.6.5: also catch an absolute interpreter path (`| /bin/bash`) and the
+    // command-substitution form (`bash -c "$(curl …)"`).
+    pattern:
+      /\b(curl|wget)\b[^|;&\n]*\|\s*(?:sudo\s+)?(?:\S*\/)?(?:bash|sh|zsh|dash|ksh)\b|\b(?:bash|sh|zsh|dash|ksh)\s+-c\s+["']?\$\(\s*(?:sudo\s+)?(?:curl|wget)\b/i
   }
 ]
 

@@ -78,6 +78,17 @@ export interface ApprovedPlan {
   expiresAt: number
   /** Absent only on records written before v2.6.2; those are rejected on read. */
   scope?: PlanScope
+  /**
+   * actionId -> fingerprint of the step's tool + arguments (v2.6.5).
+   *
+   * The trust used to be keyed on the action *id* alone, and `planHash` was
+   * computed but never compared, so the documented "editing the plan invalidates
+   * the approval" guarantee did not hold: because ids come from the provider
+   * (`call_0`, `call_1`, ...) a later turn reusing an id was auto-approved for a
+   * completely different `write_file` / `run_command`. Absent on older records,
+   * which are therefore not auto-approvable.
+   */
+  stepFingerprints?: Record<string, string>
 }
 
 export type PlanDecision =

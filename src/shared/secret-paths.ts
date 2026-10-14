@@ -84,6 +84,40 @@ function segmentsOf(normalized: string): string[] {
 }
 
 /**
+ * Collapse `.` and `..` segments lexically (v2.6.5). {@link normalize} only
+ * unifies separators, so `./../etc/shadow` never equalled `/etc/shadow` and the
+ * exact-string system-file set could be walked around.
+ */
+function collapseDotSegments(input: string): string {
+  const absolute = input.startsWith('/')
+  const out: string[] = []
+  for (const segment of input.split('/')) {
+    if (segment === '' || segment === '.') continue
+    if (segment === '..') {
+      if (out.length > 0 && out[out.length - 1] !== '..') out.pop()
+      else if (!absolute) out.push('..')
+      continue
+    }
+    out.push(segment)
+  }
+  const joined = out.join('/')
+  return absolute ? `/${joined}` : joined
+}
+
+/**
+ * The privileged system file this path resolves to, if any. A suffix comparison
+ * is used as well as equality so `../../../etc/shadow` matches the `/etc/shadow`
+ * entry after segment collapsing.
+ */
+function matchSystemFile(resolved: string): string | null {
+  const candidate = resolved.startsWith('/') ? resolved : `/${resolved}`
+  for (const entry of SECRET_SYSTEM_FILES) {
+    if (candidate === entry || candidate.endsWith(entry)) return entry
+  }
+  return null
+}
+
+/**
  * A private-key file by extension. `public.key` (and any `public*` name) is a
  * conventional *public* key name and is intentionally not matched — the boundary
  * test in §5 calls this out explicitly.
@@ -147,10 +181,15 @@ export function inspectSecretPath(path: string): SecretPathResult {
   if (lastTwo.toLowerCase() === '.docker/config.json') {
     return hit('docker-config', 'Docker config can hold registry credentials')
   }
-  if (SECRET_SYSTEM_FILES.has(lower)) {
-    return hit('system-file', `${lower} is a privileged system file`)
+  // v2.6.5: compare the *resolved* path, so `../../../etc/shadow` and
+  // `etc/../etc/shadow` are recognised like `/etc/shadow` instead of slipping
+  // past the exact-string set.
+  const resolved = collapseDotSegments(lower)
+  const systemFile = matchSystemFile(resolved)
+  if (systemFile) {
+    return hit('system-file', `${systemFile} is a privileged system file`)
   }
-  if (lower === '/etc/sudoers.d' || lower.startsWith('/etc/sudoers.d/')) {
+  if (resolved === '/etc/sudoers.d' || resolved.startsWith('/etc/sudoers.d/')) {
     return hit('system-file', '/etc/sudoers.d holds sudo privileges')
   }
 

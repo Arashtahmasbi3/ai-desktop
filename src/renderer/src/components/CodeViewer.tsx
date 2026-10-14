@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   ChevronDown,
   ChevronUp,
@@ -35,6 +36,7 @@ function matchRanges(line: string, query: string): Array<[number, number]> {
 }
 
 export default function CodeViewer(): JSX.Element {
+  const { t } = useTranslation()
   const selectedFile = useStore((state) => state.selectedFile)
   const fileContent = useStore((state) => state.fileContent)
   const draft = useStore((state) => state.draft)
@@ -89,9 +91,9 @@ export default function CodeViewer(): JSX.Element {
 
   if (!selectedFile) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 bg-bg-primary text-neutral-600">
+      <div className="flex h-full flex-col items-center justify-center gap-2 bg-bg-primary text-fg-muted">
         <Code2 className="h-8 w-8" />
-        <p className="text-xs">برای مشاهده، یک فایل را از Workspace انتخاب کنید.</p>
+        <p className="text-xs">{t('codeViewer.empty')}</p>
       </div>
     )
   }
@@ -104,9 +106,11 @@ export default function CodeViewer(): JSX.Element {
   return (
     <div className="flex h-full min-h-0 flex-col bg-bg-primary">
       <div className="flex h-8 shrink-0 items-center justify-between border-b border-border px-2 text-2xs">
-        <span className="truncate font-mono text-neutral-400" dir="ltr" title={selectedFile}>
+        <span className="truncate font-mono text-fg-muted" dir="ltr" title={selectedFile}>
           {selectedFile}
-          {changed ? <span className="ml-2 text-amber-400">● modified</span> : null}
+          {changed ? (
+            <span className="ml-2 text-warning">● {t('codeViewer.modified')}</span>
+          ) : null}
         </span>
         <div className="flex items-center gap-1">
           {editing ? (
@@ -115,20 +119,20 @@ export default function CodeViewer(): JSX.Element {
                 type="button"
                 onClick={() => void saveFile()}
                 disabled={!changed || saving}
-                className="flex items-center gap-1 rounded bg-accent px-2 py-0.5 text-white hover:bg-accent-hover disabled:opacity-40"
+                className="flex items-center gap-1 rounded bg-accent-solid px-2 py-0.5 text-white hover:bg-accent-solid-hover disabled:opacity-40"
               >
                 <Save className="h-3 w-3" />
-                Save
+                {t('codeViewer.save')}
               </button>
               <button
                 type="button"
                 onClick={() => setEditing(false)}
                 disabled={!changed}
-                title="Preview diff"
-                className="flex items-center gap-1 rounded px-2 py-0.5 text-neutral-400 hover:bg-bg-tertiary disabled:opacity-30"
+                title={t('codeViewer.previewDiff')}
+                className="flex items-center gap-1 rounded px-2 py-0.5 text-fg-muted hover:bg-bg-tertiary disabled:opacity-30"
               >
                 <Eye className="h-3 w-3" />
-                Diff
+                {t('codeViewer.diff')}
               </button>
               <button
                 type="button"
@@ -136,10 +140,10 @@ export default function CodeViewer(): JSX.Element {
                   discardDraft()
                   setEditing(false)
                 }}
-                className="flex items-center gap-1 rounded px-2 py-0.5 text-neutral-400 hover:bg-bg-tertiary"
+                className="flex items-center gap-1 rounded px-2 py-0.5 text-fg-muted hover:bg-bg-tertiary"
               >
                 <Undo2 className="h-3 w-3" />
-                Discard
+                {t('codeViewer.discard')}
               </button>
             </>
           ) : draft !== null ? (
@@ -148,44 +152,45 @@ export default function CodeViewer(): JSX.Element {
                 type="button"
                 onClick={() => void saveFile()}
                 disabled={saving}
-                className="flex items-center gap-1 rounded bg-accent px-2 py-0.5 text-white hover:bg-accent-hover disabled:opacity-40"
+                className="flex items-center gap-1 rounded bg-accent-solid px-2 py-0.5 text-white hover:bg-accent-solid-hover disabled:opacity-40"
               >
                 <Save className="h-3 w-3" />
-                Save
+                {t('codeViewer.save')}
               </button>
               <button
                 type="button"
                 onClick={() => setEditing(true)}
-                title="Back to editor"
-                className="flex items-center gap-1 rounded px-2 py-0.5 text-neutral-400 hover:bg-bg-tertiary"
+                title={t('codeViewer.backToEditor')}
+                className="flex items-center gap-1 rounded px-2 py-0.5 text-fg-muted hover:bg-bg-tertiary"
               >
                 <Pencil className="h-3 w-3" />
-                Edit
+                {t('codeViewer.edit')}
               </button>
               <button
                 type="button"
                 onClick={discardDraft}
-                className="flex items-center gap-1 rounded px-2 py-0.5 text-neutral-400 hover:bg-bg-tertiary"
+                className="flex items-center gap-1 rounded px-2 py-0.5 text-fg-muted hover:bg-bg-tertiary"
               >
                 <Undo2 className="h-3 w-3" />
-                Discard
+                {t('codeViewer.discard')}
               </button>
             </>
           ) : (
             <button
               type="button"
               onClick={() => setEditing(true)}
-              className="flex items-center gap-1 rounded px-2 py-0.5 text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200"
+              className="flex items-center gap-1 rounded px-2 py-0.5 text-fg-muted hover:bg-bg-tertiary hover:text-fg"
             >
               <Pencil className="h-3 w-3" />
-              Edit
+              {t('codeViewer.edit')}
             </button>
           )}
           <button
             type="button"
             onClick={() => void openFile(selectedFile)}
-            title="Close"
-            className="rounded p-0.5 text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-200"
+            title={t('codeViewer.close')}
+            aria-label={t('codeViewer.close')}
+            className="rounded p-0.5 text-fg-muted hover:bg-bg-tertiary hover:text-fg"
           >
             <X className="h-3 w-3" />
           </button>
@@ -194,16 +199,16 @@ export default function CodeViewer(): JSX.Element {
 
       <div className="flex h-8 shrink-0 items-center gap-2 border-b border-border px-2">
         <div className="relative flex-1">
-          <Search className="absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-neutral-600" />
+          <Search className="absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-muted" />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search in file…"
-            className="w-full rounded border border-border bg-bg-secondary py-0.5 pr-7 pl-2 text-2xs text-neutral-200 outline-none focus:border-accent/50"
+            placeholder={t('codeViewer.searchPlaceholder')}
+            className="w-full rounded border border-border bg-bg-secondary py-0.5 pr-7 pl-2 text-2xs text-fg outline-none focus:border-accent/50"
           />
         </div>
         {query ? (
-          <div className="flex items-center gap-1 text-3xs text-neutral-500">
+          <div className="flex items-center gap-1 text-3xs text-fg-muted">
             <span>
               {matchLines.length === 0 ? 0 : matchIndex + 1}/{matchLines.length}
             </span>
@@ -217,32 +222,32 @@ export default function CodeViewer(): JSX.Element {
         ) : null}
         {changed ? (
           <span className="flex items-center gap-1 text-3xs">
-            <span className="text-emerald-400">+{summary.added}</span>
-            <span className="text-red-400">-{summary.removed}</span>
+            <span className="text-success">+{summary.added}</span>
+            <span className="text-danger">-{summary.removed}</span>
           </span>
         ) : null}
         {changed && !editing && !preview ? (
           <button
             type="button"
             onClick={() => setSplitDiff((value) => !value)}
-            title={splitDiff ? 'Unified diff' : 'Side-by-side diff'}
-            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-3xs text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200"
+            title={splitDiff ? t('codeViewer.unifiedTitle') : t('codeViewer.splitTitle')}
+            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-3xs text-fg-muted hover:bg-bg-tertiary hover:text-fg"
           >
             <Columns2 className="h-3 w-3" />
-            {splitDiff ? 'Unified' : 'Split'}
+            {splitDiff ? t('codeViewer.unified') : t('codeViewer.split')}
           </button>
         ) : null}
         {canPreview ? (
           <button
             type="button"
             onClick={() => setPreview((value) => !value)}
-            title={preview ? 'Show source' : 'Preview markdown'}
+            title={preview ? t('codeViewer.sourceTitle') : t('codeViewer.previewTitle')}
             className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-3xs ${
-              preview ? 'bg-accent/20 text-accent' : 'text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200'
+              preview ? 'bg-accent-solid/20 text-accent' : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
             }`}
           >
             <FileText className="h-3 w-3" />
-            {preview ? 'Source' : 'Preview'}
+            {preview ? t('codeViewer.source') : t('codeViewer.preview')}
           </button>
         ) : null}
       </div>
@@ -251,11 +256,13 @@ export default function CodeViewer(): JSX.Element {
         <div className="flex min-h-0 flex-1" dir="ltr">
           <div className="min-h-0 w-1/2 overflow-auto border-r border-border font-mono text-xs">
             {lines.map((line, index) => (
-              <div key={index} className="flex px-2">
-                <span className="w-10 shrink-0 select-none pr-2 text-right text-neutral-600">
+              // U-11: a content-based key, so editing a line never leaves the
+              // previous line's DOM (and its highlight) in place.
+              <div key={`${index}:${line}`} className="flex px-2">
+                <span className="w-10 shrink-0 select-none pr-2 text-right text-fg-muted">
                   {index + 1}
                 </span>
-                <span className="whitespace-pre text-neutral-200">
+                <span className="whitespace-pre text-fg">
                   <HighlightedLine text={line} language={language} />
                 </span>
               </div>
@@ -271,7 +278,7 @@ export default function CodeViewer(): JSX.Element {
           onChange={(event) => setDraft(event.target.value)}
           dir="ltr"
           spellCheck={false}
-          className="min-h-0 flex-1 resize-none bg-bg-primary p-3 font-mono text-xs text-neutral-200 outline-none"
+          className="min-h-0 flex-1 resize-none bg-bg-primary p-3 font-mono text-xs text-fg outline-none"
         />
       ) : changed ? (
         splitDiff ? (
@@ -280,25 +287,25 @@ export default function CodeViewer(): JSX.Element {
         <div ref={bodyRef} className="min-h-0 flex-1 overflow-auto font-mono text-xs">
           {diff.map((line, index) => (
             <div
-              key={index}
+              key={`${line.type}:${line.oldNo ?? ''}:${line.newNo ?? ''}:${index}`}
               className={`flex px-2 ${
                 line.type === 'add'
-                  ? 'bg-emerald-500/10'
+                  ? 'bg-success/10'
                   : line.type === 'del'
-                    ? 'bg-red-500/10'
+                    ? 'bg-danger/10'
                     : ''
               }`}
             >
-              <span className="w-10 shrink-0 select-none pr-2 text-right text-neutral-600">
+              <span className="w-10 shrink-0 select-none pr-2 text-right text-fg-muted">
                 {line.oldNo ?? ''}
               </span>
-              <span className="w-10 shrink-0 select-none pr-2 text-right text-neutral-600">
+              <span className="w-10 shrink-0 select-none pr-2 text-right text-fg-muted">
                 {line.newNo ?? ''}
               </span>
-              <span className={`w-3 shrink-0 ${line.type === 'add' ? 'text-emerald-400' : line.type === 'del' ? 'text-red-400' : 'text-neutral-700'}`}>
+              <span className={`w-3 shrink-0 ${line.type === 'add' ? 'text-success' : line.type === 'del' ? 'text-danger' : 'text-fg-muted'}`}>
                 {line.type === 'add' ? '+' : line.type === 'del' ? '-' : ' '}
               </span>
-              <span className="whitespace-pre text-neutral-200">
+              <span className="whitespace-pre text-fg">
                 <HighlightedLine text={line.text} language={language} />
               </span>
             </div>
@@ -312,18 +319,18 @@ export default function CodeViewer(): JSX.Element {
             const isCurrent = matchLines[matchIndex] === index
             return (
               <div
-                key={index}
+                key={`${index}:${line}`}
                 ref={(node) => {
                   matchRefs.current[index] = node
                 }}
                 className={`flex px-2 ${
-                  isCurrent ? 'bg-amber-500/20' : isMatch ? 'bg-amber-500/10' : ''
+                  isCurrent ? 'bg-warning/20' : isMatch ? 'bg-warning/10' : ''
                 }`}
               >
-                <span className="w-10 shrink-0 select-none pr-2 text-right text-neutral-600">
+                <span className="w-10 shrink-0 select-none pr-2 text-right text-fg-muted">
                   {index + 1}
                 </span>
-                <span className="whitespace-pre text-neutral-200">
+                <span className="whitespace-pre text-fg">
                   {query && isMatch
                     ? renderWithMatches(line, query)
                     : <HighlightedLine text={line} language={language} />}
@@ -335,9 +342,9 @@ export default function CodeViewer(): JSX.Element {
       )}
 
       {draft !== null && !editing ? (
-        <div className="flex shrink-0 items-center gap-2 border-t border-border bg-bg-secondary px-3 py-1 text-2xs text-amber-400">
+        <div className="flex shrink-0 items-center gap-2 border-t border-border bg-bg-secondary px-3 py-1 text-2xs text-warning">
           <FileWarning className="h-3 w-3" />
-          Unsaved changes — preview shows a diff against the file on disk.
+          {t('codeViewer.unsaved')}
         </div>
       ) : null}
     </div>
@@ -351,7 +358,7 @@ function renderWithMatches(line: string, query: string): JSX.Element {
   ranges.forEach(([start, end], index) => {
     if (start > cursor) parts.push(<span key={`t-${index}`}>{line.slice(cursor, start)}</span>)
     parts.push(
-      <mark key={`m-${index}`} className="rounded bg-amber-500/40 text-neutral-100">
+      <mark key={`m-${index}`} className="rounded bg-warning/40 text-fg-strong">
         {line.slice(start, end)}
       </mark>
     )

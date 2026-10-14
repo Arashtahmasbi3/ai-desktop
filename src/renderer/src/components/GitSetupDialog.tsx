@@ -56,27 +56,27 @@ export default function GitSetupDialog({
     }
   }
 
-  const rowClass = 'flex items-center gap-2 text-xs text-neutral-300'
+  const rowClass = 'flex items-center gap-2 text-xs text-fg'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
       <div className="flex max-h-[calc(100vh-2rem)] w-[min(32rem,92vw)] flex-col overflow-hidden rounded-lg border border-border bg-bg-secondary shadow-xl">
         <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-2.5">
-          <div className="flex items-center gap-2 text-sm text-neutral-200">
+          <div className="flex items-center gap-2 text-sm text-fg">
             <GitBranch className="h-4 w-4 text-accent" />
             Setup Git for this project?
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-6 w-6 items-center justify-center rounded text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300"
+            className="flex h-6 w-6 items-center justify-center rounded text-fg-muted hover:bg-bg-tertiary hover:text-fg"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
-          <p className="truncate text-2xs text-neutral-500">{path}</p>
+          <p className="truncate text-2xs text-fg-muted">{path}</p>
 
           <label className={rowClass}>
             <input type="checkbox" checked={init} onChange={(e) => setInit(e.target.checked)} />
@@ -94,7 +94,7 @@ export default function GitSetupDialog({
             <select
               value={projectType}
               onChange={(e) => setProjectType(e.target.value as GitProjectType)}
-              className="w-full rounded border border-border bg-bg-primary px-2 py-1 text-xs text-neutral-200"
+              className="w-full rounded border border-border bg-bg-primary px-2 py-1 text-xs text-fg"
             >
               <option value="node">Node</option>
               <option value="python">Python</option>
@@ -114,19 +114,19 @@ export default function GitSetupDialog({
               value={remoteUrl}
               onChange={(e) => setRemoteUrl(e.target.value)}
               placeholder="git@github.com:org/repo.git"
-              className="w-full rounded border border-border bg-bg-primary px-2 py-1 text-xs text-neutral-200"
+              className="w-full rounded border border-border bg-bg-primary px-2 py-1 text-xs text-fg"
             />
           ) : null}
 
           {preview.length > 0 ? (
-            <pre className="max-h-32 overflow-auto whitespace-pre-wrap rounded border border-border bg-bg-primary p-2 text-3xs text-neutral-500">
+            <pre className="max-h-32 overflow-auto whitespace-pre-wrap rounded border border-border bg-bg-primary p-2 text-3xs text-fg-muted">
               {preview.join('\n')}
             </pre>
           ) : null}
 
-          {error ? <p className="text-xs text-red-400">{error}</p> : null}
+          {error ? <p className="text-xs text-danger">{error}</p> : null}
           {output ? (
-            <pre className="max-h-32 overflow-auto whitespace-pre-wrap rounded border border-border bg-bg-primary p-2 text-3xs text-emerald-400">
+            <pre className="max-h-32 overflow-auto whitespace-pre-wrap rounded border border-border bg-bg-primary p-2 text-3xs text-success">
               {output}
             </pre>
           ) : null}
@@ -135,7 +135,7 @@ export default function GitSetupDialog({
             <button
               type="button"
               onClick={onClose}
-              className="rounded px-3 py-1 text-xs text-neutral-400 hover:bg-bg-tertiary"
+              className="rounded px-3 py-1 text-xs text-fg-muted hover:bg-bg-tertiary"
             >
               Skip
             </button>
@@ -143,7 +143,7 @@ export default function GitSetupDialog({
               type="button"
               disabled={busy || preview.length === 0}
               onClick={() => void run()}
-              className="rounded bg-accent/20 px-3 py-1 text-xs text-accent hover:bg-accent/30 disabled:opacity-50"
+              className="rounded bg-accent-solid/20 px-3 py-1 text-xs text-accent hover:bg-accent-solid/30 disabled:opacity-50"
             >
               {busy ? 'Setting up…' : 'Set up Git'}
             </button>

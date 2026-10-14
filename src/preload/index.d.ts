@@ -66,6 +66,8 @@ import type { ResolvedGoal } from '@core/agent/goal-store'
 export interface Api {
   app: {
     ping(): Promise<string>
+    /** The running app version (from Electron), so the UI never hardcodes it. */
+    version(): Promise<string>
   }
   window: {
     minimize(): Promise<void>
@@ -142,6 +144,8 @@ export interface Api {
     connected(): Promise<string[]>
     connect(id: string): Promise<VpsConnectionState>
     disconnect(id: string): Promise<VpsConnectionState>
+    /** Refresh a server's idle stamp so the watchdog keeps an open project's host up. */
+    keepAlive(id: string): Promise<VpsConnectionState>
     approveFingerprint(id: string): Promise<VpsConnectionState>
     exec(id: string, command: string): Promise<VpsExecResult>
     audit(): Promise<AuditEntryView[]>
@@ -223,6 +227,18 @@ export interface Api {
   }
   shell: {
     exec(command: string): Promise<LocalShellResult>
+  }
+  /**
+   * v2.6.5: this whole namespace existed in `preload/index.ts` but was never
+   * declared here, so the four profile/elevation channels were unreachable from
+   * typed renderer code — the declared contract had drifted from the bridge.
+   */
+  session: {
+    get(): Promise<ResolvedProfile>
+    setProfile(profile: SessionProfile): Promise<SettingsView>
+    setInvestigateScope(scope: InvestigateScope): Promise<SettingsView>
+    grantElevation(): Promise<SettingsView>
+    revokeElevation(): Promise<SettingsView>
   }
 
   jobs: {

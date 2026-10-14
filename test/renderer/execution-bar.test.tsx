@@ -117,7 +117,8 @@ describe('v2.6.1 B.3 - execution bar', () => {
     const { rerender } = render(<ExecutionBar timelineOpen={false} onToggleTimeline={() => undefined} />)
     const ask = screen.getByTestId('exec-approval')
     expect(ask.textContent).toContain('Safe mode')
-    expect(ask.className).toContain('sky-500')
+    // v2.7.0: the badge colour is the semantic `info` token.
+    expect(ask.className).toContain('info')
 
     mount('auto-write')
     rerender(<ExecutionBar timelineOpen={false} onToggleTimeline={() => undefined} />)
@@ -129,7 +130,7 @@ describe('v2.6.1 B.3 - execution bar', () => {
     rerender(<ExecutionBar timelineOpen={false} onToggleTimeline={() => undefined} />)
     const full = screen.getByTestId('exec-approval')
     expect(full.textContent).toContain('Full access')
-    expect(full.className).toContain('amber-500')
+    expect(full.className).toContain('warning')
   })
 
   it('4. full access shows a live auto-disable countdown', () => {

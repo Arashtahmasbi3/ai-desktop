@@ -98,9 +98,9 @@ function categoryKey(category: ActionCategory): string {
 }
 
 const CATEGORY_STYLE: Record<ActionCategory, string> = {
-  read: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300',
-  write: 'border-amber-500/40 bg-amber-500/10 text-amber-300',
-  destructive: 'border-red-500/40 bg-red-500/10 text-red-300'
+  read: 'border-success/40 bg-success/10 text-success',
+  write: 'border-warning/40 bg-warning/10 text-warning',
+  destructive: 'border-danger/40 bg-danger/10 text-danger'
 }
 
 /** Lightweight token colouring for shell previews (no full syntax highlighter). */
@@ -109,7 +109,7 @@ function CommandPreview({ text }: { text: string }): JSX.Element {
     <code className="font-mono text-[12px] leading-relaxed">
       {text.split(/(\s+)/).map((token, index) =>
         RISKY_TOKENS.has(token.trim().toLowerCase()) ? (
-          <span key={index} className="font-semibold text-red-400">
+          <span key={index} className="font-semibold text-danger">
             {token}
           </span>
         ) : (
@@ -183,25 +183,27 @@ export default function ApprovalDialog(): JSX.Element | null {
   return (
     <Modal
       open
-      onClose={() => respondApproval({ approved: false })}
       maxWidth="32rem"
-      className={request.dangerous ? 'border-red-500/60' : ''}
+      className={request.dangerous ? 'border-danger/60' : ''}
       ariaLabel={t('chat.approvalTitle')}
     >
       <div className="flex shrink-0 flex-col gap-2 border-b border-border px-4 py-3">
         <div className="flex items-start justify-between gap-3">
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-neutral-100">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-fg-strong">
             <ShieldAlert
-              className={`h-4 w-4 ${request.dangerous ? 'text-red-400' : 'text-amber-400'}`}
+              className={`h-4 w-4 ${request.dangerous ? 'text-danger' : 'text-warning'}`}
             />
             {t('chat.approvalTitle')}
           </h2>
+          {/* U-14: the only ways out of this gate are an explicit Approve or
+              Deny — Escape and a backdrop click do nothing, and this button
+              says what it really does. */}
           <button
             type="button"
             onClick={() => respondApproval(false)}
-            title={t('common.close')}
-            aria-label={t('common.close')}
-            className="rounded p-1 text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300"
+            title={t('chat.deny')}
+            aria-label={t('chat.deny')}
+            className="rounded p-1 text-fg-muted hover:bg-bg-tertiary hover:text-fg"
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -219,24 +221,24 @@ export default function ApprovalDialog(): JSX.Element | null {
             {kindIcon(request.kind)}
             {t(categoryKey(categoryOf(request.dangerous, request.kind)))}
           </span>
-          <span className="flex min-w-0 items-center gap-1 text-neutral-500">
+          <span className="flex min-w-0 items-center gap-1 text-fg-muted">
             {t('chat.approvalTool')}:
-            <code className="max-w-[16rem] truncate font-mono text-neutral-200" dir="ltr">
+            <code className="max-w-[16rem] truncate font-mono text-fg" dir="ltr">
               {request.tool}
             </code>
           </span>
           {request.server ? (
-            <span className="flex min-w-0 items-center gap-1 text-neutral-500">
+            <span className="flex min-w-0 items-center gap-1 text-fg-muted">
               {t('chat.approvalServer')}:
-              <span className="max-w-[12rem] truncate font-mono text-neutral-300" dir="ltr">
+              <span className="max-w-[12rem] truncate font-mono text-fg" dir="ltr">
                 {request.server}
               </span>
             </span>
           ) : null}
           {request.workingDirectory ? (
-            <span className="flex min-w-0 items-center gap-1 text-neutral-500">
+            <span className="flex min-w-0 items-center gap-1 text-fg-muted">
               {t('chat.approvalWorkingDir')}:
-              <span className="max-w-[16rem] truncate font-mono text-neutral-300" dir="ltr">
+              <span className="max-w-[16rem] truncate font-mono text-fg" dir="ltr">
                 {request.workingDirectory}
               </span>
             </span>
@@ -244,22 +246,22 @@ export default function ApprovalDialog(): JSX.Element | null {
         </div>
 
         {request.reason ? (
-          <p className="flex items-center gap-2 text-2xs text-neutral-400">
-            <ShieldAlert className="h-3.5 w-3.5 shrink-0 text-neutral-500" />
+          <p className="flex items-center gap-2 text-2xs text-fg-muted">
+            <ShieldAlert className="h-3.5 w-3.5 shrink-0 text-fg-muted" />
             {t('chat.approvalReason')}:{' '}
-            <span className="font-medium text-neutral-200">{t(reasonKey(request.reason))}</span>
+            <span className="font-medium text-fg">{t(reasonKey(request.reason))}</span>
           </p>
         ) : null}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
         {request.dangerous ? (
-          <p className="mt-3 flex items-start gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-2 text-2xs text-red-300">
+          <p className="mt-3 flex items-start gap-2 rounded-lg border border-danger/40 bg-danger/10 p-2 text-2xs text-danger">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             {t('chat.approvalDangerous')}
           </p>
         ) : request.kind === 'write' ? (
-          <p className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-2xs text-amber-300">
+          <p className="mt-3 flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 p-2 text-2xs text-warning">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             {t('chat.approvalWriteWarning')}
           </p>
@@ -273,20 +275,20 @@ export default function ApprovalDialog(): JSX.Element | null {
           />
         ) : null}
 
-        <p className="mt-3 text-3xs uppercase tracking-wide text-neutral-600">
+        <p className="mt-3 text-3xs uppercase tracking-wide text-fg-subtle">
           {t('chat.approvalCommand')}
         </p>
 
         <pre
           dir="ltr"
-          className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-bg-primary p-2 text-neutral-200"
+          className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-bg-primary p-2 text-fg"
         >
           <CommandPreview text={request.preview ?? request.summary} />
         </pre>
         {showDetails ? (
           <pre
             dir="ltr"
-            className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-bg-primary p-2 font-mono text-3xs text-neutral-400"
+            className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-bg-primary p-2 font-mono text-3xs text-fg-muted"
           >
             {request.tool}
             {'\n'}
@@ -295,7 +297,7 @@ export default function ApprovalDialog(): JSX.Element | null {
         ) : null}
 
         {rememberable ? (
-          <div className="mt-3 flex flex-col gap-1.5 text-xs text-neutral-300">
+          <div className="mt-3 flex flex-col gap-1.5 text-xs text-fg">
             <label className="flex cursor-pointer items-center gap-2">
               <input
                 type="checkbox"
@@ -332,16 +334,16 @@ export default function ApprovalDialog(): JSX.Element | null {
               />
               {t('chat.approvalSession')}
             </label>
-            <p className="text-3xs text-neutral-600">{t('chat.approvalRememberScope')}</p>
+            <p className="text-3xs text-fg-subtle">{t('chat.approvalRememberScope')}</p>
           </div>
         ) : (
           <>
-            <p className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-2xs text-amber-300">
+            <p className="mt-3 flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 p-2 text-2xs text-warning">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               {t('chat.approvalCannotRemember')}
             </p>
             {request.dangerous || request.kind === 'write' || request.kind === 'shell' ? (
-              <p className="mt-2 flex items-start gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-2 text-2xs text-red-300">
+              <p className="mt-2 flex items-start gap-2 rounded-lg border border-danger/40 bg-danger/10 p-2 text-2xs text-danger">
                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 {t('chat.approvalNoUndo')}
               </p>
@@ -351,33 +353,33 @@ export default function ApprovalDialog(): JSX.Element | null {
 
         {showHistory ? (
           <div className="mx-4 mb-3 max-h-48 overflow-auto rounded-lg border border-border bg-bg-primary p-2">
-            <p className="mb-1 text-3xs font-medium uppercase tracking-wide text-neutral-600">
+            <p className="mb-1 text-3xs font-medium uppercase tracking-wide text-fg-subtle">
               {t('chat.approvalHistory')}
             </p>
             {history.length === 0 ? (
-              <p className="text-2xs text-neutral-600">{t('chat.approvalHistoryEmpty')}</p>
+              <p className="text-2xs text-fg-subtle">{t('chat.approvalHistoryEmpty')}</p>
             ) : (
               <ul className="mb-2 flex flex-col gap-1">
                 {history.map((entry) => (
                   <li
                     key={entry.id}
-                    className="flex items-center justify-between gap-2 text-2xs text-neutral-400"
+                    className="flex items-center justify-between gap-2 text-2xs text-fg-muted"
                   >
                     <span className="truncate" dir="ltr">
                       {entry.summary}
                     </span>
-                    <span className={entry.approved ? 'text-emerald-400' : 'text-red-400'}>
+                    <span className={entry.approved ? 'text-success' : 'text-danger'}>
                       {entry.approved ? t('chat.approve') : t('chat.deny')}
                     </span>
                   </li>
                 ))}
               </ul>
             )}
-            <p className="mb-1 text-3xs font-medium uppercase tracking-wide text-neutral-600">
+            <p className="mb-1 text-3xs font-medium uppercase tracking-wide text-fg-subtle">
               {t('settings.approvedCommands')}
             </p>
             {learned.length === 0 ? (
-              <p className="text-2xs text-neutral-600">
+              <p className="text-2xs text-fg-subtle">
                 {t('settings.approvedCommandsEmpty')}
               </p>
             ) : (
@@ -385,7 +387,7 @@ export default function ApprovalDialog(): JSX.Element | null {
                 {learned.map((item) => (
                   <li
                     key={item.id}
-                    className="flex items-center justify-between gap-2 text-2xs text-neutral-400"
+                    className="flex items-center justify-between gap-2 text-2xs text-fg-muted"
                   >
                     <span className="truncate" dir="ltr">
                       {item.label}
@@ -395,7 +397,7 @@ export default function ApprovalDialog(): JSX.Element | null {
                       onClick={() => {
                         void window.api.agent.revokeApprovedCommand(item.id).then(refreshHistory)
                       }}
-                      className="shrink-0 rounded px-1.5 py-0.5 text-neutral-500 hover:bg-bg-tertiary hover:text-red-400"
+                      className="shrink-0 rounded px-1.5 py-0.5 text-fg-muted hover:bg-bg-tertiary hover:text-danger"
                     >
                       {t('settings.revoke')}
                     </button>
@@ -414,14 +416,14 @@ export default function ApprovalDialog(): JSX.Element | null {
             <button
               type="button"
               onClick={() => setShowDetails((value) => !value)}
-              className="whitespace-nowrap text-2xs text-neutral-500 hover:text-neutral-300"
+              className="whitespace-nowrap text-2xs text-fg-muted hover:text-fg"
             >
               {showDetails ? t('chat.approvalHideDetails') : t('chat.approvalShowDetails')}
             </button>
             <button
               type="button"
               onClick={() => setShowHistory((value) => !value)}
-              className="flex items-center gap-1 whitespace-nowrap text-2xs text-neutral-500 hover:text-neutral-300"
+              className="flex items-center gap-1 whitespace-nowrap text-2xs text-fg-muted hover:text-fg"
             >
               <History className="h-3 w-3" />
               {t('chat.approvalHistory')}
@@ -434,21 +436,21 @@ export default function ApprovalDialog(): JSX.Element | null {
             <button
               type="button"
               onClick={() => respondApproval(false)}
-              className="whitespace-nowrap rounded-lg border border-border px-3 py-1.5 text-xs text-neutral-300 hover:bg-bg-tertiary"
+              className="whitespace-nowrap rounded-lg border border-border px-3 py-1.5 text-xs text-fg hover:bg-bg-tertiary"
             >
               {t('chat.deny')}
             </button>
             <button
               type="button"
               onClick={() => respondApproval({ approved: false, explain: true })}
-              className="whitespace-nowrap rounded-lg border border-amber-500/40 px-3 py-1.5 text-xs text-amber-300 hover:bg-amber-500/10"
+              className="whitespace-nowrap rounded-lg border border-warning/40 px-3 py-1.5 text-xs text-warning hover:bg-warning/10"
             >
               {t('chat.approvalDenyExplain')}
             </button>
             <button
               type="button"
               onClick={approve}
-              className="whitespace-nowrap rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover"
+              className="whitespace-nowrap rounded-lg bg-accent-solid px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-solid-hover"
             >
               {t('chat.approve')}
             </button>

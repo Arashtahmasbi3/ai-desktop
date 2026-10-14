@@ -34,15 +34,19 @@ export function capText(text: string, maxBytes: number, maxLines: number = TOOL_
   }
 
   if (Buffer.byteLength(out, 'utf8') > maxBytes) {
-    // Binary-search the longest prefix that fits the byte budget.
+    // Binary-search the longest prefix that fits the byte budget. The search is
+    // over *code points*, not UTF-16 indices: slicing by index can cut a
+    // surrogate pair in half and emit a broken character (B-19). Byte semantics
+    // are unchanged — the kept prefix still fits `maxBytes` UTF-8 bytes.
+    const points = Array.from(out)
     let lo = 0
-    let hi = out.length
+    let hi = points.length
     while (lo < hi) {
       const mid = Math.ceil((lo + hi) / 2)
-      if (Buffer.byteLength(out.slice(0, mid), 'utf8') > maxBytes) hi = mid - 1
+      if (Buffer.byteLength(points.slice(0, mid).join(''), 'utf8') > maxBytes) hi = mid - 1
       else lo = mid
     }
-    out = out.slice(0, lo)
+    out = points.slice(0, lo).join('')
     truncated = true
   }
 
