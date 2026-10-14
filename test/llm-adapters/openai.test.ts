@@ -129,6 +129,100 @@ describe('OpenAIAdapter', () => {
     expect(adapter.getCapabilities('gpt-4o').toolCalling).toBe(true)
   })
 
+  /**
+   * v2.8.0 — "show thinking, processing, etc. like you and Codex do."
+   *
+   * The adapters read only `content`, so a reasoning model's thinking was fetched over
+   * the wire and then thrown away. It is now surfaced separately, and must never leak
+   * into `content`: that field is the answer, and an assistant message built from it is
+   * replayed to the provider on the next turn.
+   */
+  describe('reasoning (v2.8.0)', () => {
+    it('reads reasoning_content from a non-streaming response without touching content', async () => {
+      const { fn } = mockFetch([
+        jsonResponse({
+          id: 'chatcmpl-r1',
+          model: 'deepseek-reasoner',
+          choices: [
+            {
+              message: {
+                role: 'assistant',
+                content: 'the answer',
+                reasoning_content: 'step 1: think\nstep 2: answer'
+              },
+              finish_reason: 'stop'
+            }
+          ]
+        })
+      ])
+
+      const response = await new OpenAIAdapter().chat(
+        { model: 'deepseek-reasoner', messages: [{ role: 'user', content: 'hi' }] },
+        config(fn)
+      )
+
+      expect(response.reasoning).toBe('step 1: think\nstep 2: answer')
+      expect(response.content).toBe('the answer')
+    })
+
+    it('accepts the OpenAI-compatible `reasoning` field too', async () => {
+      const { fn } = mockFetch([
+        jsonResponse({
+          id: 'r2',
+          model: 'm',
+          choices: [{ message: { role: 'assistant', content: 'ok', reasoning: 'because' } }]
+        })
+      ])
+
+      const response = await new OpenAIAdapter().chat(
+        { model: 'm', messages: [{ role: 'user', content: 'hi' }] },
+        config(fn)
+      )
+      expect(response.reasoning).toBe('because')
+    })
+
+    it('omits the field entirely when the provider sends no reasoning', async () => {
+      const { fn } = mockFetch([
+        jsonResponse({
+          id: 'r3',
+          model: 'm',
+          choices: [{ message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }]
+        })
+      ])
+
+      const response = await new OpenAIAdapter().chat(
+        { model: 'm', messages: [{ role: 'user', content: 'hi' }] },
+        config(fn)
+      )
+      expect(response.reasoning).toBeUndefined()
+      // Not `reasoning: ''` — an empty string would render an empty thinking panel.
+      expect('reasoning' in response).toBe(false)
+    })
+
+    it('accumulates streamed reasoning separately from the answer', async () => {
+      const { fn } = mockFetch([
+        sseResponse([
+          sse({ choices: [{ delta: { reasoning_content: 'thinking' } }] }),
+          sse({ choices: [{ delta: { reasoning_content: ' harder' } }] }),
+          sse({ choices: [{ delta: { content: 'Answer' } }] }),
+          sse({ choices: [{ finish_reason: 'stop' }] }),
+          'data: [DONE]\n\n'
+        ])
+      ])
+
+      const response = await collectStream(
+        new OpenAIAdapter().streamChat(
+          { model: 'deepseek-reasoner', messages: [{ role: 'user', content: 'hi' }] },
+          config(fn)
+        ),
+        'deepseek-reasoner'
+      )
+
+      expect(response.reasoning).toBe('thinking harder')
+      expect(response.content).toBe('Answer')
+    })
+  })
+
   it('validates config', () => {
     const adapter = new OpenAIAdapter()
     expect(adapter.validateConfig({ apiKey: '', model: '' }).valid).toBe(false)

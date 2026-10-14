@@ -15,6 +15,8 @@ export interface ScriptedTurn {
   content?: string | null
   toolCalls?: ToolCall[]
   usage?: ChatResponse['usage']
+  /** v2.8.0: the provider's reasoning text, as a reasoner would return it. */
+  reasoning?: string
   /** When set, the adapter throws this instead of returning a response. */
   error?: unknown
   /** Side effect run just before the turn is returned/throws (e.g. abort a signal). */
@@ -66,7 +68,8 @@ export class ScriptedAdapter implements BaseLLMAdapter {
       content: turn.content ?? null,
       toolCalls,
       finishReason: toolCalls.length > 0 ? 'tool_calls' : 'stop',
-      ...(turn.usage ? { usage: turn.usage } : {})
+      ...(turn.usage ? { usage: turn.usage } : {}),
+      ...(turn.reasoning ? { reasoning: turn.reasoning } : {})
     }
   }
 

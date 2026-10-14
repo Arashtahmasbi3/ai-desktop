@@ -811,6 +811,19 @@ export class AgentOrchestrator {
         usage = addUsage(usage, outcome.response.usage)
         const assistantText = outcome.response.content
         const toolCalls = outcome.response.toolCalls ?? []
+        // v2.8.0: the provider's reasoning for this call (DeepSeek `reasoning_content`,
+        // OpenAI-compatible `reasoning`, Anthropic thinking blocks). Kept out of
+        // `content` on purpose, so it can never be mistaken for the reply or re-sent as
+        // an assistant message on the next turn.
+        const stepReasoning = outcome.response.reasoning?.trim() || undefined
+        if (stepReasoning) {
+          this.log('info', 'step.reasoning', runId, {
+            step: index,
+            phase: 'planning',
+            // Capped in the log like every other free-text field.
+            reasoning: stepReasoning.slice(0, 2000)
+          })
+        }
 
         if (toolCalls.length === 0) {
           // v2.4 A.3: don't accept a bare success claim without a recent verification.
@@ -838,6 +851,7 @@ export class AgentOrchestrator {
                 startedAt: startedStepAt,
                 finishedAt: this.now(),
                 thought: assistantText,
+                ...(stepReasoning ? { reasoning: stepReasoning } : {}),
                 actions: [],
                 observations: [],
                 reflection: 'Blocked a success claim without recent verification.',
@@ -856,6 +870,7 @@ export class AgentOrchestrator {
             startedAt: startedStepAt,
             finishedAt: this.now(),
             thought: assistantText,
+            ...(stepReasoning ? { reasoning: stepReasoning } : {}),
             actions: [],
             observations: [],
             reflection: 'Model produced a final answer with no tool calls.',
@@ -1240,6 +1255,9 @@ export class AgentOrchestrator {
           startedAt: startedStepAt,
           finishedAt: this.now(),
           thought: assistantText,
+          // v2.8.0: the model's own reasoning for this step, when the provider exposes
+          // it. Asked for as "show thinking, processing, etc. like you and Codex do".
+          ...(stepReasoning ? { reasoning: stepReasoning } : {}),
           actions,
           observations,
           reflection,

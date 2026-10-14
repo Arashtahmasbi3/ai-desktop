@@ -136,12 +136,16 @@ export class OpenAIAdapter extends BaseAdapter {
       }
     })
     const usage = asRecord(root.usage)
+    // v2.8.0: the non-streaming reasoner response carries the same field.
+    const reasoning =
+      asString(message.reasoning_content) ?? asString(message.reasoning) ?? undefined
     return {
       id: asString(root.id) ?? generateId('resp'),
       model: asString(root.model) ?? request.model,
       content: asString(message.content) ?? null,
       toolCalls,
       finishReason: mapOpenAIFinishReason(asString(choice.finish_reason)),
+      ...(reasoning ? { reasoning } : {}),
       usage:
         asNumber(usage.prompt_tokens) === undefined
           ? undefined
@@ -171,6 +175,11 @@ export class OpenAIAdapter extends BaseAdapter {
 
     const text = asString(delta.content)
     if (text) events.push({ type: 'text', text })
+
+    // v2.8.0: DeepSeek's reasoner streams `reasoning_content`; some OpenAI-compatible
+    // servers use `reasoning`. Keep it separate from the answer text.
+    const reasoning = asString(delta.reasoning_content) ?? asString(delta.reasoning)
+    if (reasoning) events.push({ type: 'reasoning', text: reasoning })
 
     for (const raw of asArray(delta.tool_calls)) {
       const call = asRecord(raw)

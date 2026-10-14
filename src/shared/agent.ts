@@ -93,6 +93,12 @@ export interface AgentStep {
   finishedAt: number
   /** Assistant text produced during planning (may be null). */
   thought: string | null
+  /**
+   * v2.8.0: the model's own reasoning for this step, when the provider exposes it
+   * (`reasoning_content` / `thinking` blocks). Never merged into `thought`, which is
+   * the answer text.
+   */
+  reasoning?: string
   actions: AgentAction[]
   observations: AgentToolResult[]
   /** Human-readable reflection produced at the end of the step. */

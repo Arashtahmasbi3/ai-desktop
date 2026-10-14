@@ -434,6 +434,12 @@ interface AppState {
   fileChanges: FileChangeView[]
   /** v2.8.0: every file the agent changed in this chat, with its diffstat. */
   changedFiles: ChangedFile[]
+  /**
+   * v2.8.0: the model's own reasoning per step, keyed `${runId}:${step}` — the same
+   * key a trace decision uses, so the trace can show it inline. Never part of
+   * `messages`: it is not conversation and must not be replayed to the provider.
+   */
+  reasoningByStep: Record<string, string>
   /** Transient toast notifications. */
   toasts: Toast[]
   /** Whether the file tree is shown next to the chat. */
@@ -675,7 +681,8 @@ function chatScopedReset(): Partial<AppState> {
     loopStop: null,
     memory: null,
     // v2.8.0: "what changed" belongs to the chat that saw the change.
-    changedFiles: []
+    changedFiles: [],
+    reasoningByStep: {}
   }
 }
 
@@ -759,6 +766,7 @@ export const useStore = create<AppState>((set, get) => ({
   fileChanges: [],
   // v2.8.0: every file the agent changed in this chat, with its diffstat.
   changedFiles: [],
+  reasoningByStep: {},
   toasts: [],
   chatTreeOpen: readChatTreeOpen(),
   workspacePanelOpen: true,
@@ -1425,6 +1433,26 @@ export const useStore = create<AppState>((set, get) => ({
             decisions.splice(0, decisions.length - MAX_DECISIONS)
           }
           set({ logs, decisions })
+        } else if (event.entry.event === 'step.reasoning' && typeof event.entry.reasoning === 'string') {
+          /*
+           * v2.8.0: the model's own reasoning for a step, keyed by `${runId}:${step}`
+           * — the same key a trace decision uses, so the trace can show it inline.
+           * Kept out of `messages` on purpose: it is not part of the conversation and
+           * must never be replayed to the provider as an assistant turn.
+           */
+          const step = typeof event.entry.step === 'number' ? event.entry.step : undefined
+          const runId = event.entry.runId
+          if (step !== undefined && typeof runId === 'string') {
+            set({
+              logs,
+              reasoningByStep: {
+                ...get().reasoningByStep,
+                [`${runId}:${step}`]: event.entry.reasoning
+              }
+            })
+          } else {
+            set({ logs })
+          }
         } else if (event.entry.event === 'preflight' && Array.isArray(event.entry.checks)) {
           // v2.6.3 T3.1: the orchestrator emits one tiered entry per non-ok check.
           set({

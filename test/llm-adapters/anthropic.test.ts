@@ -126,6 +126,75 @@ describe('AnthropicAdapter', () => {
     expect(response.usage).toEqual({ promptTokens: 10, completionTokens: 5, totalTokens: 15 })
   })
 
+  /**
+   * v2.8.0: extended thinking. It arrives as its own block type and must stay out of
+   * `content`, which is the answer and is replayed as an assistant turn.
+   */
+  describe('thinking blocks (v2.8.0)', () => {
+    it('reads thinking blocks separately from the answer text', async () => {
+      const { fn } = mockFetch([
+        jsonResponse({
+          id: 'msg_t1',
+          model: 'claude-3-5-sonnet-latest',
+          stop_reason: 'end_turn',
+          content: [
+            { type: 'thinking', thinking: 'weigh the options' },
+            { type: 'text', text: 'Use plan B.' }
+          ],
+          usage: { input_tokens: 10, output_tokens: 5 }
+        })
+      ])
+
+      const response = await new AnthropicAdapter().chat(
+        { model: 'claude-3-5-sonnet-latest', messages: [{ role: 'user', content: 'which plan?' }] },
+        config(fn)
+      )
+
+      expect(response.reasoning).toBe('weigh the options')
+      expect(response.content).toBe('Use plan B.')
+    })
+
+    it('accumulates streamed thinking_delta events', async () => {
+      const { fn } = mockFetch([
+        sseResponse([
+          sseEvent('message_start', { type: 'message_start', message: { usage: { input_tokens: 4 } } }),
+          sseEvent('content_block_delta', {
+            type: 'content_block_delta',
+            index: 0,
+            delta: { type: 'thinking_delta', thinking: 'consider' }
+          }),
+          sseEvent('content_block_delta', {
+            type: 'content_block_delta',
+            index: 0,
+            delta: { type: 'thinking_delta', thinking: ' carefully' }
+          }),
+          sseEvent('content_block_delta', {
+            type: 'content_block_delta',
+            index: 1,
+            delta: { type: 'text_delta', text: 'Done.' }
+          }),
+          sseEvent('message_delta', {
+            type: 'message_delta',
+            delta: { stop_reason: 'end_turn' },
+            usage: { output_tokens: 3 }
+          }),
+          sseEvent('message_stop', { type: 'message_stop' })
+        ])
+      ])
+
+      const response = await collectStream(
+        new AnthropicAdapter().streamChat(
+          { model: 'claude-3-5-sonnet-latest', messages: [{ role: 'user', content: 'go' }] },
+          config(fn)
+        ),
+        'claude-3-5-sonnet-latest'
+      )
+
+      expect(response.reasoning).toBe('consider carefully')
+      expect(response.content).toBe('Done.')
+    })
+  })
+
   it('reports capabilities', () => {
     const adapter = new AnthropicAdapter()
     expect(adapter.getCapabilities('claude-3-5-sonnet-latest').vision).toBe(true)

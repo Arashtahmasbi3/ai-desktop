@@ -70,11 +70,22 @@ export interface ChatResponse {
   toolCalls: ToolCall[]
   finishReason: FinishReason
   usage?: Usage
+  /**
+   * v2.8.0: the model's own reasoning, when the provider exposes it (DeepSeek's
+   * `reasoning_content`, OpenAI-compatible `reasoning`, Anthropic `thinking` blocks).
+   *
+   * Reported: "I want it to show thinking, processing, etc. like you and Codex do."
+   * The adapters read only `delta.content` and dropped this entirely, so there was
+   * nothing to show even when the provider sent it.
+   */
+  reasoning?: string
 }
 
 /** Incremental event emitted while streaming. */
 export type StreamEvent =
   | { type: 'text'; text: string }
+  /** v2.8.0: reasoning/thinking tokens, kept separate from the answer text. */
+  | { type: 'reasoning'; text: string }
   | { type: 'tool_call'; index: number; id?: string; name?: string; argumentsDelta?: string }
   | { type: 'usage'; usage: Usage }
   | { type: 'done'; finishReason: FinishReason }

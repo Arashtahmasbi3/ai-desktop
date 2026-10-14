@@ -720,7 +720,10 @@
     "askWhyFailed": "Could not load the explanation.",
     "inlineTitle": "Execution trace",
     "showAll": "Show all ({{count}} more)",
-    "showLess": "Show less"
+    "showLess": "Show less",
+    "reasoningLabel": "Thinking",
+    "reasoningShow": "Show thinking",
+    "reasoningHide": "Hide thinking"
   },
   "shortcuts": {
     "title": "Keyboard shortcuts",

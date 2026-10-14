@@ -38,6 +38,8 @@ export default function InlineTrace(): JSX.Element | null {
   const [expanded, setExpanded] = useState(false)
   // v2.8.0: the durable "what changed" summary for this chat, with each file's diffstat.
   const changedFiles = useStore((state) => state.changedFiles)
+  // v2.8.0: the model's reasoning per step, keyed by `runId:step` — the trace id.
+  const reasoningByStep = useStore((state) => state.reasoningByStep)
 
   // U-11: `toolsFor` used to filter the entire message list once per visible
   // decision (O(steps x messages) every render). Index the tool messages by
@@ -63,6 +65,9 @@ export default function InlineTrace(): JSX.Element | null {
   )
   const totalAdded = changedFiles.reduce((sum, file) => sum + file.added, 0)
   const totalRemoved = changedFiles.reduce((sum, file) => sum + file.removed, 0)
+  // A decision id is `${runId}:${step}`, which is exactly the reasoning key.
+  const reasoningFor = (decision: TraceDecision): string | undefined =>
+    reasoningByStep[decision.id]
 
   const bounded = decisions.slice(-INLINE_TRACE_LIMIT)
   const visible = expanded ? bounded : bounded.slice(-INLINE_TRACE_PREVIEW)
@@ -159,6 +164,27 @@ export default function InlineTrace(): JSX.Element | null {
             return (
               <Fragment key={decision.id}>
                 <DecisionCard compact decision={decision} />
+                {/*
+                  v2.8.0: the model's own reasoning for this step, when the provider
+                  exposes it (DeepSeek `reasoning_content`, Anthropic thinking blocks).
+                  Collapsed by default — it is context for the reader, not the answer —
+                  and only shown where the provider actually sent something.
+                */}
+                {reasoningFor(decision) ? (
+                  <li className="ml-5 list-none">
+                    <details data-testid="trace-reasoning" className="group">
+                      <summary className="cursor-pointer text-3xs text-fg-subtle hover:text-fg-muted">
+                        {t('trace.reasoningLabel')}
+                      </summary>
+                      <p
+                        dir="auto"
+                        className="mt-0.5 whitespace-pre-wrap border-l-2 border-border pl-2 text-3xs text-fg-muted"
+                      >
+                        {reasoningFor(decision)}
+                      </p>
+                    </details>
+                  </li>
+                ) : null}
                 {tools.length > 0 ? (
                   <li
                     data-testid="trace-step-tools"

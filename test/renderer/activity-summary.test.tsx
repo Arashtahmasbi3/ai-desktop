@@ -66,6 +66,7 @@ beforeEach(() => {
     messages: [],
     logs: [],
     changedFiles: [],
+    reasoningByStep: {},
     fileChanges: []
   })
 })
@@ -124,5 +125,49 @@ describe('InlineTrace activity summary (v2.8.0)', () => {
     expect(useStore.getState().changedFiles).toHaveLength(1)
     expect(file?.edits).toBe(2)
     expect(file?.added).toBe(1)
+  })
+})
+
+/**
+ * v2.8.0 — "show thinking, processing, etc. like you and Codex do."
+ *
+ * The reasoner's own reasoning arrives as a `step.reasoning` log entry, keyed by the
+ * same `${runId}:${step}` a trace decision uses, and renders collapsed inside the trace
+ * for that step only.
+ */
+describe('InlineTrace: the model thinking (v2.8.0)', () => {
+  it('shows a collapsed thinking row for the step that produced one', () => {
+    useStore.setState({ decisions: [decision(1), decision(2)] })
+    useStore.getState().applyEvent({
+      type: 'log',
+      entry: { event: 'step.reasoning', runId: 'run-1', step: 2, reasoning: 'because of X' }
+    } as never)
+
+    render(<InlineTrace />)
+
+    const rows = screen.getAllByTestId('trace-reasoning')
+    expect(rows).toHaveLength(1)
+    expect(rows[0].textContent).toContain('because of X')
+    // Collapsed by default: context for the reader, not the answer. The test id is on
+    // the `<details>` itself, so read `open` there rather than re-querying.
+    expect((rows[0] as HTMLDetailsElement).open).toBe(false)
+  })
+
+  it('renders no thinking row when the provider sent none', () => {
+    useStore.setState({ decisions: [decision(1)] })
+    render(<InlineTrace />)
+    expect(screen.queryByTestId('trace-reasoning')).toBeNull()
+  })
+
+  it('keeps reasoning out of the conversation messages', () => {
+    useStore.setState({ decisions: [decision(1)], messages: [] })
+    useStore.getState().applyEvent({
+      type: 'log',
+      entry: { event: 'step.reasoning', runId: 'run-1', step: 1, reasoning: 'private chain' }
+    } as never)
+
+    // It is not an assistant turn, so it can never be replayed to the provider.
+    expect(useStore.getState().messages).toHaveLength(0)
+    expect(useStore.getState().reasoningByStep['run-1:1']).toBe('private chain')
   })
 })

@@ -720,7 +720,10 @@
     "askWhyFailed": "بارگذاری توضیح ممکن نشد.",
     "inlineTitle": "ردّ اجرا",
     "showAll": "نمایش همه ({{count}} مورد دیگر)",
-    "showLess": "نمایش کمتر"
+    "showLess": "نمایش کمتر",
+    "reasoningLabel": "تفکر",
+    "reasoningShow": "نمایش تفکر",
+    "reasoningHide": "پنهان کردن تفکر"
   },
   "shortcuts": {
     "title": "کلیدهای میانبر",

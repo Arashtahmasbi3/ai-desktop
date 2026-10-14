@@ -159,6 +159,8 @@ export async function collectStream(
   model = ''
 ): Promise<ChatResponse> {
   let content = ''
+  // v2.8.0: reasoning/thinking tokens are accumulated separately from the answer.
+  let reasoning = ''
   const toolCalls: ToolCall[] = []
   let finishReason: FinishReason = 'unknown'
   let hasUsage = false
@@ -170,6 +172,9 @@ export async function collectStream(
     switch (event.type) {
       case 'text':
         content += event.text
+        break
+      case 'reasoning':
+        reasoning += event.text
         break
       case 'tool_call': {
         const slot = toolCalls[event.index] ?? {
@@ -209,7 +214,8 @@ export async function collectStream(
     content: content.length > 0 ? content : null,
     toolCalls: toolCalls.filter((call): call is ToolCall => Boolean(call)),
     finishReason,
-    usage
+    usage,
+    ...(reasoning.length > 0 ? { reasoning } : {})
   }
 }
 

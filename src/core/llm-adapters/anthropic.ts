@@ -149,10 +149,14 @@ export class AnthropicAdapter extends BaseAdapter {
   protected parseChatResponse(json: unknown, request: ChatRequest): ChatResponse {
     const root = asRecord(json)
     let content = ''
+    // v2.8.0: extended thinking arrives as `thinking` blocks; the answer text stays
+    // separate so a reasoning block can never be mistaken for the reply.
+    let reasoning = ''
     const toolCalls: ToolCall[] = []
     for (const raw of asArray(root.content)) {
       const block = asRecord(raw)
       if (block.type === 'text') content += asString(block.text) ?? ''
+      if (block.type === 'thinking') reasoning += asString(block.thinking) ?? ''
       if (block.type === 'tool_use') {
         toolCalls.push({
           id: asString(block.id) ?? generateId('call'),
@@ -170,6 +174,7 @@ export class AnthropicAdapter extends BaseAdapter {
       content: content.length > 0 ? content : null,
       toolCalls,
       finishReason: mapAnthropicFinishReason(asString(root.stop_reason)),
+      ...(reasoning.length > 0 ? { reasoning } : {}),
       usage:
         input === undefined && output === undefined
           ? undefined
@@ -223,6 +228,10 @@ export class AnthropicAdapter extends BaseAdapter {
         if (delta.type === 'text_delta') {
           const text = asString(delta.text)
           if (text) events.push({ type: 'text', text })
+        } else if (delta.type === 'thinking_delta') {
+          // v2.8.0: extended thinking streams as `thinking_delta`.
+          const text = asString(delta.thinking)
+          if (text) events.push({ type: 'reasoning', text })
         } else if (delta.type === 'input_json_delta') {
           events.push({
             type: 'tool_call',

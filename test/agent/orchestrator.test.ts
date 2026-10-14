@@ -564,6 +564,67 @@ describe('AgentOrchestrator context and sessions (Stage 5)', () => {
     })
   })
 
+  /**
+   * v2.8.0 — "show thinking, processing, etc. like you and Codex do."
+   *
+   * The provider's reasoning text now reaches the step and the log stream. It must stay
+   * out of `thought` and out of the conversation: `thought` is the answer text, and an
+   * assistant message built from reasoning would be replayed to the provider.
+   */
+  describe('reasoning capture (v2.8.0)', () => {
+    it('records the response reasoning on the step and logs it', async () => {
+      const manager = createLocalManager(base)
+      const adapter = new ScriptedAdapter('deepseek', [
+        { content: 'looking', reasoning: 'I should read a.ts first' },
+        { content: 'done' }
+      ])
+      const logger = new MemoryLogger()
+      const orchestrator = new AgentOrchestrator({
+        sandbox: manager,
+        providers: [entry(adapter)],
+        logger
+      })
+
+      const result = await orchestrator.run('read the file')
+
+      expect(result.steps[0]?.reasoning).toBe('I should read a.ts first')
+      // The answer text is still the answer, not the reasoning.
+      expect(result.steps[0]?.thought).toBe('looking')
+      // `log()` spreads its extra fields onto the entry, so it lands at the top level.
+      const logged = logger
+        .find('step.reasoning')
+        .map((entry) => (entry as { reasoning?: string }).reasoning)
+      expect(logged).toEqual(['I should read a.ts first'])
+      await manager.dispose()
+    })
+
+    it('never sends reasoning back to the provider as an assistant message', async () => {
+      const manager = createLocalManager(base)
+      const adapter = new ScriptedAdapter('deepseek', [
+        { toolCalls: [toolCall('list_dir', {})], reasoning: 'SECRET-THOUGHT' },
+        { content: 'done' }
+      ])
+      const orchestrator = new AgentOrchestrator({ sandbox: manager, providers: [entry(adapter)] })
+
+      await orchestrator.run('look around')
+
+      const second = JSON.stringify(adapter.calls[1]?.messages ?? [])
+      expect(second).not.toContain('SECRET-THOUGHT')
+      await manager.dispose()
+    })
+
+    it('omits reasoning when the provider sends none', async () => {
+      const manager = createLocalManager(base)
+      const adapter = new ScriptedAdapter('deepseek', [{ content: 'done' }])
+      const orchestrator = new AgentOrchestrator({ sandbox: manager, providers: [entry(adapter)] })
+
+      const result = await orchestrator.run('do it')
+
+      expect(result.steps[0]?.reasoning).toBeUndefined()
+      await manager.dispose()
+    })
+  })
+
   it('stops a run that exceeds its turn time budget', async () => {
     const manager = createLocalManager(base)
     const adapter = new ScriptedAdapter('deepseek', [{ content: 'unused' }])
