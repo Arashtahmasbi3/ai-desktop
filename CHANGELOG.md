@@ -7,6 +7,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.8.0] — 2026-10-14
+
+### Fixed — the nine reported problems
+
+- **The token/cost preview no longer gates every send.** The preference defaulted to
+  "on" (`readShowContextBeforeSend()` compared `!== '0'`), so anyone who never opened
+  Settings got a pre-send dialog forever. It is opt-in now (`=== '1'`); a context-limit
+  warning still appears, because that one is real information rather than a toll.
+- **Several VPS servers stay connected at once.** Two independent causes. The UI read a
+  single global "slot" that each `vps:status` event overwrote, and the per-server map
+  added in v2.6.5 was written but never read — so connecting B made A look disconnected
+  while its socket was fine. Separately, the 30-minute idle reaper spared only hosts
+  derived from remote projects, so a server connected by hand was genuinely closed.
+  `vpsStateFor`/keep-alive now derive from the connected set at every call site.
+- **Runs no longer wedge in a loop.** Four causes: an ordinary red-test/fix cycle counted
+  as a failure streak (a step with any progress now resets it); the per-call block was
+  keyed on the tool *name*, so two red commands blacklisted `run_command` for the rest of
+  the run and the block could never clear (now keyed on the call and lifted by progress);
+  `max_steps` ended a run with no reason and no message; and the Continue button was
+  disabled for the most common stop reason.
+- **Cross-server migration accepts a target that is not a saved server yet.** The rsync
+  runs *on the source* with `BatchMode=yes`, so the destination never had to be saved
+  here — requiring an id turned "migrate to 212.16.86.23" into a dead end. `target_host`
+  (+ optional user/port) is now accepted, with host/user/port validation, and the
+  sensitive-path, deny-list, dry-run, audit and `--delete` guards all still apply.
+- **Switching projects no longer raises the chat-transfer dialog.** The default was
+  `ask`; it is `new`, and the dialog only appears for someone who chose "ask every time".
+- **Chat history is grouped under its project again, with a per-project new chat.**
+  `groupChatsByProject` had been orphaned by the v2.3 sidebar redesign. Each project
+  header carries a **+** that switches and starts a chat there directly.
+- **An approval dialog can no longer outlive its decision.** `ApprovalBroker.resolve()`
+  settled the promise without emitting anything — unlike the plan and preflight brokers —
+  so a fail-closed timeout denied the action while the modal still offered a dead
+  Approve button. `approval:resolved` now closes it, including on abort.
+
+### Added — thinking, activity and mid-run questions
+
+- **The assistant can ask a question mid-run and keep going.** There was no question
+  primitive at all: the only way to ask was to end the turn, which *finished* the run, so
+  the answer arrived as a new run with a fresh budget and no memory of the work. A new
+  `ask_user` tool is handled by the orchestrator itself (never the sandbox), awaits the
+  answer through `QuestionBroker` (which resolves "nobody answered" on timeout instead of
+  cancelling), appends it as the tool's result and continues the same run. It is
+  classified read-only, offered only when a gate exists, and also available in Plan Mode.
+- **The model's own reasoning is shown instead of discarded.** The adapters read only
+  `content`, so DeepSeek's `reasoning_content`, OpenAI-compatible `reasoning` and
+  Anthropic `thinking` blocks were fetched and thrown away. They are now parsed
+  (streaming and not), kept strictly out of `content` — a chain of thought must never be
+  replayed as an assistant turn — recorded on the step, emitted on the log stream, and
+  rendered as a collapsed "Thinking" row under the step that produced it.
+- **The status area names the work in words.** `Running remote_shell…` became "a command
+  on the server", and the live status now updates from the log stream, so "Thinking…"
+  and "Starting …" appear before the first tool result instead of a generic spinner.
+- **A durable "what changed" summary with per-file diffstats.** The trace says what the
+  run did ("Ran 2 commands, read 3 files, edited 1 file") and lists each changed file
+  with `+N`/`−M`; the record survives Apply/Reject, where the pending-changes panel
+  drops the row and the answer to "what changed?" used to disappear.
+
+### Changed
+
+- **The localhost remote-access server is unchanged but now explained.** It is off by
+  default and binds `127.0.0.1` with a bearer token; no client ships with the app, which
+  is why its status-bar toggle was confusing. Recommended: keep the capability, move it
+  out of the status bar into Settings → Advanced with the URL, token and examples.
+
+### Fixed — tests
+
+- **`goal-panel.test.tsx` is no longer flaky.** Two real races, not a tight timeout: a DOM
+  assertion issued right after an I/O wait (the file lands before React commits), and a
+  captured `<li>` asserted into after a re-render replaced it. Verified with 10
+  consecutive parallel runs.
+
+**Suite: 250 files / 2024 tests green; typecheck and production build clean.**
+
+
 ## [2.7.0] — 2026-10-14
 
 ### Added — UI & theme
@@ -887,7 +962,8 @@ First stable release. Ships as a Windows x64 NSIS installer and a portable execu
   `node_modules` are shipped inside the app package.
 - Optional code signing via `CSC_LINK` / `CSC_KEY_PASSWORD` (skipped safely when absent).
 
-[Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.6.4...HEAD
+[Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.8.0...HEAD
+[2.8.0]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.7.0...v2.8.0
 [2.7.0]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.6.4...v2.7.0
 [2.6.4]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.6.3...v2.6.4
 [2.6.3]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.6.2...v2.6.3

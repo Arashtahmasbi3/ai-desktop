@@ -51,6 +51,21 @@ fails, a tool is missing, or the budget ran out — ask rather than guess).
 
 ## Status
 
+**v2.8.0 released — the nine reported problems, plus thinking and mid-run questions.**
+All nine items from the user's report are fixed with regression tests: the opt-in token
+preview, multiple simultaneous VPS connections (two causes: a single global status slot,
+and an idle reaper that closed hand-connected servers), four independent loop wedges, raw
+`target_host` migration, the project-switch dialog default, chat grouping under each
+project, and an approval dialog that could outlive its decision. Added: `ask_user` so the
+model can ask a question mid-run and continue the *same* run, and the model's own
+reasoning (`reasoning_content` / Anthropic `thinking`), which the adapters previously
+discarded — kept strictly out of `content` and rendered collapsed in the trace. The
+status area now names the work in words and shows a durable per-file diffstat summary.
+Also fixed the long-standing `goal-panel` test flake (two real races, verified with 10
+consecutive parallel runs). 250 test files / 2024 tests green, typecheck and production
+build clean. Windows artifacts built natively on Windows (`npm run build:win`): see
+`release/SHA256SUMS.txt`. (2026-10-14)
+
 **v2.7.0 released — light theme, UI/UX hardening and the full audit fix set.** Merged
 `audit/fixes-v2.6.5` into `master` (`e2cce3d`, `--no-ff`), tag `v2.7.0`. 244 test files /
 1941 tests pass, typecheck and production build green. Windows artifacts built **natively on
