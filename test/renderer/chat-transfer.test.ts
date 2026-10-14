@@ -63,17 +63,26 @@ describe('chat transfer preference storage', () => {
     expect(readChatTransferPreference()).toBe('move')
   })
 
-  it('defaults to "ask" for a missing or invalid value', () => {
-    expect(readChatTransferPreference()).toBe('ask')
-    writeChatTransferPreference('ask')
-    expect(readChatTransferPreference()).toBe('ask')
+  it('defaults to "new" (switch straight away) for a missing or invalid value', () => {
+    // v2.8.0: the default was "ask", which put a three-way dialog in front of every
+    // project switch that had an open conversation. Reported as "extra questions and
+    // hoops" — the open chat is already filed under its own project, so switching
+    // away cannot orphan it and the question is a preference, not a safety gate.
+    expect(readChatTransferPreference()).toBe('new')
     backing.set(CHAT_TRANSFER_KEY, 'nonsense')
-    expect(readChatTransferPreference()).toBe('ask')
+    expect(readChatTransferPreference()).toBe('new')
   })
 
-  it('clears back to "ask"', () => {
-    writeChatTransferPreference('new')
-    clearChatTransferPreference()
+  it('still honours an explicit "ask" (the opt-in), and any other stored choice', () => {
+    writeChatTransferPreference('ask')
     expect(readChatTransferPreference()).toBe('ask')
+    writeChatTransferPreference('link')
+    expect(readChatTransferPreference()).toBe('link')
+  })
+
+  it('clears back to the "new" default', () => {
+    writeChatTransferPreference('ask')
+    clearChatTransferPreference()
+    expect(readChatTransferPreference()).toBe('new')
   })
 })

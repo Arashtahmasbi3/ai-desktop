@@ -28,13 +28,24 @@ export function isConversationActive(
   return messages.some((message) => message.role === 'user' && message.content.trim().length > 0)
 }
 
-/** Read the saved preference, defaulting to "ask" on anything unexpected. */
+/**
+ * Read the saved preference.
+ *
+ * v2.8.0: the default is **`new`**, not `ask`. Reported: "I want to switch a
+ * project from the chat screen to another project easily, without extra questions
+ * and hoops." The dialog fires whenever the open chat has a single user message,
+ * and its premise — that the chat would otherwise be orphaned — does not hold:
+ * `persistChat` already files the open chat under its own project, so switching
+ * away leaves it exactly where it belongs. The three-way choice is a preference,
+ * not a safety gate, so it is opt-in ("Ask every time" in Settings) and the
+ * `link`/`move` rebinds stay reachable without blocking a plain switch.
+ */
 export function readChatTransferPreference(): ChatTransferPreference {
   try {
     const raw = globalThis.localStorage?.getItem(CHAT_TRANSFER_KEY)
-    return raw === 'link' || raw === 'move' || raw === 'new' ? raw : 'ask'
+    return raw === 'link' || raw === 'move' || raw === 'new' || raw === 'ask' ? raw : 'new'
   } catch {
-    return 'ask'
+    return 'new'
   }
 }
 
