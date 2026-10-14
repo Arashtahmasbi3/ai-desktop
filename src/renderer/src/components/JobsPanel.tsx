@@ -35,7 +35,7 @@ export default function JobsPanel(): JSX.Element | null {
       className="flex flex-col gap-2 border-b border-border bg-bg-secondary/60 px-3 py-2"
     >
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-2xs font-medium uppercase tracking-wide text-neutral-500">
+        <div className="flex items-center gap-1.5 text-2xs font-medium uppercase tracking-wide text-fg-muted">
           {jobs.length > 0 ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
           {t('jobs.panelTitle', { count: jobs.length })}
         </div>
@@ -44,13 +44,13 @@ export default function JobsPanel(): JSX.Element | null {
           onClick={() => setOpen(false)}
           title={t('jobs.collapse')}
           aria-label={t('jobs.collapse')}
-          className="rounded p-0.5 text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-200"
+          className="rounded p-0.5 text-fg-muted hover:bg-bg-tertiary hover:text-fg"
         >
           <ChevronUp className="h-3.5 w-3.5" />
         </button>
       </div>
       {jobs.length === 0 ? (
-        <p className="text-2xs text-neutral-600">{t('jobs.empty')}</p>
+        <p className="text-2xs text-fg-subtle">{t('jobs.empty')}</p>
       ) : (
         jobs.map((job) => <JobCard key={job.id} job={job} onKill={kill} />)
       )}

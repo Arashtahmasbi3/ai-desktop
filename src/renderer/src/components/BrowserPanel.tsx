@@ -79,7 +79,7 @@ export default function BrowserPanel(): JSX.Element {
           onClick={() => webview()?.goBack()}
           disabled={!canBack}
           title="Back"
-          className="rounded p-1 text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200 disabled:opacity-30"
+          className="rounded p-1 text-fg-muted hover:bg-bg-tertiary hover:text-fg disabled:opacity-30"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
         </button>
@@ -88,7 +88,7 @@ export default function BrowserPanel(): JSX.Element {
           onClick={() => webview()?.goForward()}
           disabled={!canForward}
           title="Forward"
-          className="rounded p-1 text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200 disabled:opacity-30"
+          className="rounded p-1 text-fg-muted hover:bg-bg-tertiary hover:text-fg disabled:opacity-30"
         >
           <ArrowRight className="h-3.5 w-3.5" />
         </button>
@@ -97,7 +97,7 @@ export default function BrowserPanel(): JSX.Element {
           onClick={() => webview()?.reload()}
           disabled={!src}
           title="Reload"
-          className="rounded p-1 text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200 disabled:opacity-30"
+          className="rounded p-1 text-fg-muted hover:bg-bg-tertiary hover:text-fg disabled:opacity-30"
         >
           {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCw className="h-3.5 w-3.5" />}
         </button>
@@ -110,19 +110,19 @@ export default function BrowserPanel(): JSX.Element {
           }}
         >
           <div className="relative flex flex-1 items-center">
-            <Lock className="absolute left-2 h-3 w-3 text-neutral-600" />
+            <Lock className="absolute left-2 h-3 w-3 text-fg-subtle" />
             <input
               value={input}
               onChange={(event) => setInput(event.target.value)}
               dir="ltr"
               spellCheck={false}
               placeholder="Search or enter an address"
-              className="w-full rounded border border-border bg-bg-secondary py-1 pl-7 pr-2 text-2xs text-neutral-200 outline-none focus:border-accent/50"
+              className="w-full rounded border border-border bg-bg-secondary py-1 pl-7 pr-2 text-2xs text-fg outline-none focus:border-accent/50"
             />
           </div>
           <button
             type="submit"
-            className="rounded border border-border px-2 py-1 text-2xs text-neutral-300 hover:bg-bg-tertiary"
+            className="rounded border border-border px-2 py-1 text-2xs text-fg hover:bg-bg-tertiary"
           >
             Go
           </button>
@@ -130,7 +130,7 @@ export default function BrowserPanel(): JSX.Element {
       </div>
 
       {error ? (
-        <div className="shrink-0 border-b border-amber-500/30 bg-amber-500/10 px-3 py-1 text-2xs text-amber-300">
+        <div className="shrink-0 border-b border-warning/30 bg-warning/10 px-3 py-1 text-2xs text-warning">
           {error}
         </div>
       ) : null}
@@ -146,15 +146,15 @@ export default function BrowserPanel(): JSX.Element {
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4">
           <Globe className="h-9 w-9 text-accent" />
           <div className="text-center">
-            <p className="text-sm text-neutral-300">In-app browser</p>
-            <p className="mt-1 text-xs text-neutral-600">
+            <p className="text-sm text-fg">In-app browser</p>
+            <p className="mt-1 text-xs text-fg-subtle">
               Pages load in a sandboxed webview. Only http(s) is allowed.
             </p>
           </div>
           <button
             type="button"
             onClick={() => go(HOME)}
-            className="rounded bg-accent px-3 py-1.5 text-xs text-white hover:bg-accent-hover"
+            className="rounded bg-accent-solid px-3 py-1.5 text-xs text-white hover:bg-accent-solid-hover"
           >
             Open {HOME.replace('https://', '')}
           </button>
@@ -165,7 +165,7 @@ export default function BrowserPanel(): JSX.Element {
                   key={entry}
                   type="button"
                   onClick={() => go(entry)}
-                  className="max-w-[16rem] truncate rounded-full border border-border px-2.5 py-1 text-3xs text-neutral-400 hover:bg-bg-tertiary"
+                  className="max-w-[16rem] truncate rounded-full border border-border px-2.5 py-1 text-3xs text-fg-muted hover:bg-bg-tertiary"
                   dir="ltr"
                 >
                   {entry}

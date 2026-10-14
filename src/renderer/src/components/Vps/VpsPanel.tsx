@@ -14,10 +14,10 @@ function text(error: unknown): string {
 }
 
 const STATUS_COLOR: Record<VpsConnectionState['status'], string> = {
-  connected: 'text-emerald-400',
-  connecting: 'text-amber-400',
-  error: 'text-red-400',
-  disconnected: 'text-neutral-500'
+  connected: 'text-success',
+  connecting: 'text-warning',
+  error: 'text-danger',
+  disconnected: 'text-fg-muted'
 }
 
 /** VPS view: server list, connection lifecycle, live terminal, SFTP and audit. */
@@ -116,20 +116,20 @@ export default function VpsPanel(): JSX.Element {
     <div className="flex h-full min-h-0 flex-1">
       <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-bg-secondary">
         <div className="flex items-center justify-between border-b border-border px-3 py-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">VPS</span>
+          <span className="text-xs font-semibold uppercase tracking-wide text-fg-muted">VPS</span>
           <div className="flex items-center gap-1">
             <button
               onClick={() => void refresh()}
               disabled={refreshing}
               aria-busy={refreshing}
-              className="rounded p-1 text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-200 disabled:opacity-50"
+              className="rounded p-1 text-fg-muted hover:bg-bg-tertiary hover:text-fg disabled:opacity-50"
               title={t('vps.refresh')}
             >
               <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
             <button
               onClick={() => setFormOpen((open) => !open)}
-              className="rounded p-1 text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-200"
+              className="rounded p-1 text-fg-muted hover:bg-bg-tertiary hover:text-fg"
               title={t('vps.addServer')}
             >
               <Plus className="h-4 w-4" />
@@ -151,7 +151,7 @@ export default function VpsPanel(): JSX.Element {
           ) : null}
 
           {servers.length === 0 && !formOpen ? (
-            <p className="px-1 py-2 text-xs text-neutral-600">No servers yet. Add one to connect.</p>
+            <p className="px-1 py-2 text-xs text-fg-subtle">No servers yet. Add one to connect.</p>
           ) : null}
 
           {servers.map((server) => (
@@ -167,22 +167,22 @@ export default function VpsPanel(): JSX.Element {
                 aria-busy={connectingId === server.id}
                 className="min-w-0 flex-1 text-left disabled:opacity-60"
               >
-                <div className="truncate text-xs font-medium text-neutral-200">
+                <div className="truncate text-xs font-medium text-fg">
                   {server.name}
                   {connectingId === server.id ? (
                     <RefreshCw className="ms-1 inline h-3 w-3 animate-spin text-accent" />
                   ) : null}
                 </div>
-                <div className="truncate text-3xs text-neutral-500">
+                <div className="truncate text-3xs text-fg-muted">
                   {server.username}@{server.host}:{server.port}
                 </div>
               </button>
               <button
                 onClick={() => void remove(server.id, server.name)}
-                className="rounded p-1 text-neutral-500 opacity-0 transition hover:text-red-400 focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
+                className="rounded p-1 text-fg-muted opacity-0 transition hover:text-danger focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
                 title={t('common.remove')}
               >
-                <Trash2 className="h-3.5 w-3.5 text-neutral-500 hover:text-red-400" />
+                <Trash2 className="h-3.5 w-3.5 text-fg-muted hover:text-danger" />
               </button>
             </div>
           ))}
@@ -191,7 +191,7 @@ export default function VpsPanel(): JSX.Element {
 
       <section className="flex min-h-0 min-w-0 flex-1 flex-col">
         {!activeId ? (
-          <div className="flex flex-1 items-center justify-center text-sm text-neutral-600">
+          <div className="flex flex-1 items-center justify-center text-sm text-fg-subtle">
             Select a server to connect.
           </div>
         ) : (
@@ -202,7 +202,7 @@ export default function VpsPanel(): JSX.Element {
                 {status.status}
               </span>
               {status.fingerprint ? (
-                <span className="truncate font-mono text-3xs text-neutral-600">
+                <span className="truncate font-mono text-3xs text-fg-subtle">
                   {status.fingerprint}
                 </span>
               ) : null}
@@ -210,14 +210,14 @@ export default function VpsPanel(): JSX.Element {
                 {connected ? (
                   <button
                     onClick={() => void disconnect(activeId)}
-                    className="flex items-center gap-1 rounded border border-border px-2 py-1 text-xs text-neutral-300 hover:bg-bg-tertiary"
+                    className="flex items-center gap-1 rounded border border-border px-2 py-1 text-xs text-fg hover:bg-bg-tertiary"
                   >
                     <Plug className="h-3.5 w-3.5" /> Disconnect
                   </button>
                 ) : (
                   <button
                     onClick={() => void connect(activeId)}
-                    className="flex items-center gap-1 rounded bg-accent px-2 py-1 text-xs font-medium text-black"
+                    className="flex items-center gap-1 rounded bg-accent-solid px-2 py-1 text-xs font-medium text-black"
                   >
                     <PlugZap className="h-3.5 w-3.5" /> Connect
                   </button>
@@ -226,24 +226,24 @@ export default function VpsPanel(): JSX.Element {
             </div>
 
             {status.pendingFingerprint ? (
-              <div className="flex items-center gap-3 border-b border-amber-800/50 bg-amber-950/30 px-3 py-2">
-                <ShieldAlert className="h-4 w-4 shrink-0 text-amber-400" />
-                <div className="min-w-0 text-xs text-amber-200">
+              <div className="flex items-center gap-3 border-b border-warning/50 bg-warning/30 px-3 py-2">
+                <ShieldAlert className="h-4 w-4 shrink-0 text-warning" />
+                <div className="min-w-0 text-xs text-warning">
                   <div>Unverified host key. Confirm this fingerprint belongs to your server:</div>
-                  <div className="truncate font-mono text-3xs text-amber-300">
+                  <div className="truncate font-mono text-3xs text-warning">
                     {status.pendingFingerprint}
                   </div>
                 </div>
                 <button
                   onClick={() => void approve(activeId)}
-                  className="ml-auto shrink-0 rounded bg-amber-500 px-2 py-1 text-xs font-medium text-black"
+                  className="ml-auto shrink-0 rounded bg-warning px-2 py-1 text-xs font-medium text-black"
                 >
                   Trust & connect
                 </button>
               </div>
             ) : null}
 
-            {error ? <p className="px-3 py-1.5 text-xs text-red-400">{error}</p> : null}
+            {error ? <p className="px-3 py-1.5 text-xs text-danger">{error}</p> : null}
 
             <div className="flex items-center gap-1 border-b border-border px-2">
               {(['terminal', 'files', 'audit'] as const).map((item) => (
@@ -253,7 +253,7 @@ export default function VpsPanel(): JSX.Element {
                   className={`px-3 py-1.5 text-xs capitalize ${
                     tab === item
                       ? 'border-b-2 border-accent text-accent'
-                      : 'text-neutral-500 hover:text-neutral-200'
+                      : 'text-fg-muted hover:text-fg'
                   }`}
                 >
                   {item}
@@ -262,7 +262,7 @@ export default function VpsPanel(): JSX.Element {
               {connected && activeId ? (
                 <button
                   onClick={() => setHealthOpen(true)}
-                  className="ml-auto flex items-center gap-1 rounded px-2 py-1 text-xs text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200"
+                  className="ml-auto flex items-center gap-1 rounded px-2 py-1 text-xs text-fg-muted hover:bg-bg-tertiary hover:text-fg"
                 >
                   <ShieldAlert className="h-3 w-3" />
                   Health
@@ -272,7 +272,7 @@ export default function VpsPanel(): JSX.Element {
 
             <div className="min-h-0 flex-1">
               {!connected ? (
-                <div className="flex h-full items-center justify-center text-sm text-neutral-600">
+                <div className="flex h-full items-center justify-center text-sm text-fg-subtle">
                   Connect to use the {tab}.
                 </div>
               ) : tab === 'terminal' ? (
@@ -282,7 +282,7 @@ export default function VpsPanel(): JSX.Element {
               ) : (
                 <div className="h-full overflow-auto p-3 font-mono text-2xs">
                   {audit.length === 0 ? (
-                    <p className="text-neutral-600">No commands yet.</p>
+                    <p className="text-fg-subtle">No commands yet.</p>
                   ) : (
                     audit
                       .slice()
@@ -291,7 +291,7 @@ export default function VpsPanel(): JSX.Element {
                         <div
                           key={`${entry.at}-${index}`}
                           className={`flex items-center gap-2 ${
-                            entry.ok ? 'text-neutral-400' : 'text-red-400'
+                            entry.ok ? 'text-fg-muted' : 'text-danger'
                           }`}
                         >
                           <span className="min-w-0 flex-1 truncate">
@@ -301,7 +301,7 @@ export default function VpsPanel(): JSX.Element {
                             <button
                               type="button"
                               onClick={() => void restoreBackup(entry.detail as string)}
-                              className="shrink-0 rounded border border-border px-1.5 py-0.5 text-3xs text-neutral-300 hover:bg-bg-tertiary"
+                              className="shrink-0 rounded border border-border px-1.5 py-0.5 text-3xs text-fg hover:bg-bg-tertiary"
                             >
                               Restore
                             </button>

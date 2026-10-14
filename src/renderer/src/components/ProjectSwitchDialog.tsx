@@ -42,8 +42,8 @@ export default function ProjectSwitchDialog(): JSX.Element | null {
       <div className="w-full max-w-md rounded-xl border border-border bg-bg-secondary p-4 shadow-2xl">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-neutral-100">{t('projectSwitch.title')}</h2>
-            <p className="mt-1 text-xs text-neutral-400">
+            <h2 className="text-sm font-semibold text-fg-strong">{t('projectSwitch.title')}</h2>
+            <p className="mt-1 text-xs text-fg-muted">
               {t('projectSwitch.body', { project: project.name })}
             </p>
           </div>
@@ -51,7 +51,7 @@ export default function ProjectSwitchDialog(): JSX.Element | null {
             type="button"
             onClick={cancel}
             aria-label={t('common.close')}
-            className="rounded p-1 text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300"
+            className="rounded p-1 text-fg-muted hover:bg-bg-tertiary hover:text-fg"
           >
             <X className="h-4 w-4" />
           </button>
@@ -70,14 +70,14 @@ export default function ProjectSwitchDialog(): JSX.Element | null {
                 >
                   <Icon className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
                   <span className="min-w-0">
-                    <span className="block text-xs font-medium text-neutral-100">
+                    <span className="block text-xs font-medium text-fg-strong">
                       {t(option.labelKey)}
                     </span>
-                    <span className="mt-0.5 block text-3xs leading-snug text-neutral-500">
+                    <span className="mt-0.5 block text-3xs leading-snug text-fg-muted">
                       {t(option.hintKey, { project: project.name })}
                     </span>
                   </span>
-                  <ArrowRight className="ml-auto mt-0.5 h-3.5 w-3.5 shrink-0 text-neutral-600" />
+                  <ArrowRight className="ml-auto mt-0.5 h-3.5 w-3.5 shrink-0 text-fg-subtle" />
                 </button>
               </li>
             )
@@ -85,7 +85,7 @@ export default function ProjectSwitchDialog(): JSX.Element | null {
         </ul>
 
         <div className="mt-3 flex items-center justify-between gap-3">
-          <label className="flex cursor-pointer items-center gap-2 text-2xs text-neutral-400">
+          <label className="flex cursor-pointer items-center gap-2 text-2xs text-fg-muted">
             <input
               type="checkbox"
               checked={remember}
@@ -97,7 +97,7 @@ export default function ProjectSwitchDialog(): JSX.Element | null {
           <button
             type="button"
             onClick={cancel}
-            className="rounded px-2 py-1 text-2xs text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200"
+            className="rounded px-2 py-1 text-2xs text-fg-muted hover:bg-bg-tertiary hover:text-fg"
           >
             {t('projectSwitch.cancel')}
           </button>

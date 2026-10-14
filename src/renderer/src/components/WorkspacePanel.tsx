@@ -50,8 +50,8 @@ export default function WorkspacePanel({ overlay }: WorkspacePanelProps = {}): J
             aria-pressed={tab === id}
             className={`flex items-center gap-1.5 rounded px-2 py-1 text-xs transition ${
               tab === id
-                ? 'bg-accent/15 text-accent'
-                : 'text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300'
+                ? 'bg-accent-solid/15 text-accent'
+                : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
             }`}
           >
             <Icon className="h-3.5 w-3.5" />
@@ -64,7 +64,7 @@ export default function WorkspacePanel({ overlay }: WorkspacePanelProps = {}): J
           onClick={toggle}
           title={t('workspace.close')}
           aria-label={t('workspace.close')}
-          className="flex h-6 w-6 items-center justify-center rounded text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300"
+          className="flex h-6 w-6 items-center justify-center rounded text-fg-muted hover:bg-bg-tertiary hover:text-fg"
         >
           <PanelRightClose className="h-3.5 w-3.5" />
         </button>

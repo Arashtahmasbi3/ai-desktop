@@ -27,8 +27,8 @@ export function FullAccessToggle(): JSX.Element {
         title={t('chat.fullAccess')}
         className={`flex items-center gap-1 rounded px-1.5 py-0.5 transition ${
           full
-            ? 'bg-red-500/20 text-red-300'
-            : 'text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300'
+            ? 'bg-danger/20 text-danger'
+            : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
         }`}
       >
         {full ? <Zap className="h-3 w-3" /> : <ShieldCheck className="h-3 w-3" />}
@@ -46,8 +46,8 @@ export function FullAccessToggle(): JSX.Element {
               }}
               className={`block w-full rounded px-2 py-1.5 text-left text-2xs transition ${
                 value === mode
-                  ? 'bg-accent/15 text-accent'
-                  : 'text-neutral-300 hover:bg-bg-tertiary'
+                  ? 'bg-accent-solid/15 text-accent'
+                  : 'text-fg hover:bg-bg-tertiary'
               }`}
             >
               {t(MODE_LABEL[value])}
@@ -80,7 +80,7 @@ export function FullAccessBanner(): JSX.Element | null {
   return (
     <div
       data-testid="full-access-banner"
-      className="mx-3 mb-1 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-500/50 bg-red-500/10 px-2 py-1.5 text-2xs text-red-300"
+      className="mx-3 mb-1 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-danger/50 bg-danger/10 px-2 py-1.5 text-2xs text-danger"
     >
       <span className="flex min-w-0 items-center gap-1.5">
         <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
@@ -91,19 +91,19 @@ export function FullAccessBanner(): JSX.Element | null {
         </span>
       </span>
       <span className="flex shrink-0 items-center gap-2">
-        <label className="flex cursor-pointer items-center gap-1 text-red-200">
+        <label className="flex cursor-pointer items-center gap-1 text-danger">
           <input
             type="checkbox"
             checked={remember}
             onChange={(event) => void setRememberApprovalMode(event.target.checked)}
-            className="accent-red-400"
+            className="accent-danger"
           />
           {t('chat.fullAccessRemember')}
         </label>
         <button
           type="button"
           onClick={() => void setApprovalMode('ask')}
-          className="rounded border border-red-500/50 px-1.5 py-0.5 text-red-200 hover:bg-red-500/20"
+          className="rounded border border-danger/50 px-1.5 py-0.5 text-danger hover:bg-danger/20"
         >
           {t('chat.fullAccessTurnOff')}
         </button>

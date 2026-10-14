@@ -24,7 +24,7 @@ const APPROVAL_KEY: Record<HostApprovalRequirement, string> = {
   always: 'settings.hostPolicyApprovalAlways'
 }
 
-const field = 'w-full rounded-md border border-border bg-bg-tertiary px-2 py-1 text-2xs text-neutral-100 outline-none focus:border-accent'
+const field = 'w-full rounded-md border border-border bg-bg-tertiary px-2 py-1 text-2xs text-fg-strong outline-none focus:border-accent'
 
 function list(value: string): string[] {
   return value
@@ -92,12 +92,12 @@ export default function HostPolicyEditor({ server }: { server: VpsServerView }):
 
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-border bg-bg-primary p-2">
-      <p className="flex items-center gap-1.5 text-2xs font-medium text-neutral-200">
+      <p className="flex items-center gap-1.5 text-2xs font-medium text-fg">
         <ShieldCheck className="h-3 w-3" />
         {server.name}
       </p>
       <div className="grid grid-cols-2 gap-2">
-        <label className="flex flex-col gap-1 text-3xs uppercase tracking-wide text-neutral-500">
+        <label className="flex flex-col gap-1 text-3xs uppercase tracking-wide text-fg-muted">
           {t('settings.hostPolicyMode')}
           <select value={mode} onChange={(event) => changeMode(event.target.value as HostPolicyMode)} className={field}>
             {MODES.map((value) => (
@@ -107,7 +107,7 @@ export default function HostPolicyEditor({ server }: { server: VpsServerView }):
             ))}
           </select>
         </label>
-        <label className="flex flex-col gap-1 text-3xs uppercase tracking-wide text-neutral-500">
+        <label className="flex flex-col gap-1 text-3xs uppercase tracking-wide text-fg-muted">
           {t('settings.hostPolicyApproval')}
           <select
             value={approval}
@@ -129,7 +129,7 @@ export default function HostPolicyEditor({ server }: { server: VpsServerView }):
         type="button"
         onClick={() => void save()}
         disabled={busy}
-        className="w-fit rounded bg-accent px-2.5 py-1 text-2xs text-white hover:bg-accent-hover disabled:opacity-50"
+        className="w-fit rounded bg-accent-solid px-2.5 py-1 text-2xs text-white hover:bg-accent-solid-hover disabled:opacity-50"
       >
         {t('settings.hostPolicySave')}
       </button>

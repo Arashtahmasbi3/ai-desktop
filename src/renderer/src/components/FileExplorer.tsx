@@ -15,10 +15,10 @@ import type { FileEntry } from '@shared/ui'
 import { useStore } from '../store'
 
 function iconFor(entry: FileEntry): JSX.Element {
-  if (entry.type === 'dir') return <Folder className="h-4 w-4 text-sky-400/80" />
+  if (entry.type === 'dir') return <Folder className="h-4 w-4 text-info/80" />
   const codeExt = /\.(ts|tsx|js|jsx|py|go|rs|java|c|cpp|h|css|scss|html|json|yml|yaml|sh)$/i
-  if (codeExt.test(entry.name)) return <FileCode2 className="h-4 w-4 text-emerald-400/80" />
-  return <FileText className="h-4 w-4 text-neutral-500" />
+  if (codeExt.test(entry.name)) return <FileCode2 className="h-4 w-4 text-success/80" />
+  return <FileText className="h-4 w-4 text-fg-muted" />
 }
 
 export interface FileExplorerProps {
@@ -59,7 +59,7 @@ export default function FileExplorer({ onClose }: FileExplorerProps = {}): JSX.E
 
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-bg-primary">
-      <div className="flex h-8 shrink-0 items-center justify-between border-b border-border px-3 text-2xs text-neutral-500">
+      <div className="flex h-8 shrink-0 items-center justify-between border-b border-border px-3 text-2xs text-fg-muted">
         <span className="flex items-center gap-1">
           <FolderOpen className="h-3.5 w-3.5" />
           {t('workspace.title')}
@@ -69,7 +69,7 @@ export default function FileExplorer({ onClose }: FileExplorerProps = {}): JSX.E
             type="button"
             onClick={() => void refreshFiles()}
             title={t('fileExplorer.refresh')}
-            className="rounded p-0.5 hover:bg-bg-tertiary hover:text-neutral-300"
+            className="rounded p-0.5 hover:bg-bg-tertiary hover:text-fg"
           >
             <RefreshCw className="h-3 w-3" />
           </button>
@@ -80,7 +80,7 @@ export default function FileExplorer({ onClose }: FileExplorerProps = {}): JSX.E
               onClick={onClose}
               title={t('fileExplorer.close')}
               aria-label={t('fileExplorer.close')}
-              className="rounded p-0.5 hover:bg-bg-tertiary hover:text-neutral-300"
+              className="rounded p-0.5 hover:bg-bg-tertiary hover:text-fg"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -90,8 +90,8 @@ export default function FileExplorer({ onClose }: FileExplorerProps = {}): JSX.E
 
       {projects.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 text-center">
-          <Folder className="h-8 w-8 text-neutral-500" />
-          <p className="text-xs text-neutral-500">{t('fileExplorer.noProjects')}</p>
+          <Folder className="h-8 w-8 text-fg-muted" />
+          <p className="text-xs text-fg-muted">{t('fileExplorer.noProjects')}</p>
         </div>
       ) : (
         <>
@@ -99,7 +99,7 @@ export default function FileExplorer({ onClose }: FileExplorerProps = {}): JSX.E
             <select
               value={settings?.activeProjectId ?? ''}
               onChange={(event) => void openProject(event.target.value)}
-              className="mb-2 w-full rounded border border-border bg-bg-secondary px-2 py-1 text-xs text-neutral-200 outline-none focus:border-accent/50"
+              className="mb-2 w-full rounded border border-border bg-bg-secondary px-2 py-1 text-xs text-fg outline-none focus:border-accent/50"
             >
               {projects.map((project) => (
                 <option key={project.id} value={project.id}>
@@ -118,25 +118,25 @@ export default function FileExplorer({ onClose }: FileExplorerProps = {}): JSX.E
               >
                 <ArrowRight className="h-3.5 w-3.5" />
               </button>
-              <span className="truncate font-mono text-2xs text-neutral-400" dir="ltr" title={activeProject?.path}>
+              <span className="truncate font-mono text-2xs text-fg-muted" dir="ltr" title={activeProject?.path}>
                 ./{cwd === '.' ? '' : cwd}
               </span>
             </div>
 
             <div className="relative mt-2">
-              <Search className="absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-neutral-600" />
+              <Search className="absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-subtle" />
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder={t('fileExplorer.filter')}
-                className="w-full rounded border border-border bg-bg-secondary py-1 pr-7 pl-2 text-xs text-neutral-200 outline-none focus:border-accent/50"
+                className="w-full rounded border border-border bg-bg-secondary py-1 pr-7 pl-2 text-xs text-fg outline-none focus:border-accent/50"
               />
             </div>
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto py-1">
             {visible.length === 0 ? (
-              <p className="px-3 py-3 text-xs text-neutral-400">{t('fileExplorer.empty')}</p>
+              <p className="px-3 py-3 text-xs text-fg-muted">{t('fileExplorer.empty')}</p>
             ) : (
               visible.map((entry) => (
                 <button
@@ -146,7 +146,7 @@ export default function FileExplorer({ onClose }: FileExplorerProps = {}): JSX.E
                     entry.type === 'dir' ? void refreshFiles(entry.path) : void openFile(entry.path)
                   }
                   className={`flex w-full items-center gap-2 px-3 py-1 text-left text-xs transition hover:bg-bg-tertiary ${
-                    selectedFile === entry.path ? 'bg-accent/15 text-neutral-100' : 'text-neutral-300'
+                    selectedFile === entry.path ? 'bg-accent-solid/15 text-fg-strong' : 'text-fg'
                   }`}
                 >
                   {iconFor(entry)}
@@ -154,7 +154,7 @@ export default function FileExplorer({ onClose }: FileExplorerProps = {}): JSX.E
                     {entry.name}
                   </span>
                   {entry.size !== undefined ? (
-                    <span className="ml-auto shrink-0 text-3xs text-neutral-600">{entry.size}b</span>
+                    <span className="ml-auto shrink-0 text-3xs text-fg-subtle">{entry.size}b</span>
                   ) : null}
                 </button>
               ))

@@ -62,12 +62,12 @@ export default function ShortcutsOverlay(): JSX.Element | null {
       closeOnBackdrop
     >
       <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
-        <h2 className="text-sm font-semibold text-neutral-100">{t('shortcuts.title')}</h2>
+        <h2 className="text-sm font-semibold text-fg-strong">{t('shortcuts.title')}</h2>
         <button
           type="button"
           onClick={() => setOpen(false)}
           aria-label={t('common.close')}
-          className="rounded p-1 text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-200"
+          className="rounded p-1 text-fg-muted hover:bg-bg-tertiary hover:text-fg"
         >
           <X className="h-4 w-4" />
         </button>
@@ -76,18 +76,18 @@ export default function ShortcutsOverlay(): JSX.Element | null {
         <div className="grid gap-5 sm:grid-cols-2">
           {GROUPS.map((group) => (
             <section key={group.titleKey} className="flex flex-col gap-2">
-              <h3 className="text-2xs font-semibold uppercase tracking-wide text-neutral-500">
+              <h3 className="text-2xs font-semibold uppercase tracking-wide text-fg-muted">
                 {t(group.titleKey)}
               </h3>
               <ul className="flex flex-col gap-1.5">
                 {group.items.map((item) => (
                   <li key={item.labelKey} className="flex items-center justify-between gap-3 text-xs">
-                    <span className="text-neutral-300">{t(item.labelKey)}</span>
+                    <span className="text-fg">{t(item.labelKey)}</span>
                     <span className="flex shrink-0 items-center gap-1">
                       {item.keys.map((key) => (
                         <kbd
                           key={key}
-                          className="rounded border border-border bg-bg-primary px-1.5 py-0.5 text-3xs text-neutral-400"
+                          className="rounded border border-border bg-bg-primary px-1.5 py-0.5 text-3xs text-fg-muted"
                         >
                           {key}
                         </kbd>

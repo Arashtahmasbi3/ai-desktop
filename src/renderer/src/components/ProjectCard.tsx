@@ -50,14 +50,14 @@ const ENV_DOT: Record<string, string> = {
 }
 
 const ENV_BADGE: Record<string, string> = {
-  production: 'bg-red-500/15 text-red-300',
-  staging: 'bg-amber-500/15 text-amber-300',
-  development: 'bg-emerald-500/15 text-emerald-300'
+  production: 'bg-danger/15 text-danger',
+  staging: 'bg-warning/15 text-warning',
+  development: 'bg-success/15 text-success'
 }
 
 const fieldClass =
-  'w-full rounded border border-border bg-bg-primary px-2 py-1 text-xs text-neutral-200 outline-none focus:border-accent/50'
-const labelClass = 'flex flex-col gap-1 text-2xs text-neutral-400'
+  'w-full rounded border border-border bg-bg-primary px-2 py-1 text-xs text-fg outline-none focus:border-accent/50'
+const labelClass = 'flex flex-col gap-1 text-2xs text-fg-muted'
 
 interface FieldProps {
   label: string
@@ -77,9 +77,9 @@ function Field({ label, value, onChange, ltr, error, placeholder }: FieldProps):
         onChange={(event) => onChange(event.target.value)}
         dir={ltr ? 'ltr' : undefined}
         placeholder={placeholder}
-        className={`${fieldClass}${error ? ' border-red-500/60' : ''}${ltr ? ' font-mono' : ''}`}
+        className={`${fieldClass}${error ? ' border-danger/60' : ''}${ltr ? ' font-mono' : ''}`}
       />
-      {error ? <span className="text-3xs text-red-400">{error}</span> : null}
+      {error ? <span className="text-3xs text-danger">{error}</span> : null}
     </label>
   )
 }
@@ -134,7 +134,7 @@ export default function ProjectCard({ project }: { project: ProjectRecord }): JS
           onClick={() => setExpanded((value) => !value)}
           aria-expanded={expanded}
           aria-label={t('settings.projectDetails')}
-          className="rounded p-0.5 text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-200"
+          className="rounded p-0.5 text-fg-muted hover:bg-bg-tertiary hover:text-fg"
         >
           {expanded ? (
             <ChevronDown className="h-3.5 w-3.5" />
@@ -148,14 +148,14 @@ export default function ProjectCard({ project }: { project: ProjectRecord }): JS
           onClick={() => void openProject(project.id)}
           className="min-w-0 flex-1 text-left"
         >
-          <span className="text-neutral-200">{project.name}</span>
-          <span className="ml-2 font-mono text-3xs text-neutral-500" dir="ltr">
+          <span className="text-fg">{project.name}</span>
+          <span className="ml-2 font-mono text-3xs text-fg-muted" dir="ltr">
             {project.path}
           </span>
         </button>
 
         {isRemote ? (
-          <span className="inline-flex items-center gap-0.5 rounded bg-sky-500/15 px-1 py-0.5 text-4xs text-sky-300">
+          <span className="inline-flex items-center gap-0.5 rounded bg-info/15 px-1 py-0.5 text-4xs text-info">
             <Server className="h-2.5 w-2.5" />
             {t('settings.remoteBadge')}
           </span>
@@ -176,7 +176,7 @@ export default function ProjectCard({ project }: { project: ProjectRecord }): JS
             onClick={() => void locate()}
             title={t('sidebar.locate')}
             aria-label={t('settings.missingPath')}
-            className="rounded p-1 text-amber-400 hover:bg-bg-tertiary"
+            className="rounded p-1 text-warning hover:bg-bg-tertiary"
           >
             <MapPin className="h-3.5 w-3.5" />
           </button>
@@ -187,15 +187,15 @@ export default function ProjectCard({ project }: { project: ProjectRecord }): JS
           onClick={() => setConfirmingDelete(true)}
           title={t('common.remove')}
           aria-label={t('common.remove')}
-          className="rounded p-1 text-neutral-500 hover:bg-bg-tertiary hover:text-red-400"
+          className="rounded p-1 text-fg-muted hover:bg-bg-tertiary hover:text-danger"
         >
           <Trash2 className="h-3.5 w-3.5" />
         </button>
       </div>
 
       {confirmingDelete ? (
-        <div className="flex items-center justify-between gap-2 border-t border-border bg-red-500/5 px-3 py-2 text-2xs">
-          <span className="text-red-300">{t('settings.deleteProjectConfirm', { name: project.name })}</span>
+        <div className="flex items-center justify-between gap-2 border-t border-border bg-danger/5 px-3 py-2 text-2xs">
+          <span className="text-danger">{t('settings.deleteProjectConfirm', { name: project.name })}</span>
           <div className="flex items-center gap-1.5">
             <button
               type="button"
@@ -203,14 +203,14 @@ export default function ProjectCard({ project }: { project: ProjectRecord }): JS
                 void removeProject(project.id)
                 setConfirmingDelete(false)
               }}
-              className="rounded bg-red-500/80 px-2 py-1 text-white hover:bg-red-500"
+              className="rounded bg-danger/80 px-2 py-1 text-white hover:bg-danger"
             >
               {t('common.delete')}
             </button>
             <button
               type="button"
               onClick={() => setConfirmingDelete(false)}
-              className="rounded border border-border px-2 py-1 text-neutral-300 hover:bg-bg-tertiary"
+              className="rounded border border-border px-2 py-1 text-fg hover:bg-bg-tertiary"
             >
               {t('common.cancel')}
             </button>
@@ -234,7 +234,7 @@ export default function ProjectCard({ project }: { project: ProjectRecord }): JS
               ))}
             </select>
             {error('environment') ? (
-              <span className="text-3xs text-red-400">{error('environment')}</span>
+              <span className="text-3xs text-danger">{error('environment')}</span>
             ) : null}
           </label>
 
@@ -306,7 +306,7 @@ export default function ProjectCard({ project }: { project: ProjectRecord }): JS
               ))}
             </select>
             {error('policyMode') ? (
-              <span className="text-3xs text-red-400">{error('policyMode')}</span>
+              <span className="text-3xs text-danger">{error('policyMode')}</span>
             ) : null}
           </label>
 
@@ -368,7 +368,7 @@ export default function ProjectCard({ project }: { project: ProjectRecord }): JS
               value={form.auditLogPath}
               readOnly
               dir="ltr"
-              className={`${fieldClass} cursor-default font-mono text-neutral-500`}
+              className={`${fieldClass} cursor-default font-mono text-fg-muted`}
             />
           </label>
 
@@ -376,7 +376,7 @@ export default function ProjectCard({ project }: { project: ProjectRecord }): JS
             <button
               type="button"
               onClick={cancel}
-              className="flex items-center gap-1 rounded border border-border px-3 py-1 text-xs text-neutral-300 hover:bg-bg-tertiary"
+              className="flex items-center gap-1 rounded border border-border px-3 py-1 text-xs text-fg hover:bg-bg-tertiary"
             >
               <X className="h-3 w-3" />
               {t('common.cancel')}
@@ -384,7 +384,7 @@ export default function ProjectCard({ project }: { project: ProjectRecord }): JS
             <button
               type="button"
               onClick={() => void save()}
-              className="flex items-center gap-1 rounded bg-accent px-3 py-1 text-xs text-white hover:bg-accent-hover"
+              className="flex items-center gap-1 rounded bg-accent-solid px-3 py-1 text-xs text-white hover:bg-accent-solid-hover"
             >
               <Save className="h-3 w-3" />
               {t('common.save')}

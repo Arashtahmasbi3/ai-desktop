@@ -5,7 +5,7 @@ import { useStore } from '../store'
 import { CONNECTION_TONE_CLASS, useConnectionStatus } from '../lib/connection-status'
 
 function Dot({ ok }: { ok: boolean }): JSX.Element {
-  return <span className={`h-1.5 w-1.5 rounded-full ${ok ? 'bg-emerald-500' : 'bg-neutral-600'}`} />
+  return <span className={`h-1.5 w-1.5 rounded-full ${ok ? 'bg-success' : 'bg-bg-tertiary'}`} />
 }
 
 export default function StatusBar(): JSX.Element {
@@ -31,14 +31,14 @@ export default function StatusBar(): JSX.Element {
   const agentAddress = remote?.enabled ? `${remote.host}:${remote.port}` : null
 
   return (
-    <footer className="flex h-7 shrink-0 items-center justify-between border-t border-border bg-bg-secondary px-3 text-2xs text-neutral-400">
+    <footer className="flex h-7 shrink-0 items-center justify-between border-t border-border bg-bg-secondary px-3 text-2xs text-fg-muted">
       <div className="flex items-center gap-3">
         <span className="flex items-center gap-1">
           <Dot ok={ready} />
           {ready ? t('statusBar.ready') : t('common.loading')}
         </span>
         <span
-          className={`flex items-center gap-1 ${online ? 'text-neutral-400' : 'text-red-400'}`}
+          className={`flex items-center gap-1 ${online ? 'text-fg-muted' : 'text-danger'}`}
           title={
             online
               ? agentAddress
@@ -78,14 +78,14 @@ export default function StatusBar(): JSX.Element {
           title={t('settings.approvalMode')}
           className={`flex items-center gap-1 rounded px-1.5 py-0.5 ${
             approvalMode === 'full'
-              ? 'text-red-400 hover:bg-bg-tertiary'
-              : 'hover:bg-bg-tertiary hover:text-neutral-200'
+              ? 'text-danger hover:bg-bg-tertiary'
+              : 'hover:bg-bg-tertiary hover:text-fg'
           }`}
         >
           {approvalMode === 'full' ? <Zap className="h-3 w-3" /> : <ShieldCheck className="h-3 w-3" />}
           {approvalMode}
         </button>
-        <span className="text-neutral-400" dir="ltr">
+        <span className="text-fg-muted" dir="ltr">
           {t('statusBar.session', { id: effectiveSessionId.slice(0, 8) })}
         </span>
         <span
@@ -104,7 +104,7 @@ export default function StatusBar(): JSX.Element {
           )}
           <span>{t(connection.labelKey)}</span>
           {connection.detail ? (
-            <span className="max-w-[12rem] truncate text-neutral-500">· {connection.detail}</span>
+            <span className="max-w-[12rem] truncate text-fg-muted">· {connection.detail}</span>
           ) : null}
         </span>
       </div>
@@ -114,7 +114,7 @@ export default function StatusBar(): JSX.Element {
           type="button"
           onClick={() => setLocale(locale === 'fa' ? 'en' : 'fa')}
           title={t('common.language')}
-          className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-bg-tertiary hover:text-neutral-200"
+          className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-bg-tertiary hover:text-fg"
         >
           <Languages className="h-3 w-3" />
           {locale}
@@ -123,16 +123,16 @@ export default function StatusBar(): JSX.Element {
           type="button"
           onClick={() => void setOnline(!online)}
           title={t('statusBar.toggleOnline')}
-          className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-bg-tertiary hover:text-neutral-200"
+          className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-bg-tertiary hover:text-fg"
         >
-          {online ? <Wifi className="h-3 w-3 text-emerald-500" /> : <WifiOff className="h-3 w-3 text-amber-500" />}
+          {online ? <Wifi className="h-3 w-3 text-success" /> : <WifiOff className="h-3 w-3 text-warning" />}
           {online ? t('statusBar.online') : t('statusBar.offline')}
         </button>
         <button
           type="button"
           onClick={() => void toggleRemote()}
           title={t('statusBar.toggleRemote')}
-          className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-bg-tertiary hover:text-neutral-200"
+          className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-bg-tertiary hover:text-fg"
         >
           <Server className="h-3 w-3" />
           {t('statusBar.remote', {

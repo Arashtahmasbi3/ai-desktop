@@ -292,7 +292,7 @@ export default function App(): JSX.Element {
 
   return (
     <div
-      className="flex h-screen flex-col bg-bg-primary text-neutral-100"
+      className="flex h-screen flex-col bg-bg-primary text-fg-strong"
       onDragOver={(event) => {
         event.preventDefault()
         setDragging(true)
@@ -315,7 +315,7 @@ export default function App(): JSX.Element {
           {!ready ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-3">
               <Bot className="h-10 w-10 animate-pulse text-accent" />
-              <p className="text-sm text-neutral-500">{t('common.loading')}</p>
+              <p className="text-sm text-fg-muted">{t('common.loading')}</p>
             </div>
           ) : (
             <ErrorBoundary label="Workspace" key={view}>
@@ -350,14 +350,14 @@ export default function App(): JSX.Element {
       </div>
 
       {error ? (
-        <div className="flex items-center gap-2 border-t border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs text-red-300">
+        <div className="flex items-center gap-2 border-t border-danger/30 bg-danger/10 px-3 py-1.5 text-xs text-danger">
           <AlertTriangle className="h-3.5 w-3.5" />
           <span className="flex-1">{error}</span>
           <button
             type="button"
             onClick={clearError}
             aria-label={t('common.close')}
-            className="rounded p-0.5 hover:bg-red-500/20"
+            className="rounded p-0.5 hover:bg-danger/20"
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -400,8 +400,8 @@ export default function App(): JSX.Element {
       </ErrorBoundary>
 
       {dragging ? (
-        <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center bg-accent/10 backdrop-blur-sm">
-          <div className="flex items-center gap-2 rounded-xl border border-accent/50 bg-bg-secondary px-4 py-3 text-sm text-neutral-200">
+        <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center bg-accent-solid/10 backdrop-blur-sm">
+          <div className="flex items-center gap-2 rounded-xl border border-accent/50 bg-bg-secondary px-4 py-3 text-sm text-fg">
             <UploadCloud className="h-4 w-4 text-accent" />
             {t('titlebar.openFolder')}
           </div>

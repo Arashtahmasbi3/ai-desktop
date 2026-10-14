@@ -60,6 +60,7 @@ describe('Task 1.3 - StatusBar agent status', () => {
     const status = screen.getByText(/Agent: not running/)
     expect(status).toBeTruthy()
     expect(status.getAttribute('title')).toContain('offline')
-    expect(status.className).toContain('text-red-400')
+    // v2.7.0: the status colour is the semantic `danger` token.
+    expect(status.className).toContain('text-danger')
   })
 })

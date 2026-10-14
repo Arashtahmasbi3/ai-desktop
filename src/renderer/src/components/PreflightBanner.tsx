@@ -4,20 +4,20 @@ import type { PreflightCheck, PreflightTier } from '@core/agent/preflight'
 
 const TONE: Record<Exclude<PreflightTier, 'ok'>, { box: string; text: string; icon: typeof AlertTriangle; key: string }> = {
   warn: {
-    box: 'border-amber-500/40 bg-amber-500/10 text-amber-100',
-    text: 'text-amber-200/90',
+    box: 'border-warning/40 bg-warning/10 text-warning',
+    text: 'text-warning/90',
     icon: AlertTriangle,
     key: 'preflight.title'
   },
   block: {
-    box: 'border-red-500/40 bg-red-500/10 text-red-100',
-    text: 'text-red-200/90',
+    box: 'border-danger/40 bg-danger/10 text-danger',
+    text: 'text-danger/90',
     icon: ShieldAlert,
     key: 'preflight.blockTitle'
   },
   critical: {
-    box: 'border-red-500/50 bg-red-500/15 text-red-100',
-    text: 'text-red-200/90',
+    box: 'border-danger/50 bg-danger/15 text-danger',
+    text: 'text-danger/90',
     icon: ShieldAlert,
     key: 'preflight.criticalTitle'
   }
@@ -67,7 +67,7 @@ export default function PreflightBanner({
           <button
             type="button"
             onClick={onProceed}
-            className="inline-flex items-center gap-1 rounded border border-amber-400/50 px-2 py-0.5 text-2xs hover:bg-amber-500/20"
+            className="inline-flex items-center gap-1 rounded border border-warning/50 px-2 py-0.5 text-2xs hover:bg-warning/20"
           >
             <ArrowRight size={12} />
             {t('preflight.proceed')}

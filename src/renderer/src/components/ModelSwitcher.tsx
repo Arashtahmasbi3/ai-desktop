@@ -38,15 +38,15 @@ export default function ModelSwitcher(): JSX.Element {
 
   return (
     <label
-      className="flex items-center gap-1 text-2xs text-neutral-400"
+      className="flex items-center gap-1 text-2xs text-fg-muted"
       title={`Model used for the next message — capabilities: ${capabilities}`}
     >
-      <Cpu className="h-3 w-3 text-neutral-500" />
+      <Cpu className="h-3 w-3 text-fg-muted" />
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
         disabled={running}
-        className="max-w-[16rem] rounded border border-border bg-bg-secondary px-1.5 py-0.5 text-2xs text-neutral-300 outline-none focus:border-accent/50 disabled:opacity-50"
+        className="max-w-[16rem] rounded border border-border bg-bg-secondary px-1.5 py-0.5 text-2xs text-fg outline-none focus:border-accent/50 disabled:opacity-50"
       >
         {!selection.customProviderId && !knownModel && descriptor ? (
           <option value={encodeSelection(selection.provider, selection.model)}>

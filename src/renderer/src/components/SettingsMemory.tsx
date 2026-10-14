@@ -13,30 +13,30 @@ export default function SettingsMemory(): JSX.Element {
 
   return (
     <section className="flex flex-col gap-3">
-      <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
+      <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
         <MemoryStick className="h-3.5 w-3.5" />
         {t('settings.memory')}
       </h3>
-      <p className="text-2xs text-neutral-500">{t('settings.memoryHint')}</p>
+      <p className="text-2xs text-fg-muted">{t('settings.memoryHint')}</p>
 
       <div className="rounded-xl border border-border bg-bg-primary p-3">
-        <div className="flex items-center justify-between text-xs text-neutral-300">
+        <div className="flex items-center justify-between text-xs text-fg">
           <span className="flex items-center gap-1.5">
             <Cpu className="h-3.5 w-3.5" />
             {t('settings.contextUsage')}
           </span>
-          <span className={overBudget ? 'text-amber-400' : 'text-neutral-400'}>
+          <span className={overBudget ? 'text-warning' : 'text-fg-muted'}>
             {tokens.toLocaleString()} / {DEFAULT_CONTEXT_TOKEN_BUDGET.toLocaleString()}
           </span>
         </div>
         <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-bg-tertiary">
           <div
-            className={`h-full rounded-full transition-all ${overBudget ? 'bg-amber-400' : 'bg-accent'}`}
+            className={`h-full rounded-full transition-all ${overBudget ? 'bg-warning' : 'bg-accent-solid'}`}
             style={{ width: `${percent}%` }}
           />
         </div>
         {overBudget ? (
-          <p className="mt-2 text-2xs text-amber-400">{t('settings.contextOverBudget')}</p>
+          <p className="mt-2 text-2xs text-warning">{t('settings.contextOverBudget')}</p>
         ) : null}
       </div>
     </section>

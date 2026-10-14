@@ -23,25 +23,25 @@ function TotalsRow({
   return (
     <div className="rounded-xl border border-border bg-bg-primary px-3 py-2">
       <div className="mb-1 flex items-center justify-between">
-        <span className="text-xs font-medium text-neutral-300">{label}</span>
-        <span className="font-mono text-xs text-neutral-200">{formatCost(totals.cost)}</span>
+        <span className="text-xs font-medium text-fg">{label}</span>
+        <span className="font-mono text-xs text-fg">{formatCost(totals.cost)}</span>
       </div>
-      <div className="grid grid-cols-3 gap-2 text-2xs text-neutral-500">
+      <div className="grid grid-cols-3 gap-2 text-2xs text-fg-muted">
         <span>
           {t('settings.usageInput')}:{' '}
-          <span className="font-mono text-neutral-300">{totals.inputTokens.toLocaleString()}</span>
+          <span className="font-mono text-fg">{totals.inputTokens.toLocaleString()}</span>
         </span>
         <span>
           {t('settings.usageOutput')}:{' '}
-          <span className="font-mono text-neutral-300">{totals.outputTokens.toLocaleString()}</span>
+          <span className="font-mono text-fg">{totals.outputTokens.toLocaleString()}</span>
         </span>
         <span>
           {t('settings.usageCalls')}:{' '}
-          <span className="font-mono text-neutral-300">{totals.calls.toLocaleString()}</span>
+          <span className="font-mono text-fg">{totals.calls.toLocaleString()}</span>
         </span>
       </div>
       {totals.costUnknown ? (
-        <p className="mt-1 text-3xs text-amber-400">{t('settings.usageUnknownCost')}</p>
+        <p className="mt-1 text-3xs text-warning">{t('settings.usageUnknownCost')}</p>
       ) : null}
     </div>
   )
@@ -57,15 +57,15 @@ function BreakdownList({
   if (rows.length === 0) return null
   return (
     <div>
-      <p className="mb-1 text-2xs font-medium text-neutral-400">{title}</p>
+      <p className="mb-1 text-2xs font-medium text-fg-muted">{title}</p>
       <ul className="flex flex-col gap-1">
         {rows.map((row) => (
           <li
             key={row.key}
             className="flex items-center justify-between rounded-lg bg-bg-primary px-2.5 py-1.5 text-2xs"
           >
-            <span className="truncate text-neutral-300">{row.key}</span>
-            <span className="shrink-0 font-mono text-neutral-500">
+            <span className="truncate text-fg">{row.key}</span>
+            <span className="shrink-0 font-mono text-fg-muted">
               {row.inputTokens.toLocaleString()} / {row.outputTokens.toLocaleString()} ·{' '}
               {formatCost(row.cost)}
             </span>
@@ -127,19 +127,19 @@ export default function SettingsUsage(): JSX.Element {
 
   return (
     <section className="flex flex-col gap-3">
-      <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
+      <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
         <BarChart3 className="h-3.5 w-3.5" />
         {t('settings.usage')}
       </h3>
-      <p className="text-2xs text-neutral-500">{t('settings.usageHint')}</p>
+      <p className="text-2xs text-fg-muted">{t('settings.usageHint')}</p>
       <dl className="flex flex-col gap-2">
         {rows.map(([label, value]) => (
           <div
             key={label}
             className="flex items-center justify-between rounded-xl border border-border bg-bg-primary px-3 py-2"
           >
-            <dt className="text-xs text-neutral-400">{label}</dt>
-            <dd className="font-mono text-xs text-neutral-200">{value}</dd>
+            <dt className="text-xs text-fg-muted">{label}</dt>
+            <dd className="font-mono text-xs text-fg">{value}</dd>
           </div>
         ))}
       </dl>
@@ -148,9 +148,9 @@ export default function SettingsUsage(): JSX.Element {
         data-testid="usage-context-window"
         className="rounded-xl border border-border bg-bg-primary px-3 py-2"
       >
-        <div className="flex items-center justify-between text-xs text-neutral-300">
+        <div className="flex items-center justify-between text-xs text-fg">
           <span>{t('settings.contextUsage')}</span>
-          <span className={`font-mono ${context.overBudget ? 'text-amber-400' : 'text-neutral-400'}`}>
+          <span className={`font-mono ${context.overBudget ? 'text-warning' : 'text-fg-muted'}`}>
             {context.tokens.toLocaleString()} / {DEFAULT_CONTEXT_TOKEN_BUDGET.toLocaleString()} ·{' '}
             {contextPercent}%
           </span>
@@ -158,7 +158,7 @@ export default function SettingsUsage(): JSX.Element {
         <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-bg-tertiary">
           <div
             className={`h-full rounded-full transition-all ${
-              context.overBudget ? 'bg-amber-400' : 'bg-accent'
+              context.overBudget ? 'bg-warning' : 'bg-accent-solid'
             }`}
             style={{ width: `${contextPercent}%` }}
           />
@@ -166,7 +166,7 @@ export default function SettingsUsage(): JSX.Element {
       </div>
 
       <div className="flex items-center justify-between border-t border-border pt-2">
-        <span className="text-2xs font-medium text-neutral-400">
+        <span className="text-2xs font-medium text-fg-muted">
           {t('settings.usageAllTime')}
         </span>
         <div className="flex items-center gap-1">
@@ -175,7 +175,7 @@ export default function SettingsUsage(): JSX.Element {
             onClick={exportCsv}
             disabled={usageRecords.length === 0}
             title={t('settings.usageExport')}
-            className="flex items-center gap-1 rounded-lg px-2 py-1 text-2xs text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200 disabled:opacity-40"
+            className="flex items-center gap-1 rounded-lg px-2 py-1 text-2xs text-fg-muted hover:bg-bg-tertiary hover:text-fg disabled:opacity-40"
           >
             <Download className="h-3 w-3" />
             {t('settings.usageExport')}
@@ -185,7 +185,7 @@ export default function SettingsUsage(): JSX.Element {
             onClick={resetUsage}
             disabled={usageRecords.length === 0}
             title={t('settings.usageReset')}
-            className="flex items-center gap-1 rounded-lg px-2 py-1 text-2xs text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200 disabled:opacity-40"
+            className="flex items-center gap-1 rounded-lg px-2 py-1 text-2xs text-fg-muted hover:bg-bg-tertiary hover:text-fg disabled:opacity-40"
           >
             <RotateCcw className="h-3 w-3" />
             {t('settings.usageReset')}
@@ -194,7 +194,7 @@ export default function SettingsUsage(): JSX.Element {
       </div>
 
       {usageRecords.length === 0 ? (
-        <p className="rounded-xl border border-border bg-bg-primary px-3 py-2 text-2xs text-neutral-500">
+        <p className="rounded-xl border border-border bg-bg-primary px-3 py-2 text-2xs text-fg-muted">
           {t('settings.usageEmpty')}
         </p>
       ) : (
@@ -206,7 +206,7 @@ export default function SettingsUsage(): JSX.Element {
           <BreakdownList title={t('settings.usageByModel')} rows={summary.byModel} />
 
           <div>
-            <p className="mb-1 text-2xs font-medium text-neutral-400">
+            <p className="mb-1 text-2xs font-medium text-fg-muted">
               {t('settings.usageLast7Days')}
             </p>
             <div className="flex h-16 items-end gap-1">
@@ -221,11 +221,11 @@ export default function SettingsUsage(): JSX.Element {
                   >
                     <div className="flex h-12 w-full items-end">
                       <div
-                        className="w-full rounded-sm bg-accent/70"
+                        className="w-full rounded-sm bg-accent-solid/70"
                         style={{ height: `${Math.max(tokens > 0 ? 6 : 0, height)}%` }}
                       />
                     </div>
-                    <span className="text-4xs text-neutral-600">{day.day.slice(5)}</span>
+                    <span className="text-4xs text-fg-subtle">{day.day.slice(5)}</span>
                   </div>
                 )
               })}

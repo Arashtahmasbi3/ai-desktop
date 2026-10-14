@@ -12,15 +12,15 @@ export default function SettingsApproval(): JSX.Element {
 
   return (
     <section className="flex flex-col gap-3">
-      <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
+      <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
         <ShieldCheck className="h-3.5 w-3.5" />
         {t('settings.approvalMode')}
       </h3>
 
       <div className="flex flex-col gap-2 rounded-lg border border-border bg-bg-primary p-3">
         <div>
-          <p className="text-xs font-medium text-neutral-200">{t('settings.approvalMode')}</p>
-          <p className="mt-0.5 text-2xs text-neutral-500">{t('settings.approvalHint')}</p>
+          <p className="text-xs font-medium text-fg">{t('settings.approvalMode')}</p>
+          <p className="mt-0.5 text-2xs text-fg-muted">{t('settings.approvalHint')}</p>
         </div>
         {(
           [
@@ -31,7 +31,7 @@ export default function SettingsApproval(): JSX.Element {
         ).map(([value, labelKey]) => (
           <label
             key={value}
-            className="flex cursor-pointer items-center gap-2 text-xs text-neutral-300"
+            className="flex cursor-pointer items-center gap-2 text-xs text-fg"
           >
             <input
               type="radio"
@@ -43,7 +43,7 @@ export default function SettingsApproval(): JSX.Element {
             {t(labelKey)}
           </label>
         ))}
-        <label className="flex cursor-pointer items-center gap-2 text-xs text-neutral-300">
+        <label className="flex cursor-pointer items-center gap-2 text-xs text-fg">
           <input
             type="checkbox"
             checked={settings?.rememberApprovalMode ?? false}

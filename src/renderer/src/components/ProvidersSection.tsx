@@ -29,7 +29,7 @@ export default function ProvidersSection(): JSX.Element {
 
   return (
     <section>
-      <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
+      <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
         <KeyRound className="h-3.5 w-3.5" />
         {t('settings.apiKeys')}
       </h3>
@@ -42,15 +42,15 @@ export default function ProvidersSection(): JSX.Element {
           return (
             <div key={provider} className="rounded-xl border border-border bg-bg-primary p-3">
               <div className="mb-2 flex items-center justify-between">
-                <span className="flex items-center gap-2 text-sm font-medium text-neutral-200">
+                <span className="flex items-center gap-2 text-sm font-medium text-fg">
                   {descriptor.label}
                   {view?.hasApiKey ? (
-                    <span className="flex items-center gap-1 rounded bg-emerald-500/15 px-1.5 py-0.5 text-3xs text-emerald-400">
+                    <span className="flex items-center gap-1 rounded bg-success/15 px-1.5 py-0.5 text-3xs text-success">
                       <Check className="h-3 w-3" />
                       {t('settings.keySaved')}
                     </span>
                   ) : (
-                    <span className="rounded bg-bg-tertiary px-1.5 py-0.5 text-3xs text-neutral-500">
+                    <span className="rounded bg-bg-tertiary px-1.5 py-0.5 text-3xs text-fg-muted">
                       {t('settings.noKey')}
                     </span>
                   )}
@@ -61,8 +61,8 @@ export default function ProvidersSection(): JSX.Element {
                   disabled={active}
                   className={`rounded px-2 py-0.5 text-2xs ${
                     active
-                      ? 'bg-accent/20 text-accent'
-                      : 'border border-border text-neutral-400 hover:bg-bg-tertiary'
+                      ? 'bg-accent-solid/20 text-accent'
+                      : 'border border-border text-fg-muted hover:bg-bg-tertiary'
                   }`}
                 >
                   {active ? t('common.active') : t('common.setActive')}
@@ -82,13 +82,13 @@ export default function ProvidersSection(): JSX.Element {
                   placeholder={t('settings.apiKeyPlaceholder')}
                   dir="ltr"
                   autoComplete="off"
-                  className="flex-1 rounded border border-border bg-bg-secondary px-2 py-1 font-mono text-xs text-neutral-200 outline-none focus:border-accent/50"
+                  className="flex-1 rounded border border-border bg-bg-secondary px-2 py-1 font-mono text-xs text-fg outline-none focus:border-accent/50"
                 />
                 <button
                   type="button"
                   onClick={() => void saveKey(provider)}
                   disabled={!keys[provider]?.trim() || savingKey === provider}
-                  className="rounded bg-accent px-3 py-1 text-xs text-white hover:bg-accent-hover disabled:opacity-40"
+                  className="rounded bg-accent-solid px-3 py-1 text-xs text-white hover:bg-accent-solid-hover disabled:opacity-40"
                 >
                   {t('common.save')}
                 </button>
@@ -98,7 +98,7 @@ export default function ProvidersSection(): JSX.Element {
                     onClick={() => void removeApiKey(provider)}
                     title={t('common.remove')}
                     aria-label={t('common.remove')}
-                    className="rounded border border-border p-1 text-neutral-500 hover:bg-bg-tertiary hover:text-red-400"
+                    className="rounded border border-border p-1 text-fg-muted hover:bg-bg-tertiary hover:text-danger"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -106,11 +106,11 @@ export default function ProvidersSection(): JSX.Element {
               </div>
 
               <div className="mt-2 flex items-center gap-2">
-                <label className="text-2xs text-neutral-500">{t('settings.model')}</label>
+                <label className="text-2xs text-fg-muted">{t('settings.model')}</label>
                 <select
                   value={model}
                   onChange={(event) => void setModel(provider, event.target.value)}
-                  className="flex-1 rounded border border-border bg-bg-secondary px-2 py-1 text-xs text-neutral-200 outline-none focus:border-accent/50"
+                  className="flex-1 rounded border border-border bg-bg-secondary px-2 py-1 text-xs text-fg outline-none focus:border-accent/50"
                 >
                   {descriptor.models.map((option) => (
                     <option key={option.id} value={option.id}>

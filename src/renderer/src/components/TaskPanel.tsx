@@ -14,37 +14,37 @@ import type { AgentLogEntry, AgentLogLevel } from '@shared/agent'
 import { useStore } from '../store'
 
 const LEVEL_CLASS: Record<AgentLogLevel, string> = {
-  debug: 'text-neutral-500',
-  info: 'text-neutral-300',
-  warn: 'text-amber-400',
-  error: 'text-red-400'
+  debug: 'text-fg-muted',
+  info: 'text-fg',
+  warn: 'text-warning',
+  error: 'text-danger'
 }
 
 const LEVEL_BADGE: Record<AgentLogLevel, string> = {
-  debug: 'bg-neutral-800',
-  info: 'bg-sky-500/15 text-sky-300',
-  warn: 'bg-amber-500/15 text-amber-300',
-  error: 'bg-red-500/15 text-red-300'
+  debug: 'bg-bg-primary',
+  info: 'bg-info/15 text-info',
+  warn: 'bg-warning/15 text-warning',
+  error: 'bg-danger/15 text-danger'
 }
 
 const JOB_STATUS_CLASS: Record<string, string> = {
-  queued: 'text-neutral-400',
-  running: 'text-sky-400',
-  completed: 'text-emerald-400',
-  failed: 'text-red-400',
-  cancelled: 'text-neutral-500'
+  queued: 'text-fg-muted',
+  running: 'text-info',
+  completed: 'text-success',
+  failed: 'text-danger',
+  cancelled: 'text-fg-muted'
 }
 
 function LogRow({ entry }: { entry: AgentLogEntry }): JSX.Element {
   return (
     <div className="flex items-start gap-2 border-b border-border/60 px-3 py-1 font-mono text-2xs leading-5">
-      <span className="shrink-0 text-neutral-600">{entry.ts.slice(11, 19)}</span>
+      <span className="shrink-0 text-fg-subtle">{entry.ts.slice(11, 19)}</span>
       <span className={`shrink-0 rounded px-1 ${LEVEL_BADGE[entry.level]}`}>{entry.level}</span>
       {entry.step !== undefined ? (
-        <span className="shrink-0 text-neutral-600">#{entry.step}</span>
+        <span className="shrink-0 text-fg-subtle">#{entry.step}</span>
       ) : null}
       <span className={`shrink-0 ${LEVEL_CLASS[entry.level]}`}>{entry.event}</span>
-      {entry.message ? <span className="truncate text-neutral-500">{entry.message}</span> : null}
+      {entry.message ? <span className="truncate text-fg-muted">{entry.message}</span> : null}
     </div>
   )
 }
@@ -79,7 +79,7 @@ export default function TaskPanel(): JSX.Element {
 
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-bg-primary">
-      <div className="flex h-8 shrink-0 items-center justify-between border-b border-border px-3 text-2xs text-neutral-500">
+      <div className="flex h-8 shrink-0 items-center justify-between border-b border-border px-3 text-2xs text-fg-muted">
         <span className="flex items-center gap-1">
           <ListChecks className="h-3.5 w-3.5" />
           Tasks &amp; logs
@@ -91,9 +91,9 @@ export default function TaskPanel(): JSX.Element {
       </div>
 
       {warnings.length > 0 ? (
-        <div className="border-b border-border bg-amber-500/5 px-3 py-2">
+        <div className="border-b border-border bg-warning/5 px-3 py-2">
           {warnings.map((warning, index) => (
-            <div key={`${warning.kind}-${index}`} className="flex items-center gap-2 text-2xs text-amber-300">
+            <div key={`${warning.kind}-${index}`} className="flex items-center gap-2 text-2xs text-warning">
               <AlertTriangle className="h-3 w-3" />
               <span>{warning.message}</span>
             </div>
@@ -106,20 +106,20 @@ export default function TaskPanel(): JSX.Element {
           value={filter}
           onChange={(event) => setFilter(event.target.value)}
           placeholder="Filter logs…"
-          className="w-full rounded border border-border bg-bg-secondary px-2 py-1 text-xs text-neutral-200 outline-none focus:border-accent/50"
+          className="w-full rounded border border-border bg-bg-secondary px-2 py-1 text-xs text-fg outline-none focus:border-accent/50"
         />
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto bg-bg-primary">
         {filtered.length === 0 ? (
-          <p className="px-3 py-4 text-xs text-neutral-600">No log entries yet.</p>
+          <p className="px-3 py-4 text-xs text-fg-subtle">No log entries yet.</p>
         ) : (
           filtered.map((entry, index) => <LogRow key={`${entry.ts}-${index}`} entry={entry} />)
         )}
       </div>
 
       <div className="shrink-0 border-t border-border bg-bg-secondary p-3">
-        <div className="mb-2 flex items-center justify-between text-2xs text-neutral-400">
+        <div className="mb-2 flex items-center justify-between text-2xs text-fg-muted">
           <span className="flex items-center gap-1">
             <Terminal className="h-3.5 w-3.5" />
             Background worker
@@ -132,9 +132,9 @@ export default function TaskPanel(): JSX.Element {
               className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-bg-tertiary"
             >
               {worker?.online ?? true ? (
-                <Wifi className="h-3 w-3 text-emerald-500" />
+                <Wifi className="h-3 w-3 text-success" />
               ) : (
-                <WifiOff className="h-3 w-3 text-amber-500" />
+                <WifiOff className="h-3 w-3 text-warning" />
               )}
               {worker?.online ?? true ? 'online' : 'offline (queued)'}
             </button>
@@ -161,12 +161,12 @@ export default function TaskPanel(): JSX.Element {
             }}
             placeholder="Command to run in a sandbox…"
             dir="ltr"
-            className="flex-1 rounded border border-border bg-bg-primary px-2 py-1 font-mono text-xs text-neutral-200 outline-none focus:border-accent/50"
+            className="flex-1 rounded border border-border bg-bg-primary px-2 py-1 font-mono text-xs text-fg outline-none focus:border-accent/50"
           />
           <select
             value={priority}
             onChange={(event) => setPriority(Number(event.target.value))}
-            className="rounded border border-border bg-bg-primary px-1.5 py-1 text-xs text-neutral-300 outline-none"
+            className="rounded border border-border bg-bg-primary px-1.5 py-1 text-xs text-fg outline-none"
           >
             <option value={0}>normal</option>
             <option value={5}>high</option>
@@ -179,7 +179,7 @@ export default function TaskPanel(): JSX.Element {
               void submitJob({ label: command, command, priority })
               setCommand('')
             }}
-            className="flex items-center gap-1 rounded bg-accent px-2 py-1 text-xs text-white hover:bg-accent-hover disabled:opacity-40"
+            className="flex items-center gap-1 rounded bg-accent-solid px-2 py-1 text-xs text-white hover:bg-accent-solid-hover disabled:opacity-40"
           >
             <Play className="h-3 w-3" />
             Queue
@@ -193,7 +193,7 @@ export default function TaskPanel(): JSX.Element {
                 key={job.id}
                 className="flex items-center justify-between border-b border-border/60 px-2 py-1 text-2xs last:border-b-0"
               >
-                <span className="truncate font-mono text-neutral-300" dir="ltr">
+                <span className="truncate font-mono text-fg" dir="ltr">
                   {job.label}
                 </span>
                 <span className="flex items-center gap-2">
@@ -206,7 +206,7 @@ export default function TaskPanel(): JSX.Element {
                       type="button"
                       onClick={() => void cancelJob(job.id)}
                       title="Cancel"
-                      className="text-neutral-500 hover:text-red-400"
+                      className="text-fg-muted hover:text-danger"
                     >
                       <Ban className="h-3 w-3" />
                     </button>

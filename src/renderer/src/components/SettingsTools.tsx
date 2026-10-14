@@ -21,11 +21,11 @@ export default function SettingsTools(): JSX.Element {
 
   return (
     <section className="flex flex-col gap-3">
-      <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
+      <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
         <Wrench className="h-3.5 w-3.5" />
         {t('settings.tools')}
       </h3>
-      <p className="text-2xs text-neutral-500">{t('settings.toolsHint')}</p>
+      <p className="text-2xs text-fg-muted">{t('settings.toolsHint')}</p>
       <ul className="flex flex-col gap-2">
         {TOOL_TOGGLE_GROUPS.map((group) => {
           const on = enabled.includes(group.id)
@@ -44,7 +44,7 @@ export default function SettingsTools(): JSX.Element {
                 />
                 <span className="flex flex-col">
                   <span className="font-mono text-xs text-accent">{group.label}</span>
-                  <span className="text-2xs text-neutral-500">{group.description}</span>
+                  <span className="text-2xs text-fg-muted">{group.description}</span>
                 </span>
               </label>
             </li>

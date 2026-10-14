@@ -15,8 +15,8 @@ export function relativeTime(from: number, now: number): string {
 }
 
 function StatusIcon({ status }: { status: Job['status'] }): JSX.Element {
-  if (status === 'completed') return <CheckCircle2 size={14} className="text-emerald-400" />
-  if (status === 'failed') return <XCircle size={14} className="text-red-400" />
+  if (status === 'completed') return <CheckCircle2 size={14} className="text-success" />
+  if (status === 'failed') return <XCircle size={14} className="text-danger" />
   return <Loader2 size={14} className="animate-spin text-accent" />
 }
 
@@ -45,14 +45,14 @@ export default function JobCard({
     >
       <div className="flex items-center gap-2">
         <StatusIcon status={job.status} />
-        <span className="font-mono text-xs text-neutral-400">
+        <span className="font-mono text-xs text-fg-muted">
           {t('jobs.cardTitle', { id: job.id.slice(0, 8), status: job.status })}
         </span>
-        <span className="ms-auto text-3xs text-neutral-500">
+        <span className="ms-auto text-3xs text-fg-muted">
           {t('jobs.startedAgo', { time: relativeTime(job.startedAt, at) })}
         </span>
       </div>
-      <div className="mt-1 truncate font-mono text-xs text-neutral-200" title={job.command}>
+      <div className="mt-1 truncate font-mono text-xs text-fg" title={job.command}>
         $ {job.command}
       </div>
       <div className="mt-2 flex items-center gap-2">
@@ -68,7 +68,7 @@ export default function JobCard({
           <button
             type="button"
             onClick={() => onKill(job.id)}
-            className="inline-flex items-center gap-1 rounded border border-red-500/40 px-2 py-0.5 text-2xs text-red-300 hover:bg-red-500/10"
+            className="inline-flex items-center gap-1 rounded border border-danger/40 px-2 py-0.5 text-2xs text-danger hover:bg-danger/10"
           >
             <Skull size={12} />
             {t('jobs.kill')}
@@ -76,7 +76,7 @@ export default function JobCard({
         )}
       </div>
       {open && (
-        <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded bg-black/40 p-2 font-mono text-2xs text-neutral-400">
+        <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded bg-black/40 p-2 font-mono text-2xs text-fg-muted">
           {job.output || t('jobs.noOutput')}
         </pre>
       )}

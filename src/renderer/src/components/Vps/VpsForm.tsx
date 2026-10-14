@@ -8,7 +8,7 @@ interface VpsFormProps {
 }
 
 const inputClass =
-  'w-full rounded-md border border-border bg-bg-tertiary px-2 py-1.5 text-sm text-neutral-100 outline-none focus:border-accent'
+  'w-full rounded-md border border-border bg-bg-tertiary px-2 py-1.5 text-sm text-fg-strong outline-none focus:border-accent'
 
 /** Form to add a VPS. Secrets are sent once and encrypted in the main process. */
 export default function VpsForm({ onSaved, onClose }: VpsFormProps): JSX.Element {
@@ -52,22 +52,22 @@ export default function VpsForm({ onSaved, onClose }: VpsFormProps): JSX.Element
       className="flex flex-col gap-3 rounded-lg border border-border bg-bg-secondary p-4"
     >
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-neutral-200">Add VPS</h3>
-        <button type="button" onClick={onClose} className="text-neutral-500 hover:text-neutral-200">
+        <h3 className="text-sm font-semibold text-fg">Add VPS</h3>
+        <button type="button" onClick={onClose} className="text-fg-muted hover:text-fg">
           <X className="h-4 w-4" />
         </button>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <label className="flex flex-col gap-1 text-xs text-neutral-400">
+        <label className="flex flex-col gap-1 text-xs text-fg-muted">
           Name
           <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} />
         </label>
-        <label className="flex flex-col gap-1 text-xs text-neutral-400">
+        <label className="flex flex-col gap-1 text-xs text-fg-muted">
           Host
           <input className={inputClass} value={host} onChange={(e) => setHost(e.target.value)} />
         </label>
-        <label className="flex flex-col gap-1 text-xs text-neutral-400">
+        <label className="flex flex-col gap-1 text-xs text-fg-muted">
           Port
           <input
             className={inputClass}
@@ -76,7 +76,7 @@ export default function VpsForm({ onSaved, onClose }: VpsFormProps): JSX.Element
             onChange={(e) => setPort(e.target.value)}
           />
         </label>
-        <label className="flex flex-col gap-1 text-xs text-neutral-400">
+        <label className="flex flex-col gap-1 text-xs text-fg-muted">
           Username
           <input
             className={inputClass}
@@ -84,7 +84,7 @@ export default function VpsForm({ onSaved, onClose }: VpsFormProps): JSX.Element
             onChange={(e) => setUsername(e.target.value)}
           />
         </label>
-        <label className="flex flex-col gap-1 text-xs text-neutral-400">
+        <label className="flex flex-col gap-1 text-xs text-fg-muted">
           Auth
           <select
             className={inputClass}
@@ -96,7 +96,7 @@ export default function VpsForm({ onSaved, onClose }: VpsFormProps): JSX.Element
           </select>
         </label>
         {authType === 'key' ? (
-          <label className="col-span-2 flex flex-col gap-1 text-xs text-neutral-400">
+          <label className="col-span-2 flex flex-col gap-1 text-xs text-fg-muted">
             Private key path
             <input
               className={inputClass}
@@ -106,7 +106,7 @@ export default function VpsForm({ onSaved, onClose }: VpsFormProps): JSX.Element
             />
           </label>
         ) : (
-          <label className="flex flex-col gap-1 text-xs text-neutral-400">
+          <label className="flex flex-col gap-1 text-xs text-fg-muted">
             Password
             <input
               className={inputClass}
@@ -116,7 +116,7 @@ export default function VpsForm({ onSaved, onClose }: VpsFormProps): JSX.Element
             />
           </label>
         )}
-        <label className="flex flex-col gap-1 text-xs text-neutral-400">
+        <label className="flex flex-col gap-1 text-xs text-fg-muted">
           Key passphrase (optional)
           <input
             className={inputClass}
@@ -127,12 +127,12 @@ export default function VpsForm({ onSaved, onClose }: VpsFormProps): JSX.Element
         </label>
       </div>
 
-      {error ? <p className="text-xs text-red-400">{error}</p> : null}
+      {error ? <p className="text-xs text-danger">{error}</p> : null}
 
       <button
         type="submit"
         disabled={busy}
-        className="flex items-center justify-center gap-2 rounded-md bg-accent px-3 py-2 text-sm font-medium text-black disabled:opacity-50"
+        className="flex items-center justify-center gap-2 rounded-md bg-accent-solid px-3 py-2 text-sm font-medium text-black disabled:opacity-50"
       >
         <Plus className="h-4 w-4" />
         {busy ? 'Saving…' : 'Add server'}

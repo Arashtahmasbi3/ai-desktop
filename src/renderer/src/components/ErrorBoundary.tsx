@@ -37,19 +37,19 @@ export default class ErrorBoundary extends Component<Props, State> {
 
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
-        <AlertTriangle className="h-8 w-8 text-amber-400" />
+        <AlertTriangle className="h-8 w-8 text-warning" />
         <div>
-          <p className="text-sm text-neutral-200">
+          <p className="text-sm text-fg">
             {this.props.label ?? 'This panel'} crashed while rendering.
           </p>
-          <p className="mt-1 max-w-md font-mono text-2xs text-neutral-400">
+          <p className="mt-1 max-w-md font-mono text-2xs text-fg-muted">
             {safeMessage(error)}
           </p>
         </div>
         <button
           type="button"
           onClick={() => this.setState({ error: null })}
-          className="flex items-center gap-1 rounded bg-accent px-3 py-1 text-xs text-white hover:bg-accent-hover"
+          className="flex items-center gap-1 rounded bg-accent-solid px-3 py-1 text-xs text-white hover:bg-accent-solid-hover"
         >
           <RotateCw className="h-3 w-3" />
           Retry

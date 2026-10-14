@@ -75,7 +75,7 @@ export default function RemoteFileExplorer({ serverId }: { serverId: string }): 
         <button
           onClick={() => void list(parent)}
           disabled={path === '/' || busy}
-          className="rounded p-1 text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-100 disabled:opacity-30"
+          className="rounded p-1 text-fg-muted hover:bg-bg-tertiary hover:text-fg-strong disabled:opacity-30"
           title="Up"
         >
           <ArrowUp className="h-3.5 w-3.5" />
@@ -84,24 +84,24 @@ export default function RemoteFileExplorer({ serverId }: { serverId: string }): 
           onClick={() => void list(path)}
           disabled={busy}
           aria-busy={busy}
-          className="rounded p-1 text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-100 disabled:opacity-50"
+          className="rounded p-1 text-fg-muted hover:bg-bg-tertiary hover:text-fg-strong disabled:opacity-50"
           title="Refresh"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${busy ? 'animate-spin' : ''}`} />
         </button>
-        <span className="truncate font-mono text-xs text-neutral-500">{path}</span>
+        <span className="truncate font-mono text-xs text-fg-muted">{path}</span>
         {selected ? (
           <button
             onClick={() => void save()}
             disabled={busy}
-            className="ml-auto flex items-center gap-1 rounded bg-accent px-2 py-1 text-xs font-medium text-black disabled:opacity-50"
+            className="ml-auto flex items-center gap-1 rounded bg-accent-solid px-2 py-1 text-xs font-medium text-black disabled:opacity-50"
           >
             <Save className="h-3.5 w-3.5" /> Save
           </button>
         ) : null}
       </div>
 
-      {error ? <p className="px-2 py-1 text-xs text-red-400">{error}</p> : null}
+      {error ? <p className="px-2 py-1 text-xs text-danger">{error}</p> : null}
 
       <div className="flex min-h-0 flex-1">
         <div className="w-64 shrink-0 overflow-auto border-r border-border">
@@ -111,13 +111,13 @@ export default function RemoteFileExplorer({ serverId }: { serverId: string }): 
               onClick={() => void open(entry)}
               disabled={busy}
               className={`flex w-full items-center gap-2 px-2 py-1 text-left text-xs hover:bg-bg-tertiary disabled:opacity-60 ${
-                selected === entry.path ? 'bg-bg-tertiary text-accent' : 'text-neutral-300'
+                selected === entry.path ? 'bg-bg-tertiary text-accent' : 'text-fg'
               }`}
             >
               {entry.type === 'dir' ? (
                 <Folder className="h-3.5 w-3.5 shrink-0 text-accent" />
               ) : (
-                <FileIcon className="h-3.5 w-3.5 shrink-0 text-neutral-500" />
+                <FileIcon className="h-3.5 w-3.5 shrink-0 text-fg-muted" />
               )}
               <span className="truncate">{entry.name}</span>
             </button>
@@ -129,7 +129,7 @@ export default function RemoteFileExplorer({ serverId }: { serverId: string }): 
           readOnly={!selected}
           spellCheck={false}
           placeholder={selected ? '' : 'Select a file to view or edit'}
-          className="min-w-0 flex-1 resize-none bg-bg-primary p-3 font-mono text-xs text-neutral-200 outline-none"
+          className="min-w-0 flex-1 resize-none bg-bg-primary p-3 font-mono text-xs text-fg outline-none"
         />
       </div>
     </div>

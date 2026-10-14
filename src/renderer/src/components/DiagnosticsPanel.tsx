@@ -22,12 +22,12 @@ function ToolRow({ label, tool }: { label: string; tool: ToolHealth }): JSX.Elem
   return (
     <div className="flex items-center gap-2 text-xs">
       {tool.installed ? (
-        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+        <CheckCircle2 className="h-3.5 w-3.5 text-success" />
       ) : (
-        <XCircle className="h-3.5 w-3.5 text-red-400" />
+        <XCircle className="h-3.5 w-3.5 text-danger" />
       )}
-      <span className="w-16 text-neutral-300">{label}</span>
-      <span className="text-neutral-500">
+      <span className="w-16 text-fg">{label}</span>
+      <span className="text-fg-muted">
         {tool.installed ? (tool.version ? `v${tool.version}` : 'installed') : 'not installed'}
       </span>
     </div>
@@ -84,7 +84,7 @@ export default function DiagnosticsPanel({ serverId, serverName, onClose }: Prop
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
       <div className="flex max-h-[80vh] w-[36rem] flex-col overflow-hidden rounded-lg border border-border bg-bg-secondary shadow-xl">
         <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-2.5">
-          <div className="flex items-center gap-2 text-sm text-neutral-200">
+          <div className="flex items-center gap-2 text-sm text-fg">
             <Server className="h-4 w-4 text-accent" />
             System Health — {serverName}
           </div>
@@ -95,14 +95,14 @@ export default function DiagnosticsPanel({ serverId, serverName, onClose }: Prop
               disabled={busy}
               title="Refresh"
               aria-busy={busy}
-              className="flex h-6 w-6 items-center justify-center rounded text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300 disabled:opacity-50"
+              className="flex h-6 w-6 items-center justify-center rounded text-fg-muted hover:bg-bg-tertiary hover:text-fg disabled:opacity-50"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${busy ? 'animate-spin' : ''}`} />
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="flex h-6 w-6 items-center justify-center rounded text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300"
+              className="flex h-6 w-6 items-center justify-center rounded text-fg-muted hover:bg-bg-tertiary hover:text-fg"
             >
               <X className="h-4 w-4" />
             </button>
@@ -110,8 +110,8 @@ export default function DiagnosticsPanel({ serverId, serverName, onClose }: Prop
         </div>
 
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
-          {error ? <p className="text-xs text-red-400">{error}</p> : null}
-          {!health && !error ? <p className="text-xs text-neutral-500">Probing host…</p> : null}
+          {error ? <p className="text-xs text-danger">{error}</p> : null}
+          {!health && !error ? <p className="text-xs text-fg-muted">Probing host…</p> : null}
 
           {health ? (
             <>
@@ -122,48 +122,48 @@ export default function DiagnosticsPanel({ serverId, serverName, onClose }: Prop
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="flex items-center gap-2 rounded border border-border bg-bg-primary p-2 text-neutral-400">
+                <div className="flex items-center gap-2 rounded border border-border bg-bg-primary p-2 text-fg-muted">
                   <HardDrive className="h-3.5 w-3.5" />
                   Disk: {health.disk.used} / {health.disk.total} ({health.disk.percent}%)
                 </div>
-                <div className="flex items-center gap-2 rounded border border-border bg-bg-primary p-2 text-neutral-400">
+                <div className="flex items-center gap-2 rounded border border-border bg-bg-primary p-2 text-fg-muted">
                   <Cpu className="h-3.5 w-3.5" />
                   RAM: {health.memory.used} / {health.memory.total}
                 </div>
               </div>
-              <p className="text-xs text-neutral-500">
+              <p className="text-xs text-fg-muted">
                 {health.os.name} {health.os.version}
               </p>
 
               {recommendations.length > 0 ? (
                 <div className="space-y-2">
-                  <p className="text-xs font-medium text-amber-300">⚠️ Recommendations</p>
+                  <p className="text-xs font-medium text-warning">⚠️ Recommendations</p>
                   {recommendations.map((rec) => (
                     <div
                       key={rec.id}
-                      className="flex items-center justify-between rounded border border-border bg-bg-primary px-2 py-1.5 text-xs text-neutral-300"
+                      className="flex items-center justify-between rounded border border-border bg-bg-primary px-2 py-1.5 text-xs text-fg"
                     >
                       <span>{rec.message}</span>
                       {rec.installTool && getInstallRecipe(rec.installTool) ? (
                         <button
                           type="button"
                           onClick={() => setPending(rec)}
-                          className="rounded bg-accent/20 px-2 py-0.5 text-accent hover:bg-accent/30"
+                          className="rounded bg-accent-solid/20 px-2 py-0.5 text-accent hover:bg-accent-solid/30"
                         >
                           Install
                         </button>
                       ) : (
-                        <span className="text-neutral-600">—</span>
+                        <span className="text-fg-subtle">—</span>
                       )}
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-emerald-400">All essentials are present.</p>
+                <p className="text-xs text-success">All essentials are present.</p>
               )}
 
               {log ? (
-                <pre className="max-h-32 overflow-auto whitespace-pre-wrap rounded border border-border bg-bg-primary p-2 text-3xs text-neutral-500">
+                <pre className="max-h-32 overflow-auto whitespace-pre-wrap rounded border border-border bg-bg-primary p-2 text-3xs text-fg-muted">
                   {log}
                 </pre>
               ) : null}
@@ -200,12 +200,12 @@ function InstallConfirm({
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60">
       <div className="w-[30rem] rounded-lg border border-border bg-bg-secondary p-4">
-        <p className="mb-2 text-sm text-neutral-200">Install {recipe.label}?</p>
-        <pre className="mb-3 max-h-40 overflow-auto whitespace-pre-wrap rounded border border-border bg-bg-primary p-2 text-2xs text-neutral-400">
+        <p className="mb-2 text-sm text-fg">Install {recipe.label}?</p>
+        <pre className="mb-3 max-h-40 overflow-auto whitespace-pre-wrap rounded border border-border bg-bg-primary p-2 text-2xs text-fg-muted">
           {[recipe.preCheck, ...recipe.commands, recipe.verify].join('\n')}
         </pre>
         {recipe.requiresSudo ? (
-          <p className="mb-3 text-2xs text-amber-300">
+          <p className="mb-3 text-2xs text-warning">
             This recipe needs root. Confirm you want to run these commands with sudo.
           </p>
         ) : null}
@@ -213,7 +213,7 @@ function InstallConfirm({
           <button
             type="button"
             onClick={onCancel}
-            className="rounded px-3 py-1 text-xs text-neutral-400 hover:bg-bg-tertiary"
+            className="rounded px-3 py-1 text-xs text-fg-muted hover:bg-bg-tertiary"
           >
             Cancel
           </button>
@@ -221,7 +221,7 @@ function InstallConfirm({
             type="button"
             disabled={busy}
             onClick={() => onConfirm(recipe.requiresSudo)}
-            className="rounded bg-accent/20 px-3 py-1 text-xs text-accent hover:bg-accent/30 disabled:opacity-50"
+            className="rounded bg-accent-solid/20 px-3 py-1 text-xs text-accent hover:bg-accent-solid/30 disabled:opacity-50"
           >
             {recipe.requiresSudo ? 'Approve (sudo)' : 'Approve'}
           </button>

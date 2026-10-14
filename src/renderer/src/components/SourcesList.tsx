@@ -46,41 +46,41 @@ export default function SourcesList(): JSX.Element {
     filesRead.length === 0 &&
     preview.included.every((section) => section.key === 'history')
   ) {
-    return <p className="text-xs text-neutral-600">{t('workspace.sourcesEmpty')}</p>
+    return <p className="text-xs text-fg-subtle">{t('workspace.sourcesEmpty')}</p>
   }
 
   return (
     <div className="flex flex-col gap-3 text-xs">
       <section data-testid="chat-memory">
-        <p className="mb-1 flex items-center gap-1.5 text-3xs font-semibold uppercase tracking-wide text-neutral-600">
+        <p className="mb-1 flex items-center gap-1.5 text-3xs font-semibold uppercase tracking-wide text-fg-subtle">
           <Brain className="h-3 w-3" />
           {t('workspace.memoryTitle')}
         </p>
         {memory ? (
-          <ul className="space-y-0.5 text-neutral-400">
+          <ul className="space-y-0.5 text-fg-muted">
             <li className="flex justify-between gap-3">
               <span>{t('workspace.memoryTurns')}</span>
-              <span className="font-mono text-neutral-600">{memory.turns}</span>
+              <span className="font-mono text-fg-subtle">{memory.turns}</span>
             </li>
             <li className="flex justify-between gap-3">
               <span>{t('workspace.memoryMessages')}</span>
-              <span className="font-mono text-neutral-600">{memory.messages}</span>
+              <span className="font-mono text-fg-subtle">{memory.messages}</span>
             </li>
             {memory.summary ? (
               <li className="truncate" title={memory.summary}>
-                <span className="text-neutral-500">{t('workspace.memorySummary')}: </span>
+                <span className="text-fg-muted">{t('workspace.memorySummary')}: </span>
                 {memory.summary}
               </li>
             ) : null}
             {memory.trustedPlan ? (
               <li className="flex justify-between gap-3">
                 <span>{t('workspace.memoryTrustedPlan')}</span>
-                <span className="font-mono text-neutral-600">{memory.trustedPlan.steps}</span>
+                <span className="font-mono text-fg-subtle">{memory.trustedPlan.steps}</span>
               </li>
             ) : null}
           </ul>
         ) : (
-          <p className="text-neutral-600">{t('workspace.memoryEmpty')}</p>
+          <p className="text-fg-subtle">{t('workspace.memoryEmpty')}</p>
         )}
         <button
           type="button"
@@ -93,7 +93,7 @@ export default function SourcesList(): JSX.Element {
             setConfirming(false)
             void clearMemory()
           }}
-          className="mt-2 flex items-center gap-1.5 rounded border border-border px-2 py-1 text-3xs text-neutral-400 transition enabled:hover:border-red-500/60 enabled:hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-40"
+          className="mt-2 flex items-center gap-1.5 rounded border border-border px-2 py-1 text-3xs text-fg-muted transition enabled:hover:border-danger/60 enabled:hover:text-danger disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Trash2 className="h-3 w-3" />
           {confirming ? t('workspace.memoryClearConfirm') : t('workspace.memoryClear')}
@@ -101,20 +101,20 @@ export default function SourcesList(): JSX.Element {
       </section>
 
       <section>
-        <p className="mb-1 text-3xs font-semibold uppercase tracking-wide text-neutral-600">
+        <p className="mb-1 text-3xs font-semibold uppercase tracking-wide text-fg-subtle">
           {t('workspace.filesRead')}
         </p>
         {filesRead.length === 0 ? (
-          <p className="text-neutral-600">—</p>
+          <p className="text-fg-subtle">—</p>
         ) : (
           <ul className="space-y-0.5">
             {filesRead.map((path, index) => (
               <li
                 key={`${path}-${index}`}
-                className="flex items-center gap-1.5 truncate font-mono text-3xs text-neutral-400"
+                className="flex items-center gap-1.5 truncate font-mono text-3xs text-fg-muted"
                 dir="ltr"
               >
-                <FileText className="h-3 w-3 shrink-0 text-neutral-600" />
+                <FileText className="h-3 w-3 shrink-0 text-fg-subtle" />
                 {path}
               </li>
             ))}
@@ -123,16 +123,16 @@ export default function SourcesList(): JSX.Element {
       </section>
 
       <section>
-        <p className="mb-1 text-3xs font-semibold uppercase tracking-wide text-neutral-600">
+        <p className="mb-1 text-3xs font-semibold uppercase tracking-wide text-fg-subtle">
           {t('workspace.context')}
         </p>
         <ul className="space-y-0.5">
           {preview.included.map((section) => (
             <li key={section.key} className="flex justify-between gap-3">
-              <span className="truncate text-neutral-400">
+              <span className="truncate text-fg-muted">
                 {t('workspace.included')}: {section.label}
               </span>
-              <span className="shrink-0 font-mono text-neutral-600">{section.tokens}</span>
+              <span className="shrink-0 font-mono text-fg-subtle">{section.tokens}</span>
             </li>
           ))}
         </ul>
@@ -140,12 +140,12 @@ export default function SourcesList(): JSX.Element {
 
       {preview.blockedFiles.length > 0 ? (
         <section>
-          <p className="mb-1 text-3xs font-semibold uppercase tracking-wide text-amber-500">
+          <p className="mb-1 text-3xs font-semibold uppercase tracking-wide text-warning">
             {t('workspace.withheld')}
           </p>
           <ul className="space-y-0.5">
             {preview.blockedFiles.map((file) => (
-              <li key={file} className="truncate font-mono text-3xs text-amber-300/80" dir="ltr">
+              <li key={file} className="truncate font-mono text-3xs text-warning/80" dir="ltr">
                 {file}
               </li>
             ))}
@@ -154,10 +154,10 @@ export default function SourcesList(): JSX.Element {
       ) : null}
 
       <section>
-        <p className="mb-1 text-3xs font-semibold uppercase tracking-wide text-neutral-600">
+        <p className="mb-1 text-3xs font-semibold uppercase tracking-wide text-fg-subtle">
           {t('workspace.excluded')}
         </p>
-        <ul className="space-y-0.5 text-neutral-600">
+        <ul className="space-y-0.5 text-fg-subtle">
           {preview.excluded.map((item) => (
             <li key={item}>• {item}</li>
           ))}

@@ -33,19 +33,19 @@ export default function SettingsDeveloper(): JSX.Element {
 
   return (
     <section className="flex flex-col gap-3">
-      <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
+      <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
         <Wrench className="h-3.5 w-3.5" />
         {t('settings.developer')}
       </h3>
 
       <div className="flex items-center justify-between rounded-xl border border-border bg-bg-primary px-3 py-2">
-        <span className="text-xs text-neutral-400">{t('settings.version')}</span>
-        <span className="font-mono text-xs text-neutral-200">
+        <span className="text-xs text-fg-muted">{t('settings.version')}</span>
+        <span className="font-mono text-xs text-fg">
           {version ? `v${version}` : '—'}
         </span>
       </div>
 
-      <label className="flex cursor-pointer items-center gap-2 text-xs text-neutral-300">
+      <label className="flex cursor-pointer items-center gap-2 text-xs text-fg">
         <input
           type="checkbox"
           checked={planModeDefault}
@@ -58,7 +58,7 @@ export default function SettingsDeveloper(): JSX.Element {
       <button
         type="button"
         onClick={resetLocal}
-        className="flex w-fit items-center gap-1.5 rounded border border-border px-3 py-1.5 text-xs text-neutral-300 hover:bg-bg-tertiary hover:text-red-400"
+        className="flex w-fit items-center gap-1.5 rounded border border-border px-3 py-1.5 text-xs text-fg hover:bg-bg-tertiary hover:text-danger"
       >
         <Trash2 className="h-3.5 w-3.5" />
         {t('settings.resetLocal')}

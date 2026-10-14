@@ -82,17 +82,17 @@ export default function InlineTrace(): JSX.Element | null {
         className="flex items-center gap-2 px-0.5 text-left"
       >
         <Activity className="h-3.5 w-3.5 shrink-0 text-accent" />
-        <span className="text-3xs font-semibold uppercase tracking-wide text-neutral-400">
+        <span className="text-3xs font-semibold uppercase tracking-wide text-fg-muted">
           {t('trace.inlineTitle')}
         </span>
         <span
           data-testid="inline-trace-count"
-          className="rounded bg-bg-tertiary px-1 font-mono text-3xs text-neutral-400"
+          className="rounded bg-bg-tertiary px-1 font-mono text-3xs text-fg-muted"
         >
           {decisions.length}
         </span>
-        <span className="min-w-0 flex-1 truncate text-2xs text-neutral-500">{latest}</span>
-        <span className="shrink-0 text-neutral-500">
+        <span className="min-w-0 flex-1 truncate text-2xs text-fg-muted">{latest}</span>
+        <span className="shrink-0 text-fg-muted">
           {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
         </span>
       </button>
@@ -117,12 +117,12 @@ export default function InlineTrace(): JSX.Element | null {
                           key={message.id}
                           data-testid="trace-tool-chip"
                           className={`flex items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-3xs ${
-                            ok ? 'border-border text-neutral-400' : 'border-red-500/40 text-red-300'
+                            ok ? 'border-border text-fg-muted' : 'border-danger/40 text-danger'
                           }`}
                         >
                           <Icon
                             className={`h-2.5 w-2.5 shrink-0 ${
-                              ok ? 'text-emerald-400' : 'text-red-400'
+                              ok ? 'text-success' : 'text-danger'
                             }`}
                           />
                           {message.toolCall?.name}
@@ -142,7 +142,7 @@ export default function InlineTrace(): JSX.Element | null {
           type="button"
           data-testid="inline-trace-show-all"
           onClick={() => setExpanded(true)}
-          className="self-start rounded border border-border px-2 py-0.5 text-3xs text-neutral-400 hover:border-accent/50 hover:text-accent"
+          className="self-start rounded border border-border px-2 py-0.5 text-3xs text-fg-muted hover:border-accent/50 hover:text-accent"
         >
           {t('trace.showAll', { count: hiddenCount })}
         </button>
@@ -153,7 +153,7 @@ export default function InlineTrace(): JSX.Element | null {
           type="button"
           data-testid="inline-trace-show-less"
           onClick={() => setExpanded(false)}
-          className="self-start rounded border border-border px-2 py-0.5 text-3xs text-neutral-400 hover:border-accent/50 hover:text-accent"
+          className="self-start rounded border border-border px-2 py-0.5 text-3xs text-fg-muted hover:border-accent/50 hover:text-accent"
         >
           {t('trace.showLess')}
         </button>

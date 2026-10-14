@@ -23,6 +23,12 @@ import type { ChatSummary, StoredMessage } from '@shared/chat'
 import type { Job } from '@shared/jobs'
 import type { Locale } from './i18n/locale'
 import { detectLocale } from './i18n/locale'
+import {
+  applyTheme,
+  readStoredTheme,
+  storeTheme,
+  type ThemePreference
+} from './lib/theme'
 import { VPS_RECONNECT_KEY } from './lib/vps-state'
 import {
   isConversationActive,
@@ -362,6 +368,8 @@ interface AppState {
   vpsServers: VpsServerView[]
   /** Live VPS connection state from the main process. */
   vpsStatus: VpsConnectionState
+  /** Light/dark/system preference (v2.7.0). */
+  theme: ThemePreference
   /** Per-server connection state, so one host's change never repaints another's. */
   vpsStates: Record<string, VpsConnectionState>
   /** Every currently-connected server id (v2.6.4, multi-connection truth). */
@@ -445,6 +453,8 @@ interface AppState {
   dismissPreflight: () => void
   /** Toggle the pre-send context preview. */
   setShowContextBeforeSend: (value: boolean) => void
+  /** Switch the light/dark/system theme preference (v2.7.0). */
+  setTheme: (preference: ThemePreference) => void
   /** Record one LLM call's usage and persist it (v2.5.4). */
   recordUsage: (record: Omit<UsageRecord, 'timestamp'> & { timestamp?: number }) => void
   /** Clear every usage record and storage (v2.5.4). */
@@ -681,6 +691,8 @@ export const useStore = create<AppState>((set, get) => ({
   locale: detectLocale(),
   sidebarCollapsed: false,
   sidebarPinned: readSidebarPinned(),
+  // v2.7.0: theme preference (light is the default "day" theme).
+  theme: readStoredTheme(),
   showContextBeforeSend: readShowContextBeforeSend(),
   usageRecords: loadUsage(),
   sessionStartedAt: Date.now(),
@@ -740,6 +752,17 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
   dismissPreflight: () => set({ preflightNotice: null }),
+  /**
+   * v2.7.0: switch the theme. The preference is persisted and pushed onto
+   * `<html>` immediately so the CSS variables swap without a re-render.
+   */
+  setTheme(preference) {
+    set({ theme: preference })
+    storeTheme(preference)
+    if (typeof document !== 'undefined') {
+      applyTheme(preference, document.documentElement)
+    }
+  },
   setShowContextBeforeSend(value) {
     set({ showContextBeforeSend: value })
     try {

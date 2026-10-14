@@ -2,9 +2,94 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * ---------------------------------------------------------------------------
+ * Theme palettes (v2.7.0)
+ * ---------------------------------------------------------------------------
+ * Light is the default ("day") theme; `.dark` on <html> switches to the dark
+ * palette the app shipped with. Values are space-separated RGB triplets so
+ * Tailwind's `/ <alpha-value>` opacity modifiers keep working.
+ *
+ * Contrast: every foreground token below is at least 4.5:1 against every surface
+ * it is used on, in both themes — `test/renderer/theme-tokens.test.ts` computes
+ * the WCAG ratios from these exact values and fails the build if one slips.
+ */
 @layer base {
   :root {
+    color-scheme: light;
+
+    --bg-primary: 255 255 255;
+    --bg-secondary: 250 251 252;
+    --bg-tertiary: 243 245 248;
+    --bg-elevated: 255 255 255;
+    --border: 223 226 232;
+    --border-strong: 198 203 214;
+
+    /*
+     * A four-step text ramp where every step still clears 4.5:1 on the darkest
+     * surface (`bg-tertiary`). The earlier values looked nice but bottomed out at
+     * 3.25:1, which is below the readable threshold for metadata users do need to
+     * read (file sizes, hints, timestamps).
+     */
+    --fg-strong: 13 17 23;
+    --fg: 51 58 71;
+    --fg-muted: 77 85 102;
+    --fg-subtle: 102 112 128;
+
+    /* `accent` is for text/borders/tints; `accent-solid` is a filled surface. */
+    --accent: 109 67 255;
+    --accent-hover: 91 52 224;
+    --accent-solid: 109 67 255;
+    --accent-solid-hover: 91 52 224;
+    --accent-fg: 255 255 255;
+    --accent-muted: 196 183 255;
+
+    --danger: 194 38 54;
+    --warning: 154 97 0;
+    --success: 15 122 74;
+    --info: 11 107 203;
+
+    --focus-ring: 109 67 255;
+    --scrollbar-thumb: 200 205 214;
+    --scrollbar-thumb-hover: 168 174 186;
+  }
+
+  .dark {
     color-scheme: dark;
+
+    --bg-primary: 10 10 10;
+    --bg-secondary: 20 20 20;
+    --bg-tertiary: 30 30 30;
+    --bg-elevated: 26 26 26;
+    --border: 42 42 42;
+    --border-strong: 58 58 58;
+
+    --fg-strong: 245 245 245;
+    --fg: 229 229 229;
+    --fg-muted: 163 163 163;
+    --fg-subtle: 139 139 139;
+
+    /*
+     * On a near-black surface the accent has to be light to be read as text, and
+     * dark to carry white text as a filled button — one value cannot do both, so
+     * the filled surface is its own token. `accent` at #7c5cff was 4.24:1 on
+     * `bg-secondary`, just under the readable threshold.
+     */
+    --accent: 157 134 255;
+    --accent-hover: 178 160 255;
+    --accent-solid: 107 76 230;
+    --accent-solid-hover: 92 64 208;
+    --accent-fg: 255 255 255;
+    --accent-muted: 76 58 153;
+
+    --danger: 248 113 113;
+    --warning: 251 191 36;
+    --success: 52 211 153;
+    --info: 96 165 250;
+
+    --focus-ring: 167 139 250;
+    --scrollbar-thumb: 47 47 47;
+    --scrollbar-thumb-hover: 63 63 63;
   }
 
   html,
@@ -14,7 +99,7 @@
   }
 
   body {
-    @apply bg-bg-primary text-neutral-100 antialiased;
+    @apply bg-bg-primary text-fg antialiased;
     margin: 0;
     font-family: 'Inter', 'Vazirmatn', ui-sans-serif, system-ui, sans-serif;
     overflow: hidden;
@@ -45,14 +130,14 @@
    * `.outline-none` utility (0,1,0) that would otherwise hide it.
    */
   :root :focus-visible {
-    outline: 2px solid #a78bfa;
+    outline: 2px solid rgb(var(--focus-ring));
     outline-offset: 1px;
   }
 
-  /* Slim, dark scrollbars that match the app instead of the OS default. */
+  /* Slim scrollbars that match the active theme instead of the OS default. */
   * {
     scrollbar-width: thin;
-    scrollbar-color: #2f2f2f transparent;
+    scrollbar-color: rgb(var(--scrollbar-thumb)) transparent;
   }
 
   ::-webkit-scrollbar {
@@ -65,14 +150,14 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background: #2f2f2f;
+    background: rgb(var(--scrollbar-thumb));
     border: 2px solid transparent;
     background-clip: content-box;
     border-radius: 9999px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: #3f3f3f;
+    background: rgb(var(--scrollbar-thumb-hover));
     background-clip: content-box;
   }
 }
@@ -152,17 +237,17 @@
 .chat-markdown h3 {
   margin: 0.6rem 0 0.3rem;
   font-weight: 600;
-  color: #f5f5f5;
+  color: rgb(var(--fg-strong));
 }
 
 .chat-markdown a {
-  color: #a78bfa;
+  color: rgb(var(--accent));
   text-decoration: underline;
 }
 
 .chat-markdown code {
   border-radius: 0.25rem;
-  background: #0a0a0a;
+  background: rgb(var(--bg-tertiary));
   padding: 0.1rem 0.3rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.8em;
@@ -172,9 +257,9 @@
 
 .chat-markdown pre {
   overflow-x: auto;
-  border: 1px solid #2a2a2a;
+  border: 1px solid rgb(var(--border));
   border-radius: 0.5rem;
-  background: #0a0a0a;
+  background: rgb(var(--bg-tertiary));
   padding: 0.6rem 0.75rem;
   direction: ltr;
   text-align: left;
@@ -187,9 +272,9 @@
 }
 
 .chat-markdown blockquote {
-  border-inline-start: 3px solid #2a2a2a;
+  border-inline-start: 3px solid rgb(var(--border-strong));
   padding-inline-start: 0.6rem;
-  color: #a3a3a3;
+  color: rgb(var(--fg-muted));
 }
 
 .chat-markdown table {
@@ -198,6 +283,6 @@
 
 .chat-markdown th,
 .chat-markdown td {
-  border: 1px solid #2a2a2a;
+  border: 1px solid rgb(var(--border));
   padding: 0.2rem 0.5rem;
 }

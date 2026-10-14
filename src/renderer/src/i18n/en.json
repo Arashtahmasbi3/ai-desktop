@@ -431,7 +431,13 @@
     "auditVerifying": "Verifying…",
     "auditOk": "Audit chain intact ({{count}} lines).",
     "auditBroken": "Tampering detected at line {{line}}: {{reason}}",
-    "auditError": "Could not verify the audit file."
+    "auditError": "Could not verify the audit file.",
+    "theme": "Theme",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeSystem": "System",
+    "themeHint": "Day theme, dark theme, or follow the system setting.",
+    "themeApplied": "Theme: {{theme}}"
   },
   "toast": {
     "dismiss": "Dismiss",

@@ -115,7 +115,7 @@ export default function GitHubPanel(): JSX.Element {
             type="button"
             onClick={() => setTab(id)}
             className={`flex items-center gap-1 rounded px-2 py-1 text-2xs ${
-              tab === id ? 'bg-accent/20 text-accent' : 'text-neutral-400 hover:bg-bg-tertiary'
+              tab === id ? 'bg-accent-solid/20 text-accent' : 'text-fg-muted hover:bg-bg-tertiary'
             }`}
           >
             <Icon className="h-3.5 w-3.5" /> {label}
@@ -125,7 +125,7 @@ export default function GitHubPanel(): JSX.Element {
           type="button"
           onClick={() => (tab === 'status' ? void refreshStatus() : void loadTab())}
           disabled={busy}
-          className="ml-auto rounded p-1 text-neutral-400 hover:bg-bg-tertiary disabled:opacity-40"
+          className="ml-auto rounded p-1 text-fg-muted hover:bg-bg-tertiary disabled:opacity-40"
           title="Refresh"
         >
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
@@ -133,7 +133,7 @@ export default function GitHubPanel(): JSX.Element {
       </div>
 
       {error ? (
-        <div className="shrink-0 border-b border-red-500/30 bg-red-500/10 px-3 py-1 text-2xs text-red-300">
+        <div className="shrink-0 border-b border-danger/30 bg-danger/10 px-3 py-1 text-2xs text-danger">
           {error}
         </div>
       ) : null}
@@ -141,27 +141,27 @@ export default function GitHubPanel(): JSX.Element {
       <div className="min-h-0 flex-1 overflow-auto p-3 text-xs">
         {tab === 'status' ? (
           !cwd ? (
-            <p className="text-neutral-500">Open a project to see its git status.</p>
+            <p className="text-fg-muted">Open a project to see its git status.</p>
           ) : !status?.isRepo ? (
-            <p className="text-neutral-500">
+            <p className="text-fg-muted">
               {status?.error ?? 'This project is not a git repository yet.'}
             </p>
           ) : (
             <div className="space-y-3">
-              <div className="flex items-center gap-2 text-neutral-300">
+              <div className="flex items-center gap-2 text-fg">
                 <GitBranch className="h-3.5 w-3.5 text-accent" />
                 <span className="font-medium">{status.branch || '(detached)'}</span>
-                {status.ahead > 0 ? <span className="text-emerald-400">↑{status.ahead}</span> : null}
-                {status.behind > 0 ? <span className="text-amber-400">↓{status.behind}</span> : null}
-                <span className="text-neutral-600">{status.clean ? 'clean' : `${status.files.length} changed`}</span>
+                {status.ahead > 0 ? <span className="text-success">↑{status.ahead}</span> : null}
+                {status.behind > 0 ? <span className="text-warning">↓{status.behind}</span> : null}
+                <span className="text-fg-subtle">{status.clean ? 'clean' : `${status.files.length} changed`}</span>
               </div>
 
               {status.files.length > 0 ? (
                 <ul className="max-h-40 overflow-auto rounded border border-border font-mono text-2xs">
                   {status.files.map((file) => (
                     <li key={file.path} className="flex gap-2 px-2 py-0.5">
-                      <span className="text-amber-400">{file.index}{file.workingDir}</span>
-                      <span className="truncate text-neutral-300" dir="ltr">{file.path}</span>
+                      <span className="text-warning">{file.index}{file.workingDir}</span>
+                      <span className="truncate text-fg" dir="ltr">{file.path}</span>
                     </li>
                   ))}
                 </ul>
@@ -172,7 +172,7 @@ export default function GitHubPanel(): JSX.Element {
                   value={message}
                   onChange={(event) => setMessage(event.target.value)}
                   placeholder="Commit message"
-                  className="flex-1 rounded border border-border bg-bg-secondary px-2 py-1 text-2xs text-neutral-200 outline-none focus:border-accent/50"
+                  className="flex-1 rounded border border-border bg-bg-secondary px-2 py-1 text-2xs text-fg outline-none focus:border-accent/50"
                 />
                 <button
                   type="button"
@@ -180,7 +180,7 @@ export default function GitHubPanel(): JSX.Element {
                   onClick={() =>
                     void runGit(() => window.api.github.gitCommit(cwd, { message, all: true }))
                   }
-                  className="flex items-center gap-1 rounded bg-accent px-2 py-1 text-white hover:bg-accent-hover disabled:opacity-40"
+                  className="flex items-center gap-1 rounded bg-accent-solid px-2 py-1 text-white hover:bg-accent-solid-hover disabled:opacity-40"
                 >
                   <GitCommitHorizontal className="h-3 w-3" /> Commit
                 </button>
@@ -191,7 +191,7 @@ export default function GitHubPanel(): JSX.Element {
                   type="button"
                   disabled={busy}
                   onClick={() => void runGit(() => window.api.github.gitPull(cwd))}
-                  className="flex items-center gap-1 rounded border border-border px-2 py-1 text-neutral-300 hover:bg-bg-tertiary disabled:opacity-40"
+                  className="flex items-center gap-1 rounded border border-border px-2 py-1 text-fg hover:bg-bg-tertiary disabled:opacity-40"
                 >
                   <ArrowDownToLine className="h-3 w-3" /> Pull
                 </button>
@@ -199,14 +199,14 @@ export default function GitHubPanel(): JSX.Element {
                   type="button"
                   disabled={busy}
                   onClick={() => void runGit(() => window.api.github.gitPush(cwd))}
-                  className="flex items-center gap-1 rounded border border-border px-2 py-1 text-neutral-300 hover:bg-bg-tertiary disabled:opacity-40"
+                  className="flex items-center gap-1 rounded border border-border px-2 py-1 text-fg hover:bg-bg-tertiary disabled:opacity-40"
                 >
                   <ArrowUpFromLine className="h-3 w-3" /> Push
                 </button>
               </div>
 
               {output ? (
-                <pre className="max-h-40 overflow-auto rounded bg-bg-tertiary p-2 font-mono text-3xs text-neutral-400">
+                <pre className="max-h-40 overflow-auto rounded bg-bg-tertiary p-2 font-mono text-3xs text-fg-muted">
                   {output}
                 </pre>
               ) : null}
@@ -220,12 +220,12 @@ export default function GitHubPanel(): JSX.Element {
                 onChange={(event) => setRepo(event.target.value)}
                 placeholder="owner/repo"
                 dir="ltr"
-                className="flex-1 rounded border border-border bg-bg-secondary px-2 py-1 text-2xs text-neutral-200 outline-none focus:border-accent/50"
+                className="flex-1 rounded border border-border bg-bg-secondary px-2 py-1 text-2xs text-fg outline-none focus:border-accent/50"
               />
               <button
                 type="button"
                 onClick={() => void loadRepos()}
-                className="rounded border border-border px-2 py-1 text-neutral-300 hover:bg-bg-tertiary"
+                className="rounded border border-border px-2 py-1 text-fg hover:bg-bg-tertiary"
               >
                 My repos
               </button>
@@ -234,7 +234,7 @@ export default function GitHubPanel(): JSX.Element {
               <select
                 value={repo}
                 onChange={(event) => setRepo(event.target.value)}
-                className="w-full rounded border border-border bg-bg-secondary px-2 py-1 text-2xs text-neutral-200"
+                className="w-full rounded border border-border bg-bg-secondary px-2 py-1 text-2xs text-fg"
               >
                 {repos.map((entry) => (
                   <option key={entry.fullName} value={entry.fullName}>
@@ -243,7 +243,7 @@ export default function GitHubPanel(): JSX.Element {
                 ))}
               </select>
             ) : (
-              <p className="flex items-center gap-1 text-neutral-600">
+              <p className="flex items-center gap-1 text-fg-subtle">
                 <GitFork className="h-3 w-3" /> Connect GitHub in Settings to list your repositories.
               </p>
             )}
@@ -255,11 +255,11 @@ export default function GitHubPanel(): JSX.Element {
                     href={entry.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-neutral-200 hover:text-accent"
+                    className="text-fg hover:text-accent"
                   >
                     #{entry.number} {entry.title}
                   </a>
-                  <div className="mt-0.5 flex gap-2 text-3xs text-neutral-600">
+                  <div className="mt-0.5 flex gap-2 text-3xs text-fg-subtle">
                     <span>@{entry.author}</span>
                     <span>{entry.state}</span>
                     {'draft' in entry && entry.draft ? <span>draft</span> : null}

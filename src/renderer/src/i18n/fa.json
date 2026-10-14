@@ -431,7 +431,13 @@
     "auditVerifying": "در حال بررسی…",
     "auditOk": "زنجیرهٔ حسابرسی سالم است ({{count}} خط).",
     "auditBroken": "دست‌کاری در خط {{line}} شناسایی شد: {{reason}}",
-    "auditError": "بررسی فایل حسابرسی ممکن نشد."
+    "auditError": "بررسی فایل حسابرسی ممکن نشد.",
+    "theme": "پوسته",
+    "themeLight": "روشن",
+    "themeDark": "تیره",
+    "themeSystem": "سیستم",
+    "themeHint": "پوستهٔ روز، پوستهٔ تیره، یا پیروی از تنظیم سیستم.",
+    "themeApplied": "پوسته: {{theme}}"
   },
   "toast": {
     "dismiss": "بستن",

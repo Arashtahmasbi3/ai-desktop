@@ -30,14 +30,14 @@ export default function StatusCard(): JSX.Element {
       data-testid="run-status"
       className="flex shrink-0 items-center gap-3 rounded-xl border border-border bg-bg-secondary px-3 py-2"
     >
-      <span className="flex shrink-0 items-center gap-1.5 text-3xs font-semibold uppercase tracking-wide text-neutral-500">
-        <Activity className={`h-3.5 w-3.5 ${running ? 'text-accent' : 'text-neutral-500'}`} />
+      <span className="flex shrink-0 items-center gap-1.5 text-3xs font-semibold uppercase tracking-wide text-fg-muted">
+        <Activity className={`h-3.5 w-3.5 ${running ? 'text-accent' : 'text-fg-muted'}`} />
         {t('chat.statusLabel')}
       </span>
-      <span className="shrink-0 rounded bg-bg-tertiary px-1.5 py-0.5 text-3xs font-medium text-neutral-300">
+      <span className="shrink-0 rounded bg-bg-tertiary px-1.5 py-0.5 text-3xs font-medium text-fg">
         {phaseLabel}
       </span>
-      <span className="min-w-0 flex-1 truncate text-2xs text-neutral-500" title={decisionLabel}>
+      <span className="min-w-0 flex-1 truncate text-2xs text-fg-muted" title={decisionLabel}>
         {decisionLabel}
       </span>
     </div>

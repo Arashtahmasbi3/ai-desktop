@@ -44,23 +44,23 @@ export default function SettingsAudit(): JSX.Element {
 
   return (
     <section className="flex flex-col gap-3">
-      <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
+      <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
         <ScrollText className="h-3.5 w-3.5" />
         {t('settings.audit')}
       </h3>
-      <p className="text-2xs text-neutral-500">{t('settings.auditHint')}</p>
+      <p className="text-2xs text-fg-muted">{t('settings.auditHint')}</p>
 
       <div className="rounded-xl border border-border bg-bg-primary p-3">
-        <div className="flex items-center gap-1.5 text-2xs text-neutral-500">
+        <div className="flex items-center gap-1.5 text-2xs text-fg-muted">
           <FileCheck2 className="h-3.5 w-3.5" />
           {t('settings.auditPath')}
         </div>
         {path ? (
-          <code className="mt-1 block break-all text-2xs text-neutral-300" dir="ltr">
+          <code className="mt-1 block break-all text-2xs text-fg" dir="ltr">
             {path}
           </code>
         ) : (
-          <p className="mt-1 text-2xs text-neutral-500">{t('settings.auditNoProject')}</p>
+          <p className="mt-1 text-2xs text-fg-muted">{t('settings.auditNoProject')}</p>
         )}
       </div>
 
@@ -68,22 +68,22 @@ export default function SettingsAudit(): JSX.Element {
         type="button"
         onClick={() => void verify()}
         disabled={verifying || !path}
-        className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-border bg-bg-tertiary px-3 py-1.5 text-xs text-neutral-200 hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-border bg-bg-tertiary px-3 py-1.5 text-xs text-fg hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
       >
         <ShieldCheck className="h-3.5 w-3.5" />
         {verifying ? t('settings.auditVerifying') : t('settings.auditVerify')}
       </button>
 
-      {failed ? <p className="text-2xs text-amber-400">{t('settings.auditError')}</p> : null}
+      {failed ? <p className="text-2xs text-warning">{t('settings.auditError')}</p> : null}
 
       {result ? (
         result.ok ? (
-          <p className="flex items-center gap-1.5 text-2xs text-emerald-400">
+          <p className="flex items-center gap-1.5 text-2xs text-success">
             <ShieldCheck className="h-3.5 w-3.5" />
             {t('settings.auditOk', { count: result.lines })}
           </p>
         ) : (
-          <p className="flex items-center gap-1.5 text-2xs text-red-400">
+          <p className="flex items-center gap-1.5 text-2xs text-danger">
             <ShieldAlert className="h-3.5 w-3.5" />
             {t('settings.auditBroken', {
               line: (result.brokenAt ?? 0) + 1,

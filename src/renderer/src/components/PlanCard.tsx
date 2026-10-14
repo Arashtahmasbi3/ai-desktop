@@ -71,15 +71,15 @@ export default function PlanCard(): JSX.Element | null {
     >
       <header className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3">
         <ClipboardList className="h-4 w-4 shrink-0 text-accent" />
-        <h3 className="text-sm font-semibold text-neutral-100">{t('plan.title')}</h3>
-        <span className="rounded bg-bg-tertiary px-1.5 py-0.5 text-3xs text-neutral-400">
+        <h3 className="text-sm font-semibold text-fg-strong">{t('plan.title')}</h3>
+        <span className="rounded bg-bg-tertiary px-1.5 py-0.5 text-3xs text-fg-muted">
           {t('plan.stepsCount', { count: drafts.length })}
         </span>
-        <span className="hidden text-2xs text-neutral-500 sm:inline">{t('plan.subtitle')}</span>
+        <span className="hidden text-2xs text-fg-muted sm:inline">{t('plan.subtitle')}</span>
         <button
           type="button"
           onClick={() => respondPlan({ type: 'cancel' })}
-          className="ml-auto shrink-0 rounded p-1 text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-200"
+          className="ml-auto shrink-0 rounded p-1 text-fg-muted hover:bg-bg-tertiary hover:text-fg"
           aria-label={t('plan.cancel')}
         >
           <X className="h-4 w-4" />
@@ -92,7 +92,7 @@ export default function PlanCard(): JSX.Element | null {
               {pending.warnings.map((warning) => (
                 <li
                   key={warning.code}
-                  className="flex items-center gap-1.5 text-2xs text-amber-400"
+                  className="flex items-center gap-1.5 text-2xs text-warning"
                 >
                   <AlertTriangle className="h-3.5 w-3.5" />
                   {t(warningKey(warning.code), { count: drafts.length })}
@@ -102,7 +102,7 @@ export default function PlanCard(): JSX.Element | null {
           ) : null}
 
           {editing ? (
-            <p className="mb-2 text-2xs text-neutral-500">{t('plan.editHint')}</p>
+            <p className="mb-2 text-2xs text-fg-muted">{t('plan.editHint')}</p>
           ) : null}
 
           <ol className="space-y-2">
@@ -115,15 +115,15 @@ export default function PlanCard(): JSX.Element | null {
                   className="rounded-lg border border-border bg-bg-tertiary px-3 py-2"
                 >
                   <div className="flex items-baseline gap-2">
-                    <span className="text-xs font-semibold text-neutral-500">{index + 1}.</span>
-                    <span className="text-xs text-neutral-200">{step.title}</span>
+                    <span className="text-xs font-semibold text-fg-muted">{index + 1}.</span>
+                    <span className="text-xs text-fg">{step.title}</span>
                     <code className="ml-auto rounded bg-black/30 px-1.5 py-0.5 font-mono text-3xs text-accent">
                       {step.tool}
                     </code>
                   </div>
                   {editing && key ? (
                     <div className="mt-2">
-                      <label className="mb-0.5 block text-3xs text-neutral-500">
+                      <label className="mb-0.5 block text-3xs text-fg-muted">
                         {t('plan.command')}
                       </label>
                       <textarea
@@ -131,14 +131,14 @@ export default function PlanCard(): JSX.Element | null {
                         value={String(step.arguments[key] ?? '')}
                         onChange={(event) => updateStep(index, key, event.target.value)}
                         rows={2}
-                        className="w-full resize-y rounded border border-border bg-bg-secondary px-2 py-1 font-mono text-2xs text-neutral-200 outline-none focus:border-accent"
+                        className="w-full resize-y rounded border border-border bg-bg-secondary px-2 py-1 font-mono text-2xs text-fg outline-none focus:border-accent"
                       />
                     </div>
                   ) : key ? (
                     <pre
                       dir="ltr"
                       data-testid="plan-step-command"
-                      className="mt-2 overflow-x-auto break-all rounded bg-bg-secondary/70 px-2 py-1 font-mono text-2xs whitespace-pre-wrap text-neutral-300"
+                      className="mt-2 overflow-x-auto break-all rounded bg-bg-secondary/70 px-2 py-1 font-mono text-2xs whitespace-pre-wrap text-fg"
                     >
                       {String(step.arguments[key] ?? '')}
                     </pre>
@@ -153,7 +153,7 @@ export default function PlanCard(): JSX.Element | null {
           data-testid="plan-footer"
           className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-3"
         >
-          <label className="flex cursor-pointer items-center gap-2 text-2xs text-neutral-400">
+          <label className="flex cursor-pointer items-center gap-2 text-2xs text-fg-muted">
             <input
               type="checkbox"
               checked={trust}
@@ -169,14 +169,14 @@ export default function PlanCard(): JSX.Element | null {
             <button
               type="button"
               onClick={() => respondPlan({ type: 'cancel' })}
-              className="whitespace-nowrap rounded-md px-3 py-1.5 text-xs text-neutral-400 hover:bg-bg-tertiary hover:text-neutral-200"
+              className="whitespace-nowrap rounded-md px-3 py-1.5 text-xs text-fg-muted hover:bg-bg-tertiary hover:text-fg"
             >
               {t('plan.cancel')}
             </button>
             <button
               type="button"
               onClick={() => setEditing((value) => !value)}
-              className="flex items-center gap-1.5 whitespace-nowrap rounded-md border border-border px-3 py-1.5 text-xs text-neutral-300 hover:bg-bg-tertiary"
+              className="flex items-center gap-1.5 whitespace-nowrap rounded-md border border-border px-3 py-1.5 text-xs text-fg hover:bg-bg-tertiary"
             >
               <Pencil className="h-3.5 w-3.5" />
               {t('plan.modify')}
@@ -184,7 +184,7 @@ export default function PlanCard(): JSX.Element | null {
             <button
               type="button"
               onClick={approve}
-              className="flex items-center gap-1.5 whitespace-nowrap rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white hover:brightness-110"
+              className="flex items-center gap-1.5 whitespace-nowrap rounded-md bg-accent-solid px-3 py-1.5 text-xs font-medium text-white hover:brightness-110"
             >
               <Play className="h-3.5 w-3.5" />
               {editing ? t('plan.applyEdit') : t('plan.approve')}

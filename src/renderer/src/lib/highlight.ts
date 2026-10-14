@@ -144,23 +144,28 @@ export function tokenize(line: string, language = 'plain'): Token[] {
   return tokens
 }
 
+/**
+ * Token colours (v2.7.0). These are semantic tokens, not Tailwind palette values:
+ * a fixed `text-success` is tuned for a near-black background and becomes
+ * unreadable on the light theme's white surface.
+ */
 export function tokenClassName(type: TokenType): string {
   switch (type) {
     case 'comment':
-      return 'text-neutral-500 italic'
+      return 'text-fg-subtle italic'
     case 'string':
-      return 'text-emerald-400'
+      return 'text-success'
     case 'number':
-      return 'text-amber-400'
+      return 'text-warning'
     case 'keyword':
-      return 'text-violet-400'
+      return 'text-accent'
     case 'tag':
-      return 'text-sky-400'
+      return 'text-info'
     case 'attr':
-      return 'text-cyan-400'
+      return 'text-info'
     case 'punct':
-      return 'text-neutral-400'
+      return 'text-fg-muted'
     default:
-      return 'text-neutral-200'
+      return 'text-fg'
   }
 }

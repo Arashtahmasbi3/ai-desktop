@@ -29,7 +29,7 @@ export default function VpsSelector(): JSX.Element {
     <div className="flex items-center gap-1">
       <Server
         className={`h-3 w-3 ${
-          indicator === 'connected' ? 'text-emerald-400' : 'text-neutral-500'
+          indicator === 'connected' ? 'text-success' : 'text-fg-muted'
         }`}
       />
       <select
@@ -38,7 +38,7 @@ export default function VpsSelector(): JSX.Element {
         disabled={running}
         title={t('vpsSelector.label')}
         aria-label={t('vpsSelector.label')}
-        className="max-w-[10rem] rounded border border-border bg-bg-secondary px-1.5 py-0.5 text-2xs text-neutral-300 outline-none focus:border-accent/50 disabled:opacity-50"
+        className="max-w-[10rem] rounded border border-border bg-bg-secondary px-1.5 py-0.5 text-2xs text-fg outline-none focus:border-accent/50 disabled:opacity-50"
       >
         <option value="">{t('vpsSelector.none')}</option>
         {servers.map((server) => (
@@ -50,7 +50,7 @@ export default function VpsSelector(): JSX.Element {
       </select>
       {vpsServerId && indicator !== 'connected' ? (
         <span
-          className="flex items-center gap-0.5 text-3xs text-amber-400"
+          className="flex items-center gap-0.5 text-3xs text-warning"
           title={t('vpsSelector.disconnected')}
         >
           <PlugZap className="h-3 w-3" />

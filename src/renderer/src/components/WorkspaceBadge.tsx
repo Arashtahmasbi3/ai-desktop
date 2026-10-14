@@ -48,17 +48,17 @@ export default function WorkspaceBadge(): JSX.Element | null {
   const isGit = Boolean(info?.isGitRepo)
   return (
     <span
-      className="flex items-center gap-1 rounded px-1.5 py-0.5 text-neutral-400"
+      className="flex items-center gap-1 rounded px-1.5 py-0.5 text-fg-muted"
       title={formatWorkspaceTooltip(info)}
     >
       {isGit ? (
-        <GitBranch className="h-3 w-3 text-emerald-400" />
+        <GitBranch className="h-3 w-3 text-success" />
       ) : (
-        <FolderTree className="h-3 w-3 text-neutral-500" />
+        <FolderTree className="h-3 w-3 text-fg-muted" />
       )}
       <span className="max-w-[10rem] truncate">{formatWorkspaceBadge(info)}</span>
       {isGit && info?.gitDirty ? (
-        <span className="h-1.5 w-1.5 rounded-full bg-amber-400" title="Uncommitted changes" />
+        <span className="h-1.5 w-1.5 rounded-full bg-warning" title="Uncommitted changes" />
       ) : null}
     </span>
   )

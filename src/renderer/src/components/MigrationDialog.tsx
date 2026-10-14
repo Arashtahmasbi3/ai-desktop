@@ -94,33 +94,33 @@ export default function MigrationDialog(): JSX.Element | null {
       <div className="max-h-[calc(100vh-2rem)] w-full max-w-xl overflow-y-auto rounded-xl border border-border bg-bg-secondary p-5 shadow-2xl">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-400" />
-            <h2 className="text-sm font-semibold text-neutral-100">{t('migration.title')}</h2>
+            <AlertTriangle className="h-4 w-4 text-warning" />
+            <h2 className="text-sm font-semibold text-fg-strong">{t('migration.title')}</h2>
           </div>
           <button
             type="button"
             onClick={close}
             aria-label={t('common.close')}
-            className="rounded p-1 text-neutral-500 hover:bg-bg-tertiary hover:text-neutral-300"
+            className="rounded p-1 text-fg-muted hover:bg-bg-tertiary hover:text-fg"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
-        <p className="mt-2 text-xs text-neutral-400">{t('migration.body')}</p>
+        <p className="mt-2 text-xs text-fg-muted">{t('migration.body')}</p>
 
         <ul className="mt-3 flex max-h-80 flex-col gap-2 overflow-y-auto">
           {missing.map((project) => (
             <li key={project.id} className="rounded-lg border border-border bg-bg-primary p-2.5">
               <div className="flex items-center gap-2">
-                <FolderSearch className="h-3.5 w-3.5 shrink-0 text-amber-400" />
+                <FolderSearch className="h-3.5 w-3.5 shrink-0 text-warning" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs text-neutral-200">{project.name}</p>
-                  <p className="truncate font-mono text-3xs text-neutral-500" dir="ltr">
+                  <p className="truncate text-xs text-fg">{project.name}</p>
+                  <p className="truncate font-mono text-3xs text-fg-muted" dir="ltr">
                     {project.path}
                   </p>
                 </div>
                 {project.osMismatch ? (
-                  <span className="shrink-0 rounded border border-amber-500/40 px-1.5 py-0.5 text-4xs text-amber-300">
+                  <span className="shrink-0 rounded border border-warning/40 px-1.5 py-0.5 text-4xs text-warning">
                     {t('migration.osMismatch')}
                   </span>
                 ) : null}
@@ -130,7 +130,7 @@ export default function MigrationDialog(): JSX.Element | null {
                   type="button"
                   onClick={() => void locate(project.id)}
                   disabled={busy === project.id}
-                  className="flex items-center gap-1 rounded border border-border px-2 py-1 text-3xs text-neutral-300 hover:bg-bg-tertiary disabled:opacity-40"
+                  className="flex items-center gap-1 rounded border border-border px-2 py-1 text-3xs text-fg hover:bg-bg-tertiary disabled:opacity-40"
                 >
                   <MapPin className="h-3 w-3" />
                   {t('migration.locate')}
@@ -140,7 +140,7 @@ export default function MigrationDialog(): JSX.Element | null {
                   onChange={(event) =>
                     setChoice((current) => ({ ...current, [project.id]: event.target.value }))
                   }
-                  className="rounded border border-border bg-bg-secondary px-1.5 py-1 text-3xs text-neutral-300"
+                  className="rounded border border-border bg-bg-secondary px-1.5 py-1 text-3xs text-fg"
                 >
                   {servers.length === 0 ? <option value="">{t('vps.noServers')}</option> : null}
                   {servers.map((server) => (
@@ -153,7 +153,7 @@ export default function MigrationDialog(): JSX.Element | null {
                   type="button"
                   onClick={() => void connectToVps(project.id, project.name, project.path)}
                   disabled={busy === project.id || servers.length === 0}
-                  className="flex items-center gap-1 rounded border border-sky-500/40 px-2 py-1 text-3xs text-sky-300 hover:bg-sky-500/10 disabled:opacity-40"
+                  className="flex items-center gap-1 rounded border border-info/40 px-2 py-1 text-3xs text-info hover:bg-info/10 disabled:opacity-40"
                 >
                   <Server className="h-3 w-3" />
                   {t('migration.connectVps')}
@@ -168,7 +168,7 @@ export default function MigrationDialog(): JSX.Element | null {
                     }
                   }}
                   disabled={busy === project.id}
-                  className="flex items-center gap-1 rounded border border-border px-2 py-1 text-3xs text-red-300 hover:bg-red-500/10 disabled:opacity-40"
+                  className="flex items-center gap-1 rounded border border-border px-2 py-1 text-3xs text-danger hover:bg-danger/10 disabled:opacity-40"
                 >
                   <Trash2 className="h-3 w-3" />
                   {t('migration.remove')}
@@ -182,7 +182,7 @@ export default function MigrationDialog(): JSX.Element | null {
           <button
             type="button"
             onClick={close}
-            className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover"
+            className="rounded-lg bg-accent-solid px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-solid-hover"
           >
             {t('migration.later')}
           </button>
