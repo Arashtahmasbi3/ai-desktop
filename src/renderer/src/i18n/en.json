@@ -247,7 +247,8 @@
     "questionPlaceholder": "Type your answer…",
     "questionSend": "Answer",
     "questionSkip": "You decide",
-    "questionSkipHint": "Continue without an answer — the agent will use its own judgement"
+    "questionSkipHint": "Continue without an answer — the agent will use its own judgement",
+    "filesChangedTotal": "{{count}} files changed, +{{added}} −{{removed}}"
   },
   "vpsSelector": {
     "label": "VPS",

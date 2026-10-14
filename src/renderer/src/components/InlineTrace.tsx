@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Activity, AlertCircle, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react'
 import DecisionCard from './DecisionCard'
 import { useStore, type ChatMessage } from '../store'
+import { summarizeActivity } from '../lib/tool-labels'
 import type { TraceDecision } from '@shared/trace'
 
 /** Keep the inline list light; the full run is still in the Progress panel. */
@@ -35,6 +36,8 @@ export default function InlineTrace(): JSX.Element | null {
   const messages = useStore((state) => state.messages)
   const [open, setOpen] = useState(true)
   const [expanded, setExpanded] = useState(false)
+  // v2.8.0: the durable "what changed" summary for this chat, with each file's diffstat.
+  const changedFiles = useStore((state) => state.changedFiles)
 
   // U-11: `toolsFor` used to filter the entire message list once per visible
   // decision (O(steps x messages) every render). Index the tool messages by
@@ -53,6 +56,13 @@ export default function InlineTrace(): JSX.Element | null {
   }, [messages])
 
   if (decisions.length === 0) return null
+
+  // v2.8.0: the activity this run actually performed, and what it changed on disk.
+  const activity = summarizeActivity(
+    messages.filter((message) => message.role === 'tool').map((message) => message.toolCall?.name)
+  )
+  const totalAdded = changedFiles.reduce((sum, file) => sum + file.added, 0)
+  const totalRemoved = changedFiles.reduce((sum, file) => sum + file.removed, 0)
 
   const bounded = decisions.slice(-INLINE_TRACE_LIMIT)
   const visible = expanded ? bounded : bounded.slice(-INLINE_TRACE_PREVIEW)
@@ -96,6 +106,51 @@ export default function InlineTrace(): JSX.Element | null {
           {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
         </span>
       </button>
+
+      {/*
+        v2.8.0: what the run has actually done, in words, instead of a bare count of
+        steps — "Ran 3 commands, read 5 files, edited 2 files" plus the per-file
+        diffstat. Asked for as: "say which files changed and by how much".
+      */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-0.5 text-3xs text-fg-muted">
+        <span data-testid="activity-summary">
+          {activity.total === 0
+            ? t('chat.activitySummaryEmpty')
+            : t('chat.activitySummary', {
+                commands: activity.commands,
+                files: activity.reads,
+                edits: activity.edits
+              })}
+        </span>
+        {changedFiles.length > 0 ? (
+          <span data-testid="changed-files-total" className="text-fg">
+            {`· ${t('chat.filesChangedTotal', {
+              count: changedFiles.length,
+              added: totalAdded,
+              removed: totalRemoved
+            })}`}
+          </span>
+        ) : null}
+      </div>
+
+      {changedFiles.length > 0 ? (
+        <ul data-testid="changed-files" className="flex flex-col gap-0.5 px-0.5">
+          {changedFiles.map((file) => (
+            <li
+              key={file.path}
+              data-testid={`changed-file-${file.path}`}
+              className="flex items-center gap-2 text-3xs"
+            >
+              <span className="min-w-0 flex-1 truncate font-mono text-fg-muted" dir="ltr">
+                {file.path}
+              </span>
+              {/* Numbers in the semantic diff colours, readable in both themes. */}
+              <span className="shrink-0 font-mono text-success">+{file.added}</span>
+              <span className="shrink-0 font-mono text-danger">−{file.removed}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
       {open ? (
         <ul data-testid="trace-steps" className="flex flex-col gap-1">

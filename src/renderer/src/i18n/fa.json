@@ -247,7 +247,8 @@
     "questionPlaceholder": "پاسخ خود را بنویسید…",
     "questionSend": "پاسخ",
     "questionSkip": "خودت تصمیم بگیر",
-    "questionSkipHint": "بدون پاسخ ادامه بده — خودش با تشخیص خودش پیش می‌رود"
+    "questionSkipHint": "بدون پاسخ ادامه بده — خودش با تشخیص خودش پیش می‌رود",
+    "filesChangedTotal": "{{count}} فایل تغییر کرد، ‎+{{added}} −{{removed}}"
   },
   "vpsSelector": {
     "label": "VPS",

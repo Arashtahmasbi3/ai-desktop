@@ -30,6 +30,7 @@ import {
   storeTheme,
   type ThemePreference
 } from './lib/theme'
+import { diffStat } from './lib/diff-stat'
 import { VPS_RECONNECT_KEY } from './lib/vps-state'
 import {
   isConversationActive,
@@ -303,6 +304,15 @@ function basename(path: string): string {
   return path.split(/[\\/]/).filter(Boolean).pop() ?? path
 }
 
+/** v2.8.0: one row of the "what changed" summary, keyed by path. */
+export interface ChangedFile {
+  path: string
+  added: number
+  removed: number
+  /** How many times the agent wrote this path in this chat. */
+  edits: number
+}
+
 interface AppState {
   ready: boolean
   settings: SettingsView | null
@@ -422,6 +432,8 @@ interface AppState {
   queuedExplain: string | null
   /** Agent file edits awaiting the user's apply/reject decision. */
   fileChanges: FileChangeView[]
+  /** v2.8.0: every file the agent changed in this chat, with its diffstat. */
+  changedFiles: ChangedFile[]
   /** Transient toast notifications. */
   toasts: Toast[]
   /** Whether the file tree is shown next to the chat. */
@@ -640,6 +652,8 @@ function projectScopedReset(): Partial<AppState> {
     saving: false,
     projectMissing: false,
     fileChanges: [],
+    // v2.8.0: the "what changed" summary is project-scoped, like the diffs it describes.
+    changedFiles: [],
     memory: null,
     taskPlan: null,
     taskPlans: {},
@@ -659,7 +673,9 @@ function chatScopedReset(): Partial<AppState> {
     warnings: [],
     preflightNotice: null,
     loopStop: null,
-    memory: null
+    memory: null,
+    // v2.8.0: "what changed" belongs to the chat that saw the change.
+    changedFiles: []
   }
 }
 
@@ -741,6 +757,8 @@ export const useStore = create<AppState>((set, get) => ({
   approvalSuggestion: null,
   queuedExplain: null,
   fileChanges: [],
+  // v2.8.0: every file the agent changed in this chat, with its diffstat.
+  changedFiles: [],
   toasts: [],
   chatTreeOpen: readChatTreeOpen(),
   workspacePanelOpen: true,
@@ -1376,9 +1394,24 @@ export const useStore = create<AppState>((set, get) => ({
           `You approved ${event.tool} ${event.count} times. Remember it to skip prompts?`
         )
         break
-      case 'file:change':
-        set({ fileChanges: [...get().fileChanges, event.change] })
+      case 'file:change': {
+        // Durable record: `fileChanges` itself is emptied when the change is
+        // applied or rejected, so the answer to "what did it change?" would be
+        // gone by the time the user looks.
+        const stats = diffStat(event.change.before, event.change.after)
+        const known = get().changedFiles.find((entry) => entry.path === event.change.path)
+        set({
+          changedFiles: known
+            ? get().changedFiles.map((entry) =>
+                entry.path === event.change.path
+                  ? { ...entry, added: stats.added, removed: stats.removed, edits: entry.edits + 1 }
+                  : entry
+              )
+            : [...get().changedFiles, { path: event.change.path, ...stats, edits: 1 }],
+          fileChanges: [...get().fileChanges, event.change]
+        })
         break
+      }
       case 'file:change:resolved':
         set({ fileChanges: get().fileChanges.filter((change) => change.id !== event.id) })
         break
