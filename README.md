@@ -3,13 +3,18 @@
 An Electron desktop AI assistant — a local, Codex-like companion that connects to the
 DeepSeek API, VPS servers (SSH), GitHub (Git), and your local files.
 
-> Status: **v2.6.5 (in development; latest release v2.6.4)**. A Codex-like agent workspace:
+> Status: **v2.7.0 (latest release)**. A Codex-like agent workspace:
 > provider-agnostic LLM
 > adapters (OpenAI/Anthropic/DeepSeek/Google), the `SandboxManager` code-execution layer, the
 > `AgentOrchestrator` Planning → Execution → Observation → Reflection loop, token-budgeted
 > context/session state, and the full renderer UI (chat, tasks/logs, workspace explorer + code
 > viewer with diff, internal browser, GitHub, VPS/SSH remote, status bar), plus a
 > background worker queue, a localhost remote-access server and Windows packaging.
+>
+> **Theme:** the UI ships a light ("day") theme as the default, the original dark theme, and a
+> `system` option that follows the OS — choose it from the titlebar or Settings → General.
+> Every colour is a semantic CSS-variable token, so both themes stay readable; a contract test
+> recomputes the WCAG contrast of each palette and fails the build below 4.5:1.
 >
 > **Install note:** `npm install` alone may leave Electron without its binary on npm versions
 > that block dependency install scripts. If `node_modules/electron/path.txt` is missing, run
@@ -39,15 +44,15 @@ DeepSeek API, VPS servers (SSH), GitHub (Git), and your local files.
 
 ## Install (Windows)
 
-> **v2.0.0 is a pre-release and the build is unsigned** — expect a SmartScreen warning; see
-> [`KNOWN_ISSUES_v2.0.0.md`](./KNOWN_ISSUES_v2.0.0.md) and
-> [`TESTING_GUIDE_v2.0.0.md`](./TESTING_GUIDE_v2.0.0.md).
+> **The build is unsigned** — expect a SmartScreen warning on first run
+> ("More info" → "Run anyway"). Signing needs a code-signing certificate.
 
-Download `AI Desktop Setup 2.0.0.exe` from the
-[Releases](https://github.com/Arashtahmasbi3/ai-desktop/releases) page and run it. The
-installer is per-user, lets you choose the install directory, and creates desktop and
-start-menu shortcuts. A standalone `AI Desktop 2.0.0 Portable.exe` is also published — no
-installation required.
+Download `AI Desktop Setup <version>.exe` from the
+[latest release](https://github.com/Arashtahmasbi3/ai-desktop/releases/latest) and run it. The
+installer is per-user, lets you choose the install directory, upgrades an existing install in
+place, and creates desktop and start-menu shortcuts. A standalone
+`AI Desktop <version> Portable.exe` is published alongside it — no installation required.
+`SHA256SUMS.txt` on the same page covers both, and the release notes carry the hashes.
 
 On first launch, open **Settings** and add a DeepSeek (or OpenAI/Anthropic/Google) API key;
 keys are encrypted with the OS keystore and stored locally.
@@ -109,7 +114,7 @@ src/
   preload/    contextBridge bridge (window.api)
   shared/     provider-agnostic LLM + sandbox + agent types
   core/       LLM adapters + sandbox module + agent orchestrator & context/state
-  renderer/   React UI (Vazirmatn, RTL, dark theme)
+  renderer/   React UI (Vazirmatn, RTL, light + dark themes)
 test/         Vitest tests
 ```
 
