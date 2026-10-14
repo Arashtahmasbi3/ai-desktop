@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.7.0] — 2026-10-14
+
+### Added — UI & theme
+
+- **Light ("day") theme as the default**, with the original dark palette and a
+  `system` option that follows the OS. Chosen from a labelled menu in the titlebar
+  or a labelled radio group in Settings — never an icon that silently cycles.
+- **Semantic colour tokens.** Every colour is a CSS variable behind Tailwind, so one
+  set of class names renders correctly in both themes; 82 files moved off theme-blind
+  palette utilities (`text-neutral-500`, `bg-red-500/10`, ...), which are fixed hex
+  values and therefore only ever right in one theme.
+- A `theme-tokens` contract test that fails the build if a theme-blind utility
+  reappears, and recomputes the WCAG contrast of both palettes (text ≥ 4.5:1 on every
+  surface, status colours ≥ 4.5:1, accent label ≥ 4.5:1, accent fill ≥ 3:1).
+- A `theme-controls` component test that drives the titlebar menu and asserts the
+  preference is persisted and painted onto `<html>`.
+
 ### Security
 
 - **The renderer sandbox is on.** `sandbox: false` ran the process that renders model output
@@ -43,6 +60,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The theme option labels were raw i18n keys** (`settings.themelight`) instead of
+  "Light" / "Dark" / "System" — caught by the new `theme-controls` test.
+- **Contrast:** light `fg-subtle` metadata was 3.25:1 and the dark accent was 4.24:1 on
+  `bg-secondary`; the palettes and the accent fill token were retuned to clear 4.5:1.
 - **The Windows local sandbox could not run a single agent command.** It used `cmd.exe`, which
   knows none of the POSIX tools the agent writes, so every command "succeeded" with empty
   output. It now prefers Git for Windows' `bash.exe` and reports the `cmd` dialect when there
@@ -70,7 +91,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`normalizeProjectPath` keeps POSIX paths POSIX**, and the sandbox resolves against the path
   dialect of its root, so `/tmp/x` is no longer rewritten as `C:\tmp\x` on Windows.
 
-### Added
+### Added — audit fixes
 
 - CI (`.github/workflows/ci.yml`) running `typecheck`, `test` and `build` on **both**
   ubuntu-latest and windows-latest; the repository had no CI at all.
@@ -854,6 +875,7 @@ First stable release. Ships as a Windows x64 NSIS installer and a portable execu
 - Optional code signing via `CSC_LINK` / `CSC_KEY_PASSWORD` (skipped safely when absent).
 
 [Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.6.4...HEAD
+[2.7.0]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.6.4...v2.7.0
 [2.6.4]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.6.3...v2.6.4
 [2.6.3]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.6.2...v2.6.3
 [2.6.2]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.6.1...v2.6.2
