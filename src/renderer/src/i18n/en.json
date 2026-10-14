@@ -240,7 +240,10 @@
     "toolAttempts": "{{count}} attempts",
     "toolRecovered": "Recovered after {{count}} attempts",
     "toolRetryFailed": "Failed after {{count}} attempts",
-    "toolNoRetry": "No automatic retry"
+    "toolNoRetry": "No automatic retry",
+    "liveStarting": "Starting {{tool}}…",
+    "activitySummary": "Ran {{commands}} commands, read {{files}} files, edited {{edits}} files",
+    "activitySummaryEmpty": "No tool activity yet"
   },
   "vpsSelector": {
     "label": "VPS",
@@ -785,5 +788,30 @@
     "upOneLevel": "Up one level",
     "filter": "Filter files…",
     "empty": "Empty folder."
+  },
+  "tools": {
+    "runCommand": "a command",
+    "remoteShell": "a command on the server",
+    "readFile": "a file",
+    "remoteReadFile": "a file on the server",
+    "listDir": "a folder",
+    "remoteListDir": "a folder on the server",
+    "writeFile": "a file",
+    "remoteWriteFile": "a file on the server",
+    "remoteExists": "the server",
+    "remoteGrep": "the code on the server",
+    "searchCode": "the codebase",
+    "getServiceLogs": "the service logs",
+    "getProcessList": "the running processes",
+    "migrateProject": "a project transfer",
+    "migrateDatabase": "a database transfer",
+    "migrateDocker": "a container transfer",
+    "scaffoldProject": "a new project",
+    "dbMigrate": "a database migration",
+    "worktreeCreate": "a git worktree",
+    "projectUserCreate": "a project user",
+    "getSystemHealth": "the server health",
+    "askUser": "your answer",
+    "unknown": "{{tool}}"
   }
 }

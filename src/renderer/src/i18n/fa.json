@@ -240,7 +240,10 @@
     "toolAttempts": "{{count}} تلاش",
     "toolRecovered": "پس از {{count}} تلاش موفق شد",
     "toolRetryFailed": "پس از {{count}} تلاش ناموفق ماند",
-    "toolNoRetry": "تلاش مجدد خودکار انجام نشد"
+    "toolNoRetry": "تلاش مجدد خودکار انجام نشد",
+    "liveStarting": "شروع {{tool}}…",
+    "activitySummary": "{{commands}} دستور اجرا شد، {{files}} فایل خوانده شد، {{edits}} فایل تغییر کرد",
+    "activitySummaryEmpty": "هنوز فعالیتی ثبت نشده"
   },
   "vpsSelector": {
     "label": "VPS",
@@ -785,5 +788,30 @@
     "upOneLevel": "یک سطح بالاتر",
     "filter": "فیلتر فایل‌ها…",
     "empty": "پوشهٔ خالی."
+  },
+  "tools": {
+    "runCommand": "یک دستور",
+    "remoteShell": "یک دستور روی سرور",
+    "readFile": "یک فایل",
+    "remoteReadFile": "یک فایل روی سرور",
+    "listDir": "یک پوشه",
+    "remoteListDir": "یک پوشه روی سرور",
+    "writeFile": "یک فایل",
+    "remoteWriteFile": "یک فایل روی سرور",
+    "remoteExists": "سرور",
+    "remoteGrep": "کد روی سرور",
+    "searchCode": "کدبیس",
+    "getServiceLogs": "لاگ سرویس",
+    "getProcessList": "پروسه‌های در حال اجرا",
+    "migrateProject": "انتقال پروژه",
+    "migrateDatabase": "انتقال دیتابیس",
+    "migrateDocker": "انتقال کانتینر",
+    "scaffoldProject": "پروژهٔ جدید",
+    "dbMigrate": "مهاجرت دیتابیس",
+    "worktreeCreate": "ورک‌تری گیت",
+    "projectUserCreate": "کاربر پروژه",
+    "getSystemHealth": "سلامت سرور",
+    "askUser": "پاسخ شما",
+    "unknown": "{{tool}}"
   }
 }

@@ -76,9 +76,11 @@ describe('LiveStatus', () => {
   })
 
   it.each([
-    ['read_file', 'Reading read_file'],
-    ['remote_read_file', 'Reading remote_read_file'],
-    ['list_dir', 'Reading list_dir']
+    // v2.8.0: the tool is named in words. The raw name was the user's complaint —
+    // every server command rendered as "Running remote_shell…".
+    ['read_file', 'Reading a file'],
+    ['remote_read_file', 'Reading a file on the server'],
+    ['list_dir', 'Reading a folder']
   ])('5. an inspecting step names a read tool: %s', (tool, label) => {
     useStore.setState({
       decisions: [decision('inspecting')],
@@ -112,12 +114,12 @@ describe('LiveStatus', () => {
       running: true
     })
     const { unmount } = render(<LiveStatus />)
-    expect(screen.getByTestId('live-status').textContent).toContain('Writing write_file')
+    expect(screen.getByTestId('live-status').textContent).toContain('Writing a file')
     unmount()
 
     useStore.setState({ messages: [toolMessage(3, 'run_command')] })
     render(<LiveStatus />)
-    expect(screen.getByTestId('live-status').textContent).toContain('Running run_command')
+    expect(screen.getByTestId('live-status').textContent).toContain('Running a command')
   })
 
   it('9. ignores a matching tool from a different step', () => {
