@@ -17,7 +17,9 @@ beforeAll(async () => {
 
 beforeEach(() => {
   localStorage.clear()
-  useStore.setState({ showContextBeforeSend: true })
+  // v2.8.0: the preview is off unless the user asks for it, so the store default
+  // is now false and each scenario opts in explicitly.
+  useStore.setState({ showContextBeforeSend: readShowContextBeforeSend() })
 })
 
 afterEach(cleanup)
@@ -54,21 +56,31 @@ describe('Task 1.1 - show context preview before send', () => {
   })
 
   it('3. changing it in Settings applies immediately to the store', () => {
-    expect(useStore.getState().showContextBeforeSend).toBe(true)
-    useStore.getState().setShowContextBeforeSend(false)
+    // Off out of the box: sending a message must not open a cost dialog.
     expect(useStore.getState().showContextBeforeSend).toBe(false)
     useStore.getState().setShowContextBeforeSend(true)
     expect(useStore.getState().showContextBeforeSend).toBe(true)
+    useStore.getState().setShowContextBeforeSend(false)
+    expect(useStore.getState().showContextBeforeSend).toBe(false)
   })
 
   it('4. the choice survives a restart (persisted then re-read)', () => {
-    useStore.getState().setShowContextBeforeSend(false)
-    expect(localStorage.getItem(CONTEXT_SETTINGS_KEY)).toBe('0')
-    // A fresh app start reads the same key back from localStorage.
-    expect(readShowContextBeforeSend()).toBe(false)
-
     useStore.getState().setShowContextBeforeSend(true)
     expect(localStorage.getItem(CONTEXT_SETTINGS_KEY)).toBe('1')
+    // A fresh app start reads the same key back from localStorage.
     expect(readShowContextBeforeSend()).toBe(true)
+
+    useStore.getState().setShowContextBeforeSend(false)
+    expect(localStorage.getItem(CONTEXT_SETTINGS_KEY)).toBe('0')
+    expect(readShowContextBeforeSend()).toBe(false)
+  })
+
+  it('5. nothing stored means no preview (the pre-v2.8 behaviour was the opposite)', () => {
+    expect(localStorage.getItem(CONTEXT_SETTINGS_KEY)).toBeNull()
+    expect(readShowContextBeforeSend()).toBe(false)
+    expect(decideSend('hello', [], readShowContextBeforeSend())).toEqual({
+      body: 'hello',
+      preview: false
+    })
   })
 })

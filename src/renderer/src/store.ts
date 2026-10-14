@@ -187,12 +187,19 @@ function newId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `id-${Math.random().toString(36).slice(2)}`
 }
 
-/** Read the persisted "preview context before send" preference (default on). */
+/**
+ * Read the persisted "preview context before send" preference.
+ *
+ * v2.8.0: **off by default.** It used to be on, which put a token/cost estimate
+ * dialog in front of every single send — the user's report: "still, a token cost
+ * warning pops up whenever I send text". It is a useful *opt-in* for a large or
+ * expensive conversation, not a toll gate on every message.
+ */
 export function readShowContextBeforeSend(): boolean {
   try {
-    return globalThis.localStorage?.getItem(CONTEXT_SETTINGS_KEY) !== '0'
+    return globalThis.localStorage?.getItem(CONTEXT_SETTINGS_KEY) === '1'
   } catch {
-    return true
+    return false
   }
 }
 

@@ -264,7 +264,7 @@
     "model": "Model",
     "testConnection": "Test connection",
     "languageHint": "Interface language and text direction.",
-    "showContextBeforeSend": "Show context preview before sending",
+    "showContextBeforeSend": "Show a token & cost preview before every send (off by default)",
     "showJobsPanelAlways": "Always show the background jobs panel",
     "showRawToolRows": "Show raw tool rows (for debugging)",
     "showRawToolRowsHint": "Tool calls already shown inside the execution trace are hidden by default.",
