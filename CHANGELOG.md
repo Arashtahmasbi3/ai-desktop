@@ -60,6 +60,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The temp-file cleanup from the audit fix never actually ran.** The writer stopped
+  leaking (verified: zero new temp files on a day of launches), but the sweep that was
+  supposed to clear the existing ones was only reachable from the audit log's lazy
+  `load()` — i.e. on the first SSH command — and nine of the ten stores never swept at
+  all. A user who never connects to a server kept the residue forever; on a real install
+  that was **822 files / 361.8 MB**, still present a day after the fix shipped. The app
+  now sweeps its data directory once at startup. It is deliberately non-recursive, so a
+  project file named `*.tmp` inside `sandboxes/` is never touched, and files newer than
+  five minutes are left alone in case a write is in flight.
 - **The status bar claimed "Agent: running" next to "worker: idle".** With no worker report
   it defaulted to online — an unfounded claim — and with a live worker the two labels still
   read as a contradiction. Unknown now shows as `Agent: —`, and a live agent service reads

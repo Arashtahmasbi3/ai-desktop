@@ -126,3 +126,43 @@ export async function sweepStaleTempFiles(file: string, olderThanMs = 60_000): P
   }
   return removed
 }
+
+/**
+ * Delete `*.tmp` leftovers in one directory (v2.7.0).
+ *
+ * `sweepStaleTempFiles` is per-target and therefore only ever runs when that
+ * target is loaded. Nine stores write through `writeFileAtomic`, but only the audit
+ * log swept — and its `load()` is lazy, reached on the first SSH command. A user
+ * who never connects to a server therefore kept the 361.8 MB of leftovers from the
+ * old writer forever, and eight of the nine stores never swept at all.
+ *
+ * This is the startup form of the same cleanup: one non-recursive pass over the
+ * app's own data directory, which holds only stores (never user project files).
+ * It deliberately does **not** recurse — `sandboxes/` and `sessions/` contain
+ * generated trees, and a project file legitimately named `*.tmp` must never be
+ * deleted by housekeeping.
+ */
+export async function sweepStaleTempFilesInDir(dir: string, olderThanMs = 5 * 60_000): Promise<number> {
+  const cutoff = Date.now() - olderThanMs
+  let removed = 0
+  let entries: string[]
+  try {
+    entries = await fs.readdir(dir)
+  } catch {
+    return 0
+  }
+  for (const entry of entries) {
+    if (!entry.endsWith('.tmp')) continue
+    const target = join(dir, entry)
+    try {
+      const stats = await fs.stat(target)
+      if (!stats.isFile()) continue
+      if (stats.mtimeMs > cutoff) continue
+      await fs.unlink(target)
+      removed += 1
+    } catch {
+      // Already gone, or locked by another process on Windows: leave it for next launch.
+    }
+  }
+  return removed
+}

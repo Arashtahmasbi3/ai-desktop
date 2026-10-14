@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import {
   sweepStaleTempFiles,
+  sweepStaleTempFilesInDir,
   tempPathFor,
   writeFileAtomic
 } from '../../src/core/atomic-write'
@@ -89,5 +90,66 @@ describe('sweepStaleTempFiles', () => {
 
   it('is a no-op for a directory that does not exist', async () => {
     expect(await sweepStaleTempFiles(join(dir, 'missing', 'x.json'))).toBe(0)
+  })
+})
+
+/**
+ * v2.7.0: the per-target sweep above only runs when that store is loaded, so a
+ * user who never triggered an SSH audit kept the 361.8 MB of leftovers forever
+ * (measured on a real install: 822 files, newest from a launch the day before the
+ * fixed build). This is the startup sweep that actually clears them.
+ */
+describe('sweepStaleTempFilesInDir', () => {
+  it('removes every stale .tmp in the directory, whatever store it came from', async () => {
+    const stale = [
+      'ssh-audit.json.6580.1791918446801.tmp',
+      'settings.json.1234.1791900000000.tmp',
+      'jobs.json.99.1791800000000.tmp'
+    ]
+    for (const name of stale) {
+      await fs.writeFile(join(dir, name), 'orphan')
+      await fs.utimes(join(dir, name), new Date(0), new Date(0))
+    }
+    const removed = await sweepStaleTempFilesInDir(dir, 5 * 60_000)
+    expect(removed).toBe(3)
+    expect(await tmpFiles()).toEqual([])
+  })
+
+  it('keeps a temp file that may still be in flight', async () => {
+    const fresh = join(dir, `ssh-audit.json.1.${Date.now()}.tmp`)
+    await fs.writeFile(fresh, 'in flight')
+    expect(await sweepStaleTempFilesInDir(dir, 5 * 60_000)).toBe(0)
+    expect(await tmpFiles()).toHaveLength(1)
+  })
+
+  it('keeps real files, and never recurses into a subdirectory', async () => {
+    // A project file legitimately named *.tmp must survive housekeeping, and so
+    // must everything under a generated tree such as sandboxes/ or sessions/.
+    await fs.writeFile(join(dir, 'ssh-audit.json'), '[]')
+    const nested = join(dir, 'sandboxes', 'project')
+    await fs.mkdir(nested, { recursive: true })
+    const nestedTmp = join(nested, 'build.tmp')
+    await fs.writeFile(nestedTmp, 'a project file, not ours')
+    await fs.utimes(nestedTmp, new Date(0), new Date(0))
+
+    const removed = await sweepStaleTempFilesInDir(dir, 0)
+    expect(removed).toBe(0)
+    expect(await fs.readFile(join(dir, 'ssh-audit.json'), 'utf8')).toBe('[]')
+    expect(await fs.readFile(nestedTmp, 'utf8')).toBe('a project file, not ours')
+  })
+
+  it('skips a directory entry rather than failing on it', async () => {
+    // A *directory* named *.tmp must not be unlinked, and must not abort the sweep.
+    await fs.mkdir(join(dir, 'odd.tmp'))
+    const stale = join(dir, 'settings.json.1.1791900000000.tmp')
+    await fs.writeFile(stale, 'orphan')
+    await fs.utimes(stale, new Date(0), new Date(0))
+
+    expect(await sweepStaleTempFilesInDir(dir, 0)).toBe(1)
+    expect(await fs.readdir(dir)).toContain('odd.tmp')
+  })
+
+  it('is a no-op for a directory that does not exist', async () => {
+    expect(await sweepStaleTempFilesInDir(join(dir, 'missing'))).toBe(0)
   })
 })

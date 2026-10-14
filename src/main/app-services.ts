@@ -7,6 +7,7 @@ import type { InvestigateScope, SessionProfile } from '@shared/profile'
 import type { Persistence } from '@core/agent/persistence'
 import type { SessionStore } from '@core/agent/session-store'
 import { ApprovedCommands } from '@core/agent/approved-commands'
+import { sweepStaleTempFilesInDir } from '@core/atomic-write'
 import { RunStore } from '@core/agent/run-store'
 import { GoalStore } from '@core/agent/goal-store'
 import { classifyLocalProject } from '@shared/paths'
@@ -300,6 +301,11 @@ export class AppServices {
 
   /** Bring services up (currently: restore the active project). */
   async init(): Promise<void> {
+    // v2.7.0: clear the previous writer's orphaned temp files once per launch.
+    // The per-target sweep inside `writeFileAtomic` only fires when that store is
+    // loaded, so without this a user who never opens a VPS never gets the cleanup
+    // and keeps the leftovers from the old writer indefinitely.
+    await this.sweepOrphanedWrites()
     await this.persistence.load()
     await this.customProviders.load()
     await this.onboarding.load()
@@ -311,6 +317,19 @@ export class AppServices {
     // Re-arm the elevation TTL for a grant persisted before this launch (P0-5).
     await this.sessionProfile.init()
     this.worker.start()
+  }
+
+  /**
+   * Housekeeping for temp files orphaned by the pre-v2.6.5 writer. Best-effort:
+   * a failure here must never stop the app from starting.
+   */
+  private async sweepOrphanedWrites(): Promise<void> {
+    try {
+      const removed = await sweepStaleTempFilesInDir(this.dir)
+      if (removed > 0) this.emit('app:housekeeping', { removedTempFiles: removed })
+    } catch {
+      // Never block startup on cleanup.
+    }
   }
 
   async dispose(): Promise<void> {
