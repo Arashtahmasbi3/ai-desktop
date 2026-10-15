@@ -36,7 +36,8 @@ export const NAMED_DIAGNOSTIC_TOOLS: ToolDefinition[] = [
     parameters: {
       type: 'object',
       properties: {
-        server_id: { type: 'string', description: 'Id of a connected VPS server' },
+        server_id: { type: 'string', description:
+            'Must be the VPS selected in the chat header (diagnostics cannot target another host)' },
         service: {
           type: 'string',
           description: 'Service or process name, e.g. "nginx" or "api"'
@@ -57,7 +58,8 @@ export const NAMED_DIAGNOSTIC_TOOLS: ToolDefinition[] = [
     parameters: {
       type: 'object',
       properties: {
-        server_id: { type: 'string', description: 'Id of a connected VPS server' },
+        server_id: { type: 'string', description:
+            'Must be the VPS selected in the chat header (diagnostics cannot target another host)' },
         path: {
           type: 'string',
           description: 'Absolute directory on the remote host (default: the project root)'
@@ -70,11 +72,16 @@ export const NAMED_DIAGNOSTIC_TOOLS: ToolDefinition[] = [
   {
     name: 'get_system_health',
     description:
-      'Summarise host health on the connected VPS: kernel, uptime, memory, load average and disk. Read-only.',
+      'Summarise host health on the connected VPS: kernel, uptime, memory, load average and disk. ' +
+      'Read-only. Runs only against the VPS selected in the chat header.',
     parameters: {
       type: 'object',
       properties: {
-        server_id: { type: 'string', description: 'Id of a connected VPS server' }
+        server_id: {
+          type: 'string',
+          description:
+            'Must be the VPS selected in the chat header; another server is refused, not ignored.'
+        }
       },
       required: ['server_id'],
       additionalProperties: false
@@ -87,7 +94,8 @@ export const NAMED_DIAGNOSTIC_TOOLS: ToolDefinition[] = [
     parameters: {
       type: 'object',
       properties: {
-        server_id: { type: 'string', description: 'Id of a connected VPS server' },
+        server_id: { type: 'string', description:
+            'Must be the VPS selected in the chat header (diagnostics cannot target another host)' },
         filter: {
           type: 'string',
           description: 'Case-insensitive substring to match against the process list'
@@ -288,6 +296,34 @@ export class DiagnosticsToolExecutor implements ToolExecutor {
     }
 
     const requested = action.arguments.server_id
+    /*
+     * v3.0: a diagnostics tool ALWAYS runs against the server selected in the chat header
+     * (P0-4: a probe must never reach another host). A different `server_id` used to be
+     * accepted and silently ignored, so the tool returned one machine's data as the answer
+     * about another: a real user was told "yoserver's hostname is <spmotor's hostname>" and
+     * reasonably concluded the two were the same machine. Refusing is the honest answer —
+     * the caller asked about a host this tool deliberately will not touch.
+     */
+    if (
+      this.pinnedServerId &&
+      typeof requested === 'string' &&
+      requested.length > 0 &&
+      requested !== this.pinnedServerId
+    ) {
+      return {
+        ...base,
+        ok: false,
+        output: '',
+        error:
+          `Diagnostics always run against the server selected in the chat header (` +
+          `${this.pinnedServerId}), not ${requested}. Select ${requested} there to inspect ` +
+          'that host, or use a server-parameterised tool such as remote_shell.',
+        serverId: this.pinnedServerId,
+        code: 'invalid_arguments',
+        durationMs: Date.now() - startedAt
+      }
+    }
+
     const serverId = this.pinnedServerId ?? (typeof requested === 'string' ? requested : '')
     if (!serverId) {
       return {

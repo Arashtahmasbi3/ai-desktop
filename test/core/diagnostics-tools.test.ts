@@ -153,14 +153,51 @@ describe('DiagnosticsToolExecutor', () => {
     expect(calls[0]).toContain('uname -a')
   })
 
-  it('pins the server so a model-supplied server_id cannot redirect it', async () => {
+  it('runs on the pinned server when the model omits server_id', async () => {
+    const calls: string[] = []
+    const executor = new DiagnosticsToolExecutor(deps(calls), 'vps-1')
+    const result = await executor.execute(action('get_system_health', {}))
+    expect(result.ok).toBe(true)
+    expect(result.serverId).toBe('vps-1')
+    expect(calls).toHaveLength(1)
+  })
+
+  /*
+   * v3.0: the old contract accepted a different `server_id` and silently ignored it, so the
+   * tool returned one machine's data as the answer about another — a real user was told
+   * "yoserver's hostname is <spmotor's hostname>" and concluded the two were the same host.
+   * Refusing is the honest behaviour: the caller asked about a host this tool won't touch.
+   */
+  it('refuses a model-supplied server_id that differs from the pinned server', async () => {
     const calls: string[] = []
     const executor = new DiagnosticsToolExecutor(deps(calls), 'vps-1')
     const result = await executor.execute(
-      action('get_system_health', { server_id: 'attacker-host' })
+      action('get_system_health', { server_id: 'other-host' })
+    )
+
+    expect(result.ok).toBe(false)
+    expect(result.code).toBe('invalid_arguments')
+    // The message must name both hosts and say what to do, or the model just retries.
+    expect(result.error).toContain('vps-1')
+    expect(result.error).toContain('other-host')
+    expect(result.error).toContain('chat header')
+    // And it must not have touched either machine.
+    expect(calls).toHaveLength(0)
+  })
+
+  it('still honours the requested server when none is pinned', async () => {
+    // No pinned server (the user has not selected one): the model's choice is all we have,
+    // so it is used and validated against the connected set as before.
+    const calls: string[] = []
+    const executor = new DiagnosticsToolExecutor({
+      connectedServers: () => ['vps-1', 'vps-2'],
+      exec: execFor(calls)
+    })
+    const result = await executor.execute(
+      action('get_system_health', { server_id: 'vps-2' })
     )
     expect(result.ok).toBe(true)
-    expect(result.serverId).toBe('vps-1')
+    expect(result.serverId).toBe('vps-2')
   })
 
   it('uses the project root as the default disk target', async () => {
