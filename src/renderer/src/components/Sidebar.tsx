@@ -169,12 +169,20 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
     servers.find((server) => server.id === serverId)?.name
 
   const projectState = (project: ProjectRecord): DotState => {
-    if (project.exists === false) return 'missing'
+    /*
+     * v2.9.2: a remote project's `exists` does NOT mean "this path is on this disk" — main
+     * sets it to "its VPS is connected" (`app-services.ts`). Checking `exists` first
+     * therefore labelled every disconnected remote project as a missing LOCAL folder:
+     * amber dot, "Path not found", and a Locate button that opens a local folder picker for
+     * a path that lives on a server. `store.ts` already guards this when counting missing
+     * paths (`project.exists === false && project.type !== 'remote'`); the sidebar must too.
+     */
     if (project.type === 'remote') {
       return project.vpsId && vpsConnectedServers.includes(project.vpsId)
         ? 'connected'
         : 'disconnected'
     }
+    if (project.exists === false) return 'missing'
     return 'connected'
   }
 
