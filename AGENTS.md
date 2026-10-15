@@ -51,6 +51,16 @@ fails, a tool is missing, or the budget ran out — ask rather than guess).
 
 ## Status
 
+**v2.9.1 released — the agent now works inside your project.** A local run's sandbox workspace
+is rooted at the project folder (the user asked for this explicitly, having found that the
+agent could not read the project's files or run its tests), the project is never owned or
+deleted by the sandbox, and the file-change view is honest about writes that already landed
+(`FileChangeView.applied`, before/after taken from the write rather than from re-reading the
+file, no Reject for something already on disk). The system prompt no longer claims the user's
+files are unreachable. Trade-off accepted: local edits are no longer gated by "review, then
+Apply". Deny list, path containment and secret guard untouched, `..` still refused.
+263 test files / 2172 tests green, typecheck and production build clean. (2026-10-14)
+
 **v2.9.0 released — approvals, uploads, GitHub and the main page.** Everything from the
 second report: read-only work no longer prompts (one canonical read-only set, and shell
 wrappers are unwrapped and re-classified rather than trusted) and a scoped, expiring

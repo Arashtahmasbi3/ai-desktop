@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.9.1] — 2026-10-14
+
+### Changed — the agent works in your project
+
+- **A local run's workspace is now the project folder itself.** Every run used to get a
+  fresh, empty directory under `<userData>/sandboxes/<uuid>`, so the agent could not read
+  the project's own files, could not list it, and ran its commands in a temp folder rather
+  than the repository — it could only ever see files it wrote itself during that run. For a
+  local project whose folder exists, the sandbox is now rooted there: `read_file`,
+  `list_dir` and `run_command` (tests, builds) operate in place. Remote projects, a missing
+  folder and runs with no project are unchanged.
+- **The project is never deleted.** A caller-supplied workspace is not owned by the sandbox,
+  so the teardown that ends a run leaves your files alone. This is pinned end to end — the
+  failure mode would have been the project being deleted after every run.
+- **The change view is honest about what happened.** Writes land on disk immediately, so
+  re-reading the file for a "before" would have produced an empty diff; the before/after now
+  come from the write itself and the change is marked `applied`. The run summary still says
+  "Edited N files +A −R", the pending-changes panel no longer lists it, and no Reject button
+  is offered for something already written.
+- **The system prompt no longer claims your files are unreachable.** It says the workspace is
+  the project folder and that writes take effect immediately, while the rest of the computer
+  stays off limits.
+
+The trade-off, plainly: local edits are no longer gated by "review, then Apply" — the agent
+writes to your real files. The deny list, remote path containment and the secret-path guard
+are untouched, and `..` is still refused.
+
+**Suite: 263 files / 2172 tests green; typecheck and production build clean.**
+
+
 ## [2.9.0] — 2026-10-14
 
 ### Fixed — the second round of reported problems
@@ -1032,7 +1062,8 @@ First stable release. Ships as a Windows x64 NSIS installer and a portable execu
   `node_modules` are shipped inside the app package.
 - Optional code signing via `CSC_LINK` / `CSC_KEY_PASSWORD` (skipped safely when absent).
 
-[Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.9.0...HEAD
+[Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.9.1...HEAD
+[2.9.1]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.9.0...v2.9.1
 [2.9.0]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.7.0...v2.8.0
 [2.7.0]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.6.4...v2.7.0
