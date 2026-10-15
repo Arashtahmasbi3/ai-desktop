@@ -31,8 +31,13 @@ import {
   type UpdateManifest
 } from '@shared/update'
 
-/** Where the feed lives. Public GitHub Releases need no token; a private repo returns 404. */
-export const DEFAULT_UPDATE_REPO = 'Arashtahmasbi3/ai-desktop'
+/**
+ * Where the feed lives: a dedicated PUBLIC repository that holds only release binaries and
+ * their checksums. The application source stays private (its git history still contains
+ * infrastructure addresses that cannot be removed without invalidating every existing tag),
+ * and public Releases need no token to read — a private repository answers 404 instead.
+ */
+export const DEFAULT_UPDATE_REPO = 'Arashtahmasbi3/ai-desktop-releases'
 
 export interface UpdateProgress {
   received: number

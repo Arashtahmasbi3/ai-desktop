@@ -181,12 +181,23 @@ describe('UpdateService (v3.0)', () => {
     expect(result.latest).toBe('3.0.0')
     expect(result.current).toBe('2.9.2')
     expect(result.manifest?.notes).toBe('the notes')
-    expect(fetched[0]).toContain('api.github.com/repos/Arashtahmasbi3/ai-desktop/releases/latest')
+    // The feed is a separate public repository: the source repo stays private, so its
+    // unauthenticated Releases endpoint would answer 404 forever.
+    expect(fetched[0]).toContain(
+      'api.github.com/repos/Arashtahmasbi3/ai-desktop-releases/releases/latest'
+    )
   })
 
   it('does not offer the same or an older release', async () => {
     const { deps: d } = deps({ currentVersion: '3.0.0' })
     expect((await new UpdateService(d).check()).available).toBe(false)
+  })
+
+  it('uses the configured feed repository instead of the default', async () => {
+    const { deps: d, fetched } = deps()
+    const service = new UpdateService({ ...d, repo: 'someone/their-feed' })
+    await service.check()
+    expect(fetched[0]).toContain('api.github.com/repos/someone/their-feed/releases/latest')
   })
 
   it('explains a 404 instead of pretending there is no update', async () => {
