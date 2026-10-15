@@ -80,6 +80,10 @@ export default function InlineTrace(): JSX.Element | null {
     return toolsByStep.get(`${decision.runId}:${step}`) ?? []
   }
 
+  /*
+   * v3.0 clay — soft tier: the trace chip/container is a raised card, and everything
+   * inside it (step rows, tool chips, changed-file counts) stays flat.
+   */
   return (
     <section
       data-testid="inline-trace"
@@ -87,7 +91,7 @@ export default function InlineTrace(): JSX.Element | null {
       // inside an RTL chat. `auto` resolves per element, and the commands/tool
       // chips below keep their own explicit LTR direction.
       dir="auto"
-      className="mx-4 flex flex-col gap-1 rounded-lg border border-border bg-bg-secondary/40 p-2"
+      className="clay-card mx-4 flex flex-col gap-1 p-2"
     >
       <button
         type="button"

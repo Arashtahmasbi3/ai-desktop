@@ -60,8 +60,8 @@ export default function ToolResultCard(props: ToolCallView): JSX.Element {
 
   return (
     <div
-      className={`flex max-w-[min(52rem,88%)] flex-col overflow-hidden rounded-xl border bg-bg-secondary ${
-        ok ? 'border-border' : 'border-danger/40'
+      className={`clay-card flex max-w-[min(52rem,88%)] flex-col overflow-hidden ${
+        ok ? '' : 'border border-danger/40'
       }`}
       dir="ltr"
     >

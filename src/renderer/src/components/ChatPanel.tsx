@@ -367,7 +367,9 @@ export default function ChatPanel(): JSX.Element {
 
         {messages.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent-solid/15">
+            {/* v3.0 clay: the empty state is a full-clay surface — the hero mark is the
+                raised accent medallion, the prompt chips are pressable cards. */}
+            <div className="clay-hero flex h-14 w-14 items-center justify-center bg-accent-solid/15">
               <Bot className="h-7 w-7 text-accent" />
             </div>
             <div>
@@ -384,7 +386,7 @@ export default function ChatPanel(): JSX.Element {
                   key={key}
                   type="button"
                   onClick={() => void send(t(key))}
-                  className="rounded-lg border border-border bg-bg-secondary px-3 py-2 text-start text-xs text-fg transition hover:border-accent/50 hover:bg-bg-tertiary"
+                  className="clay-card clay-press px-3 py-2 text-start text-xs text-fg"
                 >
                   {t(key)}
                 </button>
@@ -427,7 +429,7 @@ export default function ChatPanel(): JSX.Element {
           type="button"
           onClick={scrollToBottom}
           aria-label={t('chat.typing')}
-          className="absolute bottom-36 left-1/2 flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-full border border-border bg-bg-secondary text-fg shadow-lg hover:bg-bg-tertiary"
+          className="absolute bottom-36 left-1/2 flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-clay-pill border border-border bg-bg-secondary text-fg shadow-clay transition-colors duration-fast ease-clay hover:bg-bg-tertiary"
         >
           <ArrowDown className="h-4 w-4" />
         </button>
@@ -553,14 +555,16 @@ export default function ChatPanel(): JSX.Element {
             </div>
           ) : null}
 
-          <div className="rounded-xl border border-border bg-bg-primary p-2">
+          {/* v3.0 clay: the composer is the app's primary touchable surface — the full
+              clay tier. The field is a recessed well inside the raised hero. */}
+          <div className="clay-hero p-2">
           <div className="flex items-end gap-2">
             <button
               type="button"
               onClick={() => void attach()}
               title={t('chat.attach')}
               aria-label={t('chat.attach')}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-fg-muted hover:bg-bg-tertiary hover:text-fg"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-clay-sm text-fg-muted transition-colors duration-fast hover:bg-bg-tertiary hover:text-fg"
             >
               <Paperclip className="h-4 w-4" />
             </button>
@@ -578,7 +582,7 @@ export default function ChatPanel(): JSX.Element {
               rows={1}
               dir={dir}
               placeholder={t('chat.placeholder')}
-              className="max-h-[200px] min-h-[2.25rem] flex-1 resize-none bg-transparent px-1 py-1.5 text-sm text-fg-strong outline-none placeholder:text-fg-subtle"
+              className="clay-inset max-h-[200px] min-h-[2.25rem] flex-1 resize-none rounded-clay-sm px-2 py-2 text-sm text-fg-strong outline-none placeholder:text-fg-subtle"
             />
             <span className="shrink-0">
               <ModelSwitcher />
@@ -589,7 +593,7 @@ export default function ChatPanel(): JSX.Element {
                 onClick={abort}
                 title={`${t('chat.stop')} (Shift+Esc)`}
                 aria-label={`${t('chat.stop')} (Shift+Esc)`}
-                className="flex h-8 w-8 items-center justify-center rounded-lg bg-danger/20 text-danger hover:bg-danger/30"
+                className="clay-press flex h-8 w-8 items-center justify-center rounded-clay-pill bg-danger/20 text-danger hover:bg-danger/30"
               >
                 <Square className="h-4 w-4" />
               </button>
@@ -600,9 +604,9 @@ export default function ChatPanel(): JSX.Element {
                 disabled={!input.trim() && attached.length === 0}
                 title={t('chat.send')}
                 aria-label={t('chat.send')}
-                className={`flex h-8 w-8 items-center justify-center rounded-lg text-white transition ${
+                className={`flex h-8 w-8 items-center justify-center rounded-clay-pill ${
                   input.trim() || attached.length > 0
-                    ? 'bg-accent-solid hover:bg-accent-solid-hover'
+                    ? 'clay-press bg-accent-solid text-accent-fg hover:bg-accent-solid-hover'
                     : 'bg-bg-tertiary text-fg-muted'
                 } disabled:cursor-not-allowed`}
               >
@@ -617,7 +621,7 @@ export default function ChatPanel(): JSX.Element {
                 type="button"
                 onClick={() => previewContext(input.trim(), false)}
                 title={t('chat.viewContext')}
-                className="flex items-center gap-1 rounded-lg px-1.5 py-0.5 text-3xs text-fg-muted hover:bg-bg-tertiary hover:text-fg"
+                className="flex items-center gap-1 rounded-clay-sm px-1.5 py-0.5 text-3xs text-fg-muted transition-colors duration-fast hover:bg-bg-tertiary hover:text-fg"
               >
                 <Eye className="h-3 w-3" />
                 {t('chat.viewContext')}

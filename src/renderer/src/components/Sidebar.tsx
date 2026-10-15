@@ -362,7 +362,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
           <button
             type="button"
             onClick={() => newSession()}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border bg-bg-primary px-2 py-1.5 text-xs font-medium text-fg transition hover:border-accent/50 hover:bg-bg-tertiary"
+            className="clay-card clay-press flex flex-1 items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium text-fg"
           >
             <Plus className="h-3.5 w-3.5" />
             {t('sidebar.newChat')}
@@ -450,15 +450,15 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
               const server = serverName(project.vpsId)
               const chatCount = chatCountFor(project.id)
               return (
-                <div key={project.id} className="group relative mb-0.5">
+                <div key={project.id} className="group relative mb-1">
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
                       onClick={() => void openProject(project.id)}
-                      className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left transition ${
+                      className={`clay-card clay-press flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left ${
                         project.id === settings?.activeProjectId
                           ? 'bg-accent-solid/15 text-fg-strong'
-                          : 'text-fg hover:bg-bg-tertiary'
+                          : 'text-fg'
                       }`}
                     >
                       <span className="min-w-0 flex-1">
@@ -638,7 +638,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                 <button
                   type="button"
                   onClick={() => void loadSession(chat.id)}
-                  className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition ${
+                  className={`flex w-full items-center gap-2 rounded-clay-sm px-2 py-1.5 text-left transition ${
                     activeChatId === chat.id
                       ? 'bg-accent-solid/15 text-fg-strong'
                       : 'text-fg hover:bg-bg-tertiary'

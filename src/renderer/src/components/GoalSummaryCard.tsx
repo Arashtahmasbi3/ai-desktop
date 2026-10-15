@@ -29,7 +29,7 @@ export default function GoalSummaryCard(): JSX.Element | null {
     <section
       data-testid="goal-summary"
       dir="auto"
-      className="mx-4 mb-1 flex items-center gap-2 rounded-lg border border-accent/40 bg-accent-solid/10 px-2.5 py-1.5"
+      className="clay-card mx-4 mb-1 flex items-center gap-2 border border-accent/40 bg-accent-solid/10 px-2.5 py-1.5"
     >
       <Target className="h-3.5 w-3.5 shrink-0 text-accent" />
       <span className="shrink-0 text-3xs font-medium text-fg-muted">{t('goal.summaryTitle')}</span>
