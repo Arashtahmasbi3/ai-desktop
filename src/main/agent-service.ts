@@ -74,6 +74,7 @@ import {
 } from '@shared/attachments'
 import type { AttachmentService } from './attachment-service'
 import type { CustomProviderStore } from './custom-providers'
+import { existsSync } from 'node:fs'
 import { loadProjectMemory } from './project-memory'
 
 /**
@@ -914,7 +915,29 @@ export class AgentService {
       exposure
     )
     const memory = await this.projectMemoryHint()
-    const systemHint = [remote.systemHint, memory].filter(Boolean).join('\n\n')
+    /*
+     * v2.9.1: for a LOCAL project the run's workspace IS the project folder.
+     *
+     * The alternative — leaving the agent in an empty temp directory — meant it could not
+     * read the project's own files or run its tests, which is most of what a coding agent
+     * is for. Scoped to a local project whose folder exists: a remote project's files are
+     * reached over SSH, and a missing folder must not become a workspace root.
+     */
+    const directWorkspace =
+      activeProject && activeProject.type !== 'remote' && existsSync(activeProject.path)
+        ? activeProject.path
+        : undefined
+    const systemHint = [
+      remote.systemHint,
+      memory,
+      directWorkspace
+        ? `Your workspace is the user's project folder (${directWorkspace}). You can read and list ` +
+          'the files that are already there, and run its commands (tests, builds) in place. ' +
+          'Every write you make lands on disk immediately, so there is no "apply" step to wait for.'
+        : ''
+    ]
+      .filter(Boolean)
+      .join('\n\n')
 
     const runId = `run-${++this.runCounter}`
     // v2.6.1 Fix 3: trust (and memory) are scoped to the chat/session, not the
@@ -1155,6 +1178,9 @@ export class AgentService {
       ...(planMode ? { planMode: true } : {}),
       // v2.6.2 T3.1: stamp the served goal onto every emitted trace decision.
       ...(goalContext.goal ? { goalId: goalContext.goal.id } : {}),
+      // v2.9.1: the project becomes the sandbox workspace, so the project is never owned
+      // by the sandbox and is never deleted on teardown.
+      ...(directWorkspace ? { sandboxOptions: { workspaceRoot: directWorkspace } } : {}),
       // Investigate: never offer mutating tools to the model; production
       // Investigate goes further and offers only the named diagnostics (T2.4).
       ...(toolPolicy ? { toolPolicy } : {}),
@@ -1175,7 +1201,10 @@ export class AgentService {
       diagnosticMode: () => Boolean(this.getDiagnosticPolicy?.()),
       ...(remoteContext ? { remoteContext } : {}),
       ...(this.files
-        ? { onFileWritten: (change: FileChange) => this.captureChange(runId, request.sessionId, change) }
+        ? {
+            onFileWritten: (change: FileChange) =>
+              this.captureChange(runId, request.sessionId, change, Boolean(directWorkspace))
+          }
         : {}),
       // v2.5.2: stream redacted/capped tool detail to the renderer so the chat can
       // show commands, targets, streams and exit codes.
@@ -1269,12 +1298,24 @@ export class AgentService {
     }
   }
   /** Records an agent edit and surfaces it in the chat for review. */
-  private captureChange(runId: string, sessionId: string | undefined, change: FileChange): void {
+  private captureChange(
+    runId: string,
+    sessionId: string | undefined,
+    change: FileChange,
+    /** v2.9.1: the run wrote straight into the project, so the edit is already applied. */
+    directWrite = false
+  ): void {
     const id = `change-${++this.changeCounter}`
     const io = this.fileIO()
     void (async () => {
       let before = change.before
-      if (io) {
+      /*
+       * In direct-write mode the project file already contains the new content, so
+       * re-reading it would produce `before === after` and an empty diff. The sandbox
+       * write's own before/after is the only honest source, and the change is recorded as
+       * already applied — there is nothing to review and no Reject that could undo it.
+       */
+      if (io && !directWrite) {
         // Read the file from the run's own root and remember its hash so apply
         // can detect external edits (P0-1). A read failure means a new file.
         before = (
@@ -1292,7 +1333,8 @@ export class AgentService {
         path: change.path,
         before,
         after: change.after,
-        ...(sessionId ? { sessionId } : {})
+        ...(sessionId ? { sessionId } : {}),
+        ...(directWrite ? { applied: true } : {})
       }
       this.changes.set(id, view)
       this.emit({ type: 'file:change', change: view, at: this.now() })

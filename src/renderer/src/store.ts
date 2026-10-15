@@ -1422,7 +1422,11 @@ export const useStore = create<AppState>((set, get) => ({
                   : entry
               )
             : [...get().changedFiles, { path: event.change.path, ...stats, edits: 1 }],
-          fileChanges: [...get().fileChanges, event.change]
+          // v2.9.1: a direct-write run has nothing left to review — the edit is on
+          // disk — so it goes into the durable summary only.
+          fileChanges: event.change.applied
+            ? get().fileChanges
+            : [...get().fileChanges, event.change]
         })
         break
       }

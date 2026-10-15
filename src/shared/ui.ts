@@ -187,6 +187,12 @@ export interface FileChangeView {
   path: string
   before: string
   after: string
+  /**
+   * v2.9.1: the agent wrote straight into the user's project folder, so this edit is
+   * already on disk. The chat shows what changed but offers no Apply, and no Reject —
+   * rejecting something already written would be a lie.
+   */
+  applied?: boolean
 }
 
 export type FileChangeStatus = 'accepted' | 'rejected'
