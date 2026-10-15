@@ -51,6 +51,21 @@ fails, a tool is missing, or the budget ran out — ask rather than guess).
 
 ## Status
 
+**v2.9.0 released — approvals, uploads, GitHub and the main page.** Everything from the
+second report: read-only work no longer prompts (one canonical read-only set, and shell
+wrappers are unwrapped and re-classified rather than trusted) and a scoped, expiring
+"approve every command on this server in this project for 30 minutes" grant is offered
+exactly where a permanent remember is refused; tool cards lead with a verb headline
+("Ran a command on the server") with the raw command and exact id in the expanded body;
+file and image upload actually works (registered in main, copied into the run workspace,
+described by a workspace-relative path, and sent as real image parts to vision models); the
+agent can discover servers itself via a read-only `list_servers` and every id-taking tool now
+accepts an id, name or host; connecting GitHub is one click through an existing `gh` login,
+and a wrong OAuth client id fails loudly instead of rendering an empty code box; and the main
+page shows "Edited N files +A −R" per file in the transcript, the elapsed time and the model's
+reasoning. 262 test files / 2166 tests green, typecheck and production build clean. Windows
+artifacts built natively on Windows. (2026-10-14)
+
 **v2.8.0 released — the nine reported problems, plus thinking and mid-run questions.**
 All nine items from the user's report are fixed with regression tests: the opt-in token
 preview, multiple simultaneous VPS connections (two causes: a single global status slot,

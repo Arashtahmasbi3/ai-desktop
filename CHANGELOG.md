@@ -7,6 +7,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.9.0] — 2026-10-14
+
+### Fixed — the second round of reported problems
+
+- **Approval prompts for provably read-only work.** Two causes. The four named diagnostics
+  (`get_service_logs`, `get_disk_usage`, `get_system_health`, `get_process_list`) were
+  missing from both read-only sets — while the app actively tells the model to prefer them
+  over free-form shell — so `auto-write` raised a dialog with a **Write** badge for each;
+  both sets are now derived from the canonical `READ_ONLY_TOOL_NAMES` so they cannot drift
+  again. And the read-only shell classifier is textual and all-or-nothing, so the wrappers
+  the agent actually used (`timeout … ssh …`, `for …; do … done`, `bash -c '…'`,
+  `env VAR=x …`) made a chain of pure probes count as a write; wrappers are now unwrapped and
+  their bodies **re-classified**, never trusted, so `timeout 12 rm -rf /srv` still prompts.
+- **Raw tool names and raw commands as the primary label.** Cards read
+  `remote_shell ok echo "== sandbox net test =="; timeout 8 bash -c '</dev/…`, the trace chip
+  was a bare `remote_shell`, and the transcript said "Used remote shell". A verb headline now
+  leads ("Ran a command on the server"), with a short, quote-aware, banner-skipping command
+  preview; the verbatim command and the exact tool id moved into the expandable body —
+  and `hasBody` gained `command`/`path`, without which a successful shell card was not
+  expandable at all and the raw command would have been lost.
+- **The agent demanded a server UUID it could have looked up.** Nothing enumerated the saved
+  servers: the only id the model could see was the active project's own, every id-taking tool
+  resolved by *exact id*, and the UI never displays one. A new read-only `list_servers` tool
+  is offered on every remote path (even with no server pinned), and one wrapper canonicalises
+  `server_id` / `source_vps_id` / `target_vps_id` from **id, name or host** before dispatch —
+  covering all fifteen tools. An ambiguous or unknown reference fails *with the candidate
+  list* rather than guessing, and the roster is discovery data only: it can never select the
+  host a run targets.
+
+### Added — uploads, and a way out of per-command approvals
+
+- **File and image upload works.** `@<desktop path>` was inert text nothing parsed, main had
+  no attachment concept, the agent could not have read an absolute path anyway (a local run's
+  workspace is an empty temp directory and `read_file` refuses absolute paths), and there was
+  no multimodal path at all. Attachments are now registered in main (secret-path guard and a
+  size cap applied), copied into the run's workspace, and described to the model by their
+  **workspace-relative** path; images additionally travel as real image parts to vision-capable
+  models (OpenAI `image_url`, Anthropic base64 blocks, Google `inlineData`), with an explicit
+  "this model cannot see images" instruction instead of a guess. A text-only request body is
+  byte-identical to before. The system prompt no longer claims the host filesystem is
+  unreachable — that sentence is what the assistant had been paraphrasing back to the user.
+- **A scoped server grant.** "Approve every command on THIS server in THIS project for 30
+  minutes", offered exactly where a permanent remember is refused (shell and writes), bound to
+  one server + one project, expiring, revocable, stored apart from the permanent allow lists.
+  It suppresses the *user approval* only: the deny list, host policy, path containment, secret
+  guard, rate limiter and audit log all still run.
+- **Connecting GitHub is one click.** `gh` was used nowhere in the repo, yet it is commonly
+  already installed and authenticated and its scopes cover everything this app does; Settings →
+  GitHub now detects that login and offers "Use my GitHub CLI login", which reads the token,
+  validates it with `GET /user` and stores it exactly as the manual paths do. A wrong OAuth
+  client id used to render an **empty** code box (GitHub answers 200 with an error body) — it
+  now fails loudly — and the stored-token decryption error, which was returned but never
+  rendered, is displayed instead of a false "connected".
+- **The main page reads like a run.** A compact **"Edited N files +A −R"** card with a row per
+  file now sits in the transcript (it used to be hidden inside the collapsible trace), the live
+  status shows how long the turn has been working, the model's reasoning appears as a one-line
+  excerpt under it, and the ongoing goal is visible in the chat instead of only in its panel.
+- **The localhost remote-access server is explained.** It is a developer API (127.0.0.1 +
+  bearer token, no client shipped), so it moved out of the status bar into Settings →
+  Developer with what it is, why nothing ships with it, the URL, the token (masked until
+  revealed), the client count and two copyable `curl` examples.
+
+### Changed
+
+- **`list_servers` is read-only** and deliberately absent from `VPS_REQUIRING_TOOLS`, so
+  asking which servers exist never itself demands a server.
+
+Test suite: **262 files / 2166 tests green**; typecheck and production build clean.
+
+
 ## [2.8.0] — 2026-10-14
 
 ### Fixed — the nine reported problems
@@ -962,7 +1032,8 @@ First stable release. Ships as a Windows x64 NSIS installer and a portable execu
   `node_modules` are shipped inside the app package.
 - Optional code signing via `CSC_LINK` / `CSC_KEY_PASSWORD` (skipped safely when absent).
 
-[Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.8.0...HEAD
+[Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.9.0...HEAD
+[2.9.0]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.7.0...v2.8.0
 [2.7.0]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.6.4...v2.7.0
 [2.6.4]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.6.3...v2.6.4
