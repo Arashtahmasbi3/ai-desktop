@@ -29,7 +29,7 @@ describe('v2.6.0 C.1 - compact tool card', () => {
     )
 
     const header = screen.getByTestId('tool-card-header')
-    expect(within(header).getByText('run_command')).toBeTruthy()
+    expect(within(header).getByText('Ran a command')).toBeTruthy()
     expect(within(header).getByText('ok')).toBeTruthy()
     expect(within(header).getByText('npm run build')).toBeTruthy()
     expect(within(header).getByText('exit 0')).toBeTruthy()
@@ -63,7 +63,10 @@ describe('v2.6.0 C.1 - compact tool card', () => {
     )
     fireEvent.click(screen.getByTestId('tool-card-header'))
     expect(screen.getByText('2 passed')).toBeTruthy()
-    expect(screen.getByText('npm test')).toBeTruthy()
+    // v2.8.1: the command appears twice on purpose — the short preview in the header
+    // and the verbatim one in the expanded body — so match all of them.
+    expect(screen.getAllByText('npm test').length).toBeGreaterThan(0)
+    expect(screen.getByTestId('tool-card-raw-command').textContent).toContain('npm test')
     expect(screen.getByTestId('tool-card-header').getAttribute('aria-expanded')).toBe('true')
   })
 
@@ -97,7 +100,7 @@ describe('v2.6.0 C.1 - compact tool card', () => {
   it('7. gives the header a larger size than the meta chips', () => {
     render(<ToolResultCard name="run_command" ok command="npm run build" exitCode={0} durationMs={10} />)
     const header = screen.getByTestId('tool-card-header')
-    const name = within(header).getByText('run_command')
+    const name = within(header).getByText('Ran a command')
     const exit = within(header).getByText('exit 0')
     const duration = within(header).getByText('0.01s')
     expect(name.className).toContain('text-[13px]')

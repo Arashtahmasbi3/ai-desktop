@@ -47,7 +47,8 @@ describe('v2.6.0 B.4 - Output / Sources split', () => {
       ]
     })
     render(<OutputFeed />)
-    expect(screen.getByText('pm2 logs api')).toBeTruthy()
+    // v2.8.1: the row label is the short preview; the full command is in the body.
+    expect(screen.getAllByText('pm2 logs api').length).toBeGreaterThan(0)
     expect(screen.getByText('exit 1')).toBeTruthy()
     // Failed calls open by default so the error is visible.
     expect(screen.getByText('not found')).toBeTruthy()

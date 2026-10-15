@@ -13,13 +13,15 @@ afterEach(() => cleanup())
 describe('B.2 ToolResultCard', () => {
   it('shows the tool name and an ok state', () => {
     render(<ToolResultCard name="migrate_database" ok />)
-    expect(screen.getByText('migrate_database')).toBeDefined()
+    // v2.8.1: the headline is prose; the raw tool id is secondary.
+    expect(screen.getByText('Ran a command')).toBeDefined()
     expect(screen.getByText('ok')).toBeDefined()
   })
 
   it('shows an error state when the tool failed', () => {
     render(<ToolResultCard name="scaffold_project" ok={false} />)
-    expect(screen.getByText('scaffold_project')).toBeDefined()
+    // v2.8.1: scaffold_project writes, so its headline is the write verb.
+    expect(screen.getByText('Wrote a file')).toBeDefined()
     expect(screen.getByText('error')).toBeDefined()
   })
 

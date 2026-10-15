@@ -30,7 +30,8 @@ function view(overrides: Partial<ToolResultView> = {}): ToolResultView {
 describe('P3 ToolResultCard rich detail', () => {
   it('1. shows the command preview and exit code without expanding', () => {
     render(<ToolResultCard name="run_command" ok command="npm run build" exitCode={0} durationMs={1500} />)
-    expect(screen.getByText('run_command')).toBeDefined()
+    // v2.8.1: prose headline, with the raw tool id in the expanded body.
+    expect(screen.getByText('Ran a command')).toBeDefined()
     expect(screen.getByText('npm run build')).toBeDefined()
     expect(screen.getByText('exit 0')).toBeDefined()
     expect(screen.getByText('1.50s')).toBeDefined()

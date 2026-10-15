@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AlertTriangle, Lock, ShieldAlert, Timer, X } from 'lucide-react'
 import { useStore } from '../store'
+import { toolLabel } from '../lib/tool-labels'
 import Modal from './ui/Modal'
 import type { PreflightOptionTone } from '@shared/preflight'
 
@@ -84,8 +85,12 @@ export default function PreflightOverrideDialog(): JSX.Element | null {
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-fg-muted">
           <span className="flex items-center gap-1">
             {t('chat.approvalTool')}:
-            <code className="max-w-[18rem] truncate font-mono text-fg" dir="ltr">
-              {request.tool}
+            <code
+              className="max-w-[18rem] truncate font-mono text-fg"
+              dir="ltr"
+              title={request.tool}
+            >
+              {toolLabel(request.tool, t)}
             </code>
           </span>
           {request.server ? (

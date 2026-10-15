@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Activity, AlertCircle, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react'
 import DecisionCard from './DecisionCard'
 import { useStore, type ChatMessage } from '../store'
-import { summarizeActivity } from '../lib/tool-labels'
+import { summarizeActivity, toolHeadline } from '../lib/tool-labels'
 import type { TraceDecision } from '@shared/trace'
 
 /** Keep the inline list light; the full run is still in the Progress panel. */
@@ -197,7 +197,9 @@ export default function InlineTrace(): JSX.Element | null {
                         <span
                           key={message.id}
                           data-testid="trace-tool-chip"
-                          className={`flex items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-3xs ${
+                          data-tool={message.toolCall?.name}
+                          title={message.toolCall?.name}
+                          className={`flex items-center gap-1 rounded border px-1.5 py-0.5 text-3xs ${
                             ok ? 'border-border text-fg-muted' : 'border-danger/40 text-danger'
                           }`}
                         >
@@ -206,7 +208,20 @@ export default function InlineTrace(): JSX.Element | null {
                               ok ? 'text-success' : 'text-danger'
                             }`}
                           />
-                          {message.toolCall?.name}
+                          {/*
+      v2.8.1: a chip that says "a file" tells the reader nothing. The prose headline
+      ("Read a file", "Ran a command on the server") is self-explanatory, and the exact
+      tool id stays in data-tool/title for tests and tooltips.
+    */}
+                    {toolHeadline(
+                      {
+                        ...(message.toolCall?.name ? { name: message.toolCall.name } : {}),
+                        ...(message.toolCall?.command ? { command: message.toolCall.command } : {}),
+                        ...(message.toolCall?.path ? { path: message.toolCall.path } : {}),
+                        ...(message.toolCall?.serverId ? { serverId: message.toolCall.serverId } : {})
+                      },
+                      t
+                    ).headline}
                         </span>
                       )
                     })}

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AlertTriangle, ClipboardList, Pencil, Play, X } from 'lucide-react'
 import { useStore } from '../store'
+import { toolLabel } from '../lib/tool-labels'
 import type { PlanStep } from '@shared/plan'
 import Modal from './ui/Modal'
 
@@ -117,8 +118,11 @@ export default function PlanCard(): JSX.Element | null {
                   <div className="flex items-baseline gap-2">
                     <span className="text-xs font-semibold text-fg-muted">{index + 1}.</span>
                     <span className="text-xs text-fg">{step.title}</span>
-                    <code className="ml-auto rounded bg-black/30 px-1.5 py-0.5 font-mono text-3xs text-accent">
-                      {step.tool}
+                    <code
+                      className="ml-auto rounded bg-black/30 px-1.5 py-0.5 font-mono text-3xs text-accent"
+                      title={step.tool}
+                    >
+                      {toolLabel(step.tool, t)}
                     </code>
                   </div>
                   {editing && key ? (

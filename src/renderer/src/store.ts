@@ -1473,7 +1473,6 @@ export const useStore = create<AppState>((set, get) => ({
       }
       case 'tool:result': {
         const toolCall = toolCallFromView(event.result)
-        const code = event.result.code !== undefined ? ` (${String(event.result.code)})` : ''
         set({
           messages: capMessages(
             [
@@ -1481,7 +1480,9 @@ export const useStore = create<AppState>((set, get) => ({
               {
                 id: newId(),
                 role: 'tool',
-                content: `${toolCall.name}${code}`,
+                // v2.8.1: just the tool name — the error code already lives on
+                // `toolCall.code`, and the raw name is a fallback label only.
+                content: toolCall.name,
                 at: event.at,
                 runId: event.runId,
                 toolCall

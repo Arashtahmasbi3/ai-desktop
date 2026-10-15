@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AlertTriangle, Brain, Check, Circle, Loader2, PauseCircle, RotateCcw, Sparkles, Wrench } from 'lucide-react'
 import { buildTimeline, type StepKind, type TimelineStep } from '../lib/timeline'
+import { toolLabel } from '../lib/tool-labels'
 import { useStore } from '../store'
 import DecisionCard from './DecisionCard'
 
@@ -33,7 +34,7 @@ export default function ProgressTimeline({ embedded }: ProgressTimelineProps = {
   const steps = useMemo(() => buildTimeline(logs, running), [logs, running])
 
   const label = (step: TimelineStep): string => {
-    if (step.kind === 'tool' && step.tool) return t('timeline.tool', { tool: step.tool })
+    if (step.kind === 'tool' && step.tool) return toolLabel(step.tool, t)
     if (step.kind === 'decision' && step.decision) return step.decision.intent.summary
     return t(`timeline.${step.kind}`)
   }

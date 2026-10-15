@@ -11,6 +11,7 @@ import {
   FileText
 } from 'lucide-react'
 import type { ToolCallView } from '@shared/ui'
+import { toolHeadline } from '../lib/tool-labels'
 
 /** Inline card in the chat for a tool call (v2.4.1; rich detail in v2.5.2). */
 export default function ToolResultCard(props: ToolCallView): JSX.Element {
@@ -40,9 +41,15 @@ export default function ToolResultCard(props: ToolCallView): JSX.Element {
   const StatusIcon = ok ? CheckCircle2 : AlertCircle
   // `detail` duplicates `error` when the event carried a technical cause.
   const legacyDetail = detail && detail !== error ? detail : undefined
-  const primary = command ?? path
+  // v2.8.1: the header names the work ("Ran a command on the server") instead of
+  // printing the raw tool id above a whole pipeline. The raw command and the exact
+  // tool name stay in the expanded body (`raw` feeds the tooltip meanwhile).
+  const { headline, detail: shortDetail, raw } = toolHeadline(
+    { name, ok, command, path, serverId },
+    t
+  )
   const hasBody = Boolean(
-    legacyDetail || error || stdout || stderr || serverId || cwd || recovery
+    legacyDetail || error || stdout || stderr || serverId || cwd || recovery || command || path
   )
 
   const seconds = durationMs !== undefined ? `${(durationMs / 1000).toFixed(2)}s` : undefined
@@ -64,21 +71,20 @@ export default function ToolResultCard(props: ToolCallView): JSX.Element {
         data-testid="tool-card-header"
         className="flex w-full items-center gap-2 px-2.5 py-1 text-left"
         aria-expanded={open}
-        aria-label={`${name} ${ok ? 'ok' : 'error'}`}
+        aria-label={`${headline} ${ok ? 'ok' : 'error'}`}
       >
         <StatusIcon
           className={`h-3.5 w-3.5 shrink-0 ${ok ? 'text-success' : 'text-danger'}`}
         />
-        <span className="shrink-0 font-mono text-[13px] text-fg">{name}</span>
+        <span className="shrink-0 text-[13px] text-fg" title={raw ?? name}>
+          {headline}
+        </span>
         <span className={`shrink-0 text-3xs ${ok ? 'text-success' : 'text-danger'}`}>
           {ok ? t('chat.toolOk') : t('chat.toolError')}
         </span>
-        {primary ? (
-          <span
-            className="min-w-0 flex-1 truncate font-mono text-[13px] text-fg-muted"
-            title={primary}
-          >
-            {primary}
+        {shortDetail ? (
+          <span className="min-w-0 flex-1 truncate font-mono text-[13px] text-fg-muted" title={raw}>
+            {shortDetail}
           </span>
         ) : (
           <span className="flex-1" />
@@ -128,6 +134,32 @@ export default function ToolResultCard(props: ToolCallView): JSX.Element {
                   : t('chat.toolRetryFailed', { count: recovery.attempts })
                 : t('chat.toolNoRetry')}
             </p>
+          ) : null}
+
+          {/* v2.8.1: the exact tool id and the raw command stay one click away, so
+              power users lose nothing while the header stays readable. */}
+          {name ? (
+            <p className="flex items-center gap-1 text-2xs text-fg-muted">
+              {t('chat.approvalTool')}:{' '}
+              <span className="font-mono text-fg" dir="ltr">
+                {name}
+              </span>
+            </p>
+          ) : null}
+
+          {raw ? (
+            <div>
+              <p className="mb-0.5 text-3xs uppercase tracking-wide text-fg-muted">
+                {t('chat.toolRawCommand')}
+              </p>
+              <pre
+                data-testid="tool-card-raw-command"
+                dir="ltr"
+                className="max-h-40 overflow-auto whitespace-pre-wrap rounded bg-bg-primary px-2 py-1.5 font-mono text-2xs text-fg"
+              >
+                {raw}
+              </pre>
+            </div>
           ) : null}
 
           {serverId || cwd || (command && path) ? (

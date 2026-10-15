@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import type { LoopStopInfo } from '@shared/agent'
 import { buildLoopStopModel, type LoopStopAction } from '../lib/loop-stop'
+import { summarizeCommand, truncateMiddle } from '../lib/tool-labels'
 
 interface Props {
   stop: LoopStopInfo
@@ -89,8 +90,13 @@ export default function LoopStopCard({ stop, onContinue, onCorrect, onStop }: Pr
               ) : (
                 <Terminal className="h-3 w-3" />
               )}
-              <code className="min-w-0 flex-1 truncate font-mono" dir="ltr" title={model.lastAction}>
-                {model.lastCommand ?? model.lastAction}
+              {/* v2.8.1: one readable stage, with the full action on hover. */}
+              <code
+                className="min-w-0 flex-1 truncate font-mono"
+                dir="ltr"
+                title={model.lastCommand ?? model.lastAction}
+              >
+                {summarizeCommand(model.lastCommand ?? model.lastAction ?? '')}
               </code>
             </div>
           ) : null}
@@ -117,9 +123,10 @@ export default function LoopStopCard({ stop, onContinue, onCorrect, onStop }: Pr
                       key={`${action}-${index}`}
                       dir="ltr"
                       className="truncate font-mono text-3xs text-warning/80"
+                      title={action}
                     >
                       <CornerDownRight className="mr-1 inline h-3 w-3" />
-                      {action}
+                      {truncateMiddle(action, 96)}
                     </li>
                   ))}
                 </ul>

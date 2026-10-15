@@ -122,7 +122,8 @@ describe('v2.6.0 C.2 - approval actions stay visible on every viewport', () => {
     const body = dialog.querySelector<HTMLElement>(':scope > .overflow-y-auto')!
     const summary = screen.getByTestId('approval-summary')
     // Identity lives in the header so it stays visible while the body scrolls.
-    expect(within(summary).getByText('remote_shell')).toBeTruthy()
+    // v2.8.1: named in words — the raw tool id moved to the tooltip.
+    expect(within(summary).getByText('a command on the server')).toBeTruthy()
     expect(within(summary).getByText('spmotor')).toBeTruthy()
     expect(within(summary).getByText('/opt/sepehr-motor')).toBeTruthy()
     expect(body.contains(summary)).toBe(false)

@@ -67,8 +67,9 @@ describe('Task 1.3 - StatusBar agent status', () => {
     expect(status).toBeTruthy()
     expect(status.getAttribute('title')).toContain('Agent service is up')
     expect(status.getAttribute('title')).toContain('127.0.0.1:4321')
-    // The remote toggle is kept alongside the new agent indicator.
-    expect(screen.getByText(/remote:/)).toBeTruthy()
+    // v2.8.1: the remote-access API moved out of the status bar into
+    // Settings → Developer, so the footer no longer offers a bare on/off chip.
+    expect(screen.queryByText(/remote:/)).toBeNull()
   })
 
   it('2. worker offline → "Agent: not running" with a warning tooltip', () => {

@@ -12,6 +12,7 @@ import {
   XCircle
 } from 'lucide-react'
 import type { TaskStep } from '@shared/task-plan'
+import { summarizeCommand } from '../lib/tool-labels'
 import { useStore } from '../store'
 
 function StepIcon({ status }: { status: TaskStep['status'] }): JSX.Element {
@@ -91,8 +92,11 @@ export default function TaskTracker(): JSX.Element | null {
                   ) : null}
                 </div>
                 {command ? (
-                  <code className="mt-0.5 block truncate font-mono text-3xs text-fg-muted">
-                    $ {command}
+                  <code
+                    className="mt-0.5 block truncate font-mono text-3xs text-fg-muted"
+                    title={command}
+                  >
+                    $ {summarizeCommand(command)}
                   </code>
                 ) : null}
                 {step.status === 'running' ? (

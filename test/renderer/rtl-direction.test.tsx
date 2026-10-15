@@ -62,7 +62,10 @@ describe('v2.6.0 A.2 - RTL/LTR direction', () => {
         cwd="/opt/sepehr-motor"
       />
     )
-    const card = screen.getByText('pm2 logs api --lines 100').closest('[dir]') as HTMLElement
+    // v2.8.1: the command shows in both the header preview and the expanded body.
+    const card = screen
+      .getAllByText('pm2 logs api --lines 100')[0]
+      .closest('[dir]') as HTMLElement
     expect(card.getAttribute('dir')).toBe('ltr')
   })
 })

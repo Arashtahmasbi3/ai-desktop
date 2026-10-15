@@ -41,6 +41,7 @@ import { decideSend } from '../lib/context-gate'
 import { workspaceStatus, shouldShowWorkspaceBanner } from '../lib/project-status'
 import { CHAT_MAX_WIDTH } from '../lib/layout'
 import { visibleChatMessages } from '../lib/tool-rows'
+import { toolLabel } from '../lib/tool-labels'
 import { contextBudget, contextWarningVisible } from '@shared/memory'
 
 const SUGGESTION_KEYS = [
@@ -423,7 +424,7 @@ export default function ChatPanel(): JSX.Element {
         {approvalSuggestion ? (
           <div className="mx-3 mb-1 flex items-center justify-between gap-2 rounded-lg border border-accent/40 bg-accent-solid/10 px-2 py-1.5 text-2xs text-fg">
             <span>
-              {t('chat.rememberSuggestion', { tool: approvalSuggestion.tool })}
+              {t('chat.rememberSuggestion', { tool: toolLabel(approvalSuggestion.tool, t) })}
             </span>
             <span className="flex shrink-0 gap-2">
               <button

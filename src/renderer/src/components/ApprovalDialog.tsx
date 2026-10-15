@@ -11,6 +11,7 @@ import {
   X
 } from 'lucide-react'
 import { useStore } from '../store'
+import { toolLabel } from '../lib/tool-labels'
 import { evaluateProjectCommandWarning } from '../lib/policy-warning'
 import PolicyWarningBanner from './PolicyWarningBanner'
 import Modal from './ui/Modal'
@@ -223,8 +224,12 @@ export default function ApprovalDialog(): JSX.Element | null {
           </span>
           <span className="flex min-w-0 items-center gap-1 text-fg-muted">
             {t('chat.approvalTool')}:
-            <code className="max-w-[16rem] truncate font-mono text-fg" dir="ltr">
-              {request.tool}
+            <code
+              className="max-w-[16rem] truncate font-mono text-fg"
+              dir="ltr"
+              title={request.tool}
+            >
+              {toolLabel(request.tool, t)}
             </code>
           </span>
           {request.server ? (

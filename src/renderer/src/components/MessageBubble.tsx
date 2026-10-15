@@ -6,6 +6,7 @@ import ToolResultCard from './ToolResultCard'
 import { readCode } from '../lib/markdown-code'
 import { AlertTriangle, Bot, Check, Copy, GitFork, Server, User } from 'lucide-react'
 import { useStore, type ChatMessage } from '../store'
+import { toolLabel } from '../lib/tool-labels'
 
 const MARKDOWN_COMPONENTS: Components = {
   pre: ({ node }) => {
@@ -59,7 +60,7 @@ export default function MessageBubble({ message }: { message: ChatMessage }): JS
           <ToolResultCard {...message.toolCall} />
         ) : (
           <span className="rounded-full border border-border bg-bg-secondary px-2.5 py-1 font-mono text-2xs text-info">
-            {message.content}
+            {toolLabel(message.content, t)}
           </span>
         )}
       </div>

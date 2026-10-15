@@ -151,7 +151,11 @@ describe('InlineTrace', () => {
     const groups = screen.getAllByTestId('trace-step-tools')
     expect(groups).toHaveLength(2)
     const chips = screen.getAllByTestId('trace-tool-chip').map((chip) => chip.textContent)
-    expect(chips).toEqual(['write_file', 'read_file'])
+    expect(chips).toEqual(['Wrote a file', 'Read a file'])
+    // v2.8.1: the chip is human prose, so keep the exact ids machine-readable.
+    expect(
+      screen.getAllByTestId('trace-tool-chip').map((chip) => chip.getAttribute('data-tool'))
+    ).toEqual(['write_file', 'read_file'])
     // A tool from a different run is never pulled into this trace.
     expect(screen.queryByText('bash')).toBeNull()
   })
