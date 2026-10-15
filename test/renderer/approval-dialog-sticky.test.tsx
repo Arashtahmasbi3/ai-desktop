@@ -32,10 +32,10 @@ function request(overrides: Partial<ApprovalRequest> = {}): ApprovalRequest {
     summary: 'npm install',
     arguments: { command: 'npm install' },
     kind: 'shell',
-    preview: 'npm install && chmod 777 /opt/sepehr-motor',
+    preview: 'npm install && chmod 777 /opt/demo-project',
     reason: 'write',
-    server: 'spmotor',
-    workingDirectory: '/opt/sepehr-motor',
+    server: 'my-server',
+    workingDirectory: '/opt/demo-project',
     ...overrides
   }
 }
@@ -124,8 +124,8 @@ describe('v2.6.0 C.2 - approval actions stay visible on every viewport', () => {
     // Identity lives in the header so it stays visible while the body scrolls.
     // v2.8.1: named in words — the raw tool id moved to the tooltip.
     expect(within(summary).getByText('a command on the server')).toBeTruthy()
-    expect(within(summary).getByText('spmotor')).toBeTruthy()
-    expect(within(summary).getByText('/opt/sepehr-motor')).toBeTruthy()
+    expect(within(summary).getByText('my-server')).toBeTruthy()
+    expect(within(summary).getByText('/opt/demo-project')).toBeTruthy()
     expect(body.contains(summary)).toBe(false)
   })
 })

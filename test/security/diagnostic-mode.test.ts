@@ -17,7 +17,7 @@ import { isCommandAlwaysAllowed } from '@core/remote/command-whitelist'
  * short-lived, user-enabled, read-only policy may widen it to a fixed set of
  * system paths for crash diagnosis.
  */
-const ROOT = '/opt/sepehr-motor'
+const ROOT = '/opt/demo-project'
 
 describe('Diagnostic Mode — path policy', () => {
   it('rejects /var/log when diagnostic OFF', () => {

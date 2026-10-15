@@ -169,13 +169,13 @@ describe('summarizeCommand (v2.8.1)', () => {
 
 describe('summarizePath (v2.8.1)', () => {
   it('shortens from the left and never cuts a path segment in half', () => {
-    const path = '/srv/apps/sepehr-motor/packages/renderer/src/components/settings/DeveloperPanel.tsx'
+    const path = '/srv/apps/demo-project/packages/renderer/src/components/settings/DeveloperPanel.tsx'
     const summary = summarizePath(path)
 
     expect(summary.startsWith('…/')).toBe(true)
     expect(summary.endsWith('/components/settings/DeveloperPanel.tsx')).toBe(true)
     // Whole segments are dropped, so no half path can appear.
-    expect(summary).not.toContain('sepehr-motor')
+    expect(summary).not.toContain('demo-project')
     expect(summary.length).toBeLessThanOrEqual(72)
   })
 
@@ -214,7 +214,7 @@ describe('toolHeadline (v2.8.1)', () => {
   })
 
   it('names a read in words and shortens the path in the detail', () => {
-    const path = '/srv/apps/sepehr-motor/packages/renderer/src/components/settings/DeveloperPanel.tsx'
+    const path = '/srv/apps/demo-project/packages/renderer/src/components/settings/DeveloperPanel.tsx'
     const result = toolHeadline({ name: 'read_file', ok: true, path }, t)
 
     expect(result.headline).toBe('Read a file')

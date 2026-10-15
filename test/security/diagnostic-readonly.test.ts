@@ -7,13 +7,13 @@ import { isDiagnosticReadOnlyCommand } from '@core/remote/command-whitelist'
  * v2.5.3 Fix 4 - Diagnostic Mode is READ-ONLY. The widening must never let a
  * write or a chained/smuggled command touch a system path, even while active.
  */
-const ROOT = '/opt/sepehr-motor'
+const ROOT = '/opt/demo-project'
 const policy = createDiagnosticPolicy()
 
 describe('Diagnostic Mode - read-only command gate', () => {
   it('accepts simple readers and read-only pipelines', () => {
     expect(isDiagnosticReadOnlyCommand('cat /var/log/syslog')).toBe(true)
-    expect(isDiagnosticReadOnlyCommand('journalctl -u sepehr')).toBe(true)
+    expect(isDiagnosticReadOnlyCommand('journalctl -u demo')).toBe(true)
     expect(isDiagnosticReadOnlyCommand('tail -n 100 /var/log/app.log | grep -i error')).toBe(true)
     expect(isDiagnosticReadOnlyCommand('cat /var/log/*.log')).toBe(true)
   })

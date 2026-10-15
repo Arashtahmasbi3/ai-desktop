@@ -135,9 +135,9 @@ describe('Task 3.2 - diagnose_crash tool', () => {
   })
 
   it('substitutes the project root into the project probes', () => {
-    const probes = buildCrashProbes('/opt/sepehr-motor')
+    const probes = buildCrashProbes('/opt/demo-project')
     const probe = probes.find((entry) => entry.id === 'recent-releases')
-    expect(probe?.command).toContain("'/opt/sepehr-motor'/releases/")
+    expect(probe?.command).toContain("'/opt/demo-project'/releases/")
     expect(CRASH_PROBES.find((entry) => entry.id === 'recent-releases')?.command).toContain('{{ROOT}}')
   })
 

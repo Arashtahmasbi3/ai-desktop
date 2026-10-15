@@ -361,7 +361,7 @@ async function migrateDatabase(params: {
 │  🗄️ Migrate Database              │
 ├────────────────────────────────────┤
 │  Source:                           │
-│    VPS: spmotor                    │
+│    VPS: my-server                    │
 │    DB: postgres://user@localhost/mydb │
 │    Size: 45 MB                     │
 │                                    │

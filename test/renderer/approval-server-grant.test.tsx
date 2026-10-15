@@ -30,7 +30,7 @@ function request(overrides: Partial<ApprovalRequest> = {}): ApprovalRequest {
     kind: 'shell',
     preview: 'npm run build',
     dangerous: false,
-    server: 'spmotor',
+    server: 'my-server',
     ...overrides
   } as ApprovalRequest
 }
@@ -56,7 +56,7 @@ describe('ApprovalDialog: the scoped server grant (v2.9.0)', () => {
     render(<ApprovalDialog />)
 
     const grant = screen.getByTestId('approval-grant-server')
-    expect(grant.textContent).toContain('spmotor')
+    expect(grant.textContent).toContain('my-server')
     expect(grant.textContent).toContain('30 minutes')
     // The promise it makes must be the promise the gate keeps.
     expect(grant.textContent).toMatch(/deny list still blocks/i)

@@ -16,7 +16,7 @@ import { createLocalManager } from '../helpers/local-sandbox-manager'
  * real orchestrator, executors and containment policy. Only the LLM boundary is
  * scripted and the SSH host is faked; nothing inside the app is mocked.
  */
-const ROOT = '/opt/sepehr-motor'
+const ROOT = '/opt/demo-project'
 const SERVERS = ['srv-1']
 
 let base: string
@@ -87,7 +87,7 @@ describe('v2.5.3 integration', () => {
     const spy = makeHost()
     const runtime = planRemoteRuntime('status?', 'srv-1', spy.host, undefined, ['remote_shell'], ROOT)
     const adapter = new ScriptedAdapter('deepseek', [
-      { content: 'پروژه sepehr-motor روی VPS spmotor در مسیر /opt/sepehr-motor' }
+      { content: 'پروژه demo-project روی VPS my-server در مسیر /opt/demo-project' }
     ])
     const manager = createLocalManager(base)
     const orchestrator = new AgentOrchestrator({
@@ -97,10 +97,10 @@ describe('v2.5.3 integration', () => {
       extraTools: runtime.extraTools,
       extraExecutor: runtime.extraExecutor,
       remoteContext: {
-        projectName: 'sepehr-motor',
+        projectName: 'demo-project',
         projectPath: ROOT,
         vpsId: 'srv-1',
-        vpsName: 'spmotor',
+        vpsName: 'my-server',
         environment: 'production'
       }
     })
@@ -110,9 +110,9 @@ describe('v2.5.3 integration', () => {
     expect(result.status).toBe('completed')
     // The model was told the context up front...
     const prompt = systemPrompt(adapter)
-    expect(prompt).toContain('sepehr-motor')
+    expect(prompt).toContain('demo-project')
     expect(prompt).toContain(ROOT)
-    expect(prompt).toContain('spmotor')
+    expect(prompt).toContain('my-server')
     expect(prompt).toContain('production')
     // ...and answered directly: a single turn, no tool activity at all.
     expect(result.steps).toHaveLength(1)

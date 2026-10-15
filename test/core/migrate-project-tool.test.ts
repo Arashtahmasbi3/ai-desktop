@@ -226,7 +226,7 @@ describe('executeMigrateProject', () => {
   })
 
   /**
-   * v2.8.0: the reported dead end — "migrate this project to 212.16.86.23" answered
+   * v2.8.0: the reported dead end — "migrate this project to 203.0.113.23" answered
    * with "that is just an IP; add it as a saved server first". The transfer runs on the
    * source server with `BatchMode=yes`, so the destination only has to be reachable
    * *from there*; it never had to be saved on this machine.
@@ -237,13 +237,13 @@ describe('executeMigrateProject', () => {
       const result = await executeMigrateProject(deps, {
         source_vps_id: 'srv-1',
         source_path: '/var/www/app',
-        target_host: '212.16.86.23',
+        target_host: '203.0.113.23',
         target_path: '/srv/app'
       })
 
       expect(result.ok).toBe(true)
       const command = deps.execCalls.map((call) => call.command).join('\n')
-      expect(command).toContain('root@212.16.86.23:/srv/app')
+      expect(command).toContain('root@203.0.113.23:/srv/app')
       // Still a dry-run first, and still no --delete.
       expect(command).toContain('--dry-run')
       expect(command).not.toContain('--delete')
@@ -256,14 +256,14 @@ describe('executeMigrateProject', () => {
       await executeMigrateProject(deps, {
         source_vps_id: 'srv-1',
         source_path: '/var/www/app',
-        target_host: '212.16.86.23',
+        target_host: '203.0.113.23',
         target_user: 'ubuntu',
         target_port: 2222,
         target_path: '/srv/app'
       })
 
       const command = deps.execCalls.map((call) => call.command).join('\n')
-      expect(command).toContain('ubuntu@212.16.86.23')
+      expect(command).toContain('ubuntu@203.0.113.23')
       expect(command).toContain('-p 2222')
     })
 

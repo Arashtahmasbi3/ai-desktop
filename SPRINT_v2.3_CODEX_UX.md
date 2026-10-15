@@ -77,11 +77,11 @@
 │                                                      │
 │  remote_shell                                        │
 │  ┌────────────────────────────────────────────────┐ │
-│  │ grep -rn "pattern" /opt/sepehr-motor          │ │
+│  │ grep -rn "pattern" /opt/demo-project          │ │
 │  └────────────────────────────────────────────────┘ │
 │                                                      │
-│  Working directory: /opt/sepehr-motor               │
-│  Server: Sepehr VPS (192.168.1.10)                  │
+│  Working directory: /opt/demo-project               │
+│  Server: Demo VPS (192.168.1.10)                  │
 │                                                      │
 │  ☐ Remember this command                            │
 │  ☐ Remember all commands from this tool             │
@@ -203,9 +203,9 @@
 │ 📝 New  🔔 Alerts  🔍 Search │
 ├──────────────────────────────┤
 │ PROJECTS                     │
-│ ● sepehrmotor    (Sepehr VPS)│  ← نقطه سبز
-│ ● peymabim       (Sepehr VPS)│
-│ ⚠ spmotor        (Path not found)│ ← قرمز
+│ ● demoproject    (Demo VPS)│  ← نقطه سبز
+│ ● demo-b       (Demo VPS)│
+│ ⚠ my-server        (Path not found)│ ← قرمز
 │ + New project                │
 ├──────────────────────────────┤
 │ RECENTS                      │
@@ -287,7 +287,7 @@
 
 **الگو (از Codex):**
 ```
-📄 /opt/sepehr-motor/.qa-commerce-ux-03-lZziYu/seed.sql   +54 -0
+📄 /opt/demo-project/.qa-commerce-ux-03-lZziYu/seed.sql   +54 -0
 📄 src/orders/orders.service.ts                            +114 -15
 📄 src/orders/orders.service.spec.ts                       +61 -0
 Show 20 more files ⌄
@@ -320,7 +320,7 @@ Show 20 more files ⌄
 **الگو (از Codex):**
 ```
               ☁️
-    What should we work on in sepehrmotor?
+    What should we work on in demoproject?
     
     [input box]
 ```

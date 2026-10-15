@@ -19,7 +19,7 @@ function plan(steps: TaskStep[], status: TaskPlan['status'] = 'executing'): Task
   return {
     id: 'plan-1',
     runId: 'run-1',
-    goal: 'Diagnose crash in sepehr-motor',
+    goal: 'Diagnose crash in demo-project',
     steps,
     status,
     createdAt: 0

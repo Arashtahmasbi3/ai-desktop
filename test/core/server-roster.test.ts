@@ -27,8 +27,8 @@ import type { ToolExecutor } from '../../src/core/agent/tools'
  * resolved by exact id. These are the two fixes.
  */
 const SERVERS: ServerRefTarget[] = [
-  { id: '34c80099-2868-40a1-bef4-9b23d865db0b', name: 'spmotor', host: '212.16.86.23', port: 22, username: 'root' },
-  { id: 'aaaa1111-2222-3333-4444-555566667777', name: 'peymabim', host: '91.107.174.210', port: 2222, username: 'ubuntu' }
+  { id: '34c80099-2868-40a1-bef4-9b23d865db0b', name: 'my-server', host: '203.0.113.23', port: 22, username: 'root' },
+  { id: 'aaaa1111-2222-3333-4444-555566667777', name: 'demo-b', host: '203.0.113.10', port: 2222, username: 'ubuntu' }
 ]
 
 const SUMMARIES: ServerSummary[] = [
@@ -41,22 +41,22 @@ describe('resolveServerRef (v2.8.1)', () => {
     const match = resolveServerRef(SERVERS[0]!.id, SERVERS)
     expect(match.ok).toBe(true)
     if (match.ok) {
-      expect(match.server.name).toBe('spmotor')
+      expect(match.server.name).toBe('my-server')
       expect(match.matchedBy).toBe('id')
     }
   })
 
   it('resolves a display name case-insensitively', () => {
-    const match = resolveServerRef('Peymabim', SERVERS)
+    const match = resolveServerRef('Demo-B', SERVERS)
     expect(match.ok).toBe(true)
-    if (match.ok) expect(match.server.host).toBe('91.107.174.210')
+    if (match.ok) expect(match.server.host).toBe('203.0.113.10')
   })
 
   it('resolves a host and a host:port', () => {
-    const byHost = resolveServerRef('212.16.86.23', SERVERS)
+    const byHost = resolveServerRef('203.0.113.23', SERVERS)
     expect(byHost.ok && byHost.matchedBy).toBe('host')
-    const byHostPort = resolveServerRef('91.107.174.210:2222', SERVERS)
-    expect(byHostPort.ok && byHostPort.server.name).toBe('peymabim')
+    const byHostPort = resolveServerRef('203.0.113.10:2222', SERVERS)
+    expect(byHostPort.ok && byHostPort.server.name).toBe('demo-b')
   })
 
   it('prefers an id over a name that looks like one', () => {
@@ -74,14 +74,14 @@ describe('resolveServerRef (v2.8.1)', () => {
     expect(match.ok).toBe(false)
     if (!match.ok) {
       expect(match.error).toContain('No saved server matches')
-      expect(formatServerRefFailure(match)).toContain('spmotor')
-      expect(formatServerRefFailure(match)).toContain('peymabim')
+      expect(formatServerRefFailure(match)).toContain('my-server')
+      expect(formatServerRefFailure(match)).toContain('demo-b')
     }
   })
 
   it('refuses an ambiguous name instead of guessing', () => {
-    const twins: ServerRefTarget[] = [SERVERS[0]!, { ...SERVERS[1]!, name: 'spmotor' }]
-    const match = resolveServerRef('spmotor', twins)
+    const twins: ServerRefTarget[] = [SERVERS[0]!, { ...SERVERS[1]!, name: 'my-server' }]
+    const match = resolveServerRef('my-server', twins)
     expect(match.ok).toBe(false)
     if (!match.ok) {
       expect(match.error).toMatch(/matches 2 servers/)
@@ -90,7 +90,7 @@ describe('resolveServerRef (v2.8.1)', () => {
   })
 
   it('rejects a disconnected server when the tool needs a live connection', () => {
-    const match = resolveServerRef('peymabim', SERVERS, {
+    const match = resolveServerRef('demo-b', SERVERS, {
       requireConnected: true,
       connected: [SERVERS[0]!.id]
     })
@@ -110,8 +110,8 @@ describe('resolveServerRef (v2.8.1)', () => {
 describe('formatServerList (v2.8.1)', () => {
   it('lists id, name, user@host:port and state, and says how to reference a server', () => {
     const text = formatServerList(SUMMARIES)
-    expect(text).toContain(`- spmotor (id: ${SERVERS[0]!.id}) root@212.16.86.23:22 [connected, policy: production]`)
-    expect(text).toContain(`- peymabim (id: ${SERVERS[1]!.id}) ubuntu@91.107.174.210:2222 [offline, active project server]`)
+    expect(text).toContain(`- my-server (id: ${SERVERS[0]!.id}) root@203.0.113.23:22 [connected, policy: production]`)
+    expect(text).toContain(`- demo-b (id: ${SERVERS[1]!.id}) ubuntu@203.0.113.10:2222 [offline, active project server]`)
     expect(text).toMatch(/Pass the id, the name, or the host/)
   })
 
@@ -121,8 +121,8 @@ describe('formatServerList (v2.8.1)', () => {
 
   it('matches by id, name and host for callers that classify a reference', () => {
     expect(matchesServerRef(SUMMARIES[0]!, SERVERS[0]!.id)).toBe(true)
-    expect(matchesServerRef(SUMMARIES[0]!, 'SPMOTOR')).toBe(true)
-    expect(matchesServerRef(SUMMARIES[0]!, '212.16.86.23')).toBe(true)
+    expect(matchesServerRef(SUMMARIES[0]!, 'MY-SERVER')).toBe(true)
+    expect(matchesServerRef(SUMMARIES[0]!, '203.0.113.23')).toBe(true)
     expect(matchesServerRef(SUMMARIES[0]!, '')).toBe(false)
     expect(matchesServerRef(SUMMARIES[0]!, 'other')).toBe(false)
   })
@@ -144,7 +144,7 @@ describe('ListServersToolExecutor (v2.8.1)', () => {
     const executor = new ListServersToolExecutor({ listServers: async () => SUMMARIES })
     const result = await executor.execute(action('list_servers', {}))
     expect(result.ok).toBe(true)
-    expect(result.output).toContain('spmotor')
+    expect(result.output).toContain('my-server')
     expect(result.output).toContain(SERVERS[1]!.id)
   })
 
@@ -201,7 +201,7 @@ describe('ServerRefResolvingExecutor (v2.8.1)', () => {
     const executor = new ServerRefResolvingExecutor(inner, resolver())
 
     const result = await executor.execute(
-      action('migrate_project', { source_vps_id: 'spmotor', target_vps_id: 'peymabim' })
+      action('migrate_project', { source_vps_id: 'my-server', target_vps_id: 'demo-b' })
     )
 
     expect(result.ok).toBe(true)
@@ -212,7 +212,7 @@ describe('ServerRefResolvingExecutor (v2.8.1)', () => {
   it('rewrites a host too', async () => {
     const inner = new RecordingExecutor()
     const executor = new ServerRefResolvingExecutor(inner, resolver())
-    await executor.execute(action('remote_shell', { server_id: '212.16.86.23', command: 'uptime' }))
+    await executor.execute(action('remote_shell', { server_id: '203.0.113.23', command: 'uptime' }))
     expect(inner.seen[0]?.arguments.server_id).toBe(SERVERS[0]!.id)
   })
 
@@ -229,7 +229,7 @@ describe('ServerRefResolvingExecutor (v2.8.1)', () => {
     expect(failure.ok).toBe(false)
     expect(failure.code).toBe('invalid_arguments')
     // The roster is in the error so the model can correct itself.
-    expect(failure.error).toContain('spmotor')
+    expect(failure.error).toContain('my-server')
     expect(inner.seen).toHaveLength(1)
   })
 
@@ -237,18 +237,18 @@ describe('ServerRefResolvingExecutor (v2.8.1)', () => {
     const inner = new RecordingExecutor()
     const executor = new ServerRefResolvingExecutor(
       inner,
-      resolver(SERVERS, [SERVERS[0]!.id]) // peymabim is offline
+      resolver(SERVERS, [SERVERS[0]!.id]) // demo-b is offline
     )
 
     const asSource = await executor.execute(
-      action('migrate_project', { source_vps_id: 'peymabim', target_path: '/x' })
+      action('migrate_project', { source_vps_id: 'demo-b', target_path: '/x' })
     )
     expect(asSource.ok).toBe(false)
     expect(asSource.error).toMatch(/is not connected/)
 
     // A migration *target* need not be connected: the transfer is pushed from the source.
     const asTarget = await executor.execute(
-      action('migrate_project', { source_vps_id: 'spmotor', target_vps_id: 'peymabim' })
+      action('migrate_project', { source_vps_id: 'my-server', target_vps_id: 'demo-b' })
     )
     expect(asTarget.ok).toBe(true)
   })

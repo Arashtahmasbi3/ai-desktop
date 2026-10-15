@@ -60,7 +60,7 @@ describe('the read-only shell classifier unwraps wrappers (v2.8.1)', () => {
     expect(isReadOnlyShellCommand('env LANG=C ls -la')).toBe(true)
     expect(isReadOnlyShellCommand('systemctl status ssh')).toBe(true)
     // An ssh *with a read-only remote command* is a read.
-    expect(isReadOnlyShellCommand('timeout 12 ssh -o BatchMode=yes root@212.16.86.23 uptime')).toBe(
+    expect(isReadOnlyShellCommand('timeout 12 ssh -o BatchMode=yes root@203.0.113.23 uptime')).toBe(
       true
     )
   })

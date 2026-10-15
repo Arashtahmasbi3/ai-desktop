@@ -300,7 +300,7 @@ export class DiagnosticsToolExecutor implements ToolExecutor {
      * v3.0: a diagnostics tool ALWAYS runs against the server selected in the chat header
      * (P0-4: a probe must never reach another host). A different `server_id` used to be
      * accepted and silently ignored, so the tool returned one machine's data as the answer
-     * about another: a real user was told "yoserver's hostname is <spmotor's hostname>" and
+     * about another: a real user was told "backup-host's hostname is <my-server's hostname>" and
      * reasonably concluded the two were the same machine. Refusing is the honest answer —
      * the caller asked about a host this tool deliberately will not touch.
      */

@@ -175,7 +175,7 @@
 ```
 ┌──────────────────────────────────────┐
 │ 🔧 migrate_database                  │
-│ Source: spmotor/prod-db (45 MB)      │
+│ Source: my-server/prod-db (45 MB)      │
 │ Target: production/prod-db           │
 │ Duration: 2m 14s                     │
 │ Status: ✅ completed                 │

@@ -146,7 +146,7 @@ Test suite: **262 files / 2166 tests green**; typecheck and production build cle
   disabled for the most common stop reason.
 - **Cross-server migration accepts a target that is not a saved server yet.** The rsync
   runs *on the source* with `BatchMode=yes`, so the destination never had to be saved
-  here — requiring an id turned "migrate to 212.16.86.23" into a dead end. `target_host`
+  here — requiring an id turned "migrate to 203.0.113.23" into a dead end. `target_host`
   (+ optional user/port) is now accepted, with host/user/port validation, and the
   sensitive-path, deny-list, dry-run, audit and `--delete` guards all still apply.
 - **Switching projects no longer raises the chat-transfer dialog.** The default was

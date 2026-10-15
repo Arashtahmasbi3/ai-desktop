@@ -259,7 +259,7 @@ async function setupGit(ssh, path, options) {
 ### UI:
 ```
 ┌──────────────────────────────┐
-│ 🌿 sepehr-motor              │
+│ 🌿 demo-project              │
 │    main · 3 changes · ↑2     │
 └──────────────────────────────┘
 ```
@@ -347,7 +347,7 @@ async function getSystemHealth(ssh): Promise<SystemHealth> {
 ### UI:
 ```
 ┌────────────────────────────────────────────┐
-│  🩺 System Health — spmotor                │
+│  🩺 System Health — my-server                │
 ├────────────────────────────────────────────┤
 │  ✅ node v20.10.0                          │
 │  ✅ npm v10.2.3                            │

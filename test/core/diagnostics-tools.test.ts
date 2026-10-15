@@ -165,7 +165,7 @@ describe('DiagnosticsToolExecutor', () => {
   /*
    * v3.0: the old contract accepted a different `server_id` and silently ignored it, so the
    * tool returned one machine's data as the answer about another — a real user was told
-   * "yoserver's hostname is <spmotor's hostname>" and concluded the two were the same host.
+   * "backup-host's hostname is <my-server's hostname>" and concluded the two were the same host.
    * Refusing is the honest behaviour: the caller asked about a host this tool won't touch.
    */
   it('refuses a model-supplied server_id that differs from the pinned server', async () => {

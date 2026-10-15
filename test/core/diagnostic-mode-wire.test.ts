@@ -9,7 +9,7 @@ import { action } from './v24-host'
  * shell/file executors so Diagnostic Mode actually widens (and only read-only)
  * the P0-2 confinement the tools enforce.
  */
-const ROOT = '/opt/sepehr-motor'
+const ROOT = '/opt/demo-project'
 const SERVERS = ['srv-1']
 
 function fakeHost(calls: Array<{ command: string }>): RemoteHost {

@@ -10,7 +10,7 @@ import type { ProjectRecord } from '@shared/ui'
 const NOW = 1_700_000_000_000
 
 function project(partial: Partial<ProjectRecord>): ProjectRecord {
-  return { id: 'p1', name: 'Motor', path: '/opt/sepehr-motor', createdAt: NOW, ...partial }
+  return { id: 'p1', name: 'Motor', path: '/opt/demo-project', createdAt: NOW, ...partial }
 }
 
 function host(connected: string[]): RemoteShellHost {
@@ -23,14 +23,14 @@ function host(connected: string[]): RemoteShellHost {
 describe('migrateProjectRecord (Task A.2)', () => {
   it('1. promotes a Linux path stored on Windows to a remote project (no VPS yet)', () => {
     const migrated = migrateProjectRecord(
-      { id: 'p1', name: 'Motor', path: '/opt/sepehr-motor', createdAt: NOW },
+      { id: 'p1', name: 'Motor', path: '/opt/demo-project', createdAt: NOW },
       'win32',
       NOW
     )
     expect(migrated).toMatchObject({
       id: 'p1',
       name: 'Motor',
-      path: '/opt/sepehr-motor',
+      path: '/opt/demo-project',
       type: 'remote'
     })
     expect(migrated.vpsId).toBeUndefined()
@@ -53,7 +53,7 @@ describe('migrateProjectRecord (Task A.2)', () => {
 
   it('4. preserves an explicitly remote project and its VPS id', () => {
     const migrated = migrateProjectRecord(
-      { id: 'p3', name: 'Motor', path: '/opt/sepehr-motor', type: 'remote', vpsId: 'vps-1' },
+      { id: 'p3', name: 'Motor', path: '/opt/demo-project', type: 'remote', vpsId: 'vps-1' },
       'win32',
       NOW
     )

@@ -72,8 +72,8 @@ describe('Task 2.3 - clearer approval dialog', () => {
     useStore.setState({
       pendingApproval: request({
         reason: 'write',
-        server: 'spmotor',
-        workingDirectory: '/opt/sepehr-motor'
+        server: 'my-server',
+        workingDirectory: '/opt/demo-project'
       })
     })
     render(<ApprovalDialog />)
@@ -82,8 +82,8 @@ describe('Task 2.3 - clearer approval dialog', () => {
     // v2.8.1: named in words; the raw tool id stays in the tooltip and in the
     // Show-details disclosure.
     expect(screen.getByText('a file on the server')).toBeTruthy()
-    expect(screen.getByText('spmotor')).toBeTruthy()
-    expect(screen.getByText('/opt/sepehr-motor')).toBeTruthy()
+    expect(screen.getByText('my-server')).toBeTruthy()
+    expect(screen.getByText('/opt/demo-project')).toBeTruthy()
     expect(screen.getByText('Write')).toBeTruthy()
   })
 

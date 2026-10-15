@@ -15,7 +15,7 @@ AUTO-DECISION در AGENTS.md ثبت کن.
 
 ### 🔴 تسک ۱: Path Discovery خودکار (حیاتی)
 
-**مشکل:** پروژه با مسیر `/opt/sepehr-motor` ساخته شده اما روی ویندوز یافت نمی‌شود.
+**مشکل:** پروژه با مسیر `/opt/demo-project` ساخته شده اما روی ویندوز یافت نمی‌شود.
 
 **راه‌حل:**
 1. **Auto-migration در Startup:**
@@ -83,7 +83,7 @@ AUTO-DECISION در AGENTS.md ثبت کن.
    ┌─────────────────────────┐
    │ + New Chat              │
    ├─────────────────────────┤
-   │ ▼ Project: spmotor      │
+   │ ▼ Project: my-server      │
    │   • Chat 1 (2h ago)     │
    │   • Chat 2 (yesterday)  │
    │   + New chat in project │

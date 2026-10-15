@@ -317,7 +317,7 @@ export function formatMigrationPlan(
  * v2.8.0: the target may also be a **raw host**. The transfer runs *on the source*
  * with `BatchMode=yes`, so the target never needed to be a saved server on this
  * machine — only reachable from the source by key. Requiring it to be saved first
- * dead-ended the user ("migrate this project to 212.16.86.23" produced "that is just
+ * dead-ended the user ("migrate this project to 203.0.113.23" produced "that is just
  * an IP; add it in Settings first"). A saved id still wins when both are given.
  */
 export async function executeMigrateProject(

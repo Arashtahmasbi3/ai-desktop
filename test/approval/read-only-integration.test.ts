@@ -12,7 +12,7 @@ import type { ApprovalOutcome } from '@shared/approval'
  * prompt, while a write still does.
  */
 const READ_ONLY_COMMAND =
-  'B=/opt/sepehr-motor/releases/RELEASE-2026-10-05/web; echo "=== BUILD_ID ? ==="; ' +
+  'B=/opt/demo-project/releases/RELEASE-2026-10-05/web; echo "=== BUILD_ID ? ==="; ' +
   'find "$B" -maxdepth 2 -name BUILD_ID 2>&1; cat "$B"/.next/package.json 2>&1'
 
 function action(name: string, args: Record<string, unknown>): AgentAction {

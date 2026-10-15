@@ -10,8 +10,8 @@ import type { ProjectRecord, SettingsView, WorkerStatus } from '@shared/ui'
 /**
  * v2.9.2 — a disconnected remote project is not a missing local folder.
  *
- * Found live on the user's own machine: both projects are remote (`/opt/sepehr-motor`,
- * `/home/deploy/workspaces/peymabim`), and at startup neither VPS is connected, so the
+ * Found live on the user's own machine: both projects are remote (`/opt/demo-project`,
+ * `/home/deploy/workspaces/demo-b`), and at startup neither VPS is connected, so the
  * sidebar showed an amber dot, **"Path not found"** and a **Locate** button — a *local*
  * folder picker for a path that lives on a server. The project was fine; only the label was
  * wrong, and it is the kind of wrong that makes a user think their work is gone.
@@ -45,8 +45,8 @@ const worker: WorkerStatus = {
 
 const remoteDisconnected: ProjectRecord = {
   id: 'p-remote',
-  name: 'sepehr-motor',
-  path: '/opt/sepehr-motor',
+  name: 'demo-project',
+  path: '/opt/demo-project',
   createdAt: 1,
   updatedAt: 1,
   environment: 'development',
@@ -135,8 +135,8 @@ describe('a remote project whose VPS is down (v2.9.2)', () => {
 
 describe('ProjectBadges does not double-report a remote path (v2.9.2)', () => {
   it('renders a disconnected remote project without a missing-path label', () => {
-    render(<ProjectBadges project={remoteDisconnected} serverName="spmotor" />)
+    render(<ProjectBadges project={remoteDisconnected} serverName="my-server" />)
     expect(screen.queryByText(i18n.t('sidebar.missingPath'))).toBeNull()
-    expect(screen.getByText('(spmotor)')).toBeTruthy()
+    expect(screen.getByText('(my-server)')).toBeTruthy()
   })
 })

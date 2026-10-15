@@ -14,19 +14,19 @@ import { executeRemoteShell, type RemoteShellDeps } from '@core/tools/remote-she
  * write outside its own root, whether the path arrives as a dedicated file tool
  * argument, a shell command, or a stray local tool call that gets rerouted.
  */
-const ROOT = '/opt/sepehr-motor'
+const ROOT = '/opt/demo-project'
 
 describe('enforceProjectPath', () => {
   it('allows a relative path inside the root', () => {
     const result = enforceProjectPath('src/index.ts', ROOT)
     expect(result.ok).toBe(true)
-    expect(result.resolvedPath).toBe('/opt/sepehr-motor/src/index.ts')
+    expect(result.resolvedPath).toBe('/opt/demo-project/src/index.ts')
   })
 
   it('allows an absolute path inside the root', () => {
-    const result = enforceProjectPath('/opt/sepehr-motor/src/app.ts', ROOT)
+    const result = enforceProjectPath('/opt/demo-project/src/app.ts', ROOT)
     expect(result.ok).toBe(true)
-    expect(result.resolvedPath).toBe('/opt/sepehr-motor/src/app.ts')
+    expect(result.resolvedPath).toBe('/opt/demo-project/src/app.ts')
   })
 
   it('allows the root itself', () => {
@@ -41,17 +41,17 @@ describe('enforceProjectPath', () => {
   })
 
   it('rejects a sibling directory sharing the root prefix', () => {
-    expect(enforceProjectPath('/opt/sepehr-motor-evil/x', ROOT).ok).toBe(false)
+    expect(enforceProjectPath('/opt/demo-project-evil/x', ROOT).ok).toBe(false)
   })
 
   it('rejects path traversal', () => {
     expect(enforceProjectPath('../../etc/passwd', ROOT).ok).toBe(false)
     expect(enforceProjectPath('src/../../etc/passwd', ROOT).ok).toBe(false)
-    expect(enforceProjectPath('/opt/sepehr-motor/../secrets', ROOT).ok).toBe(false)
+    expect(enforceProjectPath('/opt/demo-project/../secrets', ROOT).ok).toBe(false)
   })
 
   it('rejects control characters', () => {
-    const result = enforceProjectPath('/opt/sepehr-motor/file\x00.txt', ROOT)
+    const result = enforceProjectPath('/opt/demo-project/file\x00.txt', ROOT)
     expect(result.ok).toBe(false)
     expect(result.error).toMatch(/control characters/)
   })
@@ -62,8 +62,8 @@ describe('enforceProjectPath', () => {
   })
 
   it('tolerates a trailing slash on the root', () => {
-    expect(enforceProjectPath('src/a.ts', '/opt/sepehr-motor/').resolvedPath).toBe(
-      '/opt/sepehr-motor/src/a.ts'
+    expect(enforceProjectPath('src/a.ts', '/opt/demo-project/').resolvedPath).toBe(
+      '/opt/demo-project/src/a.ts'
     )
   })
 })
@@ -77,7 +77,7 @@ describe('extractAbsolutePaths / enforceCommandPaths', () => {
   })
 
   it('allows a command that only touches the project', () => {
-    expect(enforceCommandPaths('cd /opt/sepehr-motor && npm test', ROOT).ok).toBe(true)
+    expect(enforceCommandPaths('cd /opt/demo-project && npm test', ROOT).ok).toBe(true)
   })
 
   it('allows benign device redirections', () => {
@@ -108,7 +108,7 @@ describe('routeToolCall containment', () => {
     expect(decision).toMatchObject({
       kind: 'redirect',
       tool: 'remote_read_file',
-      args: { path: '/opt/sepehr-motor/src/index.ts' }
+      args: { path: '/opt/demo-project/src/index.ts' }
     })
   })
 
@@ -128,7 +128,7 @@ describe('routeToolCall containment', () => {
   })
 
   it('still redirects a run_command that stays inside the project', () => {
-    const decision = routeToolCall('run_command', { command: 'ls /opt/sepehr-motor' }, context)
+    const decision = routeToolCall('run_command', { command: 'ls /opt/demo-project' }, context)
     expect(decision).toMatchObject({ kind: 'redirect', tool: 'remote_shell' })
   })
 })
@@ -218,7 +218,7 @@ describe('executeRemoteShell containment', () => {
     const d = deps(ROOT)
     const result = await executeRemoteShell(d, {
       server_id: 'srv-1',
-      command: 'cd /opt/sepehr-motor && git status'
+      command: 'cd /opt/demo-project && git status'
     })
     expect(result.ok).toBe(true)
     expect(d.ran).toHaveLength(1)

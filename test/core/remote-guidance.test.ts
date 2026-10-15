@@ -73,26 +73,26 @@ describe('buildSystemPrompt remote option (Fix 3)', () => {
  */
 describe('buildRemoteGuidance context awareness (Smarter Prompt)', () => {
   const context = {
-    projectName: 'sepehr-motor',
-    projectPath: '/opt/sepehr-motor',
-    vpsId: 'spmotor',
-    vpsName: 'spmotor',
+    projectName: 'demo-project',
+    projectPath: '/opt/demo-project',
+    vpsId: 'my-server',
+    vpsName: 'my-server',
     environment: 'production'
   }
 
   it('renders the concrete project, path, VPS and environment', () => {
     const text = buildRemoteGuidance(true, context)
-    expect(text).toContain('- Project: sepehr-motor')
-    expect(text).toContain('- Path: /opt/sepehr-motor')
-    expect(text).toContain('- VPS: spmotor (spmotor)')
+    expect(text).toContain('- Project: demo-project')
+    expect(text).toContain('- Path: /opt/demo-project')
+    expect(text).toContain('- VPS: my-server (my-server)')
     expect(text).toContain('- Environment: production')
     expect(text).toMatch(/do NOT spend tool calls/i)
   })
 
   it('uses the VPS id when no display name is known', () => {
-    const text = buildRemoteGuidance(true, { vpsId: 'spmotor' })
-    expect(text).toContain('- VPS: spmotor')
-    expect(text).not.toContain('(spmotor)')
+    const text = buildRemoteGuidance(true, { vpsId: 'my-server' })
+    expect(text).toContain('- VPS: my-server')
+    expect(text).not.toContain('(my-server)')
   })
 
   it('falls back to the generic hint without context', () => {
@@ -107,7 +107,7 @@ describe('buildRemoteGuidance context awareness (Smarter Prompt)', () => {
       remote: true,
       remoteContext: context
     })
-    expect(prompt).toContain('- Project: sepehr-motor')
+    expect(prompt).toContain('- Project: demo-project')
     expect(prompt).toContain('- Environment: production')
   })
 })

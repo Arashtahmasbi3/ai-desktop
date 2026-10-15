@@ -15,8 +15,8 @@ beforeAll(async () => {
 
 const remote: ProjectRecord = {
   id: 'p1',
-  name: 'sepehr-motor',
-  path: '/opt/sepehr-motor',
+  name: 'demo-project',
+  path: '/opt/demo-project',
   createdAt: 1,
   updatedAt: 1,
   environment: 'production',
@@ -38,7 +38,7 @@ const local: ProjectRecord = {
 const servers: VpsServerView[] = [
   {
     id: 'srv-9',
-    name: 'spmotor',
+    name: 'my-server',
     host: '10.0.0.9',
     port: 22,
     username: 'root',
@@ -99,10 +99,10 @@ afterEach(() => {
 describe('v2.6.1 B.3 - execution bar', () => {
   it('1. line 1 names the project, server and working path', () => {
     render(<ExecutionBar timelineOpen={false} onToggleTimeline={() => undefined} />)
-    expect(screen.getByTestId('exec-project').textContent).toBe('sepehr-motor')
-    expect(screen.getByTestId('exec-server').textContent).toBe('spmotor')
+    expect(screen.getByTestId('exec-project').textContent).toBe('demo-project')
+    expect(screen.getByTestId('exec-server').textContent).toBe('my-server')
     const path = screen.getByTestId('exec-path')
-    expect(path.textContent).toBe('/opt/sepehr-motor')
+    expect(path.textContent).toBe('/opt/demo-project')
     expect(path.getAttribute('dir')).toBe('ltr')
   })
 

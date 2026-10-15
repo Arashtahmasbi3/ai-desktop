@@ -38,7 +38,7 @@ describe('buildContextPreview', () => {
         { role: 'assistant', content: 'z'.repeat(40) }
       ],
       files: ['package.json', 'src/index.ts'],
-      remotePaths: ['/opt/sepehr-motor']
+      remotePaths: ['/opt/demo-project']
     })
 
     expect(preview.provider).toBe('DeepSeek')

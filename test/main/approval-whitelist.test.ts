@@ -6,7 +6,7 @@ import { planRemoteRuntime } from '../../src/main/agent-service'
 import type { RemoteHost } from '../../src/main/agent-service'
 import { action } from '../core/v24-host'
 
-const ROOT = '/opt/sepehr-motor'
+const ROOT = '/opt/demo-project'
 
 function shell(command: string, id = `a-${command}`): AgentAction {
   return {
@@ -74,9 +74,9 @@ describe('Task 2.1 - whitelist bypasses approval', () => {
     expect(asked).toHaveLength(0)
   })
 
-  it('4. remote_shell "ls /opt/sepehr-motor 2>&1" needs no approval', async () => {
+  it('4. remote_shell "ls /opt/demo-project 2>&1" needs no approval', async () => {
     const { gate, asked } = askGate()
-    expect(await gate(shell('ls /opt/sepehr-motor 2>&1'))).toBe(true)
+    expect(await gate(shell('ls /opt/demo-project 2>&1'))).toBe(true)
     expect(asked).toHaveLength(0)
   })
 

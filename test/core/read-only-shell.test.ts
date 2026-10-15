@@ -7,7 +7,7 @@ import { enforceCommandPaths } from '@core/remote/path-guard'
 import { createDiagnosticPolicy } from '@core/remote/diagnostic-policy'
 import { shouldRequireApproval } from '@main/approval-gate'
 
-const ROOT = '/opt/sepehr-motor'
+const ROOT = '/opt/demo-project'
 
 /**
  * Task 3.1 - the read-only shell classifier accepts *compound* commands

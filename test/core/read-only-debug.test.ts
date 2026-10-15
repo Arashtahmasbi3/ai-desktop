@@ -18,7 +18,7 @@ import { isReadOnlyShellCommand } from '@core/remote/command-whitelist'
  */
 describe('v2.5.8 - read-only detection (variable assignments)', () => {
   it('1. a bare variable assignment is read-only', () => {
-    expect(isReadOnlyShellCommand('B=/opt/sepehr-motor/web')).toBe(true)
+    expect(isReadOnlyShellCommand('B=/opt/demo-project/web')).toBe(true)
     expect(isReadOnlyShellCommand('FOO=bar')).toBe(true)
     expect(isReadOnlyShellCommand('A=1 B=2 C=3')).toBe(true)
   })
@@ -37,14 +37,14 @@ describe('v2.5.8 - read-only detection (variable assignments)', () => {
 
   it('4. a complex chain with `;` and `2>&1` is read-only', () => {
     const command =
-      'B=/opt/sepehr-motor/web; echo "=== BUILD_ID ? ==="; ' +
+      'B=/opt/demo-project/web; echo "=== BUILD_ID ? ==="; ' +
       'find "$B" -maxdepth 2 -name BUILD_ID 2>&1; cat "$B"/package.json 2>&1'
     expect(isReadOnlyShellCommand(command)).toBe(true)
   })
 
   it('5. the real user command is read-only', () => {
     const command =
-      'B=/opt/sepehr-motor/releases/RELEASE-2026-10-05/web; echo "=== BUILD_ID ? ==="; ' +
+      'B=/opt/demo-project/releases/RELEASE-2026-10-05/web; echo "=== BUILD_ID ? ==="; ' +
       'find "$B" -maxdepth 2 -name BUILD_ID 2>&1; ls -la "$B" 2>&1; ' +
       'cat "$B"/.next/package.json 2>&1'
     expect(isReadOnlyShellCommand(command)).toBe(true)

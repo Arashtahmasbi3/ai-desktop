@@ -377,7 +377,7 @@ Exception: read-only commands (ls, cat, git status) do NOT need plan.
 ┌────────────────────────────────────────┐
 │ 📋 Plan                                │
 ├────────────────────────────────────────┤
-│ 1. Check remote path: /opt/sepehr-motor│
+│ 1. Check remote path: /opt/demo-project│
 │    → remote_shell: "ls /opt/..."       │
 │ 2. Read package.json                   │
 │    → remote_read_file                  │
@@ -564,7 +564,7 @@ const dryRunResult = await ssh.exec(
 │  • System prompt (2,100 tokens)          │
 │  • Chat history (8,200 tokens)           │
 │  • Files: package.json, src/index.ts     │
-│  • Remote context: /opt/sepehr-motor     │
+│  • Remote context: /opt/demo-project     │
 │                                          │
 │ NOT included:                            │
 │  • .env, secrets, private keys           │

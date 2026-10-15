@@ -77,7 +77,7 @@
 
 
 #### تسک ۱.۱: رفع خطای `files:list: ENOENT`
-**مشکل:** مسیر `/opt/sepehr-motor` (Linux) در ویندوز ذخیره شده و scandir شکست می‌خورد.
+**مشکل:** مسیر `/opt/demo-project` (Linux) در ویندوز ذخیره شده و scandir شکست می‌خورد.
 
 
 **راه‌حل:**

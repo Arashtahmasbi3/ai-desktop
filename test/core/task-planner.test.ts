@@ -11,8 +11,8 @@ import {
 
 const CONTEXT: RunContext = {
   runId: 'run-1',
-  project: { name: 'sepehr-motor', path: '/opt/sepehr-motor' },
-  vpsName: 'sepehr',
+  project: { name: 'demo-project', path: '/opt/demo-project' },
+  vpsName: 'demo',
   tools: ['remote_shell', 'diagnose_crash']
 }
 
@@ -58,7 +58,7 @@ describe('Task 4.1 - task planner', () => {
     expect(plan.steps).toHaveLength(3)
     expect(plan.steps[0].number).toBe(1)
     expect(plan.steps[2].toolName).toBe('diagnose_crash')
-    expect(prompts[0]).toContain('sepehr-motor')
+    expect(prompts[0]).toContain('demo-project')
   })
 
   it('2. a simple question needs no plan', async () => {

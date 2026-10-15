@@ -215,7 +215,7 @@ class LoopDetector {
 ## تسک A.2: Workspace Type (Local vs Remote)
 
 
-**مشکل:** پروژه با path `/opt/sepehr-motor` (Linux) روی Windows ذخیره شده. UI می‌گوید "Path not found".
+**مشکل:** پروژه با path `/opt/demo-project` (Linux) روی Windows ذخیره شده. UI می‌گوید "Path not found".
 
 
 **راه‌حل (الهام از MobaRust و wrolp):**

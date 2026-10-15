@@ -58,8 +58,8 @@ describe('v2.6.0 A.2 - RTL/LTR direction', () => {
         stdout=""
         stderr={'process "api" not found'}
         exitCode={1}
-        serverId="spmotor"
-        cwd="/opt/sepehr-motor"
+        serverId="my-server"
+        cwd="/opt/demo-project"
       />
     )
     // v2.8.1: the command shows in both the header preview and the expanded body.

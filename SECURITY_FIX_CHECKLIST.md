@@ -330,10 +330,10 @@ function extractPathsFromCommand(cmd: string): string[] {
 
 ```typescript
 describe('Remote Path Enforcement', () => {
-  const ROOT = '/opt/sepehr-motor';
+  const ROOT = '/opt/demo-project';
   
   it('allows absolute path inside root', () => {
-    expect(enforceProjectPath('/opt/sepehr-motor/src/app.ts', ROOT).ok).toBe(true);
+    expect(enforceProjectPath('/opt/demo-project/src/app.ts', ROOT).ok).toBe(true);
   });
   
   it('allows relative path', () => {
@@ -353,7 +353,7 @@ describe('Remote Path Enforcement', () => {
   });
   
   it('rejects control chars', () => {
-    expect(enforceProjectPath('/opt/sepehr-motor/file\x00.txt', ROOT).ok).toBe(false);
+    expect(enforceProjectPath('/opt/demo-project/file\x00.txt', ROOT).ok).toBe(false);
   });
   
   it('rejects command referencing outside path', async () => {
@@ -1216,8 +1216,8 @@ ci: add GitHub Actions for test + build
 ```
 ┌────────────────────────────────────────────┐
 │ 🔧 remote_shell                            │
-│ $ ls -la /opt/sepehr-motor                 │
-│ Host: spmotor | cwd: /opt/sepehr-motor     │
+│ $ ls -la /opt/demo-project                 │
+│ Host: my-server | cwd: /opt/demo-project     │
 │ Exit: 0 | Duration: 245ms                  │
 │ [▼ View output (12 lines)]                 │
 └────────────────────────────────────────────┘
@@ -1254,7 +1254,7 @@ feat(ui): rich tool result card with command + output
 │                                            │
 │ Tool: remote_shell                         │
 │ Command: $ git pull origin main            │
-│ VPS: spmotor | Project: sepehr-motor       │
+│ VPS: my-server | Project: demo-project       │
 │                                            │
 │ ⚠️ This tool cannot be remembered.         │
 │    Each call requires approval.            │

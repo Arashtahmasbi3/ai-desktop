@@ -41,7 +41,7 @@ describe('normalizeProjectPath', () => {
 
 describe('normalizeRemoteProjectPath', () => {
   it('accepts a remote POSIX path regardless of the local platform', () => {
-    expect(normalizeRemoteProjectPath('/opt/sepehr-motor')).toBe('/opt/sepehr-motor')
+    expect(normalizeRemoteProjectPath('/opt/demo-project')).toBe('/opt/demo-project')
   })
 
   it('rejects a non-absolute remote path', () => {
@@ -51,7 +51,7 @@ describe('normalizeRemoteProjectPath', () => {
 
 describe('crossPlatformPathWarning', () => {
   it('warns about a POSIX path on Windows', () => {
-    expect(crossPlatformPathWarning('/opt/sepehr-motor', 'win32')).toMatch(/Linux\/macOS/)
+    expect(crossPlatformPathWarning('/opt/demo-project', 'win32')).toMatch(/Linux\/macOS/)
   })
 
   it('warns about a Windows path on POSIX', () => {
@@ -76,7 +76,7 @@ describe('classifyLocalProject', () => {
   })
 
   it('flags a foreign-OS path as os-mismatch, not merely missing', () => {
-    expect(classifyLocalProject('/opt/sepehr-motor', 'win32', false)).toBe('os-mismatch')
+    expect(classifyLocalProject('/opt/demo-project', 'win32', false)).toBe('os-mismatch')
     expect(classifyLocalProject('C:\\projects\\app', 'linux', false)).toBe('os-mismatch')
   })
 
@@ -99,10 +99,10 @@ describe('missing project migration', () => {
 
   it('stores remote projects with their server and keeps them on reload', async () => {
     const persistence = make()
-    await persistence.addProject('Motor', '/opt/sepehr-motor', { type: 'remote', vpsId: 'vps-1' })
+    await persistence.addProject('Motor', '/opt/demo-project', { type: 'remote', vpsId: 'vps-1' })
     const reloaded = make()
     await reloaded.load()
     const project = reloaded.listProjects()[0]
-    expect(project).toMatchObject({ name: 'Motor', path: '/opt/sepehr-motor', type: 'remote', vpsId: 'vps-1' })
+    expect(project).toMatchObject({ name: 'Motor', path: '/opt/demo-project', type: 'remote', vpsId: 'vps-1' })
   })
 })
