@@ -1,4 +1,5 @@
 import type { ModelCapabilities, ProviderId } from '@shared/types'
+import { modelSupportsVision } from '@shared/attachments'
 import { OpenAIAdapter } from './openai'
 
 /**
@@ -14,7 +15,11 @@ export class DeepSeekAdapter extends OpenAIAdapter {
     return {
       streaming: true,
       toolCalling: true,
-      vision: false,
+      // v2.9.0: DeepSeek's text models have no vision endpoint. This is read as
+      // the runtime authority by `AgentService`, so an attached image is sent as
+      // a text-only note ("this model cannot see images") instead of a data URL
+      // the API would reject.
+      vision: modelSupportsVision('deepseek', model),
       jsonMode: true,
       contextWindow: 64_000,
       maxOutputTokens: isReasoner ? 32_768 : 8_192

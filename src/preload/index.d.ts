@@ -5,6 +5,7 @@ import type {
   CustomProviderView
 } from '@shared/types'
 import type { OnboardingStatus } from '@shared/onboarding'
+import type { AttachmentRefView } from '@shared/attachments'
 import type { ApprovalMode, ApprovalHistoryEntry, ApprovalOutcome, ApprovedCommandView } from '@shared/approval'
 import type { PlanDecision } from '@shared/plan'
 import type { PreflightChoice } from '@shared/preflight'
@@ -95,6 +96,10 @@ export interface Api {
   dialog: {
     pickDirectory(): Promise<string | null>
     pickFile(): Promise<string[]>
+  }
+  /** v2.9.0: register picked paths; returns opaque refs for the run. */
+  attachments: {
+    register(paths: string[]): Promise<AttachmentRefView[]>
   }
   projects: {
     open(id: string): Promise<SettingsView>

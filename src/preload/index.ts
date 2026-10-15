@@ -44,6 +44,7 @@ import type {
   WorkerJobView,
   WorkerStatus
 } from '@shared/ui'
+import type { AttachmentRefView } from '@shared/attachments'
 import type { AuditVerifyResult, TraceExplanation } from '@shared/trace'
 import type { ProjectMetadataPatch } from '@shared/project-metadata'
 import type { Goal, GoalUpdate, NewGoalInput } from '@shared/goal'
@@ -106,6 +107,14 @@ export const api = {
   dialog: {
     pickDirectory: (): Promise<string | null> => invoke('dialog:pickDirectory'),
     pickFile: (): Promise<string[]> => invoke('dialog:pickFile')
+  },
+  /**
+   * v2.9.0: hand picked absolute paths to main and get back opaque refs. The renderer
+   * never reads the file itself; the agent reaches it through the staged workspace copy.
+   */
+  attachments: {
+    register: (paths: string[]): Promise<AttachmentRefView[]> =>
+      invoke('attachments:register', paths)
   },
 
   projects: {

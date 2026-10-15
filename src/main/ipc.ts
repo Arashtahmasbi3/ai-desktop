@@ -14,6 +14,7 @@ import { registerVpsIpc } from './vps-ipc'
 import { runLocalCommand } from './local-shell'
 import { searchProject } from './project-search'
 import { canRememberTool, createRememberedApproval } from '@core/agent/remember-policy'
+import { toAttachmentRefView } from '@shared/attachments'
 
 /**
  * Registers every IPC channel the renderer is allowed to call. Handlers only
@@ -164,6 +165,13 @@ export function registerIpc(
           : dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] }))
         return result.canceled ? null : (result.filePaths[0] ?? null)
       }
+    ],
+    [
+      'attachments:register',
+      (paths: string[]) =>
+        services.attachments
+          .register(Array.isArray(paths) ? paths : [])
+          .then((refs) => refs.map(toAttachmentRefView))
     ],
     [
       'dialog:pickFile',

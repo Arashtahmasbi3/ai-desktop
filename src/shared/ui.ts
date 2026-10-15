@@ -95,6 +95,13 @@ export interface AgentRunRequest {
   planMode?: boolean
   /** Serve this specific project Goal, overriding the project's active goal (T4.3). */
   goalId?: string
+  /**
+   * v2.9.0: opaque ids of the files/images the user attached in the composer
+   * (registered through `attachments:register`). Main stages their bytes into the
+   * run's sandbox workspace and describes the workspace-relative paths to the
+   * model — the absolute desktop paths never reach the prompt.
+   */
+  attachments?: string[]
 }
 
 /** A tool call awaiting the user's approval (Approval Modes). */

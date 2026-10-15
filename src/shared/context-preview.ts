@@ -39,7 +39,11 @@ export interface ContextPreview {
 export const EXCLUDED_ALWAYS = [
   '.env and other secret files',
   'Private keys and credentials',
-  'Files outside the workspace'
+  // v2.9.0: this used to read "Files outside the workspace", which is now false —
+  // a file the user attaches is copied into the run workspace and read there, so
+  // the dialog must not claim it is withheld. What is still true is that the agent
+  // cannot browse the desktop on its own and only ever sees what was attached.
+  'Anything on your desktop you did not attach (the agent cannot browse your computer)'
 ]
 
 

@@ -1,6 +1,6 @@
 import type { AgentAction, AgentLogEntry, AgentLogger } from '@shared/agent'
 import type { AgentRunResult } from '@shared/agent'
-import type { ProviderId, ToolDefinition } from '@shared/types'
+import type { ProviderId, ContentPart, ToolDefinition } from '@shared/types'
 import type { RemoteFileEntry, VpsExecResult } from '@shared/vps'
 import type {
   AgentEvent,
@@ -67,6 +67,12 @@ import type { SessionStore } from '@core/agent/session-store'
 import { RunStore } from '@core/agent/run-store'
 import type { RunFileIO } from '@core/agent/run-store'
 import type { SandboxManager } from '@shared/sandbox'
+import {
+  buildAttachmentBlock,
+  planAttachmentPaths,
+  type AttachmentRef
+} from '@shared/attachments'
+import type { AttachmentService } from './attachment-service'
 import type { CustomProviderStore } from './custom-providers'
 import { loadProjectMemory } from './project-memory'
 
@@ -463,6 +469,12 @@ export interface AgentServiceOptions {
   approvedCommands?: ApprovedCommands
   /** Optional: enables chat review of agent edits (apply/reject). */
   files?: ProjectFiles
+  /**
+   * v2.9.0: the attachment registry. When present, `AgentRunRequest.attachments`
+   * is resolved, staged into the run's sandbox workspace and described to the
+   * model (see `./attachment-service`).
+   */
+  attachments?: AttachmentService
   /** Tracks run -> project binding so stale patches cannot leak across projects. */
   runStore?: RunStore
   /**
@@ -550,6 +562,8 @@ export class AgentService {
   private readonly cancelQuestions?: () => void
   private readonly approvedCommands?: ApprovedCommands
   private readonly files?: ProjectFiles
+  /** v2.9.0: desktop files/images the user attached to a run. */
+  private readonly attachments?: AttachmentService
   private readonly runStore: RunStore
   private readonly getDiagnosticPolicy?: () => DiagnosticPolicy | null
   private readonly resolveVpsName?: (id: string) => Promise<string | undefined>
@@ -589,6 +603,7 @@ export class AgentService {
     this.cancelPreflights = options.cancelPreflights
     if (options.approvedCommands) this.approvedCommands = options.approvedCommands
     if (options.files) this.files = options.files
+    if (options.attachments) this.attachments = options.attachments
     this.runStore = options.runStore ?? new RunStore()
     this.getDiagnosticPolicy = options.getDiagnosticPolicy
     this.resolveVpsName = options.resolveVpsName
@@ -604,6 +619,61 @@ export class AgentService {
    * Decide whether this run gets the `remote_shell` tool and, if so, build the
    * runtime that pins it to a server.
    */
+  /**
+   * v2.9.0: turn the attachment ids the composer sent into (a) the text block the model
+   * is told about, (b) inline image parts when the selected model can actually see them.
+   *
+   * The order of `refs` is the registry order filtered by the requested ids, which is
+   * exactly what `AttachmentService.stage` walks — so the workspace path the model is
+   * told about is the path that gets written, including the `-2` suffix for a duplicate
+   * file name. Vision is decided by the adapter's `getCapabilities`, the runtime
+   * authority; the prompt says so plainly when the answer is no, so the model cannot
+   * pretend to have looked at an image.
+   */
+  private async buildAttachmentContext(
+    ids: string[] | undefined,
+    entry: ProviderEntry | undefined
+  ): Promise<{ refs: AttachmentRef[]; hint: string; imageParts?: ContentPart[] }> {
+    if (!this.attachments || !Array.isArray(ids) || ids.length === 0) {
+      return { refs: [], hint: '' }
+    }
+    const wanted = new Set(ids)
+    const refs = this.attachments.refs().filter((ref) => wanted.has(ref.id))
+    if (refs.length === 0) return { refs: [], hint: '' }
+
+    const vision = entry ? entry.adapter.getCapabilities(entry.config.model).vision : false
+    const planned = planAttachmentPaths(refs.map((ref) => ({ id: ref.id, name: ref.name })))
+    const pathById = new Map(planned.map((item) => [item.id, item.workspacePath]))
+
+    const imageParts: ContentPart[] = []
+    if (vision) {
+      for (const ref of refs) {
+        if (ref.kind !== 'image' || ref.mediaType === undefined) continue
+        try {
+          const image = await this.attachments.readImage(ref.id)
+          imageParts.push({ type: 'image', mediaType: image.mediaType, base64: image.base64 })
+        } catch {
+          // A file that vanished between registering and running must not fail the run:
+          // the prompt still names it, so the model can report it honestly.
+        }
+      }
+    }
+
+    const hint = buildAttachmentBlock(
+      refs.map((ref) => {
+        const workspacePath = pathById.get(ref.id)
+        return {
+          name: ref.name,
+          ...(workspacePath ? { workspacePath } : {}),
+          kind: ref.kind,
+          bytes: ref.bytes,
+          vision
+        }
+      })
+    )
+    return { refs, hint, ...(imageParts.length > 0 ? { imageParts } : {}) }
+  }
+
   private async buildRemoteRuntime(
     task: string,
     vpsServerId?: string,
@@ -895,6 +965,18 @@ export class AgentService {
     // The goal hint joins the project/VPS hint so "what does done mean?" is
     // answered without a tool call.
     const effectiveSystemHint = [systemHint, goalContext.hint].filter(Boolean).join('\n\n')
+    // v2.9.0: resolve the attachments the composer sent, tell the model where each
+    // one lands in its workspace, and inline the images when the selected model can
+    // actually see them. The task the model receives is the attachment block plus
+    // the user's own text — never the raw desktop path.
+    const attachmentContext = await this.buildAttachmentContext(request.attachments, providers[0])
+    const attachmentIds = attachmentContext.refs.map((ref) => ref.id)
+    const task = attachmentContext.hint
+      ? `${attachmentContext.hint}\n\n${request.task}`
+      : request.task
+    const initialUserParts: ContentPart[] | undefined = attachmentContext.imageParts
+      ? [{ type: 'text', text: task }, ...attachmentContext.imageParts]
+      : undefined
     // v2.5.3 Smarter Prompt: bake the run's project/VPS/environment into the
     // prompt so "which project am I on?" is answered without tool calls.
     let vpsName: string | undefined
@@ -1098,7 +1180,18 @@ export class AgentService {
       // v2.5.2: stream redacted/capped tool detail to the renderer so the chat can
       // show commands, targets, streams and exit codes.
       onToolResult: (result) =>
-        this.emit({ type: 'tool:result', runId, result, at: this.now() })
+        this.emit({ type: 'tool:result', runId, result, at: this.now() }),
+      // v2.9.0: copy the attached files into the run workspace as soon as it
+      // exists, and hand the first user message its multimodal parts. The
+      // relative paths here are exactly the ones `buildAttachmentBlock` named.
+      ...(this.attachments && attachmentIds.length > 0
+        ? {
+            onSandboxReady: async (info: { id: string }): Promise<void> => {
+              await this.attachments!.stage(this.sandbox, info.id, attachmentIds)
+            }
+          }
+        : {}),
+      ...(initialUserParts ? { initialUserParts } : {})
     })
 
     const controller = new AbortController()

@@ -249,7 +249,12 @@
     "questionSend": "Answer",
     "questionSkip": "You decide",
     "questionSkipHint": "Continue without an answer — the agent will use its own judgement",
-    "filesChangedTotal": "{{count}} files changed, +{{added}} −{{removed}}"
+    "filesChangedTotal": "{{count}} files changed, +{{added}} −{{removed}}",
+    "attachFailed": "That file could not be attached. It may be a credential file (never attached), unreadable, or larger than 8 MB.",
+    "attachSkipped": "Some files were skipped — a credential file, an unreadable file, or one over 8 MB.",
+    "attachNoVision": "no vision",
+    "attachNoVisionHint": "This model cannot see images. The file is still copied into the workspace, but switch to a vision-capable model (e.g. Gemini or GPT-4o) to have it read.",
+    "attachmentSent": "📎 {{count}} attached file(s), copied into the workspace for the agent"
   },
   "vpsSelector": {
     "label": "VPS",

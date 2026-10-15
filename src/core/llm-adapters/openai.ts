@@ -13,6 +13,9 @@ import type {
 import { BaseAdapter, firstNumber, type ResolvedConfig } from './base'
 import type { SSEEvent } from './sse'
 import { asArray, asNumber, asRecord, asString, generateId } from './util'
+// v2.9.0: one shared vision predicate, so the renderer's attachment chip, main's
+// prompt builder and this adapter can never disagree about image support.
+import { modelSupportsVision } from '@shared/attachments'
 
 export function mapOpenAIFinishReason(reason: string | undefined): FinishReason {
   switch (reason) {
@@ -37,6 +40,22 @@ export function toOpenAIMessages(messages: ChatMessage[]): Record<string, unknow
         role: 'tool',
         tool_call_id: message.toolCallId ?? '',
         content: message.content ?? ''
+      }
+    }
+    // v2.9.0 multimodal: a message carrying `parts` is sent as a content array
+    // (text + `image_url` data URLs). Text-only messages keep the plain string
+    // content below, so their request body is byte-identical to before.
+    if (message.parts?.length) {
+      return {
+        role: message.role,
+        content: message.parts.map((part) =>
+          part.type === 'text'
+            ? { type: 'text', text: part.text }
+            : {
+                type: 'image_url',
+                image_url: { url: `data:${part.mediaType};base64,${part.base64}` }
+              }
+        )
       }
     }
     if (message.role === 'assistant' && message.toolCalls?.length) {
@@ -77,7 +96,7 @@ export class OpenAIAdapter extends BaseAdapter {
   readonly defaultBaseUrl: string = 'https://api.openai.com/v1'
 
   getCapabilities(model: string): ModelCapabilities {
-    const vision = /gpt-4o|gpt-4\.1|gpt-4-turbo|o1|o3|o4/.test(model)
+    const vision = modelSupportsVision('openai', model)
     return {
       streaming: true,
       toolCalling: true,

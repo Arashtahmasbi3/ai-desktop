@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   AlertTriangle,
+  FileText,
+  Image as ImageIcon,
   ArrowDown,
   Bot,
   Eye,
@@ -37,7 +39,8 @@ import JobsPanel from './JobsPanel'
 import MicButton from './MicButton'
 import { FullAccessBanner, FullAccessToggle } from './FullAccessToggle'
 import { filterSlashCommands, resolveSlashCommand } from '../lib/slash'
-import { decideSend } from '../lib/context-gate'
+import { decideSend, type PendingAttachment } from '../lib/context-gate'
+import { formatAttachmentSize, modelSupportsVision } from '@shared/attachments'
 import { workspaceStatus, shouldShowWorkspaceBanner } from '../lib/project-status'
 import { CHAT_MAX_WIDTH } from '../lib/layout'
 import { visibleChatMessages } from '../lib/tool-rows'
@@ -91,7 +94,15 @@ export default function ChatPanel(): JSX.Element {
   const terminalOpen = useStore((state) => state.terminalOpen)
 
   const [input, setInput] = useState('')
-  const [attached, setAttached] = useState<string[]>([])
+  /**
+   * v2.9.0: registered attachment refs, not raw desktop paths. Main reads the file and
+   * gives back an opaque id; the chip shows the name so the user sees what will be sent.
+   */
+  const [attached, setAttached] = useState<PendingAttachment[]>([])
+  const pushToast = useStore((state) => state.pushToast)
+  // v2.9.0: whether the selected model can actually be shown an image. Mirrors each
+  // adapter's getCapabilities().vision, which stays the runtime authority.
+  const visionCapable = modelSupportsVision(selection.provider, selection.model)
   const [atBottom, setAtBottom] = useState(true)
   const [commandIndex, setCommandIndex] = useState(0)
   const [timelineOpen, setTimelineOpen] = useState(false)
@@ -99,6 +110,8 @@ export default function ChatPanel(): JSX.Element {
     preview: ContextPreview
     body: string
     willSend: boolean
+    /** v2.9.0: the ids that go with this preview when the user confirms. */
+    attachmentNames: string[]
   } | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -210,23 +223,30 @@ export default function ChatPanel(): JSX.Element {
     requestAnimationFrame(() => textareaRef.current?.focus())
   }
 
-  const previewContext = (body: string, willSend: boolean): void => {
+  const previewContext = (
+    body: string,
+    willSend: boolean,
+    attachmentNames: string[] = attached.map((item) => item.name)
+  ): void => {
     const preview = buildContextPreview({
       provider: PROVIDERS[selection.provider]?.label ?? selection.provider,
       model: selection.model,
       messages: [...messages, { role: 'user', content: body }],
-      files: attached.map((path) => basename(path)),
+      // v2.9.0: attached files are copied into the run workspace and read there, so
+      // they are genuinely part of what is sent — the dialog says so instead of
+      // listing them as withheld.
+      files: attachmentNames,
       remotePaths: activeProject?.type === 'remote' ? [activeProject.path] : []
     })
-    setContextCard({ preview, body, willSend })
+    setContextCard({ preview, body, willSend, attachmentNames })
   }
 
-  const doSend = (body: string): void => {
-    if (!body || running) return
+  const doSend = (body: string, attachments: string[] = []): void => {
+    if ((!body && attachments.length === 0) || running) return
     setInput('')
     setAttached([])
     setAtBottom(true)
-    void send(body)
+    void send(body, attachments)
   }
 
   const submit = (): void => {
@@ -239,10 +259,10 @@ export default function ChatPanel(): JSX.Element {
     const decision = decideSend(trimmed, attached, showContextBeforeSend)
     if (!decision || running) return
     if (decision.preview) {
-      previewContext(decision.body, true)
+      previewContext(decision.body, true, decision.attachmentNames)
       return
     }
-    doSend(decision.body)
+    doSend(decision.body, decision.attachments)
   }
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>): void => {
@@ -281,7 +301,24 @@ export default function ChatPanel(): JSX.Element {
 
   const attach = async (): Promise<void> => {
     const picked = await window.api.dialog.pickFile()
-    if (picked.length > 0) setAttached((current) => [...current, ...picked])
+    if (picked.length === 0) return
+    // Main is the only side that reads the file: it stat()s it, refuses a
+    // credential-shaped path, and returns an opaque id.
+    const refs = await window.api.attachments.register(picked)
+    if (refs.length === 0) {
+      pushToast('error', t('chat.attachFailed'))
+      return
+    }
+    if (refs.length < picked.length) pushToast('warning', t('chat.attachSkipped'))
+    setAttached((current) => [
+      ...current,
+      ...refs.map((ref) => ({
+        id: ref.id,
+        name: ref.name,
+        kind: ref.kind,
+        bytes: ref.bytes
+      }))
+    ])
   }
 
   return (
@@ -447,25 +484,44 @@ export default function ChatPanel(): JSX.Element {
         <FileChangesPanel changes={fileChanges} />
 
         {attached.length > 0 ? (
-          <div className="mb-2 flex flex-wrap gap-1">
-            {attached.map((path) => (
-              <span
-                key={path}
-                className="flex items-center gap-1 rounded border border-border bg-bg-primary px-2 py-0.5 text-3xs text-fg-muted"
-              >
-                <span className="max-w-[14rem] truncate" dir="ltr">
-                  {basename(path)}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setAttached((current) => current.filter((item) => item !== path))}
-                  aria-label={t('common.remove')}
-                  className="text-fg-subtle hover:text-danger"
+          <div className="mb-2 flex flex-wrap gap-1" data-testid="attachment-chips">
+            {attached.map((item) => {
+              // v2.9.0: an image with a model that has no vision is worth saying out
+              // loud before the send, not after the agent refuses to look at it.
+              const blind = item.kind === 'image' && !visionCapable
+              return (
+                <span
+                  key={item.id}
+                  data-testid={`attachment-chip-${item.name}`}
+                  title={`${item.name} (${formatAttachmentSize(item.bytes ?? 0)})`}
+                  className={`flex items-center gap-1 rounded border px-2 py-0.5 text-3xs ${
+                    blind ? 'border-warning/50 text-warning' : 'border-border text-fg-muted'
+                  }`}
                 >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            ))}
+                  {item.kind === 'image' ? (
+                    <ImageIcon className="h-3 w-3 shrink-0" />
+                  ) : (
+                    <FileText className="h-3 w-3 shrink-0" />
+                  )}
+                  <span className="max-w-[14rem] truncate" dir="ltr">
+                    {item.name}
+                  </span>
+                  {blind ? (
+                    <span className="shrink-0" title={t('chat.attachNoVisionHint')}>
+                      {t('chat.attachNoVision')}
+                    </span>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => setAttached((current) => current.filter((entry) => entry.id !== item.id))}
+                    aria-label={t('common.remove')}
+                    className="text-fg-subtle hover:text-danger"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )
+            })}
           </div>
         ) : null}
 
@@ -553,12 +609,7 @@ export default function ChatPanel(): JSX.Element {
               <FullAccessToggle />
               <button
                 type="button"
-                onClick={() =>
-                  previewContext(
-                    [input.trim(), ...attached.map((path) => `@${path}`)].filter(Boolean).join('\n'),
-                    false
-                  )
-                }
+                onClick={() => previewContext(input.trim(), false)}
                 title={t('chat.viewContext')}
                 className="flex items-center gap-1 rounded-lg px-1.5 py-0.5 text-3xs text-fg-muted hover:bg-bg-tertiary hover:text-fg"
               >
@@ -593,9 +644,16 @@ export default function ChatPanel(): JSX.Element {
           preview={contextCard.preview}
           onClose={() => setContextCard(null)}
           onSend={() => {
-            const body = contextCard.body
+            const { body, attachmentNames } = contextCard
             setContextCard(null)
-            if (contextCard.willSend) doSend(body)
+            // v2.9.0: the ids were captured when the preview opened, so confirming it
+            // sends exactly what the dialog showed.
+            if (contextCard.willSend) {
+              const ids = attached
+                .filter((item) => attachmentNames.includes(item.name))
+                .map((item) => item.id)
+              doSend(body, ids)
+            }
           }}
         />
       ) : null}

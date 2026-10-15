@@ -13,6 +13,8 @@ import type {
 import { BaseAdapter, firstNumber, type ResolvedConfig } from './base'
 import type { SSEEvent } from './sse'
 import { asArray, asRecord, asString, generateId, safeJsonParse } from './util'
+// v2.9.0: one shared vision predicate (see `@shared/attachments`).
+import { modelSupportsVision } from '@shared/attachments'
 
 export function mapGoogleFinishReason(reason: string | undefined): FinishReason {
   switch (reason) {
@@ -55,6 +57,20 @@ export function toGoogleContents(messages: ChatMessage[]): GoogleBody {
             }
           }
         ]
+      })
+      continue
+    }
+    // v2.9.0 multimodal: `parts` becomes Gemini's own `parts` array with
+    // `inlineData`. Messages without `parts` keep the exact shape below, so a
+    // text-only request body is byte-identical to before.
+    if (message.parts?.length) {
+      contents.push({
+        role: message.role === 'assistant' ? 'model' : 'user',
+        parts: message.parts.map((part) =>
+          part.type === 'text'
+            ? { text: part.text }
+            : { inlineData: { mimeType: part.mediaType, data: part.base64 } }
+        )
       })
       continue
     }
@@ -105,7 +121,7 @@ export class GoogleAdapter extends BaseAdapter {
     return {
       streaming: true,
       toolCalling: true,
-      vision: true,
+      vision: modelSupportsVision('google', model),
       jsonMode: true,
       contextWindow: /gemini-2|gemini-3/.test(model) ? 1_000_000 : 128_000,
       maxOutputTokens: isPro ? 8_192 : 65_536

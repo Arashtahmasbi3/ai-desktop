@@ -3,6 +3,8 @@
  * Kept dependency-free and environment-neutral (Node + browser).
  */
 
+import type { ImageMediaType } from './attachments'
+
 export type ProviderId = 'openai' | 'anthropic' | 'deepseek' | 'google'
 
 export type Role = 'system' | 'user' | 'assistant' | 'tool'
@@ -15,10 +17,29 @@ export interface ToolCall {
   arguments: string
 }
 
+/**
+ * v2.9.0: one part of a multimodal message.
+ *
+ * Text parts mirror `ChatMessage.content`; image parts carry the inline base64
+ * payload the adapters translate into their own provider spelling
+ * (OpenAI `image_url`, Anthropic `image` block, Google `inlineData`).
+ */
+export type ContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image'; mediaType: ImageMediaType; base64: string }
+
 /** A single message in a conversation, provider-agnostic. */
 export interface ChatMessage {
   role: Role
   content: string | null
+  /**
+   * v2.9.0: multimodal parts. Present only when the message carries an inline
+   * image. `content` is deliberately kept as the canonical plain-text field
+   * (dozens of consumers read it, and `context-compressor` early-returns on
+   * falsy content so a parts-only message survives compression untouched).
+   * When `parts` is present the adapters send *these* instead of `content`.
+   */
+  parts?: ContentPart[]
   /** Optional speaker name (also used by the `tool` role to identify the function). */
   name?: string
   /** Present on assistant messages that requested tools. */

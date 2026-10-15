@@ -13,6 +13,8 @@ import type {
 import { BaseAdapter, firstNumber, type ResolvedConfig } from './base'
 import type { SSEEvent } from './sse'
 import { asArray, asNumber, asRecord, asString, generateId, safeJsonParse } from './util'
+// v2.9.0: one shared vision predicate (see `@shared/attachments`).
+import { modelSupportsVision } from '@shared/attachments'
 
 const ANTHROPIC_VERSION = '2023-06-01'
 const DEFAULT_MAX_TOKENS = 4096
@@ -72,6 +74,23 @@ export function toAnthropicMessages(messages: ChatMessage[]): AnthropicBody {
       converted.push({ role: 'assistant', content: blocks })
       continue
     }
+    // v2.9.0 multimodal: `parts` becomes a mixed text/image block list. A message
+    // without `parts` keeps exactly the single-text-block shape below, so its
+    // request body is byte-identical to before.
+    if (message.parts?.length) {
+      converted.push({
+        role: 'user',
+        content: message.parts.map((part) =>
+          part.type === 'text'
+            ? { type: 'text', text: part.text }
+            : {
+                type: 'image',
+                source: { type: 'base64', media_type: part.mediaType, data: part.base64 }
+              }
+        )
+      })
+      continue
+    }
     converted.push({ role: 'user', content: [{ type: 'text', text: message.content ?? '' }] })
   }
 
@@ -100,7 +119,7 @@ export class AnthropicAdapter extends BaseAdapter {
   readonly defaultBaseUrl: string = 'https://api.anthropic.com/v1'
 
   getCapabilities(model: string): ModelCapabilities {
-    const vision = /claude-3|claude-4|claude-sonnet|claude-opus|claude-haiku/.test(model)
+    const vision = modelSupportsVision('anthropic', model)
     return {
       streaming: true,
       toolCalling: true,

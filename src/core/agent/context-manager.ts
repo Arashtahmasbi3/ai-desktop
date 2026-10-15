@@ -59,6 +59,16 @@ const DEFAULT_MIN_MESSAGES = 6
 /** Headroom (in tokens) reserved for the summary within the compaction target. */
 const SUMMARY_RESERVE_TOKENS = 512
 const MAX_SUMMARY_LINE_CHARS = 160
+/**
+ * v2.9.0: a fixed per-image cost for the (character-based) token estimate.
+ *
+ * `estimateTextTokens` counts characters, but a provider bills an image by its
+ * pixels, not by the length of its base64 — counting the payload would overstate
+ * it wildly, and ignoring it would understate a real screenshot by roughly 1000
+ * tokens. Providers charge ~800-1100 tokens for a typical screenshot, so 4096
+ * chars (≈1024 tokens) is a small, deliberate overestimate.
+ */
+const IMAGE_PART_CHARS = 4096
 
 export function estimateTextTokens(text: string | null | undefined): number {
   if (!text) return 0
@@ -71,6 +81,12 @@ function messageChars(message: ChatMessage): number {
     for (const call of message.toolCalls) {
       total += call.name.length + call.arguments.length
     }
+  }
+  // Only image parts add cost: a text part duplicates `content` (the adapters
+  // send `parts` *instead of* `content`, never in addition to it), so counting it
+  // would double the message.
+  for (const part of message.parts ?? []) {
+    if (part.type === 'image') total += IMAGE_PART_CHARS
   }
   return total
 }

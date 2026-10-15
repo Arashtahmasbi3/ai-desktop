@@ -6,6 +6,7 @@ import type {
 import type {
   ChatMessage,
   ChatResponse,
+  ContentPart,
   ProviderId,
   ToolDefinition,
   Usage
@@ -112,6 +113,18 @@ export interface AgentOrchestratorOptions {
   recoveryPolicy?: Partial<AgentRecoveryPolicy>
   /** Extra options merged into `createSandbox`. */
   sandboxOptions?: CreateSandboxOptions
+  /**
+   * v2.9.0: called with the freshly created sandbox, before the first LLM call.
+   * `AgentService` uses it to stage the files the user attached from their
+   * desktop into the run workspace (see `src/main/attachment-service.ts`).
+   */
+  onSandboxReady?: (info: { id: string }) => Promise<void>
+  /**
+   * v2.9.0: multimodal parts for the run's first user message (the task). When
+   * present the adapters send these instead of the plain-text `content`, so an
+   * attached image reaches a vision model. Absent for text-only runs.
+   */
+  initialUserParts?: ContentPart[]
   /** Token budget for the model context (defaults from provider capabilities). */
   contextWindowTokens?: number
   /** Fraction of the token budget that triggers compaction. Default 0.8 (80%). */
@@ -236,15 +249,51 @@ function defaultContextTokens(entry: ProviderEntry): number {
   return Math.max(2048, (caps.contextWindow ?? 32_000) - reserve)
 }
 
+/**
+ * v2.9.0: the text a message contributes to a transcript/summary. A message
+ * whose `parts` replaced its `content` (multimodal) still shows its text, and an
+ * image part is named explicitly, so compaction can never erase the fact that an
+ * attachment (or its file name, carried in the text part) was part of the chat.
+ */
+function messageTranscriptBody(message: ChatMessage): string {
+  const text = message.content ?? ''
+  if (text) return text
+  return (message.parts ?? [])
+    .filter((part) => part.type === 'text')
+    .map((part) => part.text)
+    .join('\n')
+}
+
+/** "1 image attachment(s)" for a message that carries inline images. */
+function formatAttachmentParts(parts: readonly ContentPart[] | undefined): string {
+  const images = (parts ?? []).filter((part) => part.type === 'image').length
+  if (images === 0) return ''
+  return `[parts: ${images} image attachment(s)]`
+}
+
 function formatTranscriptForSummary(messages: readonly ChatMessage[]): string {
   return messages
     .map((message) => {
       const role = message.role.toUpperCase()
-      const body = message.content ?? ''
+      const body = messageTranscriptBody(message)
       const calls = message.toolCalls?.map((call) => `${call.name}(${call.arguments})`).join(', ')
-      return calls ? `${role}: ${body}\n[tool_calls: ${calls}]` : `${role}: ${body}`
+      const attachments = formatAttachmentParts(message.parts)
+      const head = calls ? `${role}: ${body}\n[tool_calls: ${calls}]` : `${role}: ${body}`
+      return attachments ? `${head}\n${attachments}` : head
     })
     .join('\n\n')
+}
+
+/**
+ * v2.9.0: image bytes are never persisted. `parts` exists only to inline an
+ * attachment for the live call; keeping base64 in the session JSON would
+ * duplicate the user's image on disk unencrypted and re-send it on every resume.
+ */
+function stripAttachmentParts(message: ChatMessage): ChatMessage {
+  if (!message.parts) return message
+  const copy: ChatMessage = { ...message }
+  delete copy.parts
+  return copy
 }
 
 /**
@@ -474,8 +523,13 @@ export function buildSystemPrompt(
   return `You are AI Desktop, an autonomous coding agent working inside a sandbox.
 
 # Environment
-- You operate inside an isolated "${provider}" sandbox workspace. The host filesystem is NOT accessible.
-- Every path you use is relative to the workspace root (for example "hello.txt", "src/app.js").
+- You operate inside a "${provider}" sandbox workspace with the tools listed below. You cannot browse
+  the user's computer: the host filesystem is not reachable from here, so never claim you opened a
+  path on their desktop unless a tool actually read it.
+- Files the user attaches in the chat ARE copied into your workspace under "attachments/". Read them
+  with \`read_file\` using that workspace-relative path (for example "attachments/report.pdf").
+- Every path you use must be relative to the workspace root (for example "hello.txt", "src/app.js").
+  An absolute host path such as "C:\\Users\\..." is always refused.
 - Network access is disabled by default.
 ${systemHint ? `\n# Remote access\n${systemHint}\n` : ''}
 # Available tools
@@ -532,6 +586,9 @@ export class AgentOrchestrator {
   private readonly loopPolicy: Partial<LoopDetectionPolicy>
   private readonly recovery: ErrorRecovery
   private readonly sandboxOptions: CreateSandboxOptions
+  /** v2.9.0: staging hook and the first message's multimodal parts. */
+  private readonly onSandboxReady?: (info: { id: string }) => Promise<void>
+  private readonly initialUserParts?: ContentPart[]
   private readonly contextWindowTokens: number
   private readonly compactionThreshold: number
   private readonly compressContext: boolean
@@ -594,6 +651,8 @@ export class AgentOrchestrator {
     this.loopPolicy = options.loopPolicy ?? {}
     this.recovery = new ErrorRecovery(options.recoveryPolicy)
     this.sandboxOptions = options.sandboxOptions ?? {}
+    this.onSandboxReady = options.onSandboxReady
+    this.initialUserParts = options.initialUserParts
     this.contextWindowTokens =
       options.contextWindowTokens ?? defaultContextTokens(this.providers[0])
     this.compactionThreshold = options.compactionThreshold ?? 0.8
@@ -671,6 +730,20 @@ export class AgentOrchestrator {
         provider,
         workspaceRoot: info.workspaceRoot
       })
+      // v2.9.0: let the caller put the user's attached files into the workspace
+      // before the model can be asked to read them. A staging failure must not
+      // abort the run — the attachment block in the task already tells the model
+      // what it could not get, and an image may still ride along as a data URL.
+      if (this.onSandboxReady) {
+        try {
+          await this.onSandboxReady({ id: sandboxId })
+        } catch (error) {
+          this.log('warn', 'sandbox.attachments_failed', runId, {
+            sandboxId,
+            message: error instanceof Error ? error.message : String(error)
+          })
+        }
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       this.log('error', 'sandbox.create_failed', runId, { message })
@@ -763,7 +836,14 @@ export class AgentOrchestrator {
       }
     }
 
-    context.appendUser(task)
+    // v2.9.0: the task's `parts` carry an attached image inline; `content` stays
+    // the canonical plain text so history, compaction and the session keep
+    // working for text-only consumers.
+    if (this.initialUserParts?.length) {
+      context.append({ role: 'user', content: task, parts: this.initialUserParts })
+    } else {
+      context.appendUser(task)
+    }
     this.log('debug', 'context.built', runId, {
       messages: context.length,
       estimatedTokens: context.estimateTokens()
@@ -1410,7 +1490,7 @@ export class AgentOrchestrator {
       status: result.status,
       createdAt: result.startedAt,
       updatedAt: result.finishedAt,
-      messages: snapshot.messages,
+      messages: snapshot.messages.map(stripAttachmentParts),
       summary: snapshot.summary,
       result,
       ...(metadata && Object.keys(metadata).length > 0 ? { metadata } : {})

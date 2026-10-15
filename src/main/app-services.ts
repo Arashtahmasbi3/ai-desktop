@@ -21,6 +21,7 @@ import { PreflightBroker } from './preflight-broker'
 import { QuestionBroker } from './question-broker'
 import { SessionProfileService } from './session-profile-service'
 import { FileService } from './file-service'
+import { AttachmentService } from './attachment-service'
 import { ChatStore } from './chat-store'
 import {
   appDataDir,
@@ -86,6 +87,11 @@ export class AppServices {
   readonly vps: SshManager
   readonly jobs: JobManager
   readonly files = new FileService()
+  /**
+   * v2.9.0: desktop files/images the user attached, staged into the run workspace by
+   * AgentService. Lives in main so the renderer only ever handles opaque ids.
+   */
+  readonly attachments = new AttachmentService()
   readonly chats: ChatStore
   readonly sandbox: SandboxManager
   /** Main-side Session Profile + elevation grant authority (v2.6.2, P0-5). */
@@ -200,6 +206,7 @@ export class AppServices {
       cancelQuestions: () => this.questions.cancelAll(),
       approvedCommands: this.approvedCommands,
       files: this.files,
+      attachments: this.attachments,
       runStore: this.runs,
       sessionProfile: this.sessionProfile,
       goalStore: this.goals,

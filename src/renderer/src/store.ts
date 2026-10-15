@@ -583,7 +583,13 @@ interface AppState {
   achieveGoal: (goalId: string) => Promise<void>
   abandonGoal: (goalId: string, note?: string) => Promise<void>
   removeGoal: (goalId: string) => Promise<void>
-  send: (text: string) => Promise<void>
+  /**
+   * v2.9.0: `attachments` are opaque ids registered through
+   * `window.api.attachments.register`. Main resolves them, stages the bytes into the
+   * run's workspace and tells the model where they are — the renderer never reads the
+   * file and never sends a desktop path.
+   */
+  send: (text: string, attachments?: string[]) => Promise<void>
   abort: () => void
   newSession: () => void
   /** v2.6.2 T5.1: archive the current chat and start a fresh context. */
@@ -1678,9 +1684,10 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
-  async send(text) {
+  async send(text, attachments) {
     const trimmed = text.trim()
-    if (!trimmed || get().running) return
+    const files = (attachments ?? []).filter((id) => typeof id === 'string' && id !== '')
+    if ((!trimmed && files.length === 0) || get().running) return
     const selection = get().selection
     // Fix 1 (v2.6.1): pin a stable chat id *before* the first run. Without this
     // a new chat sent message 1 under the throwaway `sessionId`, then
@@ -1690,7 +1697,20 @@ export const useStore = create<AppState>((set, get) => ({
     const activeChatId = get().activeChatId ?? get().sessionId
     if (!get().activeChatId) set({ activeChatId })
     set({
-      messages: [...get().messages, { id: newId(), role: 'user', content: trimmed, at: Date.now() }],
+      messages: [
+        ...get().messages,
+        {
+          id: newId(),
+          role: 'user',
+          // The transcript names the attachments so the user can see what was sent,
+          // while the agent receives them as staged files rather than as this text.
+          content:
+            files.length > 0
+              ? `${trimmed ? `${trimmed}\n\n` : ''}${i18n.t('chat.attachmentSent', { count: files.length })}`
+              : trimmed,
+          at: Date.now()
+        }
+      ],
       running: true,
       error: null
     })
@@ -1708,7 +1728,8 @@ export const useStore = create<AppState>((set, get) => ({
         ...(selection.customProviderId ? { customProviderId: selection.customProviderId } : {}),
         ...(get().vpsServerId ? { vpsServerId: get().vpsServerId } : {}),
         enabledTools: readEnabledTools(),
-        planMode: get().planMode
+        planMode: get().planMode,
+        ...(files.length > 0 ? { attachments: files } : {})
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)

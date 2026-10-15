@@ -42,7 +42,12 @@ const preview: ContextPreview = {
 describe('Task 1.1 - show context preview before send', () => {
   it('1. showContextBeforeSend=true → the send is gated behind the preview', () => {
     const decision = decideSend('hello', [], true)
-    expect(decision).toEqual({ body: 'hello', preview: true })
+    expect(decision).toEqual({
+      body: 'hello',
+      attachments: [],
+      attachmentNames: [],
+      preview: true
+    })
 
     render(<ContextPreviewCard preview={preview} onSend={() => undefined} onClose={() => undefined} />)
     expect(screen.getByText('Context to be sent')).toBeTruthy()
@@ -51,8 +56,20 @@ describe('Task 1.1 - show context preview before send', () => {
 
   it('2. showContextBeforeSend=false → no preview, straight to send', () => {
     const decision = decideSend('hello', [], false)
-    expect(decision).toEqual({ body: 'hello', preview: false })
+    expect(decision).toEqual({
+      body: 'hello',
+      attachments: [],
+      attachmentNames: [],
+      preview: false
+    })
     expect(decideSend('   ', [], true)).toBeNull()
+    // v2.9.0: a zero-text send is allowed when a file is attached.
+    expect(decideSend('   ', [{ id: 'a1', name: 'shot.png' }], true)).toEqual({
+      body: '',
+      attachments: ['a1'],
+      attachmentNames: ['shot.png'],
+      preview: true
+    })
   })
 
   it('3. changing it in Settings applies immediately to the store', () => {
@@ -80,6 +97,8 @@ describe('Task 1.1 - show context preview before send', () => {
     expect(readShowContextBeforeSend()).toBe(false)
     expect(decideSend('hello', [], readShowContextBeforeSend())).toEqual({
       body: 'hello',
+      attachments: [],
+      attachmentNames: [],
       preview: false
     })
   })
