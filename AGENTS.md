@@ -395,6 +395,90 @@ Conventions that recur across the codebase — follow them when adding code.
 - **Time/limits are injected, not hard-coded.** TTL/idle sweeps, timeouts and token budgets
   come from config so tests can drive them deterministically.
 
+## Pattern: Server references (id, name or host)
+
+How the agent names a server, and why it never asks for a UUID (v2.8.1).
+
+- **The model must be able to discover servers itself.** `list_servers`
+  (`src/core/tools/server-tools.ts`) is offered on **every** remote path — with no pinned
+  server, with a pinned-but-disconnected one, and on a plain task — because "which servers
+  do I have?" has to be answerable before a server can be chosen. Before it existed, the
+  only id the model could see was the active project's own (rendered by
+  `buildRemoteGuidance`), and asking it to migrate to a *second* saved server ended with it
+  demanding a UUID that the UI never displays. A roster read that *fails* is reported as an
+  error, never as "no servers", or the model goes straight back to asking the human.
+- **Ids, names and hosts are interchangeable at every call site.** Fifteen tools take
+  `server_id` / `source_vps_id` / `target_vps_id`. Rather than editing each one,
+  `wrapServerRefRoutes` (`src/core/tools/server-ref-executor.ts`) canonicalises those
+  arguments to the saved id before dispatch, using the pure `resolveServerRef`
+  (`src/core/tools/server-ref.ts`): exact id first (never second-guessed), then a
+  case-insensitive name, then `host` or `host:port`.
+- **An ambiguous or unknown reference FAILS with the candidate list.** Never take the first
+  match — silently migrating to the wrong server is the worst possible outcome. A
+  known-but-offline server gets "is not connected", which is a different error from
+  "unknown" because the fix is different.
+- **The roster is data, never a routing decision.** It must not be consulted by
+  `resolveVpsForRun` / `reconcileRunServer`: a run stays pinned to the explicitly chosen or
+  project server. `list_servers` is read-only in `approval.ts` and must stay OUT of
+  `VPS_REQUIRING_TOOLS`, or asking about servers would itself demand a server.
+
+## Pattern: Human labels for tool calls
+
+Never show a raw tool id as the primary label (v2.8.1).
+
+- `src/renderer/src/lib/tool-labels.ts` is the single source: `toolLabel` (the noun used by
+  the live status, "Running {{tool}}…") and `toolHeadline` (a verb headline for a card or
+  chip: "Ran a command on the server"), plus `summarizeCommand` / `summarizePath` /
+  `truncateMiddle` for the one-line preview.
+- `summarizeCommand` is **quote-aware** (a pipe or `-F'|'` inside quotes never splits),
+  splits on top-level `;`, `&&`, `||`, `|` and newlines, drops a leading decorative
+  `echo`/`printf` banner, and middle-truncates so trailing flags/hosts survive.
+- The **raw id and the verbatim command stay reachable**: the card's tooltip, a
+  `data-tool` attribute, and the expanded body. `ToolResultCard.hasBody` must include
+  `command`/`path`, otherwise a successful shell card is not expandable at all and the raw
+  command is lost.
+- Deliberately left raw: the audit log, and the disclosures a user opens on purpose
+  (approval "Show details", plan-step arguments, the task args JSON) — there the exact
+  string is the point.
+
+## Pattern: Approval — what may skip the prompt
+
+Matching the label "Auto-approve safe tools" to what actually happens (v2.8.1).
+
+- **Read-only is derived, not re-declared.** `READ_TOOLS` (`core/agent/approval.ts`) and
+  `READ_ONLY_REMOTE_TOOLS` (`main/approval-gate.ts`) come from the canonical
+  `READ_ONLY_TOOL_NAMES` (`@shared/profile`). Declaring them twice is how the four named
+  diagnostics ended up prompting with a **Write** badge in `auto-write` mode while the app
+  was telling the model to prefer them over free-form shell.
+- **Wrappers are unwrapped, then RE-CLASSIFIED.** `timeout 12 ssh …`, `for …; do … done`,
+  `bash -c '…'` and `env VAR=x …` made a chain of pure probes count as a write. Each is now
+  unwrapped and its body classified again — never trusted outright, or
+  `timeout 12 rm -rf /srv` becomes prompt-free. The safety negatives in
+  `test/core/approval-readonly.test.ts` are the point of that test file.
+- **Still asking, deliberately:** a bare `ssh host` (it opens a session, not a known read),
+  `nc`, redirection, substitution, and anything the classifier cannot *prove* is a read.
+  Unknown ⇒ write stays the default.
+- **The deny list is upstream of everything.** Path containment, the secret-path guard, the
+  rate limiter and the audit log all run after the approval gate and are never skipped.
+
+## Pattern: The scoped server grant
+
+The one escape hatch for repeated shell work (v2.8.1, `core/agent/server-grant.ts`).
+
+- The user can grant "all commands on THIS server in THIS project" for 30 minutes, because
+  per-command dialogs on your own VPS are exhausting and — since v2.5 P0-3 — shell and write
+  tools are deliberately **not** rememberable at all.
+- Invariants, each pinned by `test/security/server-grant.test.ts`: exact `vpsId` +
+  `projectId` binding (an empty `vpsId` is a local run and can never match a remote grant);
+  expiry evaluated on read, never by a renderer timer; stored apart from the permanent
+  `always`/`tools`/`sessions` lists so a stale file cannot resurrect a permanent shell
+  allow; and the check sits **inside** `if (!denyListed)`, so it suppresses the *user
+  approval* only — a deny-listed command still prompts, and the host policy, containment,
+  secret guard, rate limiter and audit log are untouched.
+- `ApprovalOutcome.grant` is a separate field from `ApprovalOutcome.remember` on purpose:
+  `ApprovalRememberScope` is contractually read-only, and widening it would put shell and
+  write tools back into the permanently-remembered set P0-3 removed.
+
 ## Pattern: Cross-Host Migration via rsync
 
 How `migrate_project` copies a project between two saved VPS servers
