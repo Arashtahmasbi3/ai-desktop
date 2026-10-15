@@ -212,6 +212,16 @@ export function registerIpc(
     ['onboarding:get', () => services.onboarding.load()],
     ['onboarding:complete', () => services.onboarding.complete()],
 
+    /*
+     * Auto-update (v3.0). The app had none. `check` only reads the public Releases API;
+     * `download` fetches the installer and verifies it against the release's published
+     * SHA256SUMS.txt before anything is executed; `install` starts the NSIS installer and
+     * the caller quits the app so its files can be replaced.
+     */
+    ['update:check', () => services.updates.check()],
+    ['update:download', () => services.updates.download()],
+    ['update:install', () => services.updates.install()],
+
     ['github:status', () => services.github.status()],
     // v2.8.1: the `gh` CLI is very often already installed and logged in, so the
     // one-click path is offered first. `detectCli` only reads (never the token);

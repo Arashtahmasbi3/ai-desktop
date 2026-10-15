@@ -151,6 +151,14 @@ export const api = {
     complete: (): Promise<OnboardingStatus> => invoke('onboarding:complete')
   },
 
+  // v3.0: auto-update. Downloading is a deliberate user action, and the installer is only
+  // started from `install` — never automatically.
+  updates: {
+    check: (): Promise<unknown> => invoke('update:check'),
+    download: (): Promise<unknown> => invoke('update:download'),
+    install: (): Promise<unknown> => invoke('update:install')
+  },
+
   github: {
     status: (): Promise<GitHubAuthStatus> => invoke('github:status'),
     detectCli: (): Promise<GitHubCliStatus> => invoke('github:detectCli'),

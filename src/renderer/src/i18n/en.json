@@ -475,7 +475,20 @@
     "remoteExamples": "Try it",
     "remoteSecurity": "Security: reachable only from this machine, every request needs the bearer token above, and the token is regenerated each time you start it. Keep it on only while you are using it.",
     "remoteCopyFailed": "Could not copy to the clipboard.",
-    "copy": "Copy"
+    "copy": "Copy",
+    "updates": "Updates",
+    "updatesHint": "Checking and downloading is manual by design: nothing is fetched or installed without your click.",
+    "updateCheck": "Check for updates",
+    "updateChecking": "Checking…",
+    "updateNeverChecked": "Not checked yet",
+    "updateCurrent": "Current",
+    "updateNotes": "Release notes",
+    "updateDownload": "Download {{size}}",
+    "updateDownloading": "Downloading the installer…",
+    "updateVerified": "Verified against the release checksum.",
+    "updateUnverified": "This release publishes no checksum, so the download could not be verified.",
+    "updateInstall": "Install and restart",
+    "updateFailed": "The update could not be completed."
   },
   "github": {
     "title": "GitHub",

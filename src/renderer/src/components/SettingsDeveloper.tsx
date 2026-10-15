@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import UpdatesCard from './UpdatesCard'
 import { Check, Copy, Server, Trash2, Wrench } from 'lucide-react'
 import { useStore } from '../store'
 
@@ -175,6 +176,9 @@ curl -X POST -H "Authorization: Bearer <token>" -d '{"method":"files.list","para
         />
         {t('settings.planModeDefault')}
       </label>
+
+      {/* v3.0: auto-update. The app had no way to learn a newer build existed. */}
+      <UpdatesCard />
 
       <button
         type="button"

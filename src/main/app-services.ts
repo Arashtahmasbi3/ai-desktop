@@ -21,8 +21,10 @@ import { PreflightBroker } from './preflight-broker'
 import { QuestionBroker } from './question-broker'
 import { SessionProfileService } from './session-profile-service'
 import { FileService } from './file-service'
-import { nativeImage } from 'electron'
+import { app, nativeImage } from 'electron'
+import { spawn } from 'node:child_process'
 import { AttachmentService } from './attachment-service'
+import { UpdateService, sha256OfFile, streamToFile } from './updater'
 import { ChatStore } from './chat-store'
 import {
   appDataDir,
@@ -95,6 +97,29 @@ export class AppServices {
    * v2.9.0: desktop files/images the user attached, staged into the run workspace by
    * AgentService. Lives in main so the renderer only ever handles opaque ids.
    */
+  /**
+   * v3.0: auto-update. Dependency-free on purpose — the app ships exactly one runtime
+   * dependency, and an updater that verifies the published SHA-256 before executing an
+   * installer is worth more here than one that does not.
+   */
+  readonly updates = new UpdateService({
+    currentVersion: app.getVersion(),
+    fetchImpl: async (url: string) => {
+      const response = await fetch(url, {
+        headers: { Accept: "application/vnd.github+json", "User-Agent": "ai-desktop-updater" }
+      })
+      return { ok: response.ok, status: response.status, text: () => response.text() }
+    },
+    download: streamToFile,
+    hashFile: sha256OfFile,
+    runInstaller: async (path: string) => {
+      // Detached so the installer outlives this process: the NSIS upgrade needs the app to
+      // exit before it can replace its own files.
+      const child = spawn(path, [], { detached: true, stdio: "ignore" })
+      child.unref()
+    }
+  })
+
   readonly attachments = new AttachmentService({
     /*
      * v3.0: previews for attached images. nativeImage is Electron's own API (no new

@@ -6,6 +6,7 @@ import type {
 } from '@shared/types'
 import type { OnboardingStatus } from '@shared/onboarding'
 import type { AttachmentRefView } from '@shared/attachments'
+import type { UpdateCheckResult, UpdateDownloadResult } from '@shared/update'
 import type { ApprovalMode, ApprovalHistoryEntry, ApprovalOutcome, ApprovedCommandView } from '@shared/approval'
 import type { PlanDecision } from '@shared/plan'
 import type { PreflightChoice } from '@shared/preflight'
@@ -124,6 +125,12 @@ export interface Api {
   onboarding: {
     get(): Promise<OnboardingStatus>
     complete(): Promise<OnboardingStatus>
+  }
+  /** v3.0: auto-update. Check reads the feed, download verifies the digest, install runs it. */
+  updates: {
+    check(): Promise<UpdateCheckResult>
+    download(): Promise<UpdateDownloadResult>
+    install(): Promise<{ ok: boolean; error?: string }>
   }
   github: {
     status(): Promise<GitHubAuthStatus>
