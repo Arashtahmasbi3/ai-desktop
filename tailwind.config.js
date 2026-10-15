@@ -58,6 +58,42 @@ module.exports = {
         '4xs': '9px',
         '3xs': '10px',
         '2xs': '11px'
+      },
+      /*
+       * Clay depth (v3.0). Radius is a three-step scale on purpose: one big radius
+       * everywhere reads as a toy, and a dense tool needs the small step for chips and
+       * rows. The shadows read their colours from theme variables, so light and dark get
+       * genuinely different depth instead of an inverted copy (see main.css).
+       */
+      borderRadius: {
+        'clay-sm': 'var(--clay-r-sm)',
+        clay: 'var(--clay-r-md)',
+        'clay-lg': 'var(--clay-r-lg)',
+        'clay-pill': 'var(--clay-r-pill)'
+      },
+      boxShadow: {
+        clay: 'var(--clay-shadow-out)',
+        'clay-soft': 'var(--clay-shadow-soft)',
+        'clay-in': 'var(--clay-shadow-in)'
+      },
+      transitionDuration: {
+        fast: 'var(--motion-fast)',
+        base: 'var(--motion-base)',
+        slow: 'var(--motion-slow)'
+      },
+      transitionTimingFunction: {
+        clay: 'var(--ease-clay)'
+      },
+      zIndex: {
+        sticky: 'var(--z-sticky)',
+        overlay: 'var(--z-overlay)',
+        modal: 'var(--z-modal)',
+        toast: 'var(--z-toast)'
+      },
+      spacing: {
+        'icon-sm': 'var(--icon-sm)',
+        'icon-md': 'var(--icon-md)',
+        'icon-lg': 'var(--icon-lg)'
       }
     }
   },

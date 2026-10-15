@@ -18,12 +18,12 @@
   :root {
     color-scheme: light;
 
-    --bg-primary: 255 255 255;
-    --bg-secondary: 250 251 252;
-    --bg-tertiary: 243 245 248;
-    --bg-elevated: 255 255 255;
-    --border: 223 226 232;
-    --border-strong: 198 203 214;
+    --bg-primary: 245 244 241;
+    --bg-secondary: 250 249 246;
+    --bg-tertiary: 237 235 231;
+    --bg-elevated: 255 255 254;
+    --border: 228 225 220;
+    --border-strong: 205 201 195;
 
     /*
      * A four-step text ramp where every step still clears 4.5:1 on the darkest
@@ -31,10 +31,10 @@
      * 3.25:1, which is below the readable threshold for metadata users do need to
      * read (file sizes, hints, timestamps).
      */
-    --fg-strong: 13 17 23;
-    --fg: 51 58 71;
-    --fg-muted: 77 85 102;
-    --fg-subtle: 102 112 128;
+    --fg-strong: 28 26 23;
+    --fg: 66 62 58;
+    --fg-muted: 92 87 81;
+    --fg-subtle: 104 98 92;
 
     /* `accent` is for text/borders/tints; `accent-solid` is a filled surface. */
     --accent: 109 67 255;
@@ -50,24 +50,59 @@
     --info: 11 107 203;
 
     --focus-ring: 109 67 255;
-    --scrollbar-thumb: 200 205 214;
-    --scrollbar-thumb-hover: 168 174 186;
+    --scrollbar-thumb: 208 204 198;
+    --scrollbar-thumb-hover: 180 175 168;
+
+    /*
+     * Clay depth (v3.0). Applied in tiers: full on touchable/primary surfaces (composer,
+     * modals, primary buttons), soft on cards, and NOT AT ALL on tables, logs, diffs and
+     * security dialogs — there, flatness is what keeps dense data readable.
+     */
+    --clay-r-sm: 12px;
+    --clay-r-md: 18px;
+    --clay-r-lg: 24px;
+    --clay-r-pill: 999px;
+    --clay-light: 255 255 255;
+    --clay-dark: 172 166 158;
+    --clay-shadow-out: 6px 6px 14px rgb(var(--clay-dark) / 0.3),
+      -6px -6px 14px rgb(var(--clay-light) / 0.95);
+    --clay-shadow-soft: 3px 3px 8px rgb(var(--clay-dark) / 0.16),
+      -2px -2px 6px rgb(var(--clay-light) / 0.85);
+    --clay-shadow-in: inset 3px 3px 7px rgb(var(--clay-dark) / 0.26),
+      inset -3px -3px 7px rgb(var(--clay-light) / 0.9);
+
+    /* Motion: clay is quick and soft, never bouncy-long. */
+    --motion-fast: 120ms;
+    --motion-base: 200ms;
+    --motion-slow: 320ms;
+    --ease-clay: cubic-bezier(0.22, 1, 0.36, 1);
+
+    /* A real scale, so overlays stop guessing with arbitrary z-[N] values. */
+    --z-base: 0;
+    --z-sticky: 10;
+    --z-overlay: 100;
+    --z-modal: 200;
+    --z-toast: 300;
+
+    --icon-sm: 14px;
+    --icon-md: 16px;
+    --icon-lg: 20px;
   }
 
   .dark {
     color-scheme: dark;
 
-    --bg-primary: 10 10 10;
-    --bg-secondary: 20 20 20;
-    --bg-tertiary: 30 30 30;
-    --bg-elevated: 26 26 26;
-    --border: 42 42 42;
-    --border-strong: 58 58 58;
+    --bg-primary: 17 16 15;
+    --bg-secondary: 27 25 23;
+    --bg-tertiary: 37 34 32;
+    --bg-elevated: 31 29 27;
+    --border: 49 46 43;
+    --border-strong: 67 63 59;
 
-    --fg-strong: 245 245 245;
-    --fg: 229 229 229;
-    --fg-muted: 163 163 163;
-    --fg-subtle: 139 139 139;
+    --fg-strong: 245 243 240;
+    --fg: 226 222 217;
+    --fg-muted: 170 164 157;
+    --fg-subtle: 148 142 135;
 
     /*
      * On a near-black surface the accent has to be light to be read as text, and
@@ -88,8 +123,21 @@
     --info: 96 165 250;
 
     --focus-ring: 167 139 250;
-    --scrollbar-thumb: 47 47 47;
-    --scrollbar-thumb-hover: 63 63 63;
+    --scrollbar-thumb: 55 52 49;
+    --scrollbar-thumb-hover: 72 68 64;
+
+    /*
+     * The highlight and shadow swap roles: on a dark surface the "light" side must be a
+     * faint local glow rather than white, or the surface reads as a hole instead of a bump.
+     */
+    --clay-light: 72 68 64;
+    --clay-dark: 0 0 0;
+    --clay-shadow-out: 6px 6px 16px rgb(var(--clay-dark) / 0.55),
+      -4px -4px 12px rgb(var(--clay-light) / 0.45);
+    --clay-shadow-soft: 3px 3px 9px rgb(var(--clay-dark) / 0.45),
+      -2px -2px 7px rgb(var(--clay-light) / 0.35);
+    --clay-shadow-in: inset 3px 3px 8px rgb(var(--clay-dark) / 0.6),
+      inset -3px -3px 8px rgb(var(--clay-light) / 0.35);
   }
 
   html,
@@ -285,4 +333,57 @@
 .chat-markdown td {
   border: 1px solid rgb(var(--border));
   padding: 0.2rem 0.5rem;
+}
+
+/*
+ * Clay surfaces (v3.0). These three classes are the whole vocabulary; components pick a tier
+ * instead of inventing their own radius, shadow and padding.
+ *   clay-hero   — the primary touchable surface (composer, modal, empty state)
+ *   clay-card   — a raised card (project card, goal card, message group)
+ *   clay-inset  — a recessed well (the composer's text field, a search box)
+ *   clay-press  — the clay interaction signature: lift on hover, press in on active
+ * Deliberately absent from: tables, log/diff viewers, the status bar, and every security
+ * dialog — density and seriousness outrank charm there.
+ */
+@layer components {
+  .clay-hero {
+    @apply rounded-clay-lg bg-bg-elevated shadow-clay;
+  }
+
+  .clay-card {
+    @apply rounded-clay bg-bg-elevated shadow-clay-soft;
+  }
+
+  .clay-inset {
+    @apply rounded-clay bg-bg-tertiary shadow-clay-in;
+  }
+
+  .clay-press {
+    @apply transition-[box-shadow,transform] duration-fast ease-clay;
+  }
+
+  .clay-press:hover {
+    @apply shadow-clay;
+  }
+
+  .clay-press:active {
+    @apply shadow-clay-in;
+    transform: translateY(1px);
+  }
+}
+
+/*
+ * Accessibility: the clay language leans on transitions, so honour the OS preference
+ * globally rather than hoping every component remembers. Kept at 1ms (not 0) so
+ * transitionend listeners still fire.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
 }
