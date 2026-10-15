@@ -260,7 +260,9 @@
     "attachmentSent": "📎 {{count}} attached file(s), copied into the workspace for the agent",
     "runChangesEdits": "Written {{count}} times",
     "liveElapsedSuffix": "· {{seconds}}s",
-    "goalSummaryTitle": "Ongoing goal"
+    "goalSummaryTitle": "Ongoing goal",
+    "approvalGrantServer": "Approve every command on {{server}} for 30 minutes",
+    "approvalGrantScope": "Scoped to this server and this project, expires automatically, revocable from the composer. The deny list still blocks dangerous commands, and nothing is remembered permanently."
   },
   "vpsSelector": {
     "label": "VPS",

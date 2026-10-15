@@ -260,7 +260,9 @@
     "attachmentSent": "📎 {{count}} فایل پیوست، برای عامل در ورک‌اسپیس کپی شد",
     "runChangesEdits": "{{count}} بار نوشته شد",
     "liveElapsedSuffix": "· {{seconds}} ثانیه",
-    "goalSummaryTitle": "هدف جاری"
+    "goalSummaryTitle": "هدف جاری",
+    "approvalGrantServer": "همهٔ دستورها روی {{server}} برای ۳۰ دقیقه تأیید شود",
+    "approvalGrantScope": "محدود به همین سرور و همین پروژه، خودکار منقضی می‌شود و از نوار composer قابل لغو است. deny-list همچنان دستورهای خطرناک را می‌بندد و هیچ‌چیز برای همیشه به خاطر سپرده نمی‌شود."
   },
   "vpsSelector": {
     "label": "VPS",

@@ -130,6 +130,7 @@ export default function ApprovalDialog(): JSX.Element | null {
   const [rememberCommand, setRememberCommand] = useState(false)
   const [rememberTool, setRememberTool] = useState(false)
   const [rememberSession, setRememberSession] = useState(false)
+  const [grantServer, setGrantServer] = useState(false)
   const [showDetails, setShowDetails] = useState(false)
   const [history, setHistory] = useState<ApprovalHistoryEntry[]>([])
   const [learned, setLearned] = useState<ApprovedCommandView[]>([])
@@ -159,6 +160,12 @@ export default function ApprovalDialog(): JSX.Element | null {
   if (!request) return null
 
   const rememberable = canRememberTool(request.tool)
+  /**
+   * v2.9.0: shell and write tools can NEVER be remembered permanently (v2.5 P0-3), which is
+   * why repeated work on the user's own VPS costs a dialog per command. The scoped grant is
+   * the bounded alternative, so it is offered exactly where the permanent one is refused.
+   */
+  const grantable = !rememberable && Boolean(request.server)
   const activeProject = settings?.projects.find((p) => p.id === settings.activeProjectId)
   const projectPolicy =
     activeProject?.policy ?? servers.find((server) => server.id === activeProject?.vpsId)?.policy
@@ -178,6 +185,8 @@ export default function ApprovalDialog(): JSX.Element | null {
     if (rememberCommand) outcome.remember = 'action'
     else if (rememberTool) outcome.remember = 'tool'
     else if (rememberSession) outcome.remember = 'session'
+    // A grant is exclusive with a permanent remember: it is the bounded form.
+    else if (grantServer) outcome.grant = 'server'
     respondApproval(outcome)
   }
 
@@ -347,6 +356,31 @@ export default function ApprovalDialog(): JSX.Element | null {
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               {t('chat.approvalCannotRemember')}
             </p>
+            {/*
+              v2.9.0: this branch used to be a dead end — "cannot be remembered" with no
+              alternative — which is why repeated work on the user's own VPS cost a dialog
+              for every command. The scoped grant is the bounded form: one server, one
+              project, 30 minutes, revocable, and the deny list still blocks.
+            */}
+            {grantable ? (
+              <label
+                data-testid="approval-grant-server"
+                className="mt-2 flex cursor-pointer items-start gap-2 rounded-lg border border-accent/40 bg-accent-solid/10 p-2 text-2xs text-fg"
+              >
+                <input
+                  type="checkbox"
+                  checked={grantServer}
+                  onChange={(event) => setGrantServer(event.target.checked)}
+                  className="mt-0.5 accent-accent"
+                />
+                <span>
+                  {t('chat.approvalGrantServer', { server: request.server })}
+                  <span className="mt-0.5 block text-3xs text-fg-subtle">
+                    {t('chat.approvalGrantScope')}
+                  </span>
+                </span>
+              </label>
+            ) : null}
             {request.dangerous || request.kind === 'write' || request.kind === 'shell' ? (
               <p className="mt-2 flex items-start gap-2 rounded-lg border border-danger/40 bg-danger/10 p-2 text-2xs text-danger">
                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
