@@ -68,9 +68,20 @@ export interface ApprovalOutcome {
   remember?: ApprovalRememberScope
   /** Deny & Explain: ask the agent why it wanted to run the action. */
   explain?: boolean
+  /**
+   * v2.8.1: "approve every command on THIS server in THIS project for 30 minutes".
+   *
+   * Deliberately a separate field from `remember`: `ApprovalRememberScope` is
+   * contractually read-only (see `remember-policy.ts`), and widening it would put shell
+   * and write tools back into the permanently-remembered set that v2.5 P0-3 removed. This
+   * grant is scoped to one server + one project, expires, and never becomes permanent.
+   */
+  grant?: 'server'
 }
 
-export type ApprovedCommandKind = 'action' | 'tool' | 'session' | 'scoped'
+export type ApprovedCommandKind = 'action' | 'tool' | 'session' | 'scoped' |
+  /** v2.8.1: "all commands on this server in this project for 30 minutes". */
+  'server'
 
 /** A learned approval shown in Settings → Advanced → Approved Commands. */
 export interface ApprovedCommandView {

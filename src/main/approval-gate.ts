@@ -141,6 +141,13 @@ export function createApprovalGate(
       if (approvedCommands?.isApproved(action.name, action.arguments, sessionId, scope)) {
         return true
       }
+      /*
+       * v2.8.1: a scoped, expiring server grant suppresses the *user approval* only. It sits
+       * inside `if (!denyListed)`, so a deny-listed command still prompts and can never be
+       * auto-approved; the host policy, remote path containment, the secret-path guard, the
+       * rate limiter and the audit log all run downstream and are unaffected.
+       */
+      if (scope && approvedCommands?.isServerGranted(scope)) return true
       if (!requiresApproval(options.mode, action)) return true
       // v2.5.5: a whitelisted or read-only command (and the remote read-only
       // tools) never pushes a prompt. Containment is still enforced downstream.
@@ -152,6 +159,16 @@ export function createApprovalGate(
     if (!outcome.approved) return false
 
     if (outcome.remember && !denyListed) await remember(action, outcome.remember)
+
+    /*
+     * v2.8.1: mint the scoped server grant the user asked for. It is only reachable for a
+     * run that knows its server and project, and it is a bounded, revocable window rather
+     * than a permanent allow — the store keeps it apart from `always`/`tools`/`sessions`
+     * precisely so a stale file cannot resurrect a permanent shell approval.
+     */
+    if (outcome.grant === 'server' && scope && approvedCommands) {
+      await approvedCommands.rememberServerGrant(scope.vpsId, scope.projectId)
+    }
 
     const count = (counts.get(action.name) ?? 0) + 1
     counts.set(action.name, count)

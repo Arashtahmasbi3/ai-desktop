@@ -8,6 +8,12 @@ import {
   type RememberedApproval,
   type RememberScope
 } from './remember-policy'
+import {
+  createServerGrant,
+  isServerGrantValid,
+  parseServerGrants,
+  type ServerGrant
+} from './server-grant'
 
 /** On-disk schema for the learned-approval database. */
 export interface ApprovedCommandsData {
@@ -20,9 +26,15 @@ export interface ApprovedCommandsData {
   sessions: Record<string, string[]>
   /** Scoped, expiring approvals (v2.5, P0-3). */
   scoped: RememberedApproval[]
+  /**
+   * v2.8.1: "approve every command on this server in this project for 30 minutes" grants.
+   * Kept apart from `always`/`tools`/`sessions` on purpose — those are permanent, and a
+   * stale permanent shell allow is exactly what P0-3 removed.
+   */
+  serverGrants: ServerGrant[]
 }
 
-export const APPROVED_COMMANDS_VERSION = 2
+export const APPROVED_COMMANDS_VERSION = 3
 
 export interface ApprovedCommandsOptions {
   file: string
@@ -56,7 +68,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function emptyData(): ApprovedCommandsData {
-  return { version: APPROVED_COMMANDS_VERSION, always: [], tools: [], sessions: {}, scoped: [] }
+  return {
+    version: APPROVED_COMMANDS_VERSION,
+    always: [],
+    tools: [],
+    sessions: {},
+    scoped: [],
+    serverGrants: []
+  }
 }
 
 function parseScoped(raw: unknown): RememberedApproval[] {
@@ -116,7 +135,8 @@ export class ApprovedCommands {
                 ])
               )
             : {},
-          scoped: parseScoped(raw.scoped)
+          scoped: parseScoped(raw.scoped),
+          serverGrants: parseServerGrants(raw.serverGrants)
         }
       }
     } catch (error) {
@@ -182,6 +202,44 @@ export class ApprovedCommands {
    * Persist a scoped, expiring approval (v2.5, P0-3). Refuses non-rememberable
    * tools and refreshes the window when the same tool+VPS+project is re-approved.
    */
+  /**
+   * v2.8.1: grant blanket approval for one server + one project for a bounded window.
+   * Deliberately NOT routed through `canRememberTool`: this is the explicit escape hatch
+   * for shell work on the user's own server, and it is scoped and expiring rather than
+   * permanent — see the invariants documented in `server-grant.ts`.
+   */
+  async rememberServerGrant(
+    vpsId: string,
+    projectId: string,
+    options: { ttlMs?: number; now?: number; id?: string } = {}
+  ): Promise<ServerGrant> {
+    if (!vpsId || !projectId) {
+      throw new Error('A server grant needs both a server id and a project id.')
+    }
+    const grant = createServerGrant(vpsId, projectId, options)
+    // One grant per server+project: a fresh grant replaces the previous one.
+    this.data.serverGrants = this.data.serverGrants.filter(
+      (entry) => !(entry.vpsId === vpsId && entry.projectId === projectId)
+    )
+    this.data.serverGrants.push(grant)
+    await this.persist()
+    return grant
+  }
+
+  /** True when a live grant covers this server + project. Expiry is evaluated now. */
+  isServerGranted(context: { vpsId: string; projectId: string }, now: number = Date.now()): boolean {
+    if (!context.vpsId || !context.projectId) return false
+    return this.data.serverGrants.some((grant) => isServerGrantValid(grant, context, now))
+  }
+
+  /** The live grant for a scope, if any (for the countdown UI). */
+  serverGrantFor(
+    context: { vpsId: string; projectId: string },
+    now: number = Date.now()
+  ): ServerGrant | undefined {
+    return this.data.serverGrants.find((grant) => isServerGrantValid(grant, context, now))
+  }
+
   async rememberScoped(approval: RememberedApproval): Promise<void> {
     if (!canRememberTool(approval.toolName)) return
     await this.load()
@@ -200,7 +258,11 @@ export class ApprovedCommands {
   async revoke(id: string): Promise<boolean> {
     await this.load()
     let changed = false
-    if (id.startsWith('tool:')) {
+    if (id.startsWith('server:')) {
+      const before = this.data.serverGrants.length
+      this.data.serverGrants = this.data.serverGrants.filter((entry) => entry.id !== id)
+      changed = this.data.serverGrants.length !== before
+    } else if (id.startsWith('tool:')) {
       const tool = id.slice('tool:'.length)
       const before = this.data.tools.length
       this.data.tools = this.data.tools.filter((entry) => entry !== tool)
@@ -237,8 +299,23 @@ export class ApprovedCommands {
     return changed
   }
 
-  list(): ApprovedCommandView[] {
+  list(now: number = Date.now()): ApprovedCommandView[] {
     const views: ApprovedCommandView[] = []
+    /*
+     * v2.8.1: live server grants are listed so the user can see the window they opened and
+     * revoke it. Expired ones are hidden — they are inert anyway, and expiry is evaluated on
+     * read (here and in the gate) rather than trusted to a renderer timer.
+     */
+    for (const grant of this.data.serverGrants) {
+      if (now >= grant.expiresAt) continue
+      const minutes = Math.max(1, Math.round((grant.expiresAt - now) / 60_000))
+      views.push({
+        id: grant.id,
+        kind: 'server',
+        tool: 'remote_shell',
+        label: `All commands on server ${grant.vpsId} in project ${grant.projectId} (${minutes} min left)`
+      })
+    }
     for (const tool of this.data.tools) {
       views.push({ id: `tool:${tool}`, kind: 'tool', tool, label: `All ${tool} calls` })
     }
@@ -262,7 +339,6 @@ export class ApprovedCommands {
         })
       }
     }
-    const now = Date.now()
     for (const entry of this.data.scoped) {
       if (now > entry.expiresAt) continue
       const minutes = Math.max(0, Math.ceil((entry.expiresAt - now) / 60000))
