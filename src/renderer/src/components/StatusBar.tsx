@@ -16,7 +16,6 @@ export default function StatusBar(): JSX.Element {
   const worker = useStore((state) => state.worker)
   const remote = useStore((state) => state.remote)
   const setOnline = useStore((state) => state.setOnline)
-  const toggleRemote = useStore((state) => state.toggleRemote)
   const sessionId = useStore((state) => state.sessionId)
   const activeChatId = useStore((state) => state.activeChatId)
   // Fix 1 (v2.6.1): show the id the agent actually runs under. For a new chat
@@ -140,17 +139,6 @@ export default function StatusBar(): JSX.Element {
         >
           {online ? <Wifi className="h-3 w-3 text-success" /> : <WifiOff className="h-3 w-3 text-warning" />}
           {online ? t('statusBar.online') : t('statusBar.offline')}
-        </button>
-        <button
-          type="button"
-          onClick={() => void toggleRemote()}
-          title={t('statusBar.toggleRemote')}
-          className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-bg-tertiary hover:text-fg"
-        >
-          <Server className="h-3 w-3" />
-          {t('statusBar.remote', {
-            target: remote?.enabled ? `${remote.host}:${remote.port}` : t('statusBar.remoteOff')
-          })}
         </button>
       </div>
     </footer>
