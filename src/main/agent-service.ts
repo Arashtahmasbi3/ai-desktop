@@ -24,6 +24,8 @@ import { RemoteFsToolExecutor } from '@core/tools/remote-fs-executor'
 import { MIGRATE_PROJECT_TOOL, type MigrateProjectDeps } from '@core/tools/migrate-project-tool'
 import { MigrateProjectToolExecutor } from '@core/tools/migrate-project-executor'
 import { CompositeToolExecutor, type ToolRoute } from '@core/tools/composite-executor'
+import { LIST_SERVERS_TOOL, ListServersToolExecutor, type ServerSummary } from '@core/tools/server-tools'
+import { wrapServerRefRoutes } from '@core/tools/server-ref-executor'
 import { DIAGNOSE_CRASH_TOOL } from '@core/tools/crash-diagnosis-tool'
 import { CrashDiagnosisToolExecutor } from '@core/tools/crash-diagnosis-tool'
 import { DiagnosticsToolExecutor, NAMED_DIAGNOSTIC_TOOLS } from '@core/tools/diagnostics-tools'
@@ -85,6 +87,14 @@ export interface RemoteFsHost {
   recordAudit?(entry: Omit<AuditEntry, 'at'>): Promise<unknown>
 }
 
+/**
+ * Hosts that can enumerate the saved servers (v2.8.1). Without this the model has no way
+ * to learn a server id and ends up asking the user for a UUID the UI never shows.
+ */
+export interface RemoteServerList {
+  listServers(): Promise<ServerSummary[]>
+}
+
 /** Hosts that can resolve a saved server's connection details (for migrations). */
 export interface RemoteServerResolver {
   resolveServer(
@@ -92,7 +102,10 @@ export interface RemoteServerResolver {
   ): Promise<{ host: string; port: number; username: string } | undefined>
 }
 
-export type RemoteHost = RemoteShellHost & Partial<RemoteFsHost> & Partial<RemoteServerResolver>
+export type RemoteHost = RemoteShellHost &
+  Partial<RemoteFsHost> &
+  Partial<RemoteServerResolver> &
+  Partial<RemoteServerList>
 /** Project-bound file access used to review and apply agent edits. */
 export interface ProjectFiles extends RunFileIO {
   read(relativePath: string): Promise<string>
@@ -155,6 +168,28 @@ export function planRemoteRuntime(
 ): RemoteRuntime {
   if (!vps) return {}
   const connected = vps.connectedServers()
+
+  /*
+   * v2.8.1: the roster is offered on every path below — with no pinned server, with a
+   * pinned-but-disconnected server, and on a plain task — because "which servers do I
+   * have?" is exactly the question the model must be able to answer before it can pick
+   * one. It returns data only and can never select a server.
+   */
+  const rosterTools: ToolDefinition[] = []
+  const rosterRoutes: ToolRoute[] = []
+  if (typeof vps.listServers === 'function') {
+    const listServers = (): Promise<ServerSummary[]> => vps.listServers!()
+    rosterTools.push(LIST_SERVERS_TOOL)
+    rosterRoutes.push({
+      names: new Set([LIST_SERVERS_TOOL.name]),
+      executor: new ListServersToolExecutor({ listServers })
+    })
+  }
+  const rosterSuffix = {
+    ...(rosterTools.length > 0
+      ? { extraTools: rosterTools, extraExecutor: new CompositeToolExecutor(rosterRoutes) }
+      : {})
+  }
   // A VPS is "wanted" when the task talks about one, or when a VPS-only tool
   // group was explicitly enabled. Either way we never guess a server (P0-4).
   // `enabledTools === undefined` means "all enabled", which is not a request for
@@ -170,8 +205,13 @@ export function planRemoteRuntime(
   })
   if (!resolution.ok) {
     return {
+      ...rosterSuffix,
       systemHint:
-        `${resolution.error} Do not assume or auto-select a server. Ask the user to pick one ` +
+        `${resolution.error} Do not assume or auto-select a server. ` +
+        (rosterTools.length > 0
+          ? 'Call "list_servers" to see every saved server (id, name, host, connected), then ' +
+            'ask the user which one to use if it is still ambiguous. '
+          : 'Ask the user to pick one ') +
         'in the chat header (or select a remote project), then retry.'
     }
   }
@@ -182,12 +222,13 @@ export function planRemoteRuntime(
   if (!connected.includes(target)) {
     if (wants) {
       return {
+        ...rosterSuffix,
         systemHint:
           `The selected VPS "${target}" is not connected. Tell the user to add or connect it ` +
           'in Settings -> Connections, then retry.'
       }
     }
-    return {}
+    return { ...rosterSuffix }
   }
   const shellTool: ToolDefinition = {
     ...REMOTE_SHELL_TOOL,
@@ -204,14 +245,19 @@ export function planRemoteRuntime(
     target
   )
 
-  const extraTools: ToolDefinition[] = [shellTool]
+  const extraTools: ToolDefinition[] = [...rosterTools, shellTool]
   const routes: ToolRoute[] = [
+    ...rosterRoutes,
     { names: new Set([REMOTE_SHELL_TOOL.name]), executor: shellExecutor }
   ]
   let hint =
     `You have access to the "remote_shell" tool on the connected VPS "${target}". ` +
     'Use it for tasks about that server; call it with server_id ' +
-    `"${target}" and the shell command to run.`
+    `"${target}" and the shell command to run.` +
+    (rosterTools.length > 0
+      ? ' To work with a DIFFERENT server, call "list_servers" first to get its id, name or host' +
+        ' — never ask the user for an id.'
+      : '')
 
   // Remote file tools are only offered when the host exposes SFTP.
   if (typeof vps.readFile === 'function') {
@@ -299,7 +345,9 @@ export function planRemoteRuntime(
     })
     hint +=
       ` You can also call "migrate_project" to copy a project directory from a connected ` +
-      'source VPS to another saved VPS with rsync over SSH.'
+      'source VPS to another saved VPS with rsync over SSH. Pass the target as target_vps_id ' +
+      'using its id, name or host (call "list_servers" to see them), or use target_host for a ' +
+      'server that is not saved here — the source must already have key access to it.'
   }
 
   // v2.4.1: database/docker migration, project scaffold, per-project user and worktrees.
@@ -320,8 +368,23 @@ export function planRemoteRuntime(
   routes.push(...v24.routes)
   if (v24.hint) hint += ` ${v24.hint}`
 
+  /*
+   * v2.8.1: any server_id / source_vps_id / target_vps_id the model supplies is
+   * canonicalised from id, name or host to the saved id before the tool runs. One wrapper
+   * covers all fifteen id-taking tools, and an unknown reference comes back with the
+   * roster so the model can retry instead of asking the user.
+   */
+  const routable =
+    typeof vps.listServers === 'function'
+      ? wrapServerRefRoutes(routes, {
+          listServers: () => vps.listServers!(),
+          connectedServers: () => vps.connectedServers()
+        })
+      : routes
   const executor: ToolExecutor =
-    routes.length === 1 ? shellExecutor : new CompositeToolExecutor(routes)
+    routable.length === 1 && routes.length === 1
+      ? shellExecutor
+      : new CompositeToolExecutor(routable)
 
   return { extraTools, extraExecutor: executor, systemHint: hint }
 }

@@ -7,6 +7,7 @@ import { parseBackupPath, restoreCommandFor } from '@core/remote/backup'
 import { runHealthCheck } from '@core/remote/health-check'
 import { shellQuote } from '@core/tools/remote-fs-tools'
 import { getCommandTimeout } from '@core/tools/remote-shell-tool'
+import type { ServerSummary } from '@core/tools/server-tools'
 import type {
   HealthCheckConfig,
   HealthCheckOutcome,
@@ -138,6 +139,27 @@ export class SshManager {
   ): Promise<{ host: string; port: number; username: string } | undefined> {
     const server = (await this.store.list()).find((entry) => entry.id === id)
     return server ? { host: server.host, port: server.port, username: server.username } : undefined
+  }
+
+  /**
+   * The saved-server roster, for the agent's `list_servers` tool (v2.8.1).
+   *
+   * The model previously had no way to learn a server id: the only id it ever saw was
+   * the active project's own, so asking it to migrate to a *second* saved server ended
+   * with it demanding a UUID from the user — and the UI never displays one. This exposes
+   * id, name, host, port, user and connection state, and nothing secret.
+   */
+  async listServers(): Promise<ServerSummary[]> {
+    const servers = await this.store.list()
+    return servers.map((server) => ({
+      id: server.id,
+      name: server.name,
+      host: server.host,
+      port: server.port,
+      username: server.username,
+      connected: this.isConnected(server.id),
+      ...(server.policy?.mode ? { policyMode: server.policy.mode } : {})
+    }))
   }
 
   auditEntries(): AuditEntry[] {

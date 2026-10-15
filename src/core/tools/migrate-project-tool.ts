@@ -17,9 +17,19 @@ export const MIGRATE_PROJECT_TOOL: ToolDefinition = {
   parameters: {
     type: 'object',
     properties: {
-      source_vps_id: { type: 'string', description: 'Id of the source VPS (from the saved server list)' },
+      source_vps_id: {
+        type: 'string',
+        description:
+          'The source VPS — its id, display name or host (call list_servers to see them). ' +
+          'Must be connected.'
+      },
       source_path: { type: 'string', description: 'Absolute project path on the source VPS' },
-      target_vps_id: { type: 'string', description: 'Id of the target VPS (from the saved server list)' },
+      target_vps_id: {
+        type: 'string',
+        description:
+          'The target as a saved server — its id, its display name, or its host. Call ' +
+          'list_servers to see the saved servers; never ask the user for an id.'
+      },
       target_host: {
         type: 'string',
         description:

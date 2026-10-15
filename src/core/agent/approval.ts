@@ -1,4 +1,6 @@
 import { checkDenyList } from './deny-list'
+import { isReadOnlyShellCommand } from '@core/remote/command-whitelist'
+import { READ_ONLY_TOOL_NAMES } from '@shared/profile'
 import type { ApprovalMode } from '@shared/approval'
 
 export {
@@ -17,22 +19,32 @@ export type ActionKind = 'read' | 'write' | 'shell'
  * {@link classifyAction} treats anything it does not recognise as a write, so a
  * tool added later can never be auto-approved just by being new (v2.6.5).
  */
-const READ_TOOLS = new Set([
-  'read_file',
-  'list_dir',
-  'remote_read_file',
-  'remote_list_dir',
-  'remote_exists',
-  'remote_grep',
-  'remote_git_status',
-  'diagnose_crash',
-  'worktree_list',
+/**
+ * v2.8.1: derived from the canonical read-only set instead of being re-declared here.
+ * Re-declaring it is how the four named diagnostics ended up missing: the app actively
+ * tells the model to prefer `get_service_logs`, `get_disk_usage`, `get_system_health`
+ * and `get_process_list` over free-form shell, yet in `auto-write` mode each of them
+ * raised an approval dialog with a **Write** badge.
+ */
+const READ_TOOLS = new Set<string>([
+  ...READ_ONLY_TOOL_NAMES,
   // v2.8.0: asking the user a question touches nothing, so it must never raise an
   // approval prompt — the question *is* the interaction.
-  'ask_user'
+  'ask_user',
+  // v2.8.1: reading the saved-server roster is how the model learns a server id at all.
+  // Prompting for it would recreate the dead end it exists to remove.
+  'list_servers'
 ])
 
 const SHELL_TOOLS = new Set(['run_command', 'remote_shell'])
+
+/** v2.8.1: the read-only tool set, so callers and tests share one source. */
+export const READ_ONLY_TOOLS: ReadonlySet<string> = READ_TOOLS
+
+/** v2.8.1: classify a shell command exactly the way the approval gate does. */
+export function classifyShellCommand(command: string): 'read' | 'write' {
+  return isReadOnlyShellCommand(command) ? 'read' : 'write'
+}
 
 export interface ClassifiableAction {
   name: string

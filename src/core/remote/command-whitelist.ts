@@ -112,6 +112,8 @@ export const READ_ONLY_BASE_COMMANDS = new Set([
   'uname', 'hostname', 'uptime', 'whoami', 'id', 'pwd', 'date',
   'free', 'df', 'lscpu', 'lsmem', 'nproc', 'lsblk',
   'ps', 'top', 'htop', 'pgrep', 'ss', 'netstat', 'ip', 'ifconfig', 'ping',
+  // v2.8.1: socket/name-service inspection the agent reaches for during diagnosis.
+  'lsof', 'dig', 'host', 'nslookup', 'getent', 'arp', 'route',
   // Text / lookups
   'echo', 'printf', 'true', 'false', 'which', 'whereis', 'env', 'printenv',
   'journalctl', 'dmesg',
@@ -120,7 +122,10 @@ export const READ_ONLY_BASE_COMMANDS = new Set([
   // Change directory (absolute targets only; guarded below)
   'cd',
   // Tool CLIs (subcommand-restricted below)
-  'systemctl', 'docker', 'pm2', 'kubectl', 'node', 'npm', 'python', 'python3', 'git'
+  'systemctl', 'docker', 'pm2', 'kubectl', 'node', 'npm', 'python', 'python3', 'git',
+  // v2.8.1: `ufw` only through the read-only subcommands below; without it in this set
+  // the subcommand gate below is never consulted.
+  'ufw'
 ])
 
 /**
@@ -135,7 +140,9 @@ const READ_ONLY_SUBCOMMANDS: Record<string, string[] | null> = {
   node: ['--version', '-v'],
   npm: ['--version', '-v', 'ls', 'list', 'view', 'outdated'],
   python: ['--version', '-V'],
-  python3: ['--version', '-V']
+  python3: ['--version', '-V'],
+  // v2.8.1: read-only ufw forms.
+  ufw: ['status', 'show']
 }
 
 /** `git` subcommands that never mutate the repository (v2.5.6). */
@@ -211,6 +218,88 @@ function allowsGit(tokens: string[]): boolean {
  * containment (P0-2) and the deny list still run afterwards, so a read-only
  * command that references a path outside the project is still blocked.
  */
+/**
+ * Strip a single wrapper layer and return the command it runs, or undefined when this is
+ * not a wrapper. The caller must RE-CLASSIFY the result: trusting `timeout`, `bash -c`
+ * or a `for` loop outright would make `timeout 12 rm -rf /srv` prompt-free, which is the
+ * entire risk of teaching the classifier about wrappers.
+ */
+export function unwrapShellWrapper(command: string): string | undefined {
+  const text = command.trim()
+  const first = text.split(/\s+/)[0] ?? ''
+  const tokens = text.split(/\s+/)
+
+  // timeout [opts] <duration> <command …>
+  if (first === 'timeout') {
+    let index = 1
+    while (index < tokens.length && tokens[index].startsWith('-')) {
+      if (tokens[index] === '-k' || tokens[index] === '-s') index += 1
+      index += 1
+    }
+    index += 1 // the duration
+    const inner = tokens.slice(index).join(' ')
+    return inner.trim() === '' || inner === text ? undefined : inner
+  }
+
+  // sh|bash|dash|zsh -c '<script>'
+  if (first === 'sh' || first === 'bash' || first === 'dash' || first === 'zsh') {
+    const match = text.match(/^(?:sh|bash|dash|zsh)\s+-c\s+([\s\S]+)$/)
+    if (!match) return undefined
+    const inner = stripOuterQuotes(match[1].trim())
+    return inner === text ? undefined : inner
+  }
+
+  // env VAR=… <command …>
+  if (first === 'env') {
+    let index = 1
+    while (index < tokens.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(tokens[index])) index += 1
+    const inner = tokens.slice(index).join(' ')
+    return inner.trim() === '' || inner === text ? undefined : inner
+  }
+
+  // for|while|until … do <body> done  →  the body
+  if (first === 'for' || first === 'while' || first === 'until') {
+    const open = text.search(/\bdo\b/)
+    const close = text.lastIndexOf('done')
+    if (open < 0 || close <= open) return undefined
+    const inner = text.slice(open + 2, close).replace(/^[;\s]+/, '').trim()
+    return inner === '' ? undefined : inner
+  }
+
+  // if … then <body> fi  →  the body
+  if (first === 'if') {
+    const open = text.search(/\bthen\b/)
+    const close = text.lastIndexOf('fi')
+    if (open < 0 || close <= open) return undefined
+    const inner = text.slice(open + 4, close).trim()
+    return inner === '' ? undefined : inner
+  }
+
+  // ssh [opts] <host> <remote command …> — the remote command is what runs.
+  if (first === 'ssh') {
+    let index = 1
+    while (index < tokens.length && tokens[index].startsWith('-')) {
+      if (['-p', '-i', '-o', '-l', '-F', '-J', '-b', '-c', '-D', '-e', '-L', '-R', '-W'].includes(tokens[index])) {
+        index += 1
+      }
+      index += 1
+    }
+    index += 1 // the host
+    const inner = tokens.slice(index).join(' ')
+    return inner.trim() === '' ? undefined : inner
+  }
+
+  return undefined
+}
+
+/** Remove \`'…'\` or \`"…"\` around the whole string. */
+function stripOuterQuotes(text: string): string {
+  const quoted =
+    text.length >= 2 &&
+    ((text.startsWith("'") && text.endsWith("'")) || (text.startsWith('"') && text.endsWith('"')))
+  return quoted ? text.slice(1, -1) : text
+}
+
 export function isReadOnlyShellCommand(command: string): boolean {
   if (typeof command !== 'string') return false
   const trimmed = command.trim()
@@ -221,6 +310,16 @@ export function isReadOnlyShellCommand(command: string): boolean {
   // `=` is included as a boundary so an assignment value (`B=../secret`) is
   // caught too - otherwise marking assignments read-only would let it through.
   if (/(^|[\s=/])\.\.($|[\s/])/.test(trimmed)) return false
+
+  /*
+   * v2.8.1: unwrap one layer and re-classify. The agent writes probes such as
+   * `timeout 12 ssh -vv …` and `timeout 8 bash -c '…'`, which the base-command test
+   * below cannot recognise — so a chain of pure reads prompted because of its wrapper.
+   * Recursion shrinks the string every time and the deny list, path containment and
+   * secret guard all still run afterwards.
+   */
+  const unwrapped = unwrapShellWrapper(trimmed)
+  if (unwrapped !== undefined) return isReadOnlyShellCommand(unwrapped)
 
   const segments = trimmed
     .split(/\s*(?:;|&&|\|\|)\s*/)
@@ -240,7 +339,11 @@ export function isReadOnlyShellCommand(command: string): boolean {
         return hadTokens
       }
       const base = tokens[0].split('/').pop() ?? tokens[0]
-      if (!READ_ONLY_BASE_COMMANDS.has(base)) return false
+      // v2.8.1: a wrapper as one stage of a chain is judged by the stage it runs.
+      if (!READ_ONLY_BASE_COMMANDS.has(base)) {
+        const inner = unwrapShellWrapper(part.trim())
+        return inner !== undefined && isReadOnlyShellCommand(inner)
+      }
       if (base === 'find' && tokens.some((token) => /^-(exec|delete|ok)$/.test(token))) return false
       // `cd` is only a read when the target is absolute; a relative target (esp.
       // `..`) could step outside the project root, so it needs approval.

@@ -9,6 +9,7 @@ import { classifyAction, isDenyListedAction, requiresApproval } from '@core/agen
 import type { ApprovedCommands } from '@core/agent/approved-commands'
 import { canRememberTool, createRememberedApproval } from '@core/agent/remember-policy'
 import { isCommandAlwaysAllowed, isReadOnlyShellCommand } from '@core/remote/command-whitelist'
+import { READ_ONLY_TOOL_NAMES } from '@shared/profile'
 
 export interface ApprovalGateOptions {
   mode: ApprovalMode
@@ -41,15 +42,14 @@ export interface ApprovalGateOptions {
 const DEFAULT_SUGGESTION_AT = 3
 
 /** Remote read-only tools that never need an explicit approval (v2.5.5). */
-const READ_ONLY_REMOTE_TOOLS = new Set([
-  'remote_read_file',
-  'remote_list_dir',
-  'remote_exists',
-  'remote_grep',
-  'remote_git_status',
-  // v2.5.6: the crash diagnosis probes are fixed and read-only.
-  'diagnose_crash'
-])
+/**
+ * v2.8.1: derived from the canonical read-only set (minus the local sandbox reads, which
+ * never reach this gate as remote). Re-declaring the list here is how the four named
+ * diagnostics ended up prompting in `auto-write` mode despite being read-only.
+ */
+const READ_ONLY_REMOTE_TOOLS = new Set(
+  [...READ_ONLY_TOOL_NAMES].filter((name) => name !== 'read_file' && name !== 'list_dir')
+)
 
 export interface ApprovalRequirement {
   required: boolean
