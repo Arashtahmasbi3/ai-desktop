@@ -51,6 +51,15 @@ fails, a tool is missing, or the budget ran out — ask rather than guess).
 
 ## Status
 
+**v2.9.2 released — a disconnected remote project is no longer reported as a missing path.**
+Found by installing the app on the user's own machine and reading the live sidebar: main
+defines a remote project's `exists` as "its VPS is connected", and `projectState()` in the
+sidebar checked `exists` before its remote branch, so a remote project whose server was down
+showed an amber dot, "Path not found" and a local **Locate** button for a path on a server.
+The sidebar now applies the same guard `store.ts` already had
+(`project.exists === false && project.type !== 'remote'`). 264 test files / 2177 tests green,
+typecheck and production build clean. (2026-10-15)
+
 **v2.9.1 released — the agent now works inside your project.** A local run's sandbox workspace
 is rooted at the project folder (the user asked for this explicitly, having found that the
 agent could not read the project's files or run its tests), the project is never owned or

@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.9.2] — 2026-10-15
+
+### Fixed — a disconnected remote project looked like a deleted folder
+
+Both of the user's projects showed an amber dot and **"Path not found"** at startup.
+Nothing was wrong: they are remote, and their VPS was not connected yet.
+
+Main defines a remote project's `exists` as *"its VPS is connected"* (a remote path is not
+on this disk), and the sidebar checked `exists` before its remote branch — so "not
+connected" rendered as "missing", with a **Locate** button that opens a local folder picker
+for a path that lives on a server. `store.ts` already excluded remote projects from its
+missing-path count; the sidebar now applies the same rule. Remote projects report
+connected/disconnected; local projects keep the missing-path warning.
+
+**Suite: 264 files / 2177 tests green; typecheck and production build clean.**
+
+
 ## [2.9.1] — 2026-10-14
 
 ### Changed — the agent works in your project
@@ -1062,7 +1079,8 @@ First stable release. Ships as a Windows x64 NSIS installer and a portable execu
   `node_modules` are shipped inside the app package.
 - Optional code signing via `CSC_LINK` / `CSC_KEY_PASSWORD` (skipped safely when absent).
 
-[Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.9.1...HEAD
+[Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.9.2...HEAD
+[2.9.2]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.9.1...v2.9.2
 [2.9.1]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.9.0...v2.9.1
 [2.9.0]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.7.0...v2.8.0
