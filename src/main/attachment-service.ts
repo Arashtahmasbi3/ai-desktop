@@ -16,12 +16,10 @@
  *    binary-safe `SandboxManager.writeFile` seam and returns the
  *    **workspace-relative** path a `read_file` tool call can use.
  *
- * Why staging exists (RC2 + RC3): for a LOCAL project the run's sandbox
- * workspace is a fresh, empty temp directory under `<userData>/sandboxes/<uuid>`
- * that is deleted when the run ends — the orchestrator never roots it at the
- * project — and `read_file` rejects absolute paths and `..`. So the only path the
- * agent can actually read is a workspace-relative one, which means the bytes have
- * to be copied in first.
+ * Why staging exists (RC2 + RC3): `read_file` rejects absolute paths and `..`, so the
+ * only path the agent can actually read is a workspace-relative one, which means the
+ * bytes have to be copied in first. (Until v2.9.1 a local run also got a fresh temp
+ * workspace that was deleted on exit — that has since been rooted at the project.)
  *
  * Deliberately dependency-free apart from `node:fs/promises` and `node:path`:
  * the packaged app ships exactly one runtime dependency (`ssh2`), so nothing here
@@ -58,6 +56,12 @@ export interface AttachmentServiceOptions {
   readFile?: (path: string) => Promise<Buffer>
   /** Injected stat boundary. */
   stat?: (path: string) => Promise<{ size: number; isFile(): boolean }>
+  /**
+   * Injected thumbnail boundary (v3.0). Main wires Electron's `nativeImage`; tests inject
+   * a stub, so this service never imports Electron and never needs a display. Returning
+   * `undefined` simply means "no preview" — a decorative failure must never lose the file.
+   */
+  thumbnail?: (path: string, mediaType: ImageMediaType) => string | undefined
   now?: () => number
 }
 
@@ -74,7 +78,9 @@ function toPublicRef(ref: StoredRef): AttachmentRef {
     sourcePath: ref.sourcePath,
     bytes: ref.bytes,
     kind: ref.kind,
-    ...(ref.mediaType ? { mediaType: ref.mediaType } : {})
+    ...(ref.mediaType ? { mediaType: ref.mediaType } : {}),
+    // v3.0: the preview must survive this mapper, or it never reaches the chip.
+    ...(ref.thumbnail ? { thumbnail: ref.thumbnail } : {})
   }
 }
 
@@ -86,6 +92,7 @@ export class AttachmentService {
   private readonly readFileImpl: (path: string) => Promise<Buffer>
   private readonly statImpl: (path: string) => Promise<{ size: number; isFile(): boolean }>
   private readonly now: () => number
+  private readonly thumbnailImpl?: (path: string, mediaType: ImageMediaType) => string | undefined
 
   constructor(options: AttachmentServiceOptions = {}) {
     this.maxBytes = options.maxBytes ?? DEFAULT_MAX_ATTACHMENT_BYTES
@@ -93,6 +100,7 @@ export class AttachmentService {
     this.readFileImpl = options.readFile ?? ((path: string) => readFile(path))
     this.statImpl = options.stat ?? ((path: string) => stat(path))
     this.now = options.now ?? (() => Date.now())
+    if (options.thumbnail) this.thumbnailImpl = options.thumbnail
   }
 
   /**
@@ -202,19 +210,34 @@ export class AttachmentService {
     if (!Number.isFinite(info.size) || info.size < 0 || info.size > this.maxBytes) return undefined
 
     const mediaType = mediaTypeForPath(sourcePath)
+    const kind = attachmentKindForPath(sourcePath)
     const ref: StoredRef = {
       id: this.idFor(sourcePath),
       name: basename(sourcePath),
       sourcePath,
       bytes: info.size,
-      kind: attachmentKindForPath(sourcePath),
+      kind,
       ...(mediaType ? { mediaType } : {}),
+      // Only images are decoded, and a failure here is never fatal: a missing preview is a
+      // cosmetic loss, while refusing the attachment would lose the user's file.
+      ...(kind === 'image' && mediaType ? { thumbnail: this.thumbnailFor(sourcePath, mediaType) } : {}),
       registeredAt: this.now()
     }
     this.byId.set(ref.id, ref)
     this.idByPath.set(sourcePath, ref.id)
     this.evictOldest()
     return toPublicRef(ref)
+  }
+
+  /** Best-effort preview; any failure (or an empty result) means "no thumbnail". */
+  private thumbnailFor(path: string, mediaType: ImageMediaType): string | undefined {
+    if (!this.thumbnailImpl) return undefined
+    try {
+      const dataUrl = this.thumbnailImpl(path, mediaType)
+      return typeof dataUrl === 'string' && dataUrl.startsWith('data:image/') ? dataUrl : undefined
+    } catch {
+      return undefined
+    }
   }
 
   /**

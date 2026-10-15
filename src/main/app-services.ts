@@ -21,6 +21,7 @@ import { PreflightBroker } from './preflight-broker'
 import { QuestionBroker } from './question-broker'
 import { SessionProfileService } from './session-profile-service'
 import { FileService } from './file-service'
+import { nativeImage } from 'electron'
 import { AttachmentService } from './attachment-service'
 import { ChatStore } from './chat-store'
 import {
@@ -76,6 +77,9 @@ export interface AppServicesOptions {
  * Wires the main-process services together: settings/sessions on disk, the
  * sandbox, the agent, the background worker and the optional remote server.
  */
+/** Longest edge of a generated attachment preview, in pixels (v3.0). */
+const THUMBNAIL_MAX_EDGE = 160
+
 export class AppServices {
   readonly dir: string
   readonly persistence: Persistence
@@ -91,7 +95,24 @@ export class AppServices {
    * v2.9.0: desktop files/images the user attached, staged into the run workspace by
    * AgentService. Lives in main so the renderer only ever handles opaque ids.
    */
-  readonly attachments = new AttachmentService()
+  readonly attachments = new AttachmentService({
+    /*
+     * v3.0: previews for attached images. nativeImage is Electron's own API (no new
+     * dependency) and this callback is the injected seam that keeps AttachmentService
+     * testable without a display. A missing or undecodable image yields undefined, which
+     * simply means the chip shows no preview.
+     */
+    thumbnail: (path: string) => {
+      const image = nativeImage.createFromPath(path)
+      if (image.isEmpty()) return undefined
+      const size = image.getSize()
+      const longest = Math.max(size.width, size.height)
+      // Never upscale: a tiny image is already its own thumbnail.
+      const resized =
+        longest > THUMBNAIL_MAX_EDGE ? image.resize({ width: THUMBNAIL_MAX_EDGE }) : image
+      return resized.toDataURL()
+    }
+  })
   readonly chats: ChatStore
   readonly sandbox: SandboxManager
   /** Main-side Session Profile + elevation grant authority (v2.6.2, P0-5). */

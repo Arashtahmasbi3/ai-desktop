@@ -30,6 +30,13 @@ export interface AttachmentRef {
   bytes: number
   kind: AttachmentKind
   mediaType?: ImageMediaType
+  /**
+   * v3.0: a small PNG data URL for an image attachment, produced in main by Electron's
+   * `nativeImage`. It exists so the chip can show *what* was picked: reporting only
+   * "screenshot.png 1.2 MB" left the user unable to confirm the right image before sending.
+   * Never the full-resolution bytes, and never the path.
+   */
+  thumbnail?: string
 }
 
 /**
@@ -44,6 +51,8 @@ export interface AttachmentRefView {
   bytes: number
   kind: AttachmentKind
   mediaType?: ImageMediaType
+  /** v3.0: preview data URL for an image attachment (see {@link AttachmentRef.thumbnail}). */
+  thumbnail?: string
 }
 
 export function toAttachmentRefView(ref: AttachmentRef): AttachmentRefView {
@@ -52,7 +61,10 @@ export function toAttachmentRefView(ref: AttachmentRef): AttachmentRefView {
     name: ref.name,
     bytes: ref.bytes,
     kind: ref.kind,
-    ...(ref.mediaType ? { mediaType: ref.mediaType } : {})
+    ...(ref.mediaType ? { mediaType: ref.mediaType } : {}),
+    // A thumbnail is only ever produced for images, so its presence is also a hint that
+    // this attachment is one.
+    ...(ref.thumbnail ? { thumbnail: ref.thumbnail } : {})
   }
 }
 

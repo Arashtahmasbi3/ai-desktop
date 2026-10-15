@@ -132,6 +132,95 @@ describe('AttachmentService (v2.9.0)', () => {
     })
   })
 
+  /*
+   * v3.0 (user-reported): after uploading an image they could not see *which* image they had
+   * picked — only "screenshot.png 1.2 MB". The preview is produced in main (the desktop path
+   * must never reach the renderer) and travels as a small data URL on the view.
+   */
+  describe('image previews (v3.0)', () => {
+    const DATA_URL = 'data:image/png;base64,iVBORw0KGgo='
+
+    it('previews an image, and the preview reaches the renderer view', async () => {
+      await withDir(async (dir) => {
+        const file = join(dir, 'shot.png')
+        await fs.writeFile(file, PNG)
+        const calls: string[] = []
+        const service = new AttachmentService({
+          thumbnail: (path) => {
+            calls.push(path)
+            return DATA_URL
+          }
+        })
+
+        const [ref] = await service.register([file])
+
+        expect(calls).toEqual([file])
+        expect(ref?.thumbnail).toBe(DATA_URL)
+        // The view is what crosses the IPC boundary.
+        expect(toAttachmentRefView(ref!).thumbnail).toBe(DATA_URL)
+      })
+    })
+
+    it('never decodes a text file', async () => {
+      await withDir(async (dir) => {
+        const file = join(dir, 'notes.md')
+        await fs.writeFile(file, '# hi')
+        const calls: string[] = []
+        const service = new AttachmentService({
+          thumbnail: (path) => {
+            calls.push(path)
+            return DATA_URL
+          }
+        })
+
+        const [ref] = await service.register([file])
+
+        expect(calls).toEqual([])
+        expect(ref?.thumbnail).toBeUndefined()
+      })
+    })
+
+    it('has no preview at all when no thumbnailer is wired (plain Node, no Electron)', async () => {
+      await withDir(async (dir) => {
+        const file = join(dir, 'shot.png')
+        await fs.writeFile(file, PNG)
+        const [ref] = await new AttachmentService().register([file])
+        // Absent, not an empty string: the view must not carry a broken <img src="">.
+        expect(ref?.thumbnail).toBeUndefined()
+        expect(toAttachmentRefView(ref!).thumbnail).toBeUndefined()
+      })
+    })
+
+    it('keeps the attachment when the preview fails — a preview is cosmetic, the file is not', async () => {
+      await withDir(async (dir) => {
+        const file = join(dir, 'shot.png')
+        await fs.writeFile(file, PNG)
+        const service = new AttachmentService({
+          thumbnail: () => {
+            throw new Error('no decoder for this format')
+          }
+        })
+
+        const [ref] = await service.register([file])
+
+        expect(ref).toBeDefined()
+        expect(ref?.kind).toBe('image')
+        expect(ref?.thumbnail).toBeUndefined()
+      })
+    })
+
+    it('rejects a thumbnailer that returns something that is not an image data URL', async () => {
+      await withDir(async (dir) => {
+        const file = join(dir, 'shot.png')
+        await fs.writeFile(file, PNG)
+        // A file:// path or an empty string would render as a broken image, so it is dropped.
+        const service = new AttachmentService({ thumbnail: () => 'file:///tmp/shot.png' })
+        const [ref] = await service.register([file])
+        expect(ref?.thumbnail).toBeUndefined()
+      })
+    })
+  })
+
   it('refuses a credential-shaped path, so the channel cannot bypass the secret guard', async () => {
     await withDir(async (dir) => {
       const secret = join(dir, '.env')
