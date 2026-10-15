@@ -34,6 +34,8 @@ import ExecutionBar from './ExecutionBar'
 import ProgressTimeline from './ProgressTimeline'
 import StatusCard from './StatusCard'
 import InlineTrace from './InlineTrace'
+import RunChangesCard from './RunChangesCard'
+import GoalSummaryCard from './GoalSummaryCard'
 import LiveStatus from './LiveStatus'
 import JobsPanel from './JobsPanel'
 import MicButton from './MicButton'
@@ -412,6 +414,10 @@ export default function ChatPanel(): JSX.Element {
         ) : null}
 
         <InlineTrace />
+        {/* v2.9.0: the reference design keeps the ongoing goal and the changed files
+            visible in the transcript, where the reader actually looks. */}
+        <GoalSummaryCard />
+        <RunChangesCard />
         </div>
       </div>
       <JobsPanel />

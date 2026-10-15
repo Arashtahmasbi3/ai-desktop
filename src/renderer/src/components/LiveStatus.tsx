@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Brain,
@@ -83,9 +83,32 @@ function statusFor(phase: TracePhase, tool: string | undefined, t: Translate): S
 export default function LiveStatus(): JSX.Element | null {
   const { t } = useTranslation()
   const running = useStore((state) => state.running)
+  // v2.9.0: the reference design shows how long the current turn has been working, which
+  // is the difference between "it is thinking" and "it is stuck".
+  const [startedAt, setStartedAt] = useState<number | null>(null)
+  const [now, setNow] = useState(() => Date.now())
   const decisions = useStore((state) => state.decisions)
   const messages = useStore((state) => state.messages)
   const logs = useStore((state) => state.logs)
+
+  // v2.9.0: start the clock when a run begins and stop it when the run ends, so the
+  // elapsed time is the current turn's and not the app's uptime.
+  useEffect(() => {
+    if (!running) {
+      setStartedAt(null)
+      return
+    }
+    setStartedAt((current) => current ?? Date.now())
+    const timer = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(timer)
+  }, [running])
+
+  // v2.9.0: the model's own reasoning for the newest step, shown as a one-line excerpt —
+  // the reference design puts "Analysing the request …" right under the status.
+  const reasoning = useStore((state) => {
+    const latest = state.decisions[state.decisions.length - 1]
+    return latest ? state.reasoningByStep[latest.id] : undefined
+  })
 
   // U-11: this scans the whole message list, so memoize it instead of redoing
   // the walk on every unrelated store update.
@@ -130,18 +153,38 @@ export default function LiveStatus(): JSX.Element | null {
   if (!running) return null
 
   const Icon = status?.icon
+  const elapsedSeconds =
+    startedAt === null ? 0 : Math.max(0, Math.floor((now - startedAt) / 1000))
+  const excerpt = reasoning ? reasoning.replace(/\s+/g, ' ').trim().slice(0, 160) : ''
 
   return (
     <div
       data-testid="live-status"
-      className="flex items-center justify-end gap-2 px-4 text-xs text-fg-muted"
+      className="mx-4 mb-1 flex flex-col items-end gap-0.5 text-xs text-fg-muted"
     >
-      {Icon ? (
-        <Icon className="h-3.5 w-3.5 shrink-0 text-accent" />
-      ) : (
-        <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-accent" />
-      )}
-      {status ? t(status.key, status.params) : t('chat.typing')}
+      <div className="flex items-center gap-2">
+        {Icon ? (
+          <Icon className="h-3.5 w-3.5 shrink-0 text-accent" />
+        ) : (
+          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-accent" />
+        )}
+        {status ? t(status.key, status.params) : t('chat.typing')}
+        {elapsedSeconds >= 2 ? (
+          <span data-testid="live-elapsed" className="text-fg-subtle">
+            {t('chat.liveElapsedSuffix', { seconds: elapsedSeconds })}
+          </span>
+        ) : null}
+      </div>
+      {excerpt ? (
+        <p
+          data-testid="live-reasoning"
+          dir="auto"
+          className="max-w-[42rem] truncate text-right text-3xs text-fg-subtle"
+          title={reasoning}
+        >
+          {excerpt}
+        </p>
+      ) : null}
     </div>
   )
 }
