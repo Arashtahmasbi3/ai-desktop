@@ -213,6 +213,12 @@ export function registerIpc(
     ['onboarding:complete', () => services.onboarding.complete()],
 
     ['github:status', () => services.github.status()],
+    // v2.8.1: the `gh` CLI is very often already installed and logged in, so the
+    // one-click path is offered first. `detectCli` only reads (never the token);
+    // `connectCli` reads the token, validates it with `GET /user` and stores it
+    // encrypted through setToken — the token never crosses this boundary.
+    ['github:detectCli', () => services.github.detectCli()],
+    ['github:connectCli', () => services.github.connectWithCli()],
     ['github:setClientId', (clientId: string) => services.github.setClientId(clientId)],
     ['github:setToken', (token: string) => services.github.setToken(token)],
     ['github:startAuth', () => services.github.startAuth()],

@@ -23,6 +23,7 @@ import type {
   GitRepoStatus,
   GitHubAuthPollResult,
   GitHubAuthStatus,
+  GitHubCliStatus,
   GitHubDeviceCode,
   GitHubIssue,
   GitHubPull,
@@ -152,6 +153,8 @@ export const api = {
 
   github: {
     status: (): Promise<GitHubAuthStatus> => invoke('github:status'),
+    detectCli: (): Promise<GitHubCliStatus> => invoke('github:detectCli'),
+    connectCli: (): Promise<GitHubAuthStatus> => invoke('github:connectCli'),
     setClientId: (clientId: string): Promise<GitHubAuthStatus> =>
       invoke('github:setClientId', clientId),
     setToken: (token: string): Promise<GitHubAuthStatus> => invoke('github:setToken', token),

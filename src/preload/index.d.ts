@@ -36,6 +36,7 @@ import type {
   GitRepoStatus,
   GitHubAuthPollResult,
   GitHubAuthStatus,
+  GitHubCliStatus,
   GitHubDeviceCode,
   GitHubIssue,
   GitHubPull,
@@ -126,6 +127,8 @@ export interface Api {
   }
   github: {
     status(): Promise<GitHubAuthStatus>
+    detectCli(): Promise<GitHubCliStatus>
+    connectCli(): Promise<GitHubAuthStatus>
     setClientId(clientId: string): Promise<GitHubAuthStatus>
     setToken(token: string): Promise<GitHubAuthStatus>
     startAuth(): Promise<GitHubDeviceCode>

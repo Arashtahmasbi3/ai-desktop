@@ -98,6 +98,9 @@ describe('v2.6.3 T1.3 - single column', () => {
     useStore.setState({ running: true })
     render(<ChatPanel />)
     const status = screen.getByTestId('live-status')
-    expect(status.className).toContain('justify-end')
+    // v2.9.0: the row became a column so the elapsed time and the model's reasoning excerpt
+    // can sit under the status line. It is still pinned to the right edge, which is what the
+    // conformance rule protects, so the assertion follows the layout it now has.
+    expect(status.className).toContain('items-end')
   })
 })

@@ -105,4 +105,38 @@ describe('device flow', () => {
       pollDeviceFlow('c', 'd', { fetchImpl: make({ error: 'access_denied' }) })
     ).resolves.toMatchObject({ status: 'error' })
   })
+
+  /**
+   * v2.8.1 regression — "I cannot connect to GitHub and it is very hard to connect to it."
+   *
+   * GitHub answers a bad client id with **HTTP 200** and `{"error":"incorrect_client_credentials"}`,
+   * which `!response.ok` never caught. `str()` then fell back to `''`, so the UI rendered
+   * "Enter this code on GitHub:" above a blank code and an empty link — the user could not tell
+   * a wrong client id from a slow network. It must reject instead.
+   */
+  it('rejects a wrong client id instead of returning an empty code box', async () => {
+    const fetchImpl = (async () =>
+      jsonResponse({ error: 'incorrect_client_credentials', error_description: 'bad' })) as FetchLike
+
+    await expect(startDeviceFlow('wrong-id', { fetchImpl })).rejects.toThrow(
+      /incorrect_client_credentials/
+    )
+    // The message has to point at the fix, not just name the failure.
+    await expect(startDeviceFlow('wrong-id', { fetchImpl })).rejects.toThrow(/OAuth app/i)
+  })
+
+  it('names a disabled device flow and other start failures', async () => {
+    const make = (body: unknown): FetchLike => (async () => jsonResponse(body)) as FetchLike
+    await expect(
+      startDeviceFlow('c', { fetchImpl: make({ error: 'device_flow_disabled' }) })
+    ).rejects.toThrow(/Device Flow enabled/i)
+    await expect(
+      startDeviceFlow('c', { fetchImpl: make({ error: 'unsupported_grant_type' }) })
+    ).rejects.toThrow(/unsupported_grant_type/)
+  })
+
+  it('still rejects a 200 without a user code rather than rendering a blank one', async () => {
+    const fetchImpl = (async () => jsonResponse({ device_code: 'dev' })) as FetchLike
+    await expect(startDeviceFlow('c', { fetchImpl })).rejects.toThrow(/device code/i)
+  })
 })

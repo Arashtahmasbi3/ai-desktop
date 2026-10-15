@@ -6,11 +6,30 @@ export interface GitHubUser {
   avatarUrl?: string
 }
 
+/** How the stored credential was obtained, so the UI can label the connection honestly. */
+export type GitHubAuthSource = 'pat' | 'device' | 'gh-cli'
+
 export interface GitHubAuthStatus {
   connected: boolean
   user?: GitHubUser
   clientId?: string
   error?: string
+  source?: GitHubAuthSource
+}
+
+/**
+ * Result of looking for an existing GitHub CLI login (v2.8.1). Pure read: nothing is
+ * stored and no token is read. `reason` explains an unusable CLI ('not installed',
+ * 'not logged in', or a redacted stderr) so the UI can say why the one-click path is
+ * not offered instead of hiding it silently.
+ */
+export interface GitHubCliStatus {
+  available: boolean
+  login?: string
+  host?: string
+  scopes?: string[]
+  version?: string
+  reason?: string
 }
 
 /** Result of `POST /login/device/code` — shown to the user to authorise. */

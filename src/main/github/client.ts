@@ -272,6 +272,41 @@ export interface DeviceFlowOptions {
   scope?: string
 }
 
+/**
+ * Turn a device-flow `error` code into something the user can act on.
+ *
+ * GitHub answers `POST /login/device/code` with **HTTP 200** and an error body, so
+ * `!response.ok` never catches it. Before this, `str()` fell back to `''` and the UI
+ * rendered "Enter this code on GitHub:" with a blank code and an empty link — the
+ * worst possible failure, indistinguishable from a slow network (v2.8.1).
+ */
+function deviceFlowError(code: string): Error {
+  if (code === 'incorrect_client_credentials' || code === 'unrecognized_client_id') {
+    return new Error(
+      'GitHub rejected this OAuth App client ID (incorrect_client_credentials). ' +
+        'Check it under GitHub → Settings → Developer settings → OAuth Apps: the value must be ' +
+        "the app's Client ID, not its client secret. Or skip the OAuth App entirely and use the " +
+        'access-token path, or let AI Desktop reuse your GitHub CLI login.'
+    )
+  }
+  if (code === 'device_flow_disabled') {
+    return new Error(
+      'This OAuth App does not have Device Flow enabled. Enable "Device Flow" under GitHub → ' +
+        'Settings → Developer settings → OAuth Apps, or connect with an access token instead.'
+    )
+  }
+  if (code === 'unsupported_grant_type' || code === 'invalid_request') {
+    return new Error(
+      `GitHub rejected the device-flow request (${code}). Start the device flow again, or connect ` +
+        'with an access token instead.'
+    )
+  }
+  return new Error(
+    `GitHub refused to start the device flow (${code}). Check the OAuth App client ID under ` +
+      'GitHub → Settings → Developer settings → OAuth apps, or connect with an access token instead.'
+  )
+}
+
 /** Begin the OAuth device flow: returns the code the user must enter. */
 export async function startDeviceFlow(
   clientId: string,
@@ -284,10 +319,23 @@ export async function startDeviceFlow(
     body: JSON.stringify({ client_id: clientId, scope: options.scope ?? 'repo read:user' })
   })
   if (!response.ok) throw new Error(`GitHub device flow failed: HTTP ${response.status}`)
-  const raw = record(await response.json())
+  const raw = record(await response.json().catch(() => ({})))
+
+  // A 200 can still be a failure: GitHub reports a bad client id in the body.
+  const error = str(raw.error)
+  if (error) throw deviceFlowError(error)
+
+  const userCode = str(raw.user_code)
+  if (!userCode) {
+    throw new Error(
+      'GitHub did not return a device code. Check the OAuth App client ID is correct and has ' +
+        'Device Flow enabled, or connect with an access token instead.'
+    )
+  }
+
   return {
     deviceCode: str(raw.device_code),
-    userCode: str(raw.user_code),
+    userCode,
     verificationUri: str(raw.verification_uri),
     expiresIn: Number(raw.expires_in ?? 900),
     interval: Number(raw.interval ?? 5)

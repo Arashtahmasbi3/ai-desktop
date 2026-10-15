@@ -7,15 +7,19 @@ import type {
   GitOpResult,
   GitRepoStatus,
   GitHubAuthPollResult,
+  GitHubAuthSource,
   GitHubAuthStatus,
+  GitHubCliStatus,
   GitHubDeviceCode,
   GitHubIssue,
   GitHubPull,
   GitHubRepo,
   GitHubUser
 } from '@shared/github'
+import type { CommandRunner } from '@core/sandbox/command-runner'
 import { GitHubClient, pollDeviceFlow, startDeviceFlow } from './client'
 import { GitRunner, type GitExec } from './git'
+import { detectGhCli, readGhToken } from './gh-cli'
 
 export const GITHUB_SCHEMA_VERSION = 1
 
@@ -24,6 +28,14 @@ interface GitHubFile {
   clientId?: string
   tokenEnc?: string
   user?: GitHubUser
+  /** How the stored token was obtained; provenance only, never a secret. */
+  source?: GitHubAuthSource
+}
+
+const AUTH_SOURCES: readonly GitHubAuthSource[] = ['pat', 'device', 'gh-cli']
+
+function isAuthSource(value: unknown): value is GitHubAuthSource {
+  return typeof value === 'string' && (AUTH_SOURCES as readonly string[]).includes(value)
 }
 
 export interface GitHubServiceOptions {
@@ -33,6 +45,12 @@ export interface GitHubServiceOptions {
   exec?: GitExec
   /** Default OAuth app client id (users normally set their own). */
   clientId?: string
+  /**
+   * Boundary for the `gh` CLI probes (v2.8.1). Injected so the one-click path is
+   * testable without a real CLI on the machine; production wires a
+   * `ChildProcessRunner`. Detection stays lazy — nothing is probed at startup.
+   */
+  ghRunner?: CommandRunner
 }
 
 /**
@@ -45,6 +63,7 @@ export class GitHubService {
   private readonly client: GitHubClient
   private readonly git: GitRunner
   private readonly fetchImpl?: FetchLike
+  private readonly ghRunner?: CommandRunner
   private state: GitHubFile = { version: GITHUB_SCHEMA_VERSION }
   private loaded = false
   private lastError?: string
@@ -53,6 +72,7 @@ export class GitHubService {
     this.file = options.file
     this.cipher = options.cipher
     if (options.fetchImpl) this.fetchImpl = options.fetchImpl
+    if (options.ghRunner) this.ghRunner = options.ghRunner
     this.client = new GitHubClient(
       options.fetchImpl ? { fetchImpl: options.fetchImpl } : {}
     )
@@ -71,6 +91,7 @@ export class GitHubService {
           version: GITHUB_SCHEMA_VERSION,
           ...(typeof raw.clientId === 'string' ? { clientId: raw.clientId } : {}),
           ...(typeof raw.tokenEnc === 'string' ? { tokenEnc: raw.tokenEnc } : {}),
+          ...(isAuthSource(raw.source) ? { source: raw.source } : {}),
           ...(raw.user && typeof raw.user === 'object' ? { user: raw.user as GitHubUser } : {})
         }
       }
@@ -111,6 +132,7 @@ export class GitHubService {
       connected: Boolean(this.state.tokenEnc),
       ...(this.state.user ? { user: this.state.user } : {}),
       ...(this.state.clientId ? { clientId: this.state.clientId } : {}),
+      ...(this.state.tokenEnc && this.state.source ? { source: this.state.source } : {}),
       ...(this.lastError ? { error: this.lastError } : {})
     }
   }
@@ -134,7 +156,7 @@ export class GitHubService {
    * token is validated with `GET /user` *before* anything is persisted, so a
    * rejected token never leaves a half-connected state behind.
    */
-  async setToken(token: string): Promise<GitHubAuthStatus> {
+  async setToken(token: string, source: GitHubAuthSource = 'pat'): Promise<GitHubAuthStatus> {
     await this.load()
     const trimmed = token.trim()
     if (!trimmed) throw new Error('A GitHub token is required.')
@@ -147,8 +169,47 @@ export class GitHubService {
       throw new Error(error instanceof Error ? error.message : String(error))
     }
     this.state.tokenEnc = await this.cipher.encrypt(trimmed)
+    this.state.source = source
     await this.persist()
     return this.statusFromState()
+  }
+
+  /**
+   * Look for an existing, authenticated GitHub CLI login (v2.8.1). A pure read that
+   * never throws and never reads the token — the UI only needs to know whether the
+   * one-click path is worth offering, and the probe must not slow down a launch.
+   */
+  async detectCli(): Promise<GitHubCliStatus> {
+    if (!this.ghRunner) {
+      return { available: false, reason: 'GitHub CLI detection is not configured' }
+    }
+    const detection = await detectGhCli(this.ghRunner)
+    return {
+      available: detection.available,
+      ...(detection.login ? { login: detection.login } : {}),
+      ...(detection.host ? { host: detection.host } : {}),
+      ...(detection.scopes ? { scopes: detection.scopes } : {}),
+      ...(detection.version ? { version: detection.version } : {}),
+      ...(detection.reason ? { reason: detection.reason } : {})
+    }
+  }
+
+  /**
+   * One-click connect using the CLI's own login (v2.8.1). The token is read, then
+   * handed to the existing {@link setToken}, so validation (`GET /user` *before*
+   * anything is persisted) and `safeStorage` encryption are unchanged. A CLI that is
+   * missing or logged out fails here with an actionable message and **no network
+   * call**; a token GitHub rejects leaves the previous connection untouched.
+   *
+   * The token is a local only: it is never logged, never returned and never written
+   * to disk in plaintext. Nothing here runs `gh auth logout`, so disconnecting the
+   * app cannot sign the user out of their own CLI.
+   */
+  async connectWithCli(): Promise<GitHubAuthStatus> {
+    await this.load()
+    if (!this.ghRunner) throw new Error('GitHub CLI detection is not configured')
+    const token = await readGhToken(this.ghRunner)
+    return this.setToken(token, 'gh-cli')
   }
 
   private requireClientId(): string {
@@ -185,6 +246,7 @@ export class GitHubService {
 
   private async storeToken(token: string): Promise<void> {
     this.state.tokenEnc = await this.cipher.encrypt(token)
+    this.state.source = 'device'
     this.lastError = undefined
     try {
       this.client.setToken(token)
@@ -199,6 +261,7 @@ export class GitHubService {
     await this.load()
     delete this.state.tokenEnc
     delete this.state.user
+    delete this.state.source
     this.client.setToken(undefined)
     this.lastError = undefined
     await this.persist()

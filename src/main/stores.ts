@@ -6,6 +6,7 @@ import { CustomProviderStore } from './custom-providers'
 import { OnboardingStore } from './onboarding-store'
 import { GitHubService } from './github/service'
 import { createNodeGitExec } from './github/git'
+import { ChildProcessRunner } from '@core/sandbox/command-runner'
 import { VpsServerStore } from './ssh/server-store'
 import { AuditLog } from '@core/agent/audit-log'
 
@@ -45,12 +46,17 @@ export function createOnboardingStore(dir = appDataDir()): OnboardingStore {
   return new OnboardingStore({ file: join(dir, 'onboarding.json') })
 }
 
-/** GitHub auth (encrypted token) + git CLI operations. */
+/**
+ * GitHub auth (encrypted token) + git CLI operations. The `gh` CLI runner is wired
+ * here but never probed at startup: `detectCli()`/`connectWithCli()` are on-demand so
+ * a machine without `gh` pays nothing (v2.8.1).
+ */
 export function createGitHubService(dir = appDataDir()): GitHubService {
   return new GitHubService({
     file: join(dir, 'github.json'),
     cipher: createSafeStorageCipher(),
-    exec: createNodeGitExec()
+    exec: createNodeGitExec(),
+    ghRunner: new ChildProcessRunner()
   })
 }
 
