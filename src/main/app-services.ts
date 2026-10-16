@@ -520,13 +520,13 @@ export class AppServices {
   }
 
   /** v3.1: add a key to a provider's pool and return the redacted settings view. */
-  async addProviderKey(provider: ProviderId, apiKey: string): Promise<unknown> {
+  async addProviderKey(provider: ProviderId, apiKey: string): Promise<SettingsView> {
     await this.persistence.addApiKey(provider, apiKey)
     return this.settingsView()
   }
 
   /** v3.1: remove one key from a provider's pool by position. */
-  async removeProviderKeyAt(provider: ProviderId, index: number): Promise<unknown> {
+  async removeProviderKeyAt(provider: ProviderId, index: number): Promise<SettingsView> {
     await this.persistence.removeApiKeyAt(provider, index)
     return this.settingsView()
   }

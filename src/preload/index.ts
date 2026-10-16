@@ -2,7 +2,7 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { CustomProviderInput, CustomProviderTestResult, CustomProviderView, ProviderId } from '@shared/types'
 import type { OnboardingStatus } from '@shared/onboarding'
 import type { LearnResultView, ProjectFact } from '@shared/memory-facts'
-import type { ProviderKeyHealth } from '@shared/types'
+import type { ProviderKeyHealthView } from '@shared/types'
 import type { ApprovalMode, ApprovalHistoryEntry, ApprovalOutcome, ApprovedCommandView } from '@shared/approval'
 import type { InvestigateScope, ResolvedProfile, SessionProfile } from '@shared/profile'
 import type { PlanDecision } from '@shared/plan'
@@ -91,7 +91,7 @@ export const api = {
       invoke('settings:addApiKey', provider, apiKey),
     removeApiKeyAt: (provider: ProviderId, index: number): Promise<SettingsView> =>
       invoke('settings:removeApiKeyAt', provider, index),
-    keyHealth: (): Promise<ProviderKeyHealth[]> => invoke('settings:keyHealth'),
+    keyHealth: (): Promise<ProviderKeyHealthView[]> => invoke('settings:keyHealth'),
     removeApiKey: (provider: ProviderId): Promise<SettingsView> =>
       invoke('settings:removeApiKey', provider),
     setModel: (provider: ProviderId, model: string): Promise<SettingsView> =>
