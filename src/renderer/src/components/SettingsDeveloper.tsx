@@ -59,14 +59,14 @@ export default function SettingsDeveloper(): JSX.Element {
 
   return (
     <section className="flex flex-col gap-3">
-      <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
+      <h3 className="brutal-label flex items-center gap-2">
         <Wrench className="h-3.5 w-3.5" />
         {t('settings.developer')}
       </h3>
 
-      <div className="flex items-center justify-between rounded-xl border border-border bg-bg-primary px-3 py-2">
+      <div className="brutal-card flex items-center justify-between px-3 py-2">
         <span className="text-xs text-fg-muted">{t('settings.version')}</span>
-        <span className="font-mono text-xs text-fg">
+        <span className="brutal-data text-xs">
           {version ? `v${version}` : '—'}
         </span>
       </div>
@@ -78,7 +78,7 @@ export default function SettingsDeveloper(): JSX.Element {
       */}
       <div
         data-testid="remote-access"
-        className="flex flex-col gap-2 rounded-xl border border-border bg-bg-primary px-3 py-2"
+        className="brutal-card flex flex-col gap-2 px-3 py-2"
       >
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 flex-col gap-1">
@@ -103,17 +103,17 @@ export default function SettingsDeveloper(): JSX.Element {
         <p className="text-2xs text-fg-subtle">{t('settings.remoteWhy')}</p>
 
         {remote?.enabled ? (
-          <div className="flex flex-col gap-2 border-t border-border pt-2">
+          <div className="flex flex-col gap-2 border-t-2 border-border pt-2">
             <div className="flex items-center gap-2">
-              <span className="w-14 shrink-0 text-2xs text-fg-muted">{t('settings.remoteUrl')}</span>
-              <code dir="ltr" className="min-w-0 flex-1 truncate rounded bg-bg-tertiary px-1.5 py-0.5 font-mono text-2xs text-fg">
+              <span className="brutal-label w-14 shrink-0">{t('settings.remoteUrl')}</span>
+              <code dir="ltr" className="brutal-inset brutal-data min-w-0 flex-1 truncate px-1.5 py-0.5 text-2xs">
                 {baseUrl}
               </code>
               <button
                 type="button"
                 data-testid="remote-copy-url"
                 onClick={() => copy('url', baseUrl)}
-                className="shrink-0 text-fg-muted hover:text-fg"
+                className="brutal-btn shrink-0 p-1"
                 title={t('settings.copy')}
               >
                 {copied === 'url' ? <Check className="h-3 w-3 text-success" /> : <Copy className="h-3 w-3" />}
@@ -121,11 +121,11 @@ export default function SettingsDeveloper(): JSX.Element {
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="w-14 shrink-0 text-2xs text-fg-muted">{t('settings.remoteToken')}</span>
+              <span className="brutal-label w-14 shrink-0">{t('settings.remoteToken')}</span>
               <code
                 dir="ltr"
                 data-testid="remote-token"
-                className="min-w-0 flex-1 truncate rounded bg-bg-tertiary px-1.5 py-0.5 font-mono text-2xs text-fg"
+                className="brutal-inset brutal-data min-w-0 flex-1 truncate px-1.5 py-0.5 text-2xs"
               >
                 {revealed ? remote.token : masked}
               </code>
@@ -133,7 +133,7 @@ export default function SettingsDeveloper(): JSX.Element {
                 type="button"
                 data-testid="remote-reveal-token"
                 onClick={() => setRevealed((value) => !value)}
-                className="shrink-0 text-2xs text-fg-muted hover:text-fg"
+                className="brutal-btn shrink-0"
               >
                 {revealed ? t('settings.remoteHide') : t('settings.remoteShow')}
               </button>
@@ -141,7 +141,7 @@ export default function SettingsDeveloper(): JSX.Element {
                 type="button"
                 data-testid="remote-copy-token"
                 onClick={() => copy('token', remote.token ?? '')}
-                className="shrink-0 text-fg-muted hover:text-fg"
+                className="brutal-btn shrink-0 p-1"
                 title={t('settings.copy')}
               >
                 {copied === 'token' ? <Check className="h-3 w-3 text-success" /> : <Copy className="h-3 w-3" />}
@@ -153,11 +153,11 @@ export default function SettingsDeveloper(): JSX.Element {
             </p>
 
             <div className="flex flex-col gap-1">
-              <span className="text-2xs text-fg-muted">{t('settings.remoteExamples')}</span>
+              <span className="brutal-label">{t('settings.remoteExamples')}</span>
               <pre
                 dir="ltr"
                 data-testid="remote-examples"
-                className="overflow-x-auto rounded bg-bg-tertiary p-2 font-mono text-3xs text-fg"
+                className="brutal-inset brutal-data overflow-x-auto p-2 text-3xs"
               >{`curl -H "Authorization: Bearer <token>" ${baseUrl}/status
 curl -X POST -H "Authorization: Bearer <token>" -d '{"method":"files.list","params":{"path":"."}}' ${baseUrl}`}</pre>
             </div>
@@ -183,7 +183,7 @@ curl -X POST -H "Authorization: Bearer <token>" -d '{"method":"files.list","para
       <button
         type="button"
         onClick={resetLocal}
-        className="flex w-fit items-center gap-1.5 rounded border border-border px-3 py-1.5 text-xs text-fg hover:bg-bg-tertiary hover:text-danger"
+        className="brutal-btn brutal-danger flex w-fit items-center gap-1.5 px-3 py-1.5 text-xs"
       >
         <Trash2 className="h-3.5 w-3.5" />
         {t('settings.resetLocal')}

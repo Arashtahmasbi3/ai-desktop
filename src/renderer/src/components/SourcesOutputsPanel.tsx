@@ -117,12 +117,15 @@ export default function SourcesOutputsPanel({
                 type="button"
                 data-testid={`run-output-kind-${option}`}
                 aria-pressed={option === kind}
+                data-selected={option === kind}
                 onClick={() => setKind(option)}
-                className={`rounded-clay-sm border px-2 py-0.5 text-3xs transition-colors duration-fast ${
-                  option === kind
-                    ? 'border-accent/50 bg-accent-solid/15 text-accent'
-                    : 'border-border text-fg-muted hover:bg-bg-tertiary hover:text-fg'
-                }`}
+                /*
+                 * v4.0: the segmented control is part of the surface vocabulary now. The selected
+                 * state is filled and ink-bordered rather than accent-tinted, so it reads as
+                 * "chosen" by structure instead of by a colour wash nobody can distinguish from a
+                 * hover.
+                 */
+                className="brutal-tab text-3xs"
               >
                 {t(KIND_KEY[option])}
               </button>
@@ -143,13 +146,13 @@ export default function SourcesOutputsPanel({
               aria-label={t('runPanel.targetLabel')}
               data-testid="run-output-target"
               dir="ltr"
-              className="clay-inset min-w-0 flex-1 rounded-clay-sm px-2 py-1 text-3xs text-fg-strong outline-none placeholder:text-fg-subtle"
+              className="brutal-inset min-w-0 flex-1 rounded-shape-sm px-2 py-1 text-3xs text-fg-strong outline-none placeholder:text-fg-subtle"
             />
             <button
               type="button"
               onClick={submitOutput}
               data-testid="run-output-add"
-              className="clay-press flex shrink-0 items-center gap-1 rounded-clay-sm bg-accent-solid px-2 py-1 text-3xs text-accent-fg hover:bg-accent-solid-hover"
+              className="brutal-press flex shrink-0 items-center gap-1 rounded-shape-sm bg-accent-solid px-2 py-1 text-3xs text-accent-fg hover:bg-accent-solid-hover"
             >
               <Plus className="h-3 w-3" />
               {t('runPanel.add')}
@@ -164,7 +167,7 @@ export default function SourcesOutputsPanel({
                 <li
                   key={output.id}
                   data-testid={`run-output-${output.id}`}
-                  className="flex items-center gap-1.5 rounded-clay-sm border border-border bg-bg-tertiary px-2 py-1 text-3xs"
+                  className="flex items-center gap-1.5 rounded-shape-sm border border-border bg-bg-tertiary px-2 py-1 text-3xs"
                 >
                   <span className="shrink-0 font-medium text-fg">{t(KIND_KEY[output.kind])}</span>
                   <span className="min-w-0 flex-1 truncate font-mono text-fg-muted" dir="ltr">
@@ -212,7 +215,7 @@ export default function SourcesOutputsPanel({
                 <li
                   key={source.id}
                   data-testid={`run-source-${source.id}`}
-                  className="flex items-center gap-1.5 rounded-clay-sm border border-border bg-bg-tertiary px-2 py-1 text-3xs"
+                  className="flex items-center gap-1.5 rounded-shape-sm border border-border bg-bg-tertiary px-2 py-1 text-3xs"
                 >
                   <FolderOpen className="h-3 w-3 shrink-0 text-fg-subtle" />
                   <span className="min-w-0 flex-1 truncate font-mono text-fg-muted" dir="ltr">
@@ -236,7 +239,7 @@ export default function SourcesOutputsPanel({
               type="button"
               onClick={onAddFiles}
               data-testid="run-sources-add-files"
-              className="flex items-center gap-1 rounded-clay-sm border border-border px-2 py-0.5 text-3xs text-fg-muted hover:bg-bg-tertiary hover:text-fg"
+              className="flex items-center gap-1 rounded-shape-sm border border-border px-2 py-0.5 text-3xs text-fg-muted hover:bg-bg-tertiary hover:text-fg"
             >
               <Plus className="h-3 w-3" />
               {t('runPanel.addFiles')}
@@ -245,7 +248,7 @@ export default function SourcesOutputsPanel({
               type="button"
               onClick={onAddFolder}
               data-testid="run-sources-add-folder"
-              className="flex items-center gap-1 rounded-clay-sm border border-border px-2 py-0.5 text-3xs text-fg-muted hover:bg-bg-tertiary hover:text-fg"
+              className="flex items-center gap-1 rounded-shape-sm border border-border px-2 py-0.5 text-3xs text-fg-muted hover:bg-bg-tertiary hover:text-fg"
             >
               <FolderPlus className="h-3 w-3" />
               {t('runPanel.addFolder')}
@@ -254,7 +257,7 @@ export default function SourcesOutputsPanel({
               type="button"
               onClick={onViewAll}
               data-testid="run-sources-view-all"
-              className="flex items-center gap-1 rounded-clay-sm border border-border px-2 py-0.5 text-3xs text-fg-muted hover:bg-bg-tertiary hover:text-fg"
+              className="flex items-center gap-1 rounded-shape-sm border border-border px-2 py-0.5 text-3xs text-fg-muted hover:bg-bg-tertiary hover:text-fg"
             >
               <Eye className="h-3 w-3" />
               {t('runPanel.viewAll')}
@@ -269,7 +272,7 @@ export default function SourcesOutputsPanel({
                 disabled
                 data-testid="run-source-web-search"
                 title={t('runPanel.webSearchHint')}
-                className="flex cursor-not-allowed items-center gap-1 rounded-clay-sm border border-dashed border-border px-2 py-0.5 text-3xs text-fg-subtle opacity-70"
+                className="flex cursor-not-allowed items-center gap-1 rounded-shape-sm border border-dashed border-border px-2 py-0.5 text-3xs text-fg-subtle opacity-70"
               >
                 <Globe className="h-3 w-3" />
                 {t('runPanel.webSearch')}
@@ -282,7 +285,7 @@ export default function SourcesOutputsPanel({
                 disabled
                 data-testid="run-source-github"
                 title={t('runPanel.githubHint')}
-                className="flex cursor-not-allowed items-center gap-1 rounded-clay-sm border border-dashed border-border px-2 py-0.5 text-3xs text-fg-subtle opacity-70"
+                className="flex cursor-not-allowed items-center gap-1 rounded-shape-sm border border-dashed border-border px-2 py-0.5 text-3xs text-fg-subtle opacity-70"
               >
                 <GitBranch className="h-3 w-3" />
                 {t('runPanel.githubRepo')}

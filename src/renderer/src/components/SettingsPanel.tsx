@@ -111,7 +111,22 @@ export default function SettingsPanel(): JSX.Element | null {
   const showContextWarning = useStore((state) => state.showContextWarning)
   const setShowContextWarning = useStore((state) => state.setShowContextWarning)
 
+  const requestedTab = useStore((state) => state.settingsTab)
   const [tab, setTab] = useState<TabId>('general')
+
+  /*
+   * v4.0: honour a tab the caller asked for. The panel keeps the tab in local state on purpose (it
+   * is incidental UI, not app state), so the store hands over a **request** and this effect consumes
+   * it — which also means reopening Settings normally lands on General again instead of wherever the
+   * last deep link went.
+   */
+  useEffect(() => {
+    if (!requestedTab) return
+    // The groups hold the items, so a deep link has to look through them rather than at a flat list.
+    const known = NAV_GROUPS.flatMap((group) => group.items).some((item) => item.id === requestedTab)
+    if (known) setTab(requestedTab as TabId)
+    useStore.setState({ settingsTab: null })
+  }, [requestedTab])
   const refreshVps = useStore((state) => state.refreshVps)
 
   useEffect(() => {
@@ -130,14 +145,14 @@ export default function SettingsPanel(): JSX.Element | null {
       closeOnBackdrop
     >
       <div className="flex h-[min(85vh,44rem)] max-h-full flex-col overflow-hidden">
-        <div className="flex h-11 shrink-0 items-center justify-between border-b border-border px-4">
-          <h2 className="text-sm font-semibold text-fg-strong">{t('settings.title')}</h2>
+        <div className="flex h-11 shrink-0 items-center justify-between border-b-2 border-fg-strong px-4">
+          <h2 className="brutal-label text-fg-strong">{t('settings.title')}</h2>
           <button
             type="button"
             onClick={close}
             title={`${t('common.close')} (Esc)`}
             aria-label={t('common.close')}
-            className="rounded p-1 text-fg-muted hover:bg-bg-tertiary hover:text-fg"
+            className="brutal-btn brutal-focus p-1"
           >
             <X className="h-4 w-4" />
           </button>
@@ -146,12 +161,12 @@ export default function SettingsPanel(): JSX.Element | null {
         <div className="flex min-h-0 flex-1">
           <nav
             aria-label={t('settings.title')}
-            className="flex w-44 shrink-0 flex-col gap-0.5 border-r border-border p-2"
+            className="flex w-44 shrink-0 flex-col gap-0.5 border-r-2 border-border p-2"
           >
             {NAV_GROUPS.map((group, groupIndex) => (
               <div key={group.labelKey ?? `group-${groupIndex}`} className="flex flex-col gap-0.5">
                 {group.labelKey ? (
-                  <span className="px-2.5 pb-0.5 pt-2 text-3xs font-semibold uppercase tracking-wide text-fg-subtle">
+                  <span className="brutal-label px-2.5 pb-0.5 pt-2">
                     {t(group.labelKey)}
                   </span>
                 ) : null}
@@ -162,11 +177,8 @@ export default function SettingsPanel(): JSX.Element | null {
                       key={item.id}
                       type="button"
                       onClick={() => setTab(item.id)}
-                      className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition ${
-                        tab === item.id
-                          ? 'bg-accent-solid/15 text-accent'
-                          : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
-                      }`}
+                      data-selected={tab === item.id}
+                      className="brutal-tab flex items-center gap-2 px-2.5 py-1.5 text-left"
                     >
                       <Icon className="h-3.5 w-3.5" />
                       {t(item.labelKey)}
@@ -185,11 +197,11 @@ export default function SettingsPanel(): JSX.Element | null {
                   hint, so "which theme am I on?" is never a guess. It sits above the
                   language because it is the setting a new user reaches for first.
                 */}
-                <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
+                <h3 className="brutal-label flex items-center gap-2">
                   <Palette className="h-3.5 w-3.5" />
                   {t('settings.theme')}
                 </h3>
-                <div className="rounded-xl border border-border bg-bg-primary p-3">
+                <div className="brutal-card p-3">
                   <p className="text-xs text-fg-muted">{t('settings.themeHint')}</p>
                   <div
                     role="radiogroup"
@@ -204,13 +216,10 @@ export default function SettingsPanel(): JSX.Element | null {
                           type="button"
                           role="radio"
                           aria-checked={active}
+                          data-selected={active}
                           data-testid={`settings-theme-${option}`}
                           onClick={() => setTheme(option)}
-                          className={`flex items-center justify-center gap-2 rounded-lg border px-2 py-2 text-xs transition ${
-                            active
-                              ? 'border-accent bg-accent-solid/10 text-fg-strong'
-                              : 'border-border text-fg-muted hover:bg-bg-tertiary hover:text-fg'
-                          }`}
+                          className="brutal-tab flex items-center justify-center gap-2 px-2 py-2"
                         >
                           <ThemeIcon preference={option} className="h-3.5 w-3.5" />
                           {t(themeLabelKey(option))}
@@ -220,11 +229,11 @@ export default function SettingsPanel(): JSX.Element | null {
                   </div>
                 </div>
 
-                <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
+                <h3 className="brutal-label flex items-center gap-2">
                   <Languages className="h-3.5 w-3.5" />
                   {t('common.language')}
                 </h3>
-                <div className="rounded-xl border border-border bg-bg-primary p-3">
+                <div className="brutal-card p-3">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-sm text-fg">{t('settings.languageHint')}</p>
@@ -235,7 +244,7 @@ export default function SettingsPanel(): JSX.Element | null {
                         setLocale(event.target.value === 'fa' ? 'fa' : 'en')
                       }
                       aria-label={t('common.language')}
-                      className="rounded border border-border bg-bg-secondary px-2 py-1 text-xs text-fg outline-none focus:border-accent/50"
+                      className="brutal-inset brutal-focus px-2 py-1 text-xs text-fg"
                     >
                       {SUPPORTED_LOCALES.map((option) => (
                         <option key={option} value={option}>
@@ -305,7 +314,7 @@ export default function SettingsPanel(): JSX.Element | null {
                         )
                       }
                       aria-label={t('settings.chatOnProjectSwitch')}
-                      className="shrink-0 rounded border border-border bg-bg-secondary px-2 py-1 text-xs text-fg outline-none focus:border-accent/50"
+                      className="brutal-inset brutal-focus shrink-0 px-2 py-1 text-xs text-fg"
                     >
                       <option value="ask">{t('projectSwitch.ask')}</option>
                       <option value="link">{t('projectSwitch.link')}</option>

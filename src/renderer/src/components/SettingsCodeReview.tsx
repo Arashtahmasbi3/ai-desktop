@@ -52,7 +52,7 @@ export default function SettingsCodeReview(): JSX.Element {
 
   return (
     <section className="flex flex-col gap-3">
-      <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
+      <h3 className="brutal-label flex items-center gap-2">
         <GitFork className="h-3.5 w-3.5" />
         {t('settings.codeReview')}
       </h3>
@@ -67,7 +67,7 @@ export default function SettingsCodeReview(): JSX.Element {
         <p className="text-2xs text-fg-subtle">{t('settings.codeReviewNoAuth')}</p>
       ) : (
         <>
-          <label className="flex items-center gap-2 rounded-lg border border-border bg-bg-primary px-2 py-1.5">
+          <label className="brutal-inset brutal-focus flex items-center gap-2 px-2 py-1.5">
             <Search className="h-3.5 w-3.5 text-fg-muted" />
             <input
               value={query}
@@ -86,9 +86,9 @@ export default function SettingsCodeReview(): JSX.Element {
                 return (
                   <li
                     key={repo.fullName}
-                    className="flex items-center justify-between gap-3 rounded-xl border border-border bg-bg-primary px-3 py-2"
+                    className="brutal-card flex items-center justify-between gap-3 px-3 py-2"
                   >
-                    <span className="min-w-0 truncate text-xs text-fg" dir="ltr">
+                    <span className="brutal-data min-w-0 truncate text-xs" dir="ltr">
                       {repo.fullName}
                     </span>
                     <label className="flex shrink-0 cursor-pointer items-center gap-2 text-2xs text-fg-muted">

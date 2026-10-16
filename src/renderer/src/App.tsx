@@ -27,6 +27,7 @@ import { basename, subscribeToEvents, useStore } from './store'
 import { keepAliveIds, readLastVpsId, remoteVpsIds, resolveReconnectId } from './lib/vps-state'
 import { topmostEscapeTarget } from './lib/escape'
 import { resolveLayout } from './lib/layout'
+import { isCapabilityEnabled } from './lib/capabilities'
 
 /** Retry interval for a selected-but-dropped VPS connection. */
 const VPS_KEEPALIVE_MS = 30_000
@@ -325,7 +326,8 @@ export default function App(): JSX.Element {
             <ErrorBoundary label="Workspace" key={view}>
               {view === 'chat' ? (
                 <div className="relative flex min-h-0 min-w-0 flex-1">
-                  {chatTreeOpen ? (
+                  {/* v4.0: gated by the Filesystem switch in Settings → Surfaces. */}
+                  {chatTreeOpen && isCapabilityEnabled('filesystem') ? (
                     <ChatTree mode={layout.tree} onClose={toggleChatTree} />
                   ) : null}
                   <ChatPanel />

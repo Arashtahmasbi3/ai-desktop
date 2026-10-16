@@ -40,9 +40,10 @@ describe('v3.0 — the attachment chip shows the preview main produced', () => {
     const img = button.querySelector('img')
     expect(img).toBeTruthy()
     expect(img!.getAttribute('src')).toBe(PNG)
-    // The chip contract: rounded, cropped, and 40×40 (h-10 w-10).
+    // The chip contract: squared off, cropped, and 40×40 (h-10 w-10). v4.0 renamed the radius
+    // token from clay to shape; the geometry itself did not change.
     expect(img!.className).toContain('object-cover')
-    expect(img!.className).toContain('rounded-clay-sm')
+    expect(img!.className).toContain('rounded-shape-sm')
     expect(img!.className).toContain('h-10')
     expect(img!.className).toContain('w-10')
   })

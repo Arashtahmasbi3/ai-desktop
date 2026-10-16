@@ -34,9 +34,8 @@ export default function StatusCard(): JSX.Element {
         <Activity className={`h-3.5 w-3.5 ${running ? 'text-accent' : 'text-fg-muted'}`} />
         {t('chat.statusLabel')}
       </span>
-      <span className="shrink-0 rounded bg-bg-tertiary px-1.5 py-0.5 text-3xs font-medium text-fg">
-        {phaseLabel}
-      </span>
+      {/* v4.0: the phase read-out is a chip like every other state on the screen. */}
+      <span className="brutal-chip text-fg">{phaseLabel}</span>
       <span className="min-w-0 flex-1 truncate text-2xs text-fg-muted" title={decisionLabel}>
         {decisionLabel}
       </span>

@@ -53,12 +53,12 @@ export default function AttachmentChip({
             onClick={() => setPreviewOpen(true)}
             title={t('chat.viewImage')}
             aria-label={t('chat.viewImage')}
-            className="shrink-0 overflow-hidden rounded-clay-sm"
+            className="shrink-0 overflow-hidden rounded-shape-sm"
           >
             <img
               src={thumbnail}
               alt={attachment.name}
-              className="h-10 w-10 rounded-clay-sm object-cover"
+              className="h-10 w-10 rounded-shape-sm object-cover"
             />
           </button>
         ) : attachment.kind === 'image' ? (
@@ -113,7 +113,7 @@ export default function AttachmentChip({
             <img
               src={thumbnail}
               alt={attachment.name}
-              className="max-h-[70vh] w-auto max-w-full rounded-clay-sm object-contain"
+              className="max-h-[70vh] w-auto max-w-full rounded-shape-sm object-contain"
             />
           </div>
         </Modal>

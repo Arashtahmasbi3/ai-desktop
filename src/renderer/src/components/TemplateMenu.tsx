@@ -39,7 +39,7 @@ export default function TemplateMenu({ currentInput, onPick }: TemplateMenuProps
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="flex items-center gap-1.5 rounded-lg border border-border bg-bg-secondary px-3 py-1.5 text-xs text-fg transition hover:border-accent/50 hover:bg-bg-tertiary"
+        className="brutal-btn flex items-center gap-1.5"
       >
         <LayoutTemplate className="h-3.5 w-3.5 text-accent" />
         {t('chat.templates')}

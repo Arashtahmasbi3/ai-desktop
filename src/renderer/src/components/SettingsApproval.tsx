@@ -3,6 +3,42 @@ import { ShieldCheck } from 'lucide-react'
 import { useStore } from '../store'
 import ApprovedCommandsSection from './ApprovedCommandsSection'
 
+/**
+ * One option in a segmented control. The native radio stays (so the accessible name is the label
+ * text and the arrow keys still work), and the visible surface is the label itself, filled by
+ * `.brutal-tab` through `data-selected`.
+ */
+function Choice({
+  name,
+  value,
+  checked,
+  label,
+  onSelect
+}: {
+  name: string
+  value: string
+  checked: boolean
+  label: string
+  onSelect: () => void
+}): JSX.Element {
+  return (
+    <label
+      data-selected={checked}
+      className="brutal-tab flex w-full cursor-pointer items-center gap-2 border-border-strong px-2.5 py-1.5 text-left"
+    >
+      <input
+        type="radio"
+        name={name}
+        value={value}
+        checked={checked}
+        onChange={onSelect}
+        className="accent-accent"
+      />
+      {label}
+    </label>
+  )
+}
+
 /** Settings → Approval Mode: approval policy plus remembered commands. */
 export default function SettingsApproval(): JSX.Element {
   const { t } = useTranslation()
@@ -13,37 +49,34 @@ export default function SettingsApproval(): JSX.Element {
 
   return (
     <section className="flex flex-col gap-3">
-      <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
+      <h3 className="brutal-label flex items-center gap-2">
         <ShieldCheck className="h-3.5 w-3.5" />
         {t('settings.approvalMode')}
       </h3>
 
-      <div className="flex flex-col gap-2 rounded-lg border border-border bg-bg-primary p-3">
+      <div className="brutal-card flex flex-col gap-2 p-3">
         <div>
           <p className="text-xs font-medium text-fg">{t('settings.approvalMode')}</p>
           <p className="mt-0.5 text-2xs text-fg-muted">{t('settings.approvalHint')}</p>
         </div>
-        {(
-          [
-            ['ask', 'settings.approvalAsk'],
-            ['auto-write', 'settings.approvalAutoWrite'],
-            ['full', 'settings.approvalFull']
-          ] as const
-        ).map(([value, labelKey]) => (
-          <label
-            key={value}
-            className="flex cursor-pointer items-center gap-2 text-xs text-fg"
-          >
-            <input
-              type="radio"
+        <div role="radiogroup" aria-label={t('settings.approvalMode')} className="brutal-inset flex flex-col">
+          {(
+            [
+              ['ask', 'settings.approvalAsk'],
+              ['auto-write', 'settings.approvalAutoWrite'],
+              ['full', 'settings.approvalFull']
+            ] as const
+          ).map(([value, labelKey]) => (
+            <Choice
+              key={value}
               name="approval-mode"
+              value={value}
               checked={(settings?.approvalMode ?? 'ask') === value}
-              onChange={() => void setApprovalMode(value)}
-              className="accent-accent"
+              label={t(labelKey)}
+              onSelect={() => void setApprovalMode(value)}
             />
-            {t(labelKey)}
-          </label>
-        ))}
+          ))}
+        </div>
         <label className="flex cursor-pointer items-center gap-2 text-xs text-fg">
           <input
             type="checkbox"
@@ -60,29 +93,29 @@ export default function SettingsApproval(): JSX.Element {
         it answers a different question ("which decisions should I be able to review?") and it can
         ask even when the approval mode above would have proceeded.
       */}
-      <div className="flex flex-col gap-2 rounded-lg border border-border bg-bg-primary p-3">
+      <div className="brutal-card flex flex-col gap-2 p-3">
         <div>
           <p className="text-xs font-medium text-fg">{t('settings.checkpointTitle')}</p>
           <p className="mt-0.5 text-2xs text-fg-muted">{t('settings.checkpointHint')}</p>
         </div>
-        {(
-          [
-            ['off', 'settings.checkpointOff'],
-            ['record', 'settings.checkpointRecord'],
-            ['confirm', 'settings.checkpointConfirm']
-          ] as const
-        ).map(([value, labelKey]) => (
-          <label key={value} className="flex cursor-pointer items-center gap-2 text-xs text-fg">
-            <input
-              type="radio"
+        <div role="radiogroup" aria-label={t('settings.checkpointTitle')} className="brutal-inset flex flex-col">
+          {(
+            [
+              ['off', 'settings.checkpointOff'],
+              ['record', 'settings.checkpointRecord'],
+              ['confirm', 'settings.checkpointConfirm']
+            ] as const
+          ).map(([value, labelKey]) => (
+            <Choice
+              key={value}
               name="checkpoint-mode"
+              value={value}
               checked={(settings?.checkpointMode ?? 'off') === value}
-              onChange={() => void setCheckpointMode(value)}
-              className="accent-accent"
+              label={t(labelKey)}
+              onSelect={() => void setCheckpointMode(value)}
             />
-            {t(labelKey)}
-          </label>
-        ))}
+          ))}
+        </div>
       </div>
 
       <ApprovedCommandsSection />

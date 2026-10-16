@@ -25,11 +25,9 @@ import type {
  *     through `t()` and the device code and link are copyable.
  */
 
-const inputClass =
-  'w-full rounded border border-border bg-bg-secondary px-2 py-1.5 text-xs text-fg outline-none focus:border-accent/50'
+const inputClass = 'brutal-inset brutal-focus w-full px-2 py-1.5 text-xs text-fg'
 
-const primaryButton =
-  'flex items-center gap-1 rounded bg-accent-solid px-3 py-1.5 text-xs text-accent-fg hover:bg-accent-solid-hover disabled:opacity-40'
+const primaryButton = 'brutal-btn brutal-primary flex items-center gap-1 px-3 py-1.5 text-xs'
 
 const linkClass = 'inline-flex items-center gap-1 text-2xs text-accent underline'
 
@@ -175,27 +173,27 @@ export default function GitHubSection(): JSX.Element {
 
   return (
     <section className="mt-6 space-y-2">
-      <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
+      <h3 className="brutal-label flex items-center gap-2">
         <GitFork className="h-3.5 w-3.5" /> {t('github.title')}
       </h3>
 
       {connected ? (
         <div
           data-testid="github-connected"
-          className="rounded border border-border bg-bg-secondary px-3 py-2 text-xs"
+          className="brutal-card px-3 py-2 text-xs"
         >
           <div className="flex items-center justify-between">
             <span className="flex items-center gap-2 text-fg">
               <Check className="h-3.5 w-3.5 text-success" />
               {t('github.connectedAs')}{' '}
-              <span className="text-accent">@{status?.user?.login ?? t('github.accountUnknown')}</span>
+              <span className="brutal-data text-accent">@{status?.user?.login ?? t('github.accountUnknown')}</span>
             </span>
             <button
               type="button"
               data-testid="github-disconnect"
               title={t('github.disconnectTitle')}
               onClick={() => void disconnect()}
-              className="flex items-center gap-1 rounded px-2 py-1 text-fg-muted hover:bg-bg-tertiary hover:text-fg"
+              className="brutal-btn flex items-center gap-1"
             >
               <LogOut className="h-3 w-3" /> {t('github.disconnect')}
             </button>
@@ -208,7 +206,7 @@ export default function GitHubSection(): JSX.Element {
             </span>
           </p>
           {cli?.scopes && cli.scopes.length > 0 && status?.source === 'gh-cli' ? (
-            <p className="mt-1 text-2xs text-fg-muted">
+            <p className="brutal-data mt-1 text-2xs text-fg-muted">
               {t('github.cliScopes', { scopes: cli.scopes.join(', ') })}
             </p>
           ) : null}
@@ -218,7 +216,7 @@ export default function GitHubSection(): JSX.Element {
       {status?.error ? (
         <div
           data-testid="github-status-error"
-          className="rounded border border-danger/40 bg-danger/10 px-3 py-2 text-2xs text-danger"
+          className="brutal-banner border-danger text-2xs text-danger"
         >
           <p className="flex items-center gap-1 font-semibold">
             <TriangleAlert className="h-3 w-3" /> {t('github.errorTitle')}
@@ -238,14 +236,14 @@ export default function GitHubSection(): JSX.Element {
       {!connected && cliOffer ? (
         <div
           data-testid="github-cli-card"
-          className="rounded border border-accent/40 bg-accent-solid/10 p-3 text-xs text-fg"
+          className="brutal-card border-accent p-3 text-xs text-fg"
         >
           <p className="font-semibold" data-testid="github-cli-title">
             {t('github.cliFoundTitle', { login: cli?.login ?? '' })}
           </p>
           <p className="mt-1 text-2xs leading-relaxed text-fg-muted">{t('github.cliFoundBody')}</p>
           {cli?.scopes && cli.scopes.length > 0 ? (
-            <p className="mt-1 text-2xs text-fg-muted" data-testid="github-cli-scopes">
+            <p className="brutal-data mt-1 text-2xs text-fg-muted" data-testid="github-cli-scopes">
               {t('github.cliScopes', { scopes: cli.scopes.join(', ') })}
             </p>
           ) : null}
@@ -288,8 +286,8 @@ export default function GitHubSection(): JSX.Element {
       ) : null}
 
       {!connected ? (
-        <div className="rounded border border-border bg-bg-secondary p-2" data-testid="github-which">
-          <p className="text-2xs font-semibold text-fg">{t('github.whichTitle')}</p>
+        <div className="brutal-card p-2" data-testid="github-which">
+          <p className="brutal-label text-fg">{t('github.whichTitle')}</p>
           <ul className="mt-1 list-disc space-y-0.5 pl-4 text-2xs text-fg-muted">
             <li>{t('github.whichCli')}</li>
             <li>{t('github.whichToken')}</li>
@@ -300,25 +298,23 @@ export default function GitHubSection(): JSX.Element {
 
       {!connected ? (
         <div className="space-y-2">
-          <p className="text-2xs font-semibold uppercase tracking-wide text-fg-muted" data-testid="github-other-ways">
+          <p className="brutal-label" data-testid="github-other-ways">
             {t('github.otherWays')}
           </p>
-          <div className="flex gap-1 rounded-lg border border-border bg-bg-secondary p-0.5 text-2xs">
+          <div className="brutal-inset flex gap-1 p-0.5">
             <button
               type="button"
               onClick={() => setMode('token')}
-              className={`flex-1 rounded-md px-2 py-1 transition ${
-                mode === 'token' ? 'bg-bg-tertiary text-fg-strong' : 'text-fg-muted'
-              }`}
+              data-selected={mode === 'token'}
+              className="brutal-tab flex-1 px-2 py-1"
             >
               {t('github.tabToken')}
             </button>
             <button
               type="button"
               onClick={() => setMode('device')}
-              className={`flex-1 rounded-md px-2 py-1 transition ${
-                mode === 'device' ? 'bg-bg-tertiary text-fg-strong' : 'text-fg-muted'
-              }`}
+              data-selected={mode === 'device'}
+              className="brutal-tab flex-1 px-2 py-1"
             >
               {t('github.tabDevice')}
             </button>
@@ -397,10 +393,10 @@ export default function GitHubSection(): JSX.Element {
       ) : null}
 
       {device ? (
-        <div className="rounded border border-accent/40 bg-accent-solid/10 p-3 text-xs text-fg">
-          <p className="mb-1 text-fg-muted">{t('github.enterCode')}</p>
+        <div className="brutal-card border-accent p-3 text-xs text-fg">
+          <p className="brutal-label mb-1">{t('github.enterCode')}</p>
           <div className="mb-2 flex items-center gap-2">
-            <p className="font-mono text-base tracking-widest text-accent" data-testid="github-device-code">
+            <p className="brutal-data text-base tracking-label text-accent" data-testid="github-device-code">
               {device.userCode}
             </p>
             <button
@@ -408,13 +404,13 @@ export default function GitHubSection(): JSX.Element {
               data-testid="github-copy-code"
               title={t('github.copyCode')}
               onClick={() => void copy(device.userCode)}
-              className="flex items-center gap-1 rounded px-2 py-1 text-fg-muted hover:bg-bg-tertiary hover:text-fg"
+              className="brutal-btn flex items-center gap-1"
             >
               <Copy className="h-3 w-3" /> {t('github.copyCode')}
             </button>
           </div>
           <div className="flex items-center gap-2">
-            <a href={device.verificationUri} target="_blank" rel="noreferrer" className={linkClass}>
+            <a href={device.verificationUri} target="_blank" rel="noreferrer" className={`${linkClass} brutal-data`}>
               {device.verificationUri} <ExternalLink className="h-3 w-3" />
             </a>
             <button
@@ -422,12 +418,12 @@ export default function GitHubSection(): JSX.Element {
               data-testid="github-copy-link"
               title={t('github.copyLink')}
               onClick={() => void copy(device.verificationUri)}
-              className="flex items-center gap-1 rounded px-2 py-1 text-fg-muted hover:bg-bg-tertiary hover:text-fg"
+              className="brutal-btn flex items-center gap-1"
             >
               <Copy className="h-3 w-3" /> {t('github.copyLink')}
             </button>
           </div>
-          <p className="mt-2 text-2xs text-fg-muted" data-testid="github-code-expiry">
+          <p className="brutal-data mt-2 text-2xs text-fg-muted" data-testid="github-code-expiry">
             {t('github.codeExpires', { count: expiryMinutes })}
           </p>
           <p className="mt-1 flex items-center gap-1 text-fg-muted">
@@ -437,13 +433,13 @@ export default function GitHubSection(): JSX.Element {
       ) : null}
 
       {notice ? (
-        <p data-testid="github-notice" className="rounded bg-bg-tertiary px-2 py-1 text-2xs text-fg-muted">
+        <p data-testid="github-notice" className="brutal-inset px-2 py-1 text-2xs text-fg-muted">
           {notice}
         </p>
       ) : null}
 
       {error ? (
-        <p data-testid="github-error" className="rounded bg-danger/10 px-2 py-1 text-2xs text-danger">
+        <p data-testid="github-error" className="brutal-banner border-danger text-2xs text-danger">
           {error}
         </p>
       ) : null}

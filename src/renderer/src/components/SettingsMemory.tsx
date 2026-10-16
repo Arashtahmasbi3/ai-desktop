@@ -146,25 +146,25 @@ export default function SettingsMemory(): JSX.Element {
 
   return (
     <section className="flex flex-col gap-3">
-      <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
+      <h3 className="brutal-label flex items-center gap-2">
         <MemoryStick className="h-3.5 w-3.5" />
         {t('settings.memory')}
       </h3>
       <p className="text-2xs text-fg-muted">{t('settings.memoryHint')}</p>
 
-      <div className="clay-card p-3">
+      <div className="brutal-panel p-3">
         <div className="flex items-center justify-between text-xs text-fg">
           <span className="flex items-center gap-1.5">
             <Cpu className="h-3.5 w-3.5" />
             {t('settings.contextUsage')}
           </span>
-          <span className={overBudget ? 'text-warning' : 'text-fg-muted'}>
+          <span className={`brutal-data ${overBudget ? 'text-warning' : 'text-fg-muted'}`}>
             {tokens.toLocaleString()} / {DEFAULT_CONTEXT_TOKEN_BUDGET.toLocaleString()}
           </span>
         </div>
-        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-bg-tertiary">
+        <div className="mt-2 h-1.5 w-full overflow-hidden bg-bg-tertiary">
           <div
-            className={`h-full rounded-full transition-all ${overBudget ? 'bg-warning' : 'bg-accent-solid'}`}
+            className={`h-full transition-all ease-shape ${overBudget ? 'bg-warning' : 'bg-accent-solid'}`}
             style={{ width: `${percent}%` }}
           />
         </div>
@@ -174,13 +174,13 @@ export default function SettingsMemory(): JSX.Element {
       </div>
 
       {/* The fact ledger: everything the app believes about this project, including the past. */}
-      <div className="clay-card flex flex-col gap-2 p-3">
+      <div className="brutal-panel flex flex-col gap-2 p-3">
         <div className="flex items-center justify-between gap-2">
           <span className="flex items-center gap-1.5 text-xs font-semibold text-fg">
             <Brain className="h-3.5 w-3.5 text-accent" />
             {t('settings.factsTitle')}
           </span>
-          <span className="shrink-0 font-mono text-3xs text-fg-subtle">
+          <span className="brutal-data shrink-0 text-3xs text-fg-subtle">
             {t('settings.factsCount', { live: live.length, superseded: past })}
           </span>
         </div>
@@ -198,7 +198,7 @@ export default function SettingsMemory(): JSX.Element {
             type="button"
             onClick={() => void learn()}
             disabled={!activeChatId || learning}
-            className="clay-press flex items-center gap-1.5 rounded-clay-sm bg-accent-solid px-2.5 py-1 text-2xs text-accent-fg disabled:opacity-50"
+            className="brutal-btn brutal-primary flex items-center gap-1.5 px-2.5 py-1 text-2xs"
           >
             <Sparkles className="h-3.5 w-3.5" />
             {learning ? t('settings.factsLearning') : t('settings.factsLearn')}
@@ -210,10 +210,8 @@ export default function SettingsMemory(): JSX.Element {
             <button
               type="button"
               onClick={() => void forgetAll()}
-              className={`clay-press ml-auto flex items-center gap-1.5 rounded-clay-sm px-2.5 py-1 text-2xs ${
-                confirmingClear
-                  ? 'bg-danger/20 text-danger'
-                  : 'bg-bg-tertiary text-fg-muted hover:text-danger'
+              className={`brutal-btn ml-auto flex items-center gap-1.5 px-2.5 py-1 text-2xs ${
+                confirmingClear ? 'brutal-danger text-danger' : 'hover:text-danger'
               }`}
             >
               <Eraser className="h-3.5 w-3.5" />
@@ -243,8 +241,10 @@ export default function SettingsMemory(): JSX.Element {
                   key={fact.id}
                   data-testid="fact-row"
                   data-status={status}
-                  className={`flex items-start gap-2 rounded-clay-sm border border-border px-2 py-1.5 text-2xs ${
-                    isLive ? 'bg-bg-primary' : 'bg-bg-secondary'
+                  className={`flex items-start gap-2 border px-2 py-1.5 text-2xs ${
+                    isLive
+                      ? 'border-border bg-bg-secondary'
+                      : 'border-border-strong bg-bg-tertiary'
                   }`}
                 >
                   <div className="min-w-0 flex-1">
@@ -254,12 +254,12 @@ export default function SettingsMemory(): JSX.Element {
                     >
                       {fact.text}
                     </div>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-3xs text-fg-subtle">
+                    <div className="brutal-data mt-0.5 flex flex-wrap items-center gap-1.5 text-3xs text-fg-subtle">
                       <span>
                         {t('settings.factsObserved', { date: factDate(fact.validAt) })}
                       </span>
                       {isLive ? null : (
-                        <span className="rounded-clay-sm border border-border px-1 py-0.5 uppercase tracking-wide">
+                        <span className="brutal-chip">
                           {status === 'expired'
                             ? t('settings.factsExpired')
                             : t('settings.factsSuperseded')}
@@ -277,7 +277,7 @@ export default function SettingsMemory(): JSX.Element {
                     onClick={() => void forget(fact.id)}
                     aria-label={t('settings.factsForgetOne')}
                     title={t('settings.factsForgetOne')}
-                    className="clay-press shrink-0 rounded-clay-sm p-1 text-fg-subtle hover:bg-bg-tertiary hover:text-danger"
+                    className="brutal-btn shrink-0 p-1 text-fg-subtle hover:text-danger"
                   >
                     <Trash2 className="h-3 w-3" />
                   </button>

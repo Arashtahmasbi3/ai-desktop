@@ -48,7 +48,7 @@ export default function WorkspaceBadge(): JSX.Element | null {
   const isGit = Boolean(info?.isGitRepo)
   return (
     <span
-      className="flex items-center gap-1 rounded px-1.5 py-0.5 text-fg-muted"
+      className="brutal-chip"
       title={formatWorkspaceTooltip(info)}
     >
       {isGit ? (

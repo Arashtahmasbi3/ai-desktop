@@ -16,6 +16,7 @@ import {
   Zap
 } from 'lucide-react'
 import { useStore } from '../store'
+import { isCapabilityEnabled } from '../lib/capabilities'
 import { useConnectionStatus, CONNECTION_TONE_CLASS } from '../lib/connection-status'
 import { vpsServerName } from '../lib/vps-state'
 import { nextApprovalMode } from '@shared/approval'
@@ -45,7 +46,7 @@ function DiagnosticBadge(): JSX.Element | null {
       title={`${t('settings.diagnosticOn')}${
         minutes > 0 ? ` · ${t('settings.diagnosticRemaining', { minutes })}` : ''
       }`}
-      className="flex items-center gap-1 rounded-full border border-warning/40 bg-warning/10 px-1.5 py-0.5 text-3xs font-medium text-warning"
+      className="brutal-chip border-warning text-warning"
     >
       <Activity className="h-3 w-3" />
       {t('settings.diagnosticTitle')}
@@ -131,15 +132,18 @@ export default function ExecutionBar({
     >
       {/* Line 1 — identity: project / server / path */}
       <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-        <button
-          type="button"
-          onClick={toggleChatTree}
-          title={t('chat.toggleTree')}
-          aria-label={t('chat.toggleTree')}
-          className={iconButton(chatTreeOpen)}
-        >
-          <PanelLeft className="h-3.5 w-3.5" />
-        </button>
+        {/* v4.0: the toggle goes with the surface it opens (Settings → Surfaces). */}
+        {isCapabilityEnabled('filesystem') ? (
+          <button
+            type="button"
+            onClick={toggleChatTree}
+            title={t('chat.toggleTree')}
+            aria-label={t('chat.toggleTree')}
+            className={iconButton(chatTreeOpen)}
+          >
+            <PanelLeft className="h-3.5 w-3.5" />
+          </button>
+        ) : null}
         <span
           data-testid="exec-project"
           className="max-w-[10rem] truncate font-medium text-fg"
@@ -201,7 +205,15 @@ export default function ExecutionBar({
             data-testid="exec-approval"
             onClick={() => void setApprovalMode(nextApprovalMode(approvalMode))}
             title={t('settings.approvalMode')}
-            className={`flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 font-medium ${APPROVAL_TONE[approvalMode]}`}
+            /*
+         * v4.0: a chip, not a lozenge. The tone still comes from the approval mode, so the colour
+         * keeps meaning what it meant; only the geometry changed.
+         */
+        /*
+         * `shrink-0` is not decoration: in a narrow window this chip must keep its full width
+         * instead of collapsing, which `execution-bar.test.tsx` pins as a real requirement.
+         */
+        className={`brutal-chip shrink-0 ${APPROVAL_TONE[approvalMode]}`}
           >
             <ModeIcon className="h-3 w-3" />
             <span className="whitespace-nowrap">{modeLabel}</span>
@@ -234,15 +246,17 @@ export default function ExecutionBar({
           >
             <Activity className="h-3.5 w-3.5" />
           </button>
-          <button
-            type="button"
-            onClick={toggleTerminal}
-            title={t('chat.terminalTitle')}
-            aria-label={t('chat.terminalTitle')}
-            className={iconButton(terminalOpen)}
-          >
-            <Terminal className="h-3.5 w-3.5" />
-          </button>
+          {isCapabilityEnabled('terminal') ? (
+            <button
+              type="button"
+              onClick={toggleTerminal}
+              title={t('chat.terminalTitle')}
+              aria-label={t('chat.terminalTitle')}
+              className={iconButton(terminalOpen)}
+            >
+              <Terminal className="h-3.5 w-3.5" />
+            </button>
+          ) : null}
           {running ? (
             <button
               type="button"

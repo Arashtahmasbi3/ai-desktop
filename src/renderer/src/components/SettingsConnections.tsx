@@ -36,7 +36,7 @@ function DiagnosticModeSection(): JSX.Element {
   const paths = diagnostic?.allowedPaths ?? []
 
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-border bg-bg-primary p-3">
+    <div className="brutal-card flex flex-col gap-2 p-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="flex items-center gap-2 text-sm text-fg">
@@ -47,7 +47,7 @@ function DiagnosticModeSection(): JSX.Element {
             )}
             {t('settings.diagnosticTitle')}
           </p>
-          <p className="mt-0.5 text-2xs text-fg-muted">
+          <p className="brutal-data mt-0.5 text-2xs text-fg-muted">
             {active ? t('settings.diagnosticOn') : t('settings.diagnosticOff')}
             {active && remainingMin > 0
               ? ` · ${t('settings.diagnosticRemaining', { minutes: remainingMin })}`
@@ -57,10 +57,8 @@ function DiagnosticModeSection(): JSX.Element {
         <button
           type="button"
           onClick={() => void setDiagnosticMode(!active)}
-          className={`shrink-0 rounded px-2.5 py-1 text-2xs transition ${
-            active
-              ? 'border border-warning/40 text-warning hover:bg-warning/10'
-              : 'bg-accent-solid text-white hover:bg-accent-solid-hover'
+          className={`brutal-btn shrink-0 ${
+            active ? 'border-warning text-warning' : 'brutal-primary'
           }`}
         >
           {active ? t('settings.diagnosticDisable') : t('settings.diagnosticEnable')}
@@ -69,7 +67,7 @@ function DiagnosticModeSection(): JSX.Element {
       <p className="text-2xs leading-relaxed text-fg-muted">{t('settings.diagnosticDesc')}</p>
       {active && paths.length > 0 ? (
         <p className="break-all text-2xs text-fg-subtle">
-          {t('settings.diagnosticPaths')}: <span className="font-mono">{paths.join(', ')}</span>
+          {t('settings.diagnosticPaths')}: <span className="brutal-data">{paths.join(', ')}</span>
         </p>
       ) : null}
     </div>
@@ -102,12 +100,12 @@ export default function SettingsConnections(): JSX.Element {
 
   return (
     <section className="flex flex-col gap-3">
-      <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
+      <h3 className="brutal-label flex items-center gap-2">
         <Server className="h-3.5 w-3.5" />
         {t('settings.connections')}
       </h3>
 
-      <div className="flex items-center gap-1">
+      <div className="brutal-inset flex w-fit items-center gap-1 p-0.5">
         {tabs.map((item) => {
           const Icon = item.icon
           return (
@@ -115,11 +113,8 @@ export default function SettingsConnections(): JSX.Element {
               key={item.id}
               type="button"
               onClick={() => setTab(item.id)}
-              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs transition ${
-                tab === item.id
-                  ? 'bg-accent-solid/15 text-accent'
-                  : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
-              }`}
+              data-selected={tab === item.id}
+              className="brutal-tab flex items-center gap-1.5 px-2.5 py-1"
             >
               <Icon className="h-3.5 w-3.5" />
               {t(item.labelKey)}
@@ -129,11 +124,11 @@ export default function SettingsConnections(): JSX.Element {
       </div>
 
       {tab === 'pc' ? (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-bg-primary p-3">
+        <div className="brutal-card flex items-center justify-between gap-3 p-3">
           <div className="min-w-0">
             <p className="flex items-center gap-2 text-sm text-fg">
               <span
-                className={`h-1.5 w-1.5 rounded-full ${pcEnabled ? 'bg-success' : 'bg-bg-tertiary'}`}
+                className={`h-1.5 w-1.5 rounded-shape-pill ${pcEnabled ? 'bg-success' : 'bg-bg-tertiary'}`}
               />
               {t('settings.thisPc')}
             </p>
@@ -149,25 +144,25 @@ export default function SettingsConnections(): JSX.Element {
                 closeSettings()
                 toggleTerminal()
               }}
-              className="flex items-center gap-1 rounded border border-border px-2 py-1 text-2xs text-fg hover:bg-bg-tertiary"
+              className="brutal-btn flex items-center gap-1"
             >
               <Terminal className="h-3.5 w-3.5" />
               {t('settings.openTerminal')}
             </button>
+            {/* A square switch: the track carries the state, the ink block is the knob. */}
             <button
               type="button"
               role="switch"
               aria-checked={pcEnabled}
               aria-label={t('settings.thisPc')}
               onClick={togglePc}
-              className={`relative h-4 w-8 rounded-full transition ${
+              className={`brutal-inset brutal-focus relative h-4 w-8 ${
                 pcEnabled ? 'bg-accent-solid' : 'bg-bg-tertiary'
               }`}
             >
               <span
-                className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all ${
-                  pcEnabled ? 'left-4' : 'left-0.5'
-                }`}
+                className="absolute top-0.5 h-2.5 w-2.5 bg-bg-elevated"
+                style={{ left: pcEnabled ? '16px' : '1px' }}
               />
             </button>
           </div>
@@ -175,7 +170,7 @@ export default function SettingsConnections(): JSX.Element {
       ) : null}
 
       {tab === 'devices' ? (
-        <div className="rounded-xl border border-border bg-bg-primary p-4 text-center">
+        <div className="brutal-card p-4 text-center">
           <Smartphone className="mx-auto h-5 w-5 text-fg-subtle" />
           <p className="mt-2 text-xs text-fg-muted">{t('settings.noDevices')}</p>
           <p className="mt-0.5 text-2xs text-fg-subtle">{t('settings.noDevicesHint')}</p>
@@ -186,7 +181,7 @@ export default function SettingsConnections(): JSX.Element {
         <div className="flex flex-col gap-3">
           <p className="text-xs leading-relaxed text-fg-muted">{t('onboarding.vpsBody')}</p>
           <p className="text-2xs text-fg-muted">
-            {t('settings.sshProjects')}: {sshCount}
+            {t('settings.sshProjects')}: <span className="brutal-data">{sshCount}</span>
           </p>
           <SshConfigImport />
           <DiagnosticModeSection />
@@ -203,7 +198,7 @@ export default function SettingsConnections(): JSX.Element {
               setView('vps')
               closeSettings()
             }}
-            className="w-fit rounded bg-accent-solid px-3 py-1.5 text-xs text-white hover:bg-accent-solid-hover"
+            className="brutal-btn brutal-primary w-fit"
           >
             {t('sidebar.navVps')}
           </button>

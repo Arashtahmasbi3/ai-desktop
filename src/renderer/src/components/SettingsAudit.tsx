@@ -44,19 +44,19 @@ export default function SettingsAudit(): JSX.Element {
 
   return (
     <section className="flex flex-col gap-3">
-      <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
+      <h3 className="brutal-label flex items-center gap-2">
         <ScrollText className="h-3.5 w-3.5" />
         {t('settings.audit')}
       </h3>
       <p className="text-2xs text-fg-muted">{t('settings.auditHint')}</p>
 
-      <div className="rounded-xl border border-border bg-bg-primary p-3">
+      <div className="brutal-card p-3">
         <div className="flex items-center gap-1.5 text-2xs text-fg-muted">
           <FileCheck2 className="h-3.5 w-3.5" />
           {t('settings.auditPath')}
         </div>
         {path ? (
-          <code className="mt-1 block break-all text-2xs text-fg" dir="ltr">
+          <code className="brutal-data mt-1 block break-all text-2xs" dir="ltr">
             {path}
           </code>
         ) : (
@@ -68,7 +68,7 @@ export default function SettingsAudit(): JSX.Element {
         type="button"
         onClick={() => void verify()}
         disabled={verifying || !path}
-        className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-border bg-bg-tertiary px-3 py-1.5 text-xs text-fg hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
+        className="brutal-btn inline-flex w-fit items-center gap-1.5"
       >
         <ShieldCheck className="h-3.5 w-3.5" />
         {verifying ? t('settings.auditVerifying') : t('settings.auditVerify')}
@@ -78,17 +78,19 @@ export default function SettingsAudit(): JSX.Element {
 
       {result ? (
         result.ok ? (
-          <p className="flex items-center gap-1.5 text-2xs text-success">
+          <p className="brutal-banner flex items-center gap-1.5 border-success text-2xs text-success">
             <ShieldCheck className="h-3.5 w-3.5" />
             {t('settings.auditOk', { count: result.lines })}
           </p>
         ) : (
-          <p className="flex items-center gap-1.5 text-2xs text-danger">
+          <p className="brutal-banner flex items-center gap-1.5 border-danger text-2xs text-danger">
             <ShieldAlert className="h-3.5 w-3.5" />
-            {t('settings.auditBroken', {
-              line: (result.brokenAt ?? 0) + 1,
-              reason: result.reason ?? 'hash mismatch'
-            })}
+            <span className="brutal-data">
+              {t('settings.auditBroken', {
+                line: (result.brokenAt ?? 0) + 1,
+                reason: result.reason ?? 'hash mismatch'
+              })}
+            </span>
           </p>
         )
       ) : null}

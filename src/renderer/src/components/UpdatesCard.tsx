@@ -67,17 +67,17 @@ export default function UpdatesCard(): JSX.Element {
   }
 
   return (
-    <div className="clay-card flex flex-col gap-3 p-3">
+    <div className="brutal-card flex flex-col gap-3 p-3">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <RefreshCw className={phase === 'checking' ? 'h-3.5 w-3.5 animate-spin text-accent' : 'h-3.5 w-3.5 text-accent'} />
-          <span className="text-xs font-semibold text-fg">{t('settings.updates')}</span>
+          <span className="brutal-label text-fg">{t('settings.updates')}</span>
         </div>
         <button
           type="button"
           onClick={() => void check()}
           disabled={phase === 'checking' || phase === 'downloading'}
-          className="clay-press rounded-clay-sm bg-bg-tertiary px-2.5 py-1 text-2xs text-fg disabled:opacity-50"
+          className="brutal-btn"
         >
           {phase === 'checking' ? t('settings.updateChecking') : t('settings.updateCheck')}
         </button>
@@ -85,7 +85,7 @@ export default function UpdatesCard(): JSX.Element {
 
       <p className="text-3xs text-fg-subtle">{t('settings.updatesHint')}</p>
 
-      <div className="flex flex-col gap-2 rounded-clay-sm border border-border bg-bg-primary p-2.5 text-2xs">
+      <div className="brutal-inset flex flex-col gap-2 p-2.5 text-2xs">
         <div className="flex items-center gap-2">
           {phase === 'current' ? (
             <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-success" />
@@ -98,7 +98,7 @@ export default function UpdatesCard(): JSX.Element {
             {result ? describeCheck(result) : t('settings.updateNeverChecked')}
           </span>
           {result ? (
-            <span className="ml-auto shrink-0 font-mono text-3xs text-fg-subtle">
+            <span className="brutal-data ml-auto shrink-0 text-3xs text-fg-subtle">
               {t('settings.updateCurrent')}: {result.current}
             </span>
           ) : null}
@@ -121,7 +121,7 @@ export default function UpdatesCard(): JSX.Element {
           <button
             type="button"
             onClick={() => void download()}
-            className="clay-press mt-1 flex items-center justify-center gap-1.5 rounded-clay-sm bg-accent-solid px-3 py-1.5 text-2xs text-accent-fg"
+            className="brutal-btn brutal-press brutal-primary mt-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-2xs"
           >
             <DownloadCloud className="h-3.5 w-3.5" />
             {t('settings.updateDownload', { size: formatUpdateSize(result.manifest.size) })}
@@ -140,7 +140,7 @@ export default function UpdatesCard(): JSX.Element {
             <button
               type="button"
               onClick={() => void install()}
-              className="clay-press mt-1 flex items-center justify-center gap-1.5 rounded-clay-sm bg-accent-solid px-3 py-1.5 text-2xs text-accent-fg"
+              className="brutal-btn brutal-press brutal-primary mt-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-2xs"
             >
               <Rocket className="h-3.5 w-3.5" />
               {t('settings.updateInstall')}

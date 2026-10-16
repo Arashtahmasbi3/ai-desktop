@@ -22,8 +22,12 @@
     --bg-secondary: 250 249 246;
     --bg-tertiary: 237 235 231;
     --bg-elevated: 255 255 254;
-    --border: 228 225 220;
-    --border-strong: 205 201 195;
+    /*
+     * Border hierarchy (v4.0). The previous values sat at roughly 1.1:1 against the page, so 180
+     * borders rendered as nothing. These are the two tiers: a visible separator, and ink.
+     */
+    --border: 176 169 159;
+    --border-strong: 66 62 58;
 
     /*
      * A four-step text ramp where every step still clears 4.5:1 on the darkest
@@ -54,28 +58,34 @@
     --scrollbar-thumb-hover: 180 175 168;
 
     /*
-     * Clay depth (v3.0). Applied in tiers: full on touchable/primary surfaces (composer,
-     * modals, primary buttons), soft on cards, and NOT AT ALL on tables, logs, diffs and
-     * security dialogs — there, flatness is what keeps dense data readable.
+     * Brutalist geometry (v4.0). Two steps only: a square edge, and a hairline micro-round for
+     * inputs and tiny chips where a true 0 reads as a rendering mistake. "Pill" survives solely
+     * for status dots, which are circles by definition rather than by style choice.
      */
-    --clay-r-sm: 12px;
-    --clay-r-md: 18px;
-    --clay-r-lg: 24px;
-    --clay-r-pill: 999px;
-    --clay-light: 255 255 255;
-    --clay-dark: 172 166 158;
-    --clay-shadow-out: 6px 6px 14px rgb(var(--clay-dark) / 0.3),
-      -6px -6px 14px rgb(var(--clay-light) / 0.95);
-    --clay-shadow-soft: 3px 3px 8px rgb(var(--clay-dark) / 0.16),
-      -2px -2px 6px rgb(var(--clay-light) / 0.85);
-    --clay-shadow-in: inset 3px 3px 7px rgb(var(--clay-dark) / 0.26),
-      inset -3px -3px 7px rgb(var(--clay-light) / 0.9);
+    --shape-r-sm: 2px;
+    --shape-r: 0px;
+    --shape-r-lg: 0px;
+    --shape-pill: 999px;
+    /** The one border width that means "this is a surface". */
+    --shape-border: 2px;
+    /*
+     * Hard offset shadows: zero blur, so they read as ink rather than as a light source. This is
+     * what replaces clay's blurred double shadow — the same signal (this floats) with none of the
+     * softness that made every surface compete for attention.
+     */
+    --shape-shadow: 4px 4px 0 0 rgb(var(--fg-strong));
+    --shape-shadow-sm: 2px 2px 0 0 rgb(var(--fg-strong));
+    --shape-shadow-accent: 4px 4px 0 0 rgb(var(--accent));
+    --shape-shadow-outline: 0 0 0 var(--shape-border) rgb(var(--fg-strong));
 
-    /* Motion: clay is quick and soft, never bouncy-long. */
-    --motion-fast: 120ms;
-    --motion-base: 200ms;
-    --motion-slow: 320ms;
-    --ease-clay: cubic-bezier(0.22, 1, 0.36, 1);
+    /*
+     * Motion: instant. Brutalism does not ease — a state change is a state change. Non-zero so
+     * transitionend listeners still fire, which the reduced-motion block already depends on.
+     */
+    --motion-fast: 60ms;
+    --motion-base: 90ms;
+    --motion-slow: 120ms;
+    --ease-shape: linear;
 
     /* A real scale, so overlays stop guessing with arbitrary z-[N] values. */
     --z-base: 0;
@@ -96,8 +106,9 @@
     --bg-secondary: 27 25 23;
     --bg-tertiary: 37 34 32;
     --bg-elevated: 31 29 27;
-    --border: 49 46 43;
-    --border-strong: 67 63 59;
+    /* Border hierarchy (v4.0) — the dark theme's edges were as invisible as the light one's. */
+    --border: 92 87 80;
+    --border-strong: 176 169 159;
 
     --fg-strong: 245 243 240;
     --fg: 226 222 217;
@@ -127,17 +138,14 @@
     --scrollbar-thumb-hover: 72 68 64;
 
     /*
-     * The highlight and shadow swap roles: on a dark surface the "light" side must be a
-     * faint local glow rather than white, or the surface reads as a hole instead of a bump.
+     * A shadow cannot be dark-on-dark, so the dark theme draws its offset from the foreground ramp
+     * instead: the same hard ink edge, in the one direction that is visible on this background.
+     * Still zero blur, still no light source — it stays an edge, not a glow.
      */
-    --clay-light: 72 68 64;
-    --clay-dark: 0 0 0;
-    --clay-shadow-out: 6px 6px 16px rgb(var(--clay-dark) / 0.55),
-      -4px -4px 12px rgb(var(--clay-light) / 0.45);
-    --clay-shadow-soft: 3px 3px 9px rgb(var(--clay-dark) / 0.45),
-      -2px -2px 7px rgb(var(--clay-light) / 0.35);
-    --clay-shadow-in: inset 3px 3px 8px rgb(var(--clay-dark) / 0.6),
-      inset -3px -3px 8px rgb(var(--clay-light) / 0.35);
+    --shape-shadow: 4px 4px 0 0 rgb(var(--border-strong));
+    --shape-shadow-sm: 2px 2px 0 0 rgb(var(--border-strong));
+    --shape-shadow-accent: 4px 4px 0 0 rgb(var(--accent-solid));
+    --shape-shadow-outline: 0 0 0 var(--shape-border) rgb(var(--border-strong));
   }
 
   html,
@@ -336,46 +344,133 @@
 }
 
 /*
- * Clay surfaces (v3.0). These three classes are the whole vocabulary; components pick a tier
- * instead of inventing their own radius, shadow and padding.
- *   clay-hero   — the primary touchable surface (composer, modal, empty state)
- *   clay-card   — a raised card (project card, goal card, message group)
- *   clay-inset  — a recessed well (the composer's text field, a search box)
- *   clay-press  — the clay interaction signature: lift on hover, press in on active
- * Deliberately absent from: tables, log/diff viewers, the status bar, and every security
- * dialog — density and seriousness outrank charm there.
+ * Brutalist surfaces (v4.0). These classes are the whole vocabulary; components pick a tier
+ * instead of inventing their own borders, shadows and padding.
+ *
+ *   brutal-panel — a bordered surface that sits ON the page (a modal, the composer, a card)
+ *   brutal-inset — a bordered well that sits IN a surface (a text field, a code block, search)
+ *   brutal-press — the interaction signature: the surface moves INTO its own shadow when pressed
+ *   brutal-label — the uppercase micro-label that names a region without spending colour on it
+ *   brutal-data  — monospace tabular figures: any number, id, path, token count or price
+ *   brutal-primary / brutal-danger / brutal-focus — the three semantic states worth a class
+ *
+ * Two rules that keep this from becoming pastiche, because brutalism applied to everything IS the
+ * "cluttered and over-saturated" complaint it is meant to answer:
+ *
+ *   1. **Depth is for things you can touch.** A surface gets its offset shadow only when it is
+ *      interactive. Static containers get a border and no shadow, so the eye can tell what responds.
+ *   2. **Never two shouting elements.** A heavy-bordered surface does not also take the accent fill,
+ *      and the security dialogs keep the border with **no** offset shadow — a decision about a
+ *      destructive command should not look playful.
  */
 @layer components {
-  .clay-hero {
-    @apply rounded-clay-lg bg-bg-elevated shadow-clay;
+  .brutal-panel {
+    @apply rounded-shape border-2 border-fg-strong bg-bg-elevated;
   }
 
-  .clay-card {
-    @apply rounded-clay bg-bg-elevated shadow-clay-soft;
+  /**
+   * Secondary containers: visible structure, no shadow. A card you cannot click should not float —
+   * that was the single biggest contributor to "everything competes for attention".
+   */
+  .brutal-card {
+    @apply rounded-shape border-2 border-border-strong bg-bg-elevated;
   }
 
-  .clay-inset {
-    @apply rounded-clay bg-bg-tertiary shadow-clay-in;
+  .brutal-inset {
+    @apply rounded-shape-sm border border-border-strong bg-bg-tertiary;
   }
 
-  .clay-press {
-    @apply transition-[box-shadow,transform] duration-fast ease-clay;
+  .brutal-press {
+    @apply transition-[box-shadow,transform] duration-fast ease-shape;
   }
 
-  .clay-press:hover {
-    @apply shadow-clay;
+  .brutal-press:hover {
+    @apply shadow-shape;
   }
 
-  .clay-press:active {
-    @apply shadow-clay-in;
-    transform: translateY(1px);
+  .brutal-press:active {
+    @apply shadow-none;
+    /* Moves into where its shadow was: the press reads as the surface going down, not fading. */
+    transform: translate(2px, 2px);
+  }
+
+  /**
+   * A notice bar. Brutalism does not whisper in a soft tinted rounded box: the notice gets a solid
+   * edge in its own state colour plus a hard rail on the leading side, so it reads as a stamped
+   * label rather than as decoration — and it stays legible in both themes because the state colour
+   * is carried by a border, not only by a background wash.
+   */
+  .brutal-banner {
+    @apply rounded-shape border-2 border-l-8 bg-bg-elevated px-3 py-2;
+  }
+
+  /** A square, bordered button: the default interactive surface of the new language. */
+  .brutal-btn {
+    @apply brutal-focus rounded-shape border-2 border-border-strong bg-bg-elevated px-3 py-1.5 text-xs font-semibold text-fg transition-[box-shadow,transform] duration-fast ease-shape hover:border-fg-strong hover:shadow-shape-sm active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:opacity-50;
+  }
+
+  /**
+   * A chip: a state read-out ("Safe mode", "Idle", "3 files"). Square, hairline-round, and its
+   * label is uppercased so a row of chips reads as a legend instead of as buttons.
+   */
+  .brutal-chip {
+    @apply inline-flex items-center gap-1 rounded-shape-sm border border-border-strong bg-bg-secondary px-1.5 py-0.5 text-3xs font-semibold uppercase tracking-label text-fg-muted;
+  }
+
+  /** A tab or segmented control: same geometry, flatter, with the selected one filled in. */
+  .brutal-tab {
+    @apply rounded-shape border-2 border-transparent px-2.5 py-1 text-2xs font-bold uppercase tracking-label text-fg-muted transition-colors duration-fast hover:text-fg;
+  }
+
+  /*
+   * Any of the three honest ways a component can say "I am the selected one". A segmented control
+   * in this codebase uses aria-pressed, the tab strip uses aria-selected, and list rows use
+   * data-selected — supporting only one of them is how the panel tabs ended up unstyled.
+   */
+  .brutal-tab[aria-selected='true'],
+  .brutal-tab[aria-pressed='true'],
+  .brutal-tab[data-selected='true'] {
+    @apply border-fg-strong bg-bg-tertiary text-fg-strong;
+  }
+
+  .brutal-label {
+    @apply text-2xs font-bold uppercase tracking-label text-fg-muted;
+  }
+
+  .brutal-data {
+    @apply font-mono tabular-nums text-fg;
+  }
+
+  /** The single most important control on a surface (send, save, apply). */
+  .brutal-primary {
+    @apply rounded-shape border-2 border-fg-strong bg-accent-solid text-accent-fg shadow-shape-sm;
+  }
+
+  /** Destructive or irreversible. Border and colour, never a soft tint alone. */
+  .brutal-danger {
+    @apply rounded-shape border-2 border-danger bg-danger/10 text-danger;
+  }
+
+  /**
+   * Keyboard focus must be unmissable: a 2px accent outline offset from the edge, so it survives
+   * on top of the hard border instead of hiding inside it.
+   */
+  .brutal-focus {
+    @apply outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent;
+  }
+}
+
+/* A hard-edged scrollbar, because a soft rounded thumb on a square surface is the tell. */
+@layer utilities {
+  .brutal-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--border-strong)) transparent;
   }
 }
 
 /*
- * Accessibility: the clay language leans on transitions, so honour the OS preference
- * globally rather than hoping every component remembers. Kept at 1ms (not 0) so
- * transitionend listeners still fire.
+ * Accessibility: honour the OS preference globally rather than hoping every component
+ * remembers. Kept at 1ms (not 0) so transitionend listeners still fire.
  */
 @media (prefers-reduced-motion: reduce) {
   *,

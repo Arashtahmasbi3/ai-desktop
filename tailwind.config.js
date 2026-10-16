@@ -60,21 +60,28 @@ module.exports = {
         '2xs': '11px'
       },
       /*
-       * Clay depth (v3.0). Radius is a three-step scale on purpose: one big radius
-       * everywhere reads as a toy, and a dense tool needs the small step for chips and
-       * rows. The shadows read their colours from theme variables, so light and dark get
-       * genuinely different depth instead of an inverted copy (see main.css).
+       * Brutalist geometry (v4.0). Two radius steps — square, and a hairline micro-round for inputs
+       * and chips. The offset shadows read their colour from the theme, so light and dark each get
+       * an edge that is actually visible on their own background (see main.css).
        */
       borderRadius: {
-        'clay-sm': 'var(--clay-r-sm)',
-        clay: 'var(--clay-r-md)',
-        'clay-lg': 'var(--clay-r-lg)',
-        'clay-pill': 'var(--clay-r-pill)'
+        'shape-sm': 'var(--shape-r-sm)',
+        shape: 'var(--shape-r)',
+        'shape-lg': 'var(--shape-r-lg)',
+        'shape-pill': 'var(--shape-pill)'
+      },
+      borderWidth: {
+        shape: 'var(--shape-border)'
+      },
+      letterSpacing: {
+        /** The micro-label's tracking. A named token, so no component hard-codes a magic em value. */
+        label: '0.14em'
       },
       boxShadow: {
-        clay: 'var(--clay-shadow-out)',
-        'clay-soft': 'var(--clay-shadow-soft)',
-        'clay-in': 'var(--clay-shadow-in)'
+        shape: 'var(--shape-shadow)',
+        'shape-sm': 'var(--shape-shadow-sm)',
+        'shape-accent': 'var(--shape-shadow-accent)',
+        'shape-outline': 'var(--shape-shadow-outline)'
       },
       transitionDuration: {
         fast: 'var(--motion-fast)',
@@ -82,7 +89,7 @@ module.exports = {
         slow: 'var(--motion-slow)'
       },
       transitionTimingFunction: {
-        clay: 'var(--ease-clay)'
+        shape: 'var(--ease-shape)'
       },
       zIndex: {
         sticky: 'var(--z-sticky)',

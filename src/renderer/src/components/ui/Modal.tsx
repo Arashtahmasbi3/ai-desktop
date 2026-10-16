@@ -133,7 +133,12 @@ export default function Modal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      /*
+         * v4.0: no backdrop blur. Blurring is the soft language's way of dimming, and it smeared the
+         * whole window behind every dialog — the opposite of a hard edge. A flat scrim separates the
+         * dialog just as well and keeps the app around it readable.
+         */
+        className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4"
       onMouseDown={(event) => {
         if (!closeOnBackdrop) return
         if (event.target === event.currentTarget) onClose?.()
@@ -146,7 +151,7 @@ export default function Modal({
         aria-label={ariaLabel}
         tabIndex={-1}
         style={{ maxWidth, maxHeight }}
-        className={`clay-hero flex w-full flex-col overflow-hidden border border-border outline-none ${className}`}
+        className={`brutal-panel flex w-full flex-col overflow-hidden border border-border outline-none ${className}`}
       >
         {children}
       </div>

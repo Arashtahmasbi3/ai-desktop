@@ -48,11 +48,7 @@ export default function WorkspacePanel({ overlay }: WorkspacePanelProps = {}): J
             type="button"
             onClick={() => setTab(id)}
             aria-pressed={tab === id}
-            className={`flex items-center gap-1.5 rounded px-2 py-1 text-xs transition ${
-              tab === id
-                ? 'bg-accent-solid/15 text-accent'
-                : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
-            }`}
+            className="brutal-tab flex items-center gap-1.5 text-2xs"
           >
             <Icon className="h-3.5 w-3.5" />
             {label}

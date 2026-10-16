@@ -32,6 +32,7 @@ import { basename, useStore, type ViewId } from '../store'
 import ProjectBadges from './ProjectBadges'
 import GitStatusPill from './GitStatusPill'
 import { hasPolicyMismatch } from '../lib/project-badge'
+import { isCapabilityEnabled } from '../lib/capabilities'
 
 const NAV: Array<{ id: ViewId; labelKey: string; icon: typeof MessageSquare }> = [
   { id: 'chat', labelKey: 'sidebar.navChat', icon: MessageSquare },
@@ -83,6 +84,15 @@ export interface SidebarProps {
    * sidebar expanded alongside a readable chat. The user's own collapse still wins.
    */
   rail?: boolean
+}
+
+/**
+ * The navigation entries the user has not switched off. Brutalism is not the point here — honesty
+ * is: Settings → Surfaces offers a Browser switch, and a switch that does not remove the thing it
+ * names is exactly the kind of lie this release set out to remove from the app.
+ */
+function visibleNav(): typeof NAV {
+  return NAV.filter((item) => item.id !== 'browser' || isCapabilityEnabled('browser'))
 }
 
 export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
@@ -247,13 +257,15 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
     pushToast('success', t('toast.saved'))
   }
 
+  const VISIBLE_NAV = visibleNav()
+
   if (collapsed) {
     return (
       <nav
         aria-label={t('sidebar.chats')}
         className="flex w-14 shrink-0 flex-col items-center gap-1 border-r border-border bg-bg-secondary py-2 transition-all duration-200"
       >
-        {NAV.map((item) => {
+        {VISIBLE_NAV.map((item) => {
           const Icon = item.icon
           const active = view === item.id
           return (
@@ -362,7 +374,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
           <button
             type="button"
             onClick={() => newSession()}
-            className="clay-card clay-press flex flex-1 items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium text-fg"
+            className="brutal-card brutal-press flex flex-1 items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium text-fg"
           >
             <Plus className="h-3.5 w-3.5" />
             {t('sidebar.newChat')}
@@ -455,7 +467,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                     <button
                       type="button"
                       onClick={() => void openProject(project.id)}
-                      className={`clay-card clay-press flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left ${
+                      className={`brutal-card brutal-press flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left ${
                         project.id === settings?.activeProjectId
                           ? 'bg-accent-solid/15 text-fg-strong'
                           : 'text-fg'
@@ -638,7 +650,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                 <button
                   type="button"
                   onClick={() => void loadSession(chat.id)}
-                  className={`flex w-full items-center gap-2 rounded-clay-sm px-2 py-1.5 text-left transition ${
+                  className={`flex w-full items-center gap-2 rounded-shape-sm px-2 py-1.5 text-left transition ${
                     activeChatId === chat.id
                       ? 'bg-accent-solid/15 text-fg-strong'
                       : 'text-fg hover:bg-bg-tertiary'

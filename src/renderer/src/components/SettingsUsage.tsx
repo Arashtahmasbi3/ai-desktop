@@ -28,23 +28,23 @@ function TotalsRow({
   t: (key: string, options?: Record<string, unknown>) => string
 }): JSX.Element {
   return (
-    <div className="rounded-xl border border-border bg-bg-primary px-3 py-2">
+    <div className="brutal-card px-3 py-2">
       <div className="mb-1 flex items-center justify-between">
         <span className="text-xs font-medium text-fg">{label}</span>
-        <span className="font-mono text-xs text-fg">{formatCost(totals.cost)}</span>
+        <span className="brutal-data text-xs">{formatCost(totals.cost)}</span>
       </div>
       <div className="grid grid-cols-3 gap-2 text-2xs text-fg-muted">
         <span>
           {t('settings.usageInput')}:{' '}
-          <span className="font-mono text-fg">{totals.inputTokens.toLocaleString()}</span>
+          <span className="brutal-data">{totals.inputTokens.toLocaleString()}</span>
         </span>
         <span>
           {t('settings.usageOutput')}:{' '}
-          <span className="font-mono text-fg">{totals.outputTokens.toLocaleString()}</span>
+          <span className="brutal-data">{totals.outputTokens.toLocaleString()}</span>
         </span>
         <span>
           {t('settings.usageCalls')}:{' '}
-          <span className="font-mono text-fg">{totals.calls.toLocaleString()}</span>
+          <span className="brutal-data">{totals.calls.toLocaleString()}</span>
         </span>
       </div>
       {totals.costUnknown ? (
@@ -64,15 +64,15 @@ function BreakdownList({
   if (rows.length === 0) return null
   return (
     <div>
-      <p className="mb-1 text-2xs font-medium text-fg-muted">{title}</p>
+      <p className="brutal-label mb-1">{title}</p>
       <ul className="flex flex-col gap-1">
         {rows.map((row) => (
           <li
             key={row.key}
-            className="flex items-center justify-between rounded-lg bg-bg-primary px-2.5 py-1.5 text-2xs"
+            className="brutal-inset flex items-center justify-between px-2.5 py-1.5 text-2xs"
           >
-            <span className="truncate text-fg">{row.key}</span>
-            <span className="shrink-0 font-mono text-fg-muted">
+            <span className="brutal-data truncate">{row.key}</span>
+            <span className="brutal-data shrink-0 text-fg-muted">
               {row.inputTokens.toLocaleString()} / {row.outputTokens.toLocaleString()} ·{' '}
               {formatCost(row.cost)}
             </span>
@@ -148,14 +148,14 @@ export default function SettingsUsage(): JSX.Element {
   return (
     <section className="flex flex-col gap-3">
       {/* v3.1: the cap that makes the totals act. */}
-      <div className="clay-card flex flex-col gap-2 p-3" data-testid="budget-guard">
+      <div className="brutal-card p-2.5 text-2xs" data-testid="budget-guard">
         <div className="flex items-center justify-between gap-2">
           <span className="flex items-center gap-1.5 text-xs font-semibold text-fg">
             <Gauge className="h-3.5 w-3.5 text-accent" />
             {t('settings.budgetTitle')}
           </span>
           <span
-            className={`font-mono text-2xs ${
+            className={`brutal-data text-2xs ${
               budgetNow.level === 'over'
                 ? 'text-danger'
                 : budgetNow.level === 'warn'
@@ -169,9 +169,9 @@ export default function SettingsUsage(): JSX.Element {
         </div>
 
         {budgetNow.cap > 0 ? (
-          <div className="h-1.5 w-full overflow-hidden rounded-clay-pill bg-bg-tertiary">
+          <div className="mt-2 h-1.5 w-full overflow-hidden bg-bg-tertiary">
             <div
-              className={`h-full rounded-clay-pill ${
+              className={`h-full ease-shape ${
                 budgetNow.level === 'over' ? 'bg-danger' : budgetNow.level === 'warn' ? 'bg-warning' : 'bg-success'
               }`}
               style={{ width: `${Math.min(100, Math.round(budgetNow.fraction * 100))}%` }}
@@ -179,7 +179,7 @@ export default function SettingsUsage(): JSX.Element {
           </div>
         ) : null}
 
-        <label className="flex items-center justify-between gap-2 text-2xs text-fg-muted">
+        <label className="mt-2 flex items-center justify-between gap-2 text-2xs text-fg-muted">
           {t('settings.budgetCap')}
           <input
             type="number"
@@ -188,11 +188,11 @@ export default function SettingsUsage(): JSX.Element {
             value={budget.dailyCap || ''}
             placeholder="0"
             onChange={(event) => updateBudget({ dailyCap: Number(event.target.value) })}
-            className="w-20 rounded-clay-sm border border-border bg-bg-primary px-2 py-1 text-right font-mono text-2xs text-fg"
+            className="brutal-inset brutal-focus brutal-data w-20 px-2 py-1 text-right text-2xs"
           />
         </label>
 
-        <label className="flex cursor-pointer items-center gap-2 text-2xs text-fg-muted">
+        <label className="mt-2 flex cursor-pointer items-center gap-2 text-2xs text-fg-muted">
           <input
             type="checkbox"
             checked={budget.blockWhenExceeded}
@@ -202,18 +202,18 @@ export default function SettingsUsage(): JSX.Element {
           {t('settings.budgetBlock')}
         </label>
 
-        <p className="text-3xs text-fg-subtle">{t('settings.budgetHint')}</p>
+        <p className="mt-2 text-3xs text-fg-subtle">{t('settings.budgetHint')}</p>
         {/*
           An unpriced model means the total is a lower bound. Saying so is the difference between
           a guard the user can trust and one that quietly under-counts.
         */}
         {budgetNow.unknownModels ? (
-          <p className="text-3xs text-warning" data-testid="budget-unpriced">
+          <p className="mt-1 text-3xs text-warning" data-testid="budget-unpriced">
             {t('settings.budgetUnpriced')}
           </p>
         ) : null}
       </div>
-      <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
+      <h3 className="brutal-label flex items-center gap-2">
         <BarChart3 className="h-3.5 w-3.5" />
         {t('settings.usage')}
       </h3>
@@ -222,28 +222,28 @@ export default function SettingsUsage(): JSX.Element {
         {rows.map(([label, value]) => (
           <div
             key={label}
-            className="flex items-center justify-between rounded-xl border border-border bg-bg-primary px-3 py-2"
+            className="brutal-card flex items-center justify-between px-3 py-2"
           >
             <dt className="text-xs text-fg-muted">{label}</dt>
-            <dd className="font-mono text-xs text-fg">{value}</dd>
+            <dd className="brutal-data text-xs">{value}</dd>
           </div>
         ))}
       </dl>
 
       <div
         data-testid="usage-context-window"
-        className="rounded-xl border border-border bg-bg-primary px-3 py-2"
+        className="brutal-inset px-3 py-2"
       >
         <div className="flex items-center justify-between text-xs text-fg">
           <span>{t('settings.contextUsage')}</span>
-          <span className={`font-mono ${context.overBudget ? 'text-warning' : 'text-fg-muted'}`}>
+          <span className={`brutal-data ${context.overBudget ? 'text-warning' : 'text-fg-muted'}`}>
             {context.tokens.toLocaleString()} / {DEFAULT_CONTEXT_TOKEN_BUDGET.toLocaleString()} ·{' '}
             {contextPercent}%
           </span>
         </div>
-        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-bg-tertiary">
+        <div className="mt-2 h-1.5 w-full overflow-hidden bg-bg-primary">
           <div
-            className={`h-full rounded-full transition-all ${
+            className={`h-full ease-shape ${
               context.overBudget ? 'bg-warning' : 'bg-accent-solid'
             }`}
             style={{ width: `${contextPercent}%` }}
@@ -251,7 +251,7 @@ export default function SettingsUsage(): JSX.Element {
         </div>
       </div>
 
-      <div className="flex items-center justify-between border-t border-border pt-2">
+      <div className="flex items-center justify-between border-t-2 border-border pt-2">
         <span className="text-2xs font-medium text-fg-muted">
           {t('settings.usageAllTime')}
         </span>
@@ -261,7 +261,7 @@ export default function SettingsUsage(): JSX.Element {
             onClick={exportCsv}
             disabled={usageRecords.length === 0}
             title={t('settings.usageExport')}
-            className="flex items-center gap-1 rounded-lg px-2 py-1 text-2xs text-fg-muted hover:bg-bg-tertiary hover:text-fg disabled:opacity-40"
+            className="brutal-btn flex items-center gap-1"
           >
             <Download className="h-3 w-3" />
             {t('settings.usageExport')}
@@ -271,7 +271,7 @@ export default function SettingsUsage(): JSX.Element {
             onClick={resetUsage}
             disabled={usageRecords.length === 0}
             title={t('settings.usageReset')}
-            className="flex items-center gap-1 rounded-lg px-2 py-1 text-2xs text-fg-muted hover:bg-bg-tertiary hover:text-fg disabled:opacity-40"
+            className="brutal-btn flex items-center gap-1"
           >
             <RotateCcw className="h-3 w-3" />
             {t('settings.usageReset')}
@@ -280,7 +280,7 @@ export default function SettingsUsage(): JSX.Element {
       </div>
 
       {usageRecords.length === 0 ? (
-        <p className="rounded-xl border border-border bg-bg-primary px-3 py-2 text-2xs text-fg-muted">
+        <p className="brutal-inset px-3 py-2 text-2xs text-fg-muted">
           {t('settings.usageEmpty')}
         </p>
       ) : (
@@ -292,7 +292,7 @@ export default function SettingsUsage(): JSX.Element {
           <BreakdownList title={t('settings.usageByModel')} rows={summary.byModel} />
 
           <div>
-            <p className="mb-1 text-2xs font-medium text-fg-muted">
+            <p className="brutal-label mb-1">
               {t('settings.usageLast7Days')}
             </p>
             <div className="flex h-16 items-end gap-1">
@@ -307,11 +307,11 @@ export default function SettingsUsage(): JSX.Element {
                   >
                     <div className="flex h-12 w-full items-end">
                       <div
-                        className="w-full rounded-sm bg-accent-solid/70"
+                        className="w-full bg-accent-solid/70"
                         style={{ height: `${Math.max(tokens > 0 ? 6 : 0, height)}%` }}
                       />
                     </div>
-                    <span className="text-4xs text-fg-subtle">{day.day.slice(5)}</span>
+                    <span className="brutal-data text-4xs text-fg-subtle">{day.day.slice(5)}</span>
                   </div>
                 )
               })}
