@@ -51,6 +51,19 @@ fails, a tool is missing, or the budget ran out — ask rather than guess).
 
 ## Status
 
+**v3.2.0 released — decision checkpoints.** The last item of phase 4, and with it phase 4 is
+complete. Per step the app already knew what the agent intended and what it chose; it can now judge
+**how much a decision matters** by whether it can be undone, keep an **append-only log** of the
+consequential ones, and — in `confirm` mode — stop before anything that is not routine. The
+classification is deterministic (no model call), credentials and production hosts outrank the
+command, and an unclassified tool is treated as a change rather than as harmless. Two rules make it
+more than a log, each pinned by a test: a standing **server grant** is not consent to the
+irreversible (that is still asked), and a **trusted plan** is consent to the plan, not to the
+irreversible (it now goes through the gate anyway rather than being silently skipped). Off by
+default. Known limitation, documented at the call site: `productionHost` is not passed here because
+the host policy is evaluated at the SSH layer and a second opinion could disagree with it. 283 test
+files / 2384 tests green, typecheck and production build clean. (2026-10-16)
+
 **v3.1.1 released — rate limits are recoverable, and keys rotate.** A 429 used to retry the same
 provider until the run died (the planner switched provider only on `auth`/`config`) and the parsed
 `Retry-After` was ignored, so the app could retry inside the window the provider asked it to wait

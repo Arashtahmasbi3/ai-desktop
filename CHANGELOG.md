@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.0] — 2026-10-16
+
+### Added — decision checkpoints
+
+The app already derived, per step, what the agent intended, what evidence it had and what it chose.
+What was missing is a judgement about **how much a decision matters**, and a mode that can stop
+**before** the action rather than explain it afterwards.
+
+- **Judged by reversibility, not by how alarming a command sounds.** Reading is `routine`; installing
+  a package, restarting a service, deploying, or writing a file inside the project is
+  `consequential` (it changes state and can be changed back); a recursive delete, a format, `dd`, a
+  plain force-push, `git reset --hard`, a database drop, a write that leaves the project, or anything
+  touching a credential is `irreversible`. That distinction is what keeps a prompt from becoming
+  noise people click through — and `--force-with-lease` is deliberately *not* the destructive case.
+- **Unknown is not harmless.** A tool nobody classified is treated as a change: if nothing can say
+  what it does, it does not get to be routine.
+- **Credentials and production hosts outrank the command**, so reading `.env` is irreversible even
+  though reading is routine.
+- **A durable, append-only log**, one JSONL per project: a decision record is history, and history
+  that can be rewritten is worth less than none. A corrupt line is skipped rather than hiding the
+  rest, and one project can never read another's.
+- **Three modes, defaulting to off** — a log nothing reads and prompts nobody asked for are not
+  features. `record` keeps the log; `confirm` also stops before anything that is not routine.
+  Settings → Approval has the control.
+
+Two rules that decide whether this is a safety feature or theatre, both pinned by tests:
+
+- **A standing permission is not consent to the irreversible.** In `confirm` mode an irreversible
+  action is put to the user **even inside a granted server window** — "stop asking me about this
+  server" is not "you may destroy it without telling me" — while an ordinary command in that same
+  window is not re-asked.
+- **A trusted plan is consent to the plan, not to the irreversible.** A trusted plan auto-approves its
+  own steps before the approval gate is consulted, so an irreversible action is now sent through the
+  gate anyway instead of being silently skipped for exactly the runs that mutate the most.
+
+The **record is written before anything can skip the decision**, so a review sees what the app did on
+its own and not only the times it asked.
+
+**Suite green at 283 test files / 2384 tests; typecheck and production build clean.**
+
+
 ## [3.1.1] — 2026-10-16
 
 ### Fixed — a rate limit no longer kills the run
@@ -1230,7 +1271,8 @@ First stable release. Ships as a Windows x64 NSIS installer and a portable execu
   `node_modules` are shipped inside the app package.
 - Optional code signing via `CSC_LINK` / `CSC_KEY_PASSWORD` (skipped safely when absent).
 
-[Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v3.1.1...HEAD
+[Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v3.2.0...HEAD
+[3.2.0]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v3.1.1...v3.2.0
 [3.1.1]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v3.1.0...v3.1.1
 [3.1.0]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.9.2...v3.0.0
