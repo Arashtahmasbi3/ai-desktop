@@ -22,6 +22,12 @@ import type { VpsConnectionState, VpsServerView } from '@shared/vps'
 import type { DiagnosticStatus, PreflightNotice } from '@shared/ui'
 import type { ChatSummary, StoredMessage } from '@shared/chat'
 import type { Job } from '@shared/jobs'
+import {
+  buildRunIntentBlock,
+  type RunOutput,
+  type RunOutputKind,
+  type RunSource
+} from '@shared/run-outputs'
 import type { Locale } from './i18n/locale'
 import { detectLocale } from './i18n/locale'
 import {
@@ -468,6 +474,16 @@ interface AppState {
   showRawToolRows: boolean
   /** v2.6.4 Fix E: show the composer's context-filling warning (default off). */
   showContextWarning: boolean
+  /**
+   * v3.0: what the user declared this run should produce (the composer's Outputs
+   * section). Prompt text only — it never grants access to anything.
+   */
+  runOutputs: RunOutput[]
+  /**
+   * v3.0: extra sources that are not attachments — a folder picked with the
+   * existing `dialog:pickDirectory`. Also prompt text only.
+   */
+  runSources: RunSource[]
   /** Electron zoom level, 0 == 100% (T5.3). */
   zoomLevel: number
   /** Keyboard-shortcut cheat sheet visibility (T5.3). */
@@ -537,6 +553,12 @@ interface AppState {
   /** v2.6.3: toggle raw tool rows (persisted). */
   setShowRawToolRows: (value: boolean) => void
   setShowContextWarning: (value: boolean) => void
+  /** v3.0: declare one output for the next run (the Outputs section). */
+  addRunOutput: (kind: RunOutputKind, target?: string) => void
+  removeRunOutput: (id: string) => void
+  /** v3.0: record a folder source (Sources → Add folder). */
+  addRunSource: (value: string) => void
+  removeRunSource: (id: string) => void
   /** Apply (and persist) an Electron zoom level, clamped to a safe range (T5.3). */
   applyZoom: (level: number) => void
   zoomIn: () => void
@@ -787,6 +809,8 @@ export const useStore = create<AppState>((set, get) => ({
   showJobsPanelAlways: readShowJobsPanelAlways(),
   showRawToolRows: readShowRawToolRows(),
   showContextWarning: readShowContextWarning(),
+  runOutputs: [],
+  runSources: [],
   zoomLevel: readZoomLevel(),
   shortcutsOpen: false,
 
@@ -989,6 +1013,30 @@ export const useStore = create<AppState>((set, get) => ({
   setPlanMode: (value) => set({ planMode: value }),
   toggleWorkspacePanel: () => set({ workspacePanelOpen: !get().workspacePanelOpen }),
   setWorkspacePanelTab: (tab) => set({ workspacePanelTab: tab, workspacePanelOpen: true }),
+  /**
+   * v3.0: the composer's Sources/Outputs declarations. `send` reads them back and
+   * appends `buildRunIntentBlock` to the task; nothing else consumes them.
+   */
+  addRunOutput(kind, target) {
+    const trimmed = target?.trim()
+    set({
+      runOutputs: [
+        ...get().runOutputs,
+        { id: newId(), kind, ...(trimmed ? { target: trimmed } : {}) }
+      ]
+    })
+  },
+  removeRunOutput(id) {
+    set({ runOutputs: get().runOutputs.filter((output) => output.id !== id) })
+  },
+  addRunSource(value) {
+    const trimmed = String(value ?? '').trim()
+    if (!trimmed) return
+    set({ runSources: [...get().runSources, { id: newId(), kind: 'folder', value: trimmed }] })
+  },
+  removeRunSource(id) {
+    set({ runSources: get().runSources.filter((source) => source.id !== id) })
+  },
   async setApprovalMode(mode) {
     set({ settings: await window.api.settings.setApprovalMode(mode) })
     if (mode === 'full') {
@@ -1692,6 +1740,14 @@ export const useStore = create<AppState>((set, get) => ({
     const trimmed = text.trim()
     const files = (attachments ?? []).filter((id) => typeof id === 'string' && id !== '')
     if ((!trimmed && files.length === 0) || get().running) return
+    /**
+     * v3.0: the Sources/Outputs panel declares intent, and that intent is prompt
+     * text — the attachments keep travelling as ids, so this adds no IPC. The
+     * block is `''` when nothing was declared, which keeps an ordinary send
+     * byte-for-byte what it was before the panel existed.
+     */
+    const intent = buildRunIntentBlock(get().runOutputs, get().runSources)
+    const task = intent ? (trimmed ? `${trimmed}\n\n${intent}` : intent) : trimmed
     const selection = get().selection
     // Fix 1 (v2.6.1): pin a stable chat id *before* the first run. Without this
     // a new chat sent message 1 under the throwaway `sessionId`, then
@@ -1721,7 +1777,7 @@ export const useStore = create<AppState>((set, get) => ({
     void get().persistChat()
     try {
       await window.api.agent.run({
-        task: trimmed,
+        task,
         sessionId: activeChatId,
         // Fix 2 (v2.6.1): load the stored session so the model sees the whole
         // conversation, not just this turn. The agent persists each run under
@@ -1768,6 +1824,10 @@ export const useStore = create<AppState>((set, get) => ({
       approvalSuggestion: null,
       queuedExplain: null,
       fileChanges: [],
+      // v3.0: a declared output belongs to the run it was declared for, so a new
+      // chat starts with an empty Sources/Outputs panel.
+      runOutputs: [],
+      runSources: [],
       view: 'chat'
     })
     // Full access is per-session unless the user asked to remember it.

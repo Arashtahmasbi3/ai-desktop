@@ -2,20 +2,21 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   AlertTriangle,
-  FileText,
-  Image as ImageIcon,
   ArrowDown,
   Bot,
   Eye,
   Paperclip,
   Send,
-  Square,
-  X
+  SlidersHorizontal,
+  Square
 } from 'lucide-react'
 import { basename, useStore } from '../store'
 import { PROVIDERS } from '@shared/providers'
 import { buildContextPreview, type ContextPreview } from '@shared/context-preview'
+import { buildRunIntentBlock } from '@shared/run-outputs'
 import MessageBubble from './MessageBubble'
+import AttachmentChip from './AttachmentChip'
+import SourcesOutputsPanel from './SourcesOutputsPanel'
 import ContextPreviewCard from './ContextPreviewCard'
 import FileChangesPanel from './FileChangesPanel'
 import ContextWarning from './ContextWarning'
@@ -42,7 +43,7 @@ import MicButton from './MicButton'
 import { FullAccessBanner, FullAccessToggle } from './FullAccessToggle'
 import { filterSlashCommands, resolveSlashCommand } from '../lib/slash'
 import { decideSend, type PendingAttachment } from '../lib/context-gate'
-import { formatAttachmentSize, modelSupportsVision } from '@shared/attachments'
+import { modelSupportsVision } from '@shared/attachments'
 import { workspaceStatus, shouldShowWorkspaceBanner } from '../lib/project-status'
 import { CHAT_MAX_WIDTH } from '../lib/layout'
 import { visibleChatMessages } from '../lib/tool-rows'
@@ -94,6 +95,11 @@ export default function ChatPanel(): JSX.Element {
   const dismissPreflight = useStore((state) => state.dismissPreflight)
   const fileChanges = useStore((state) => state.fileChanges)
   const terminalOpen = useStore((state) => state.terminalOpen)
+  // v3.0: the declared run intent, read here so the context preview can show what
+  // `send` will append to the task (the panel itself owns editing it).
+  const runOutputs = useStore((state) => state.runOutputs)
+  const runSources = useStore((state) => state.runSources)
+  const addRunSource = useStore((state) => state.addRunSource)
 
   const [input, setInput] = useState('')
   /**
@@ -108,6 +114,8 @@ export default function ChatPanel(): JSX.Element {
   const [atBottom, setAtBottom] = useState(true)
   const [commandIndex, setCommandIndex] = useState(0)
   const [timelineOpen, setTimelineOpen] = useState(false)
+  /** v3.0: the composer's Sources / Outputs panel. */
+  const [sourcesPanelOpen, setSourcesPanelOpen] = useState(false)
   const [contextCard, setContextCard] = useState<{
     preview: ContextPreview
     body: string
@@ -230,10 +238,14 @@ export default function ChatPanel(): JSX.Element {
     willSend: boolean,
     attachmentNames: string[] = attached.map((item) => item.name)
   ): void => {
+    // v3.0: `send` appends the declared-output block to the task, so the preview
+    // counts it too — the dialog must not under-report what leaves the machine.
+    const intent = buildRunIntentBlock(runOutputs, runSources)
+    const previewBody = intent ? (body ? `${body}\n\n${intent}` : intent) : body
     const preview = buildContextPreview({
       provider: PROVIDERS[selection.provider]?.label ?? selection.provider,
       model: selection.model,
-      messages: [...messages, { role: 'user', content: body }],
+      messages: [...messages, { role: 'user', content: previewBody }],
       // v2.9.0: attached files are copied into the run workspace and read there, so
       // they are genuinely part of what is sent — the dialog says so instead of
       // listing them as withheld.
@@ -318,9 +330,22 @@ export default function ChatPanel(): JSX.Element {
         id: ref.id,
         name: ref.name,
         kind: ref.kind,
-        bytes: ref.bytes
+        bytes: ref.bytes,
+        // v3.0: the preview main already produced, if any. Nothing new crosses
+        // the bridge for this and the renderer still never reads the file.
+        ...(ref.thumbnail ? { thumbnail: ref.thumbnail } : {})
       }))
     ])
+  }
+
+  /**
+   * v3.0: "Add folder" in the Sources section. It reuses the existing
+   * `dialog:pickDirectory` channel and records the picked folder as a plain
+   * source entry — prompt text, not a new permission.
+   */
+  const addFolderSource = async (): Promise<void> => {
+    const picked = await window.api.dialog.pickDirectory()
+    if (picked) addRunSource(picked)
   }
 
   return (
@@ -493,43 +518,16 @@ export default function ChatPanel(): JSX.Element {
 
         {attached.length > 0 ? (
           <div className="mb-2 flex flex-wrap gap-1" data-testid="attachment-chips">
-            {attached.map((item) => {
-              // v2.9.0: an image with a model that has no vision is worth saying out
-              // loud before the send, not after the agent refuses to look at it.
-              const blind = item.kind === 'image' && !visionCapable
-              return (
-                <span
-                  key={item.id}
-                  data-testid={`attachment-chip-${item.name}`}
-                  title={`${item.name} (${formatAttachmentSize(item.bytes ?? 0)})`}
-                  className={`flex items-center gap-1 rounded border px-2 py-0.5 text-3xs ${
-                    blind ? 'border-warning/50 text-warning' : 'border-border text-fg-muted'
-                  }`}
-                >
-                  {item.kind === 'image' ? (
-                    <ImageIcon className="h-3 w-3 shrink-0" />
-                  ) : (
-                    <FileText className="h-3 w-3 shrink-0" />
-                  )}
-                  <span className="max-w-[14rem] truncate" dir="ltr">
-                    {item.name}
-                  </span>
-                  {blind ? (
-                    <span className="shrink-0" title={t('chat.attachNoVisionHint')}>
-                      {t('chat.attachNoVision')}
-                    </span>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={() => setAttached((current) => current.filter((entry) => entry.id !== item.id))}
-                    aria-label={t('common.remove')}
-                    className="text-fg-subtle hover:text-danger"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              )
-            })}
+            {attached.map((item) => (
+              <AttachmentChip
+                key={item.id}
+                attachment={item}
+                visionCapable={visionCapable}
+                onRemove={() =>
+                  setAttached((current) => current.filter((entry) => entry.id !== item.id))
+                }
+              />
+            ))}
           </div>
         ) : null}
 
@@ -587,6 +585,22 @@ export default function ChatPanel(): JSX.Element {
             <span className="shrink-0">
               <ModelSwitcher />
             </span>
+            {/* v3.0 clay: the Sources/Outputs panel lives at the composer's top-right,
+                in the same control row as the model and send buttons so it costs no
+                extra height. */}
+            <button
+              type="button"
+              data-testid="composer-sources-toggle"
+              onClick={() => setSourcesPanelOpen((open) => !open)}
+              title={t('runPanel.open')}
+              aria-label={t('runPanel.open')}
+              aria-pressed={sourcesPanelOpen}
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-clay-sm transition-colors duration-fast hover:bg-bg-tertiary ${
+                sourcesPanelOpen ? 'text-accent' : 'text-fg-muted hover:text-fg'
+              }`}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+            </button>
             {running ? (
               <button
                 type="button"
@@ -649,6 +663,24 @@ export default function ChatPanel(): JSX.Element {
       {/* v2.8.0: the agent asks and keeps going; answering resumes the same run. */}
       <QuestionCard />
       <PreflightOverrideDialog />
+      {sourcesPanelOpen ? (
+        <SourcesOutputsPanel
+          attached={attached}
+          visionCapable={visionCapable}
+          onRemoveAttachment={(id) =>
+            setAttached((current) => current.filter((entry) => entry.id !== id))
+          }
+          onAddFiles={() => void attach()}
+          onAddFolder={() => void addFolderSource()}
+          // "View all" is a drill-down: the panel closes and the existing context
+          // preview opens, so there is never a second preview implementation.
+          onViewAll={() => {
+            setSourcesPanelOpen(false)
+            previewContext(input.trim(), false)
+          }}
+          onClose={() => setSourcesPanelOpen(false)}
+        />
+      ) : null}
       {contextCard ? (
         <ContextPreviewCard
           preview={contextCard.preview}

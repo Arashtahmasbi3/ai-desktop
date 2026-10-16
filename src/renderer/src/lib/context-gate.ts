@@ -27,6 +27,12 @@ export interface PendingAttachment {
   /** v2.9.0: drives the chip icon and the "cannot see images" state. */
   kind?: 'text' | 'image'
   bytes?: number
+  /**
+   * v3.0: the small PNG data URL main produced for an image attachment, carried
+   * through unchanged so the chip can show *what* was picked. Absent for a text
+   * file or when main had no thumbnailer — the chip then renders as it always did.
+   */
+  thumbnail?: string
 }
 
 export function decideSend(
