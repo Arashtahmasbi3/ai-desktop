@@ -16,6 +16,8 @@ import type { FileChange } from '@core/agent-orchestrator'
 import type { ProviderEntry } from '@core/agent-orchestrator'
 import type { ToolExecutor } from '@core/agent/tools'
 import { PROVIDERS, createAdapterForConfig } from '@core/llm-adapters/registry'
+import { KeyPool, poolForKeys, type KeySnapshot } from '@core/llm-adapters/key-pool'
+import { withKeyHealth } from '@core/llm-adapters/key-health'
 import type { AuditEntry } from '@core/agent/audit-log'
 import { REMOTE_SHELL_TOOL, type RemoteJobRunner } from '@core/tools/remote-shell-tool'
 import { RemoteShellToolExecutor } from '@core/tools/remote-shell-executor'
@@ -585,6 +587,11 @@ export class AgentService {
    * run that created it so it keeps auto-approving across a chat's messages,
    * until its TTL lapses.
    */
+  /**
+   * v3.1: one key pool per provider, kept across runs so a key parked by a rate limit stays parked
+   * and the round-robin cursor keeps rotating instead of restarting at key one every run.
+   */
+  private readonly keyPools = new Map<string, KeyPool>()
   private readonly facts?: FactStore
   private readonly planTrust: PlanTrustRegistry
   private runCounter = 0
@@ -839,20 +846,35 @@ export class AgentService {
     const candidates: Array<{
       id: ProviderId
       apiKey: string
+      keyId?: string
+      pool?: KeyPool
       model?: string
       baseUrl?: string
     }> = []
     for (const id of order) {
       const stored = settings.providers[id]
-      if (!stored?.apiKeyEnc) continue
-      const apiKey = await this.persistence.getApiKey(id)
-      if (!apiKey) continue
-      candidates.push({
-        id,
-        apiKey,
-        ...(stored.model ? { model: stored.model } : {}),
-        ...(stored.baseUrl ? { baseUrl: stored.baseUrl } : {})
-      })
+      if (!stored?.apiKeyEnc && !stored?.apiKeysEnc?.length) continue
+      const keys = await this.persistence.getApiKeys(id)
+      if (keys.length === 0) continue
+
+      /*
+       * v3.1: one candidate per key. The pool hands them out in its own order and **skips a key
+       * that is cooling down**, so the fallback loop that already existed now rotates credentials
+       * as well as providers — which is what a rate limit actually needs.
+       */
+      const pool = this.ensureKeyPool(id, keys)
+      for (let slot = 0; slot < pool.size; slot += 1) {
+        const next = pool.next()
+        if (!next) break
+        candidates.push({
+          id,
+          apiKey: next.apiKey,
+          keyId: next.id,
+          pool,
+          ...(stored.model ? { model: stored.model } : {}),
+          ...(stored.baseUrl ? { baseUrl: stored.baseUrl } : {})
+        })
+      }
     }
 
     entries.push(
@@ -870,7 +892,20 @@ export class AgentService {
           model,
           baseUrl: candidate.baseUrl ?? descriptor.defaultBaseUrl
         }
-        return { provider: candidate.id, adapter: createAdapterForConfig(config), config }
+        const adapter = createAdapterForConfig(config)
+        return {
+          provider: candidate.id,
+          /*
+           * Wrapped so the pool learns the outcome: a key is parked after a rate limit (honouring
+           * the provider's Retry-After) or repeated failures, and cleared on success. The wrapper
+           * rethrows the original error, so recovery still sees its code.
+           */
+          adapter:
+            candidate.pool && candidate.keyId
+              ? withKeyHealth(adapter, candidate.pool, candidate.keyId)
+              : adapter,
+          config
+        }
       })
     )
 
@@ -1368,7 +1403,27 @@ export class AgentService {
     await this.facts.clear(project.id)
   }
 
-  /** One bounded, non-streaming completion with the the user's own provider and key. */
+  /** The pool for a provider, rebuilt only when the set of keys actually changed. */
+  private ensureKeyPool(provider: ProviderId, keys: readonly string[]): KeyPool {
+    const existing = this.keyPools.get(provider)
+    if (existing && existing.size === keys.length) return existing
+    const pool = poolForKeys(provider, keys, { now: () => this.now() })
+    this.keyPools.set(provider, pool)
+    return pool
+  }
+
+  /**
+   * v3.1: per-provider key states for Settings — which credential is ready, which is cooling down,
+   * and until when. Never the keys: `KeyPool.snapshot()` cannot return them.
+   */
+  keyHealth(): Array<{ provider: string; keys: KeySnapshot[] }> {
+    return [...this.keyPools.entries()].map(([provider, pool]) => ({
+      provider,
+      keys: pool.snapshot()
+    }))
+  }
+
+  /** One bounded, non-streaming completion with the user's own provider and key. */
   private async completeOnce(prompt: string): Promise<string> {
     const settings = await this.persistence.load()
     const ids = Object.keys(settings.providers) as ProviderId[]

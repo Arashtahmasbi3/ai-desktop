@@ -78,8 +78,46 @@ describe('Persistence', () => {
     await store.setProviderModel('deepseek', 'deepseek-chat')
 
     const redacted = store.redacted()
-    expect(redacted.providers.deepseek).toEqual({ hasApiKey: true, model: 'deepseek-chat' })
+    // v3.1: the view gained `keyCount` (how many keys the provider has, never which).
+    expect(redacted.providers.deepseek).toEqual({
+      hasApiKey: true,
+      keyCount: 1,
+      model: 'deepseek-chat'
+    })
     expect(JSON.stringify(redacted)).not.toContain('enc:')
+  })
+
+  it('counts several keys without ever exposing one (v3.1)', async () => {
+    const store = new Persistence({ file, cipher })
+    await store.setApiKey('deepseek', 'sk-first-secret-value')
+    await store.addApiKey('deepseek', 'sk-second-secret-value')
+
+    const redacted = store.redacted()
+    expect(redacted.providers.deepseek?.keyCount).toBe(2)
+    expect(redacted.providers.deepseek?.hasApiKey).toBe(true)
+
+    // The whole point of a redacted view: neither the keys nor their ciphertext appear anywhere.
+    const serialised = JSON.stringify(redacted)
+    expect(serialised).not.toContain('sk-first-secret-value')
+    expect(serialised).not.toContain('sk-second-secret-value')
+    expect(serialised).not.toContain('enc:')
+  })
+
+  it('resolves both an old single-key file and a new pool file (v3.1)', async () => {
+    const store = new Persistence({ file, cipher })
+    await store.setApiKeys('deepseek', ['sk-a-value', 'sk-b-value'])
+
+    expect(await store.getApiKeys('deepseek')).toHaveLength(2)
+    // `getApiKey` is the first of the pool, so older callers keep working unchanged.
+    expect(await store.getApiKey('deepseek')).toBe('sk-a-value')
+
+    await store.removeApiKeyAt('deepseek', 0)
+    expect(await store.getApiKeys('deepseek')).toEqual(['sk-b-value'])
+    // Removing the last key clears both fields, so `hasApiKey` cannot stay true on an empty pool.
+    await store.removeApiKeyAt('deepseek', 0)
+    expect(await store.getApiKeys('deepseek')).toEqual([])
+    expect(store.redacted().providers.deepseek?.hasApiKey).toBe(false)
+    expect(store.redacted().providers.deepseek?.keyCount).toBe(0)
   })
 
   it('removes a key when set to an empty string', async () => {

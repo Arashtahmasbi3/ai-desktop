@@ -46,6 +46,12 @@ export interface ProjectRecord extends ProjectMetadata {
 export interface ProviderSettings {
   /** Encrypted API key (never the plaintext). */
   apiKeyEnc?: string
+  /**
+   * v3.1: extra encrypted keys for the same provider, so a rate-limited credential can be rotated
+   * instead of retried until the run dies. `apiKeyEnc` is the first key and stays authoritative for
+   * older builds; `resolveKeys` is the one place that decides what a provider's keys are.
+   */
+  apiKeysEnc?: string[]
   model?: string
   baseUrl?: string
 }
@@ -358,6 +364,8 @@ export interface PersistenceOptions {
 /** A settings view that hides ciphertext, for safe display in a UI. */
 export interface RedactedProviderSettings {
   hasApiKey: boolean
+  /** v3.1: how many keys this provider has. The keys themselves never reach the UI. */
+  keyCount: number
   model?: string
   baseUrl?: string
 }
@@ -438,7 +446,11 @@ export class Persistence {
     for (const [key, value] of Object.entries(this.settings.providers)) {
       if (!value) continue
       providers[key as ProviderId] = {
-        hasApiKey: typeof value.apiKeyEnc === 'string' && value.apiKeyEnc !== '',
+        hasApiKey:
+      typeof value.apiKeyEnc === 'string' && value.apiKeyEnc !== ''
+        ? true
+        : Array.isArray(value.apiKeysEnc) && value.apiKeysEnc.length > 0,
+    keyCount: Array.isArray(value.apiKeysEnc) ? value.apiKeysEnc.length : 0,
         ...(value.model ? { model: value.model } : {}),
         ...(value.baseUrl ? { baseUrl: value.baseUrl } : {})
       }
@@ -464,22 +476,79 @@ export class Persistence {
   }
 
   async setApiKey(provider: ProviderId, apiKey: string): Promise<void> {
+    // One representation: a single key is a pool of one. Keeping two fields independently writable
+    // is how `hasApiKey` and `keyCount` would end up disagreeing in the UI.
+    await this.setApiKeys(provider, apiKey === '' ? [] : [apiKey])
+  }
+
+  async getApiKey(provider: ProviderId): Promise<string | undefined> {
+    const keys = await this.getApiKeys(provider)
+    return keys[0]
+  }
+
+  /**
+   * Every usable key for a provider, decrypted. A key that fails to decrypt is dropped rather than
+   * thrown: one unreadable credential must not make the provider unusable when another key works.
+   */
+  async getApiKeys(provider: ProviderId): Promise<string[]> {
+    await this.load()
+    const stored = this.settings.providers[provider]
+    if (!stored) return []
+
+    const ciphertexts =
+      Array.isArray(stored.apiKeysEnc) && stored.apiKeysEnc.length > 0
+        ? stored.apiKeysEnc
+        : stored.apiKeyEnc
+          ? [stored.apiKeyEnc]
+          : []
+
+    const keys: string[] = []
+    for (const enc of ciphertexts) {
+      if (typeof enc !== 'string' || enc === '') continue
+      try {
+        const plain = await this.cipher.decrypt(enc)
+        if (plain && plain.trim() !== '') keys.push(plain)
+      } catch {
+        // Skip an undecryptable key; the others still work.
+      }
+    }
+    return keys
+  }
+
+  /** Replace every key for a provider. An empty list removes them all. */
+  async setApiKeys(provider: ProviderId, apiKeys: readonly string[]): Promise<void> {
     await this.load()
     const current = this.settings.providers[provider] ?? {}
-    if (apiKey === '') {
+    const clean = apiKeys.filter((key) => typeof key === 'string' && key.trim() !== '')
+    if (clean.length === 0) {
       delete current.apiKeyEnc
+      delete current.apiKeysEnc
     } else {
-      current.apiKeyEnc = await this.cipher.encrypt(apiKey)
+      const encrypted: string[] = []
+      for (const key of clean) encrypted.push(await this.cipher.encrypt(key))
+      current.apiKeysEnc = encrypted
+      // Keep the single-key field in step so an older build reading this file still works.
+      current.apiKeyEnc = encrypted[0]!
     }
     this.settings.providers[provider] = current
     await this.persist()
   }
 
-  async getApiKey(provider: ProviderId): Promise<string | undefined> {
-    await this.load()
-    const enc = this.settings.providers[provider]?.apiKeyEnc
-    if (!enc) return undefined
-    return this.cipher.decrypt(enc)
+  /** Add one more key for a provider (ignored when it is already there). */
+  async addApiKey(provider: ProviderId, apiKey: string): Promise<void> {
+    const existing = await this.getApiKeys(provider)
+    if (apiKey.trim() === '' || existing.includes(apiKey)) return
+    await this.setApiKeys(provider, [...existing, apiKey])
+  }
+
+  /** Remove the key at `index`, leaving the rest of the pool intact. */
+  async removeApiKeyAt(provider: ProviderId, index: number): Promise<void> {
+    const existing = await this.getApiKeys(provider)
+    if (index < 0 || index >= existing.length) return
+    await this.setApiKeys(
+      provider,
+      existing.filter((_, position) => position !== index)
+    )
   }
 
   async removeApiKey(provider: ProviderId): Promise<void> {

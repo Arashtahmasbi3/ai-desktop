@@ -6,6 +6,15 @@ export const DEFAULT_RECOVERY_POLICY: AgentRecoveryPolicy = {
   maxLlmAttempts: 2
 }
 
+/**
+ * How long a provider's `Retry-After` may hold the run up before we stop honouring it.
+ *
+ * Waiting is better than failing, but an unparseable or absurd header (a provider asking for an
+ * hour) must not hang the app: past this ceiling the caller is told the attempt is exhausted so
+ * the fallback provider is used instead.
+ */
+export const MAX_RETRY_AFTER_MS = 30_000
+
 /** Failures that a blind re-run of the *same* action can plausibly fix. */
 const TRANSIENT_TOOL_ERRORS: ReadonlySet<ToolErrorCode> = new Set(['timeout', 'sandbox_error'])
 
@@ -110,12 +119,41 @@ export class ErrorRecovery {
   planLlmRetry(error: unknown, attempt: number): LlmRecoveryPlan {
     const code: LLMErrorCode = error instanceof LLMError ? error.code : 'api'
     const retryable = error instanceof LLMError ? error.retryable : true
-    const exhausted = attempt >= this.policy.maxLlmAttempts
-    const switchProvider = code === 'auth' || code === 'config'
+    /**
+     * v3.1: a rate limit is a provider-level condition, not a transient blip. The first attempt
+     * may retry the same provider (it is often a momentary burst), but once that is used up the
+     * next configured provider is the right answer — refusing to switch is how a run died with a
+     * working fallback available.
+     */
+    const attemptsPerProvider = Math.max(1, this.policy.maxLlmAttempts)
+    const rateLimited = code === 'rate_limit'
+
+    /**
+     * Honour `Retry-After` when the provider sent one: our own 200ms backoff can land inside the
+     * window the provider just asked us to wait out, which turns one rate limit into several.
+     */
+    const retryAfterMs = error instanceof LLMError ? error.retryAfterMs : undefined
+    const honoured =
+      typeof retryAfterMs === 'number' && retryAfterMs > 0
+        ? Math.min(retryAfterMs, MAX_RETRY_AFTER_MS)
+        : 0
+    const requestedWait = Math.max(this.delay(attempt), honoured)
+    /**
+     * A wait longer than the ceiling is not something a run should sit through. That case has to
+     * count as "move on" rather than only "this attempt is spent": with `switchProvider` false the
+     * caller would have nothing left to try, which is how a long rate-limit window became a failed
+     * run instead of a fallback. (Caught by the test for it.)
+     */
+    const tooLong = typeof retryAfterMs === 'number' && retryAfterMs > MAX_RETRY_AFTER_MS
+
+    const switchProvider =
+      code === 'auth' || code === 'config' || (rateLimited && (attempt >= attemptsPerProvider || tooLong))
+    const exhausted = attempt >= attemptsPerProvider || tooLong
+
     return {
       retrySame: retryable && !exhausted,
       switchProvider,
-      delayMs: this.delay(attempt),
+      delayMs: tooLong ? 0 : requestedWait,
       guidance: guidanceForLlmError(code),
       exhausted
     }
