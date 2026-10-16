@@ -877,13 +877,21 @@ export class AgentService {
       }
     }
 
+    /*
+     * v3.1: the chat header's model override belongs to the **primary provider**, not to whichever
+     * candidate happens to sit at index 0. With a key pool, index 0 is only the first *key* of that
+     * provider, so keying the override off the index alone made a rotated key silently drop back to
+     * the provider's configured model — a different model than the user picked, with nothing to say
+     * so. With one key per provider the two rules are identical, so nothing changes for anyone who
+     * has not added a second key.
+     */
+    const primaryProvider = candidates[0]?.id
+
     entries.push(
-      ...candidates.map((candidate, index) => {
+      ...candidates.map((candidate) => {
         const descriptor = PROVIDERS[candidate.id]
-        // The model chosen in the chat header overrides only the primary entry;
-        // fallback providers keep their own configured model.
         const model =
-          !primaryIsCustom && index === 0 && options.model
+          !primaryIsCustom && candidate.id === primaryProvider && options.model
             ? options.model
             : (candidate.model ?? descriptor.defaultModel)
         const config = {
