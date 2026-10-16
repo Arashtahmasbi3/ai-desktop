@@ -185,6 +185,15 @@ export function renderFactLedger(
   return [header, ...lines].join('\n')
 }
 
+/** Outcome of asking the app to learn from a chat (v3.1). */
+export interface LearnResultView {
+  learned: number
+  superseded: number
+  /** Why nothing was learned, when nothing was. Never a failure of the session itself. */
+  skipped?: 'no-transcript' | 'no-facts' | 'model-error'
+  error?: string
+}
+
 /** A chat message, as much of it as the transcript builder needs. */
 export interface TranscriptMessage {
   role: string

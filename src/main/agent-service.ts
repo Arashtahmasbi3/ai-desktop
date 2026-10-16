@@ -76,6 +76,9 @@ import type { AttachmentService } from './attachment-service'
 import type { CustomProviderStore } from './custom-providers'
 import { existsSync } from 'node:fs'
 import { loadProjectMemory } from './project-memory'
+import { renderFactLedger, type ProjectFact, type TranscriptMessage } from '@shared/memory-facts'
+import type { FactStore } from './fact-store'
+import { FactLearner, type LearnResult } from './fact-learning'
 
 /**
  * The slice of the SSH manager the agent needs to run remote commands. Kept as
@@ -433,6 +436,11 @@ export interface AgentServiceOptions {
   vps?: RemoteHost
   /** Optional: detaches long remote commands as tracked jobs (v2.4, A.1). */
   jobs?: RemoteJobRunner
+  /**
+   * v3.1: the project fact ledger. When present, what earlier sessions learned about the active
+   * project is added to the system prompt, and learnFacts() can grow it.
+   */
+  facts?: FactStore
   /** Ask the user to approve a tool call (Approval Modes). Defaults to allow. */
   requestApproval?: (
     runId: string,
@@ -577,6 +585,7 @@ export class AgentService {
    * run that created it so it keeps auto-approving across a chat's messages,
    * until its TTL lapses.
    */
+  private readonly facts?: FactStore
   private readonly planTrust: PlanTrustRegistry
   private runCounter = 0
   private changeCounter = 0
@@ -590,6 +599,7 @@ export class AgentService {
     this.emit = options.emit
     this.now = options.now ?? (() => Date.now())
     if (options.userDataDir) this.userDataDir = options.userDataDir
+    if (options.facts) this.facts = options.facts
     this.planTrust = new PlanTrustRegistry(() => this.now())
     if (options.customProviders) this.customProviders = options.customProviders
     if (options.vps) this.vps = options.vps
@@ -916,6 +926,18 @@ export class AgentService {
     )
     const memory = await this.projectMemoryHint()
     /*
+     * v3.1: what earlier sessions learned about this project, rendered as *prior beliefs* with
+     * the date each was observed (see renderFactLedger) rather than as truth, and bounded to a
+     * character budget so memory can never crowd out the task. A failure to read the ledger is
+     * not fatal: having no memory is a normal state, not an error.
+     */
+    const factLedger =
+      this.facts && activeProject
+        ? renderFactLedger(await this.facts.live(activeProject.id).catch(() => []), {
+            now: this.now()
+          })
+        : ''
+    /*
      * v2.9.1: for a LOCAL project the run's workspace IS the project folder.
      *
      * The alternative — leaving the agent in an empty temp directory — meant it could not
@@ -930,6 +952,7 @@ export class AgentService {
     const systemHint = [
       remote.systemHint,
       memory,
+      factLedger,
       directWorkspace
         ? `Your workspace is the user's project folder (${directWorkspace}). You can read and list ` +
           'the files that are already there, and run its commands (tests, builds) in place. ' +
@@ -1297,6 +1320,80 @@ export class AgentService {
       writeAt: (root, path, content) => files.writeAt(root, path, content)
     }
   }
+  /**
+   * v3.1: learn durable facts from a finished session.
+   *
+   * Best-effort by design: memory is an optimisation, so a provider error, a junk reply or an
+   * empty chat returns a reason instead of throwing, and the session that triggered it is
+   * unaffected. The model call resolves a provider exactly as a run does, one-shot, at
+   * temperature 0, and is bounded by the extraction prompt itself.
+   */
+  async learnFacts(input: {
+    messages: readonly TranscriptMessage[]
+    task: string
+  }): Promise<LearnResult> {
+    const store = this.facts
+    const project = this.persistence.getActiveProject()
+    if (!store) {
+      return { learned: 0, superseded: 0, skipped: 'model-error', error: 'memory is disabled' }
+    }
+    if (!project) return { learned: 0, superseded: 0, skipped: 'no-transcript' }
+
+    const learner = new FactLearner({
+      store,
+      now: () => this.now(),
+      complete: (prompt) => this.completeOnce(prompt)
+    })
+    return learner.learn({ projectId: project.id, task: input.task, messages: input.messages })
+  }
+
+  /** Everything ever learned about the active project, for the Settings view. */
+  async projectFacts(): Promise<ProjectFact[]> {
+    const project = this.persistence.getActiveProject()
+    if (!this.facts || !project) return []
+    return this.facts.list(project.id)
+  }
+
+  /** Forget one fact. Always possible: memory the user cannot delete is a liability. */
+  async forgetFact(factId: string): Promise<boolean> {
+    const project = this.persistence.getActiveProject()
+    if (!this.facts || !project) return false
+    return this.facts.forget(project.id, factId)
+  }
+
+  /** Forget everything about the active project. */
+  async clearFacts(): Promise<void> {
+    const project = this.persistence.getActiveProject()
+    if (!this.facts || !project) return
+    await this.facts.clear(project.id)
+  }
+
+  /** One bounded, non-streaming completion with the the user's own provider and key. */
+  private async completeOnce(prompt: string): Promise<string> {
+    const settings = await this.persistence.load()
+    const ids = Object.keys(settings.providers) as ProviderId[]
+    const order = providerOrder(ids, undefined, settings.activeProvider)
+    for (const id of order) {
+      const stored = settings.providers[id]
+      if (!stored?.apiKeyEnc) continue
+      const apiKey = await this.persistence.getApiKey(id)
+      if (!apiKey) continue
+      const descriptor = PROVIDERS[id]
+      const config = {
+        provider: id,
+        apiKey,
+        model: stored.model ?? descriptor.defaultModel,
+        baseUrl: stored.baseUrl ?? descriptor.defaultBaseUrl
+      }
+      const response = await createAdapterForConfig(config).chat(
+        { model: config.model, temperature: 0, messages: [{ role: 'user', content: prompt }] },
+        config
+      )
+      return response.content ?? ''
+    }
+    throw new Error('no provider is configured, so memory cannot be extracted')
+  }
+
   /** Records an agent edit and surfaces it in the chat for review. */
   private captureChange(
     runId: string,

@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { CustomProviderInput, CustomProviderTestResult, CustomProviderView, ProviderId } from '@shared/types'
 import type { OnboardingStatus } from '@shared/onboarding'
+import type { LearnResultView, ProjectFact } from '@shared/memory-facts'
 import type { ApprovalMode, ApprovalHistoryEntry, ApprovalOutcome, ApprovedCommandView } from '@shared/approval'
 import type { InvestigateScope, ResolvedProfile, SessionProfile } from '@shared/profile'
 import type { PlanDecision } from '@shared/plan'
@@ -153,6 +154,14 @@ export const api = {
 
   // v3.0: auto-update. Downloading is a deliberate user action, and the installer is only
   // started from `install` — never automatically.
+  // v3.1: the project fact ledger. Learning is one bounded model call; forgetting is instant.
+  facts: {
+    list: (): Promise<ProjectFact[]> => invoke('facts:list'),
+    learn: (chatId: string): Promise<LearnResultView> => invoke('facts:learn', chatId),
+    forget: (factId: string): Promise<boolean> => invoke('facts:forget', factId),
+    clear: (): Promise<void> => invoke('facts:clear')
+  },
+
   updates: {
     check: (): Promise<unknown> => invoke('update:check'),
     download: (): Promise<unknown> => invoke('update:download'),

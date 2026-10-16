@@ -7,6 +7,7 @@ import type {
 import type { OnboardingStatus } from '@shared/onboarding'
 import type { AttachmentRefView } from '@shared/attachments'
 import type { UpdateCheckResult, UpdateDownloadResult } from '@shared/update'
+import type { LearnResultView, ProjectFact } from '@shared/memory-facts'
 import type { ApprovalMode, ApprovalHistoryEntry, ApprovalOutcome, ApprovedCommandView } from '@shared/approval'
 import type { PlanDecision } from '@shared/plan'
 import type { PreflightChoice } from '@shared/preflight'
@@ -127,6 +128,13 @@ export interface Api {
     complete(): Promise<OnboardingStatus>
   }
   /** v3.0: auto-update. Check reads the feed, download verifies the digest, install runs it. */
+  /** v3.1: the project fact ledger (read, learn, forget, clear). */
+  facts: {
+    list(): Promise<ProjectFact[]>
+    learn(chatId: string): Promise<LearnResultView>
+    forget(factId: string): Promise<boolean>
+    clear(): Promise<void>
+  }
   updates: {
     check(): Promise<UpdateCheckResult>
     download(): Promise<UpdateDownloadResult>

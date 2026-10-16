@@ -24,6 +24,8 @@ import { FileService } from './file-service'
 import { app, nativeImage } from 'electron'
 import { spawn } from 'node:child_process'
 import { AttachmentService } from './attachment-service'
+import { FactStore } from './fact-store'
+import type { TranscriptMessage } from '@shared/memory-facts'
 import { UpdateService, sha256OfFile, streamToFile } from './updater'
 import { ChatStore } from './chat-store'
 import {
@@ -102,6 +104,12 @@ export class AppServices {
    * dependency, and an updater that verifies the published SHA-256 before executing an
    * installer is worth more here than one that does not.
    */
+  /**
+   * v3.1: the project fact ledger. One JSON file per project under <userData>/facts, written
+   * atomically; the agent gets a bounded, dated view of it in every system prompt.
+   */
+  readonly facts = new FactStore({ dir: join(appDataDir(), 'facts') })
+
   readonly updates = new UpdateService({
     currentVersion: app.getVersion(),
     fetchImpl: async (url: string) => {
@@ -221,6 +229,7 @@ export class AppServices {
       file: join(this.dir, 'approved-commands.json')
     })
     this.agent = new AgentService({
+      facts: this.facts,
       sandbox: this.sandbox,
       persistence: this.persistence,
       sessionStore: this.sessions,
@@ -491,6 +500,24 @@ export class AppServices {
   }
 
   /** Convenience for tests and diagnostics. */
+  /**
+   * v3.1: learn facts from a saved chat.
+   *
+   * Main reads the chat itself rather than accepting a transcript from the renderer: the text
+   * already exists in the chat store, and not shipping it over IPC keeps the bridge's payload
+   * small and the source of truth in one place. The task line is the chat title, which is what
+   * the user named the session.
+   */
+  async learnFactsFromChat(chatId: string): Promise<{ learned: number; superseded: number; skipped?: string; error?: string }> {
+    const chat = await this.chats.load(chatId)
+    if (!chat) return { learned: 0, superseded: 0, skipped: 'no-transcript' }
+    const messages: TranscriptMessage[] = chat.messages.map((message) => ({
+      role: message.role,
+      content: message.content
+    }))
+    return this.agent.learnFacts({ messages, task: chat.title })
+  }
+
   static sessionDir(dir = appDataDir()): string {
     return join(dir, 'sessions')
   }

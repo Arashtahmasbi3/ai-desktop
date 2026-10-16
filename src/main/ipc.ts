@@ -218,6 +218,15 @@ export function registerIpc(
      * SHA256SUMS.txt before anything is executed; `install` starts the NSIS installer and
      * the caller quits the app so its files can be replaced.
      */
+    /*
+     * Project memory (v3.1). Reading and forgetting are cheap and read-only from the app's point
+     * of view; learning makes one bounded model call, so it is a deliberate user action.
+     */
+    ['facts:list', () => services.agent.projectFacts()],
+    ['facts:learn', (chatId: string) => services.learnFactsFromChat(String(chatId ?? ''))],
+    ['facts:forget', (factId: string) => services.agent.forgetFact(String(factId ?? ''))],
+    ['facts:clear', () => services.agent.clearFacts()],
+
     ['update:check', () => services.updates.check()],
     ['update:download', () => services.updates.download()],
     ['update:install', () => services.updates.install()],
