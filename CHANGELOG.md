@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.1] — 2026-10-16
+
+### Fixed — the chat transcript, which the restyle had missed entirely
+
+Found by reading a **real conversation** instead of the component list. `MessageBubble` used no clay
+classes, so the mechanical rename never touched it and it never appeared in a sweep; it is also the
+most-used surface in the app. The rendered transcript showed the old language sitting inside the new
+one: an assistant message in a soft `rounded-xl` pillow, a user message as a rounded accent lozenge,
+and a rounded code block.
+
+- The speaker is now told apart by a **border** rather than a soft fill: the user's own words take the
+  accent border, the assistant's take ink, a system notice takes the warning colour — and each keeps
+  its own label, so nothing depends on colour alone.
+- Inline code is a small bordered chip; the code block has a stated header (an ink rule with an
+  uppercase monospace language) instead of a tinted strip with rounded buttons.
+
+### Fixed — a source note that rendered as chat text
+
+While fixing the above I introduced a JSX comment in the **children** position, where a bare
+`/* … */` is not a comment but a text node — so the transcript printed my own note above every
+message. No assertion caught it; reading the rendered page text did. A test now pins the case: the
+bubble must render its message and **nothing else**.
+
+The bubble also gained a `data-testid` per role, because the first version of that test used
+`getByText` and matched the `<p>` markdown renders *inside* the bubble — an element with an empty
+`className`, so the border assertions were reading the wrong node.
+
+### Fixed — the one untranslated label in the shell
+
+The sidebar's bottom nav had a **hard-coded** "Plugins" string (not even an i18n key), so it kept the
+old section name after it became *Surfaces*.
+
+**Suite green at 286 test files / 2414 tests; typecheck and production build clean.**
+
+
 ## [4.0.0] — 2026-10-16
 
 ### Changed — a brutalist design language, with the palette untouched
@@ -1346,7 +1381,8 @@ First stable release. Ships as a Windows x64 NSIS installer and a portable execu
   `node_modules` are shipped inside the app package.
 - Optional code signing via `CSC_LINK` / `CSC_KEY_PASSWORD` (skipped safely when absent).
 
-[Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v4.0.0...HEAD
+[Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v4.0.1...HEAD
+[4.0.1]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v4.0.0...v4.0.1
 [4.0.0]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v3.2.1...v4.0.0
 [3.2.1]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v3.2.0...v3.2.1
 [3.2.0]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v3.1.1...v3.2.0

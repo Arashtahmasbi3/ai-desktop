@@ -51,6 +51,18 @@ fails, a tool is missing, or the budget ran out — ask rather than guess).
 
 ## Status
 
+**v4.0.1 released — the chat transcript, which the 4.0 restyle had missed.** Found by reading a real
+conversation rather than the component list: `MessageBubble` used no clay classes, so the mechanical
+rename never touched it and it never made a sweep list — and it is the most-used surface in the app.
+Messages are now bordered blocks told apart by border colour (user = accent, assistant = ink, system =
+warning), never by a soft fill alone; inline code is a bordered chip and the code block has a stated
+header. Fixing it introduced a bug worth recording: a JSX comment in the **children** position must be
+`{/* … */}` — a bare `/* … */` there is a text node, and the transcript printed my own note above
+every message. No test caught it, reading the rendered page did; a case now pins that the bubble
+renders its message and nothing else. The sidebar's bottom nav also had a hard-coded "Plugins" string
+that survived the rename to *Surfaces*, and was the one untranslated label in the shell. 286 test files
+/ 2414 tests green, typecheck and production build clean. (2026-10-16)
+
 **v4.0.0 released — a brutalist design language, and a settings page that stopped lying.** The
 report was "still cluttered, messy, over-saturated, confusing, not beautiful", so the layer *under*
 the colours was rebuilt and the colours were kept: the warm ramps, the brand accent and the WCAG
