@@ -1,6 +1,6 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { BarChart3, Download, RotateCcw } from 'lucide-react'
+import { BarChart3, Download, Gauge, RotateCcw } from 'lucide-react'
 import { estimateTokens, contextBudget, DEFAULT_CONTEXT_TOKEN_BUDGET } from '@shared/memory'
 import { useStore } from '../store'
 import {
@@ -10,6 +10,13 @@ import {
   type UsageBreakdown,
   type UsageTotals
 } from '../lib/usage'
+import {
+  budgetState,
+  normalizeBudget,
+  readBudget,
+  writeBudget,
+  type BudgetSettings
+} from '../lib/budget'
 
 function TotalsRow({
   label,
@@ -111,6 +118,19 @@ export default function SettingsUsage(): JSX.Element {
   const contextPercent = Math.min(100, Math.round(context.ratio * 100))
   const maxDaily = Math.max(1, ...summary.last7Days.map((day) => day.inputTokens + day.outputTokens))
 
+  // v3.1: the spend guard. The cap lives in localStorage like the other renderer preferences,
+  // and the state is recomputed from the recorded calls, so nothing has to be kept in sync.
+  const [budget, setBudget] = useState<BudgetSettings>(() => readBudget())
+  const budgetNow = useMemo(
+    () => budgetState(usageRecords, budget, Date.now()),
+    [usageRecords, budget]
+  )
+  const updateBudget = (next: Partial<BudgetSettings>): void => {
+    const merged = normalizeBudget({ ...budget, ...next })
+    setBudget(merged)
+    writeBudget(merged)
+  }
+
   const exportCsv = (): void => {
     try {
       const blob = new Blob([toCsv(usageRecords)], { type: 'text/csv' })
@@ -127,6 +147,72 @@ export default function SettingsUsage(): JSX.Element {
 
   return (
     <section className="flex flex-col gap-3">
+      {/* v3.1: the cap that makes the totals act. */}
+      <div className="clay-card flex flex-col gap-2 p-3" data-testid="budget-guard">
+        <div className="flex items-center justify-between gap-2">
+          <span className="flex items-center gap-1.5 text-xs font-semibold text-fg">
+            <Gauge className="h-3.5 w-3.5 text-accent" />
+            {t('settings.budgetTitle')}
+          </span>
+          <span
+            className={`font-mono text-2xs ${
+              budgetNow.level === 'over'
+                ? 'text-danger'
+                : budgetNow.level === 'warn'
+                  ? 'text-warning'
+                  : 'text-fg-muted'
+            }`}
+            data-testid="budget-today"
+          >
+            {budgetNow.label}
+          </span>
+        </div>
+
+        {budgetNow.cap > 0 ? (
+          <div className="h-1.5 w-full overflow-hidden rounded-clay-pill bg-bg-tertiary">
+            <div
+              className={`h-full rounded-clay-pill ${
+                budgetNow.level === 'over' ? 'bg-danger' : budgetNow.level === 'warn' ? 'bg-warning' : 'bg-success'
+              }`}
+              style={{ width: `${Math.min(100, Math.round(budgetNow.fraction * 100))}%` }}
+            />
+          </div>
+        ) : null}
+
+        <label className="flex items-center justify-between gap-2 text-2xs text-fg-muted">
+          {t('settings.budgetCap')}
+          <input
+            type="number"
+            min={0}
+            step={0.5}
+            value={budget.dailyCap || ''}
+            placeholder="0"
+            onChange={(event) => updateBudget({ dailyCap: Number(event.target.value) })}
+            className="w-20 rounded-clay-sm border border-border bg-bg-primary px-2 py-1 text-right font-mono text-2xs text-fg"
+          />
+        </label>
+
+        <label className="flex cursor-pointer items-center gap-2 text-2xs text-fg-muted">
+          <input
+            type="checkbox"
+            checked={budget.blockWhenExceeded}
+            onChange={(event) => updateBudget({ blockWhenExceeded: event.target.checked })}
+            className="accent-accent"
+          />
+          {t('settings.budgetBlock')}
+        </label>
+
+        <p className="text-3xs text-fg-subtle">{t('settings.budgetHint')}</p>
+        {/*
+          An unpriced model means the total is a lower bound. Saying so is the difference between
+          a guard the user can trust and one that quietly under-counts.
+        */}
+        {budgetNow.unknownModels ? (
+          <p className="text-3xs text-warning" data-testid="budget-unpriced">
+            {t('settings.budgetUnpriced')}
+          </p>
+        ) : null}
+      </div>
       <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
         <BarChart3 className="h-3.5 w-3.5" />
         {t('settings.usage')}

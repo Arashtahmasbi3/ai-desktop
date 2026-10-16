@@ -1,8 +1,20 @@
-import { Cpu, Globe, HardDrive, Languages, Server, ShieldCheck, Zap, Wifi, WifiOff } from 'lucide-react'
+import {
+  Cpu,
+  Globe,
+  HardDrive,
+  Languages,
+  Server,
+  ShieldCheck,
+  Wallet,
+  Zap,
+  Wifi,
+  WifiOff
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { nextApprovalMode } from '@shared/approval'
 import { useStore } from '../store'
 import { CONNECTION_TONE_CLASS, useConnectionStatus } from '../lib/connection-status'
+import { budgetState, readBudget } from '../lib/budget'
 
 /** `ok: null` renders the neutral "unknown" dot (v2.7.0). */
 function Dot({ ok }: { ok: boolean | null }): JSX.Element {
@@ -27,6 +39,14 @@ export default function StatusBar(): JSX.Element {
   const setLocale = useStore((state) => state.setLocale)
   const approvalMode = useStore((state) => state.settings?.approvalMode ?? 'ask')
   const connection = useConnectionStatus()
+  const usageRecords = useStore((state) => state.usageRecords)
+  /*
+   * v3.1: the spend guard's read-out. Recomputed from the recorded calls rather than stored, so
+   * it cannot drift from Settings -> Usage. Hidden entirely when no cap is set.
+   */
+  const budget = budgetState(usageRecords, readBudget(), Date.now())
+  const budgetTone =
+    budget.level === 'over' ? 'text-danger' : budget.level === 'warn' ? 'text-warning' : 'text-fg-muted'
 
   // v2.7.0: `worker` is null until the background worker reports in. Defaulting to
   // "online" made the bar claim "Agent: running" next to "worker: idle" before
@@ -39,6 +59,16 @@ export default function StatusBar(): JSX.Element {
   return (
     <footer className="flex h-7 shrink-0 items-center justify-between border-t border-border bg-bg-secondary px-3 text-2xs text-fg-muted">
       <div className="flex items-center gap-3">
+        {budget.cap > 0 ? (
+          <span
+            className={`flex items-center gap-1 font-mono ${budgetTone}`}
+            data-testid="status-budget"
+            title={budget.unknownModels ? t('settings.budgetUnpriced') : undefined}
+          >
+            <Wallet className="h-3 w-3 shrink-0" />
+            {budget.label}
+          </span>
+        ) : null}
         <span className="flex items-center gap-1">
           <Dot ok={ready} />
           {ready ? t('statusBar.ready') : t('common.loading')}

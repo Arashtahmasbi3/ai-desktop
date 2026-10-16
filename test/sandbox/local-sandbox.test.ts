@@ -75,11 +75,21 @@ describe('LocalSandboxDriver', () => {
     )
   })
 
-  it('honours the command timeout', async () => {
-    const handle = await createHandle()
-    const result = await driver.exec(handle, 'sleep 5', { timeoutMs: 150 })
-    expect(result.timedOut).toBe(true)
-  })
+  it(
+    'honours the command timeout',
+    async () => {
+      const handle = await createHandle()
+      /*
+       * `sleep 3` rather than 5, plus an explicit test timeout. The whole suite runs many files
+       * in parallel, and under that load the spawn+kill path made this exceed vitest's default
+       * 5s limit — it failed as "Test timed out in 5000ms" rather than as a real regression.
+       * The assertion is about the 150ms kill, which a 3-second sleep demonstrates just as well.
+       */
+      const result = await driver.exec(handle, 'sleep 3', { timeoutMs: 150 })
+      expect(result.timedOut).toBe(true)
+    },
+    15_000
+  )
 
   it('destroys the workspace', async () => {
     const handle = await createHandle()
