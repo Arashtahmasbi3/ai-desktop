@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.1] — 2026-10-16
+
+### Fixed — a rate limit no longer kills the run
+
+Two defects, found while implementing key rotation rather than reported by a user. Both turned a
+recoverable condition into a failed run:
+
+- **A 429 never moved to another provider.** The recovery planner derived "switch provider" from
+  `auth`/`config` only, so a rate-limited provider was retried on the same credential until the run
+  died — with a configured fallback sitting right there.
+- **`Retry-After` was parsed and then ignored.** The HTTP layer reads the header into the error and
+  the recovery plan used its own 200ms→2s backoff anyway, so the app could retry *inside* the window
+  the provider had asked it to wait out.
+
+A rate limit now retries the same provider once, then switches; the provider's own `Retry-After` is
+honoured instead of our guess; and a wait beyond 30 seconds becomes "move on to the fallback" rather
+than something a run sits through.
+
+### Added — several keys per provider, with a circuit breaker
+
+- Keys are handed out **round-robin**; a rate-limited key is parked for **exactly as long as the
+  provider asked** (including when that is shorter than our default), and a key that keeps failing is
+  parked for longer each time, up to a cap. Success clears the history.
+- **Settings → Providers** manages the pool: how many keys a provider holds, add one, remove one.
+  Key states (ready / cooling, and until when) are shown; **the keys themselves are never returned to
+  the interface or written to a log**, which a test asserts.
+- **An upgrade keeps every key.** Settings files written before this release hold a single key and no
+  pool: a test writes that old shape by hand and asserts it still resolves, keeps `hasApiKey` true,
+  and accepts a second key without dropping the first.
+
+### Fixed — a silent data-loss bug in this very change
+
+The settings migration step rebuilds each provider from the fields it knows, and it did not know the
+new key list. The first key survived (it is mirrored into the old field) and **every additional key
+vanished on the next read** — configure a credential for rotation, lose it on restart, no error
+anywhere. Caught by the upgrade test above, not by review. A test now restarts the app (a fresh store
+reading the same file) and asserts both keys are still there.
+
+**Suite green; typecheck and production build clean.**
+
+
 ## [3.1.0] — 2026-10-16
 
 ### Added — the app remembers your project
@@ -1189,7 +1230,8 @@ First stable release. Ships as a Windows x64 NSIS installer and a portable execu
   `node_modules` are shipped inside the app package.
 - Optional code signing via `CSC_LINK` / `CSC_KEY_PASSWORD` (skipped safely when absent).
 
-[Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v3.1.0...HEAD
+[Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v3.1.1...HEAD
+[3.1.1]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v3.1.0...v3.1.1
 [3.1.0]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.9.2...v3.0.0
 [2.9.2]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.9.1...v2.9.2

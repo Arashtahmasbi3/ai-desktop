@@ -51,6 +51,20 @@ fails, a tool is missing, or the budget ran out — ask rather than guess).
 
 ## Status
 
+**v3.1.1 released — rate limits are recoverable, and keys rotate.** A 429 used to retry the same
+provider until the run died (the planner switched provider only on `auth`/`config`) and the parsed
+`Retry-After` was ignored, so the app could retry inside the window the provider asked it to wait
+out. Both fixed: one same-provider retry, then the next provider; the provider's own window honoured;
+a wait past 30s treated as "move on". Providers can now hold **several keys** with round-robin
+rotation, a cooldown that honours `Retry-After`, a circuit breaker with a capped exponential park,
+and success clearing the history — managed in Settings → Providers, where key states are visible and
+**the keys themselves never are**. An upgrade keeps every key: a test writes a pre-3.1.1 settings
+file by hand and asserts it resolves, and that same test caught a **silent data-loss bug** in this
+change (the settings migration dropped the new key list, so every key after the first vanished on the
+next read). Full suite green, typecheck and production build clean. **Still outstanding from this
+phase: decision-checkpoint mode** — a durable, reviewable record of the agent's consequential
+decisions plus an optional pause before them. (2026-10-16)
+
 **v3.1.0 released — the app remembers the project, and a spend cap that stops a send.** Phase 4
 of the approved plan: a **project fact ledger** with validity windows (a newer observation
 supersedes an older one and keeps its history; facts reach the prompt as dated prior beliefs
