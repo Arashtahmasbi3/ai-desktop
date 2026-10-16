@@ -325,6 +325,8 @@ interface AppState {
   ready: boolean
   settings: SettingsView | null
   settingsOpen: boolean
+  /** Set by `openSettingsTab`; SettingsPanel seeds its tab from this and clears it. */
+  settingsTab: string | null
   view: ViewId
 
   messages: ChatMessage[]
@@ -579,6 +581,12 @@ interface AppState {
 
   init: () => Promise<void>
   openSettings: () => void
+  /**
+   * v4.0: open Settings **on a named tab**. `openSettings` alone was enough while every entry
+   * point was a generic "Settings" button; a row that says "Configure … in Connections" has to
+   * arrive there, or the label is a promise the interface does not keep.
+   */
+  openSettingsTab: (tab: string) => void
   closeSettings: () => void
   closeMigration: () => void
   setView: (view: ViewId) => void
@@ -732,6 +740,8 @@ export const useStore = create<AppState>((set, get) => ({
   ready: false,
   settings: null,
   settingsOpen: false,
+  /** A tab for Settings to open on, consumed and cleared by SettingsPanel. */
+  settingsTab: null as string | null,
   view: 'chat',
 
   messages: [],
@@ -1368,7 +1378,8 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
-  openSettings: () => set({ settingsOpen: true }),
+  openSettings: () => set({ settingsOpen: true, settingsTab: null }),
+  openSettingsTab: (tab) => set({ settingsOpen: true, settingsTab: tab }),
   closeSettings: () => set({ settingsOpen: false }),
   closeMigration: () => set({ migrationOpen: false }),
   setView: (view) => set({ view }),

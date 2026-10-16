@@ -344,13 +344,19 @@
     "groupIntegrations": "Integrations",
     "groupCoding": "Coding",
     "groupAdvanced": "Advanced",
-    "plugins": "Plugins",
-    "pluginsTab": "Plugins",
+    "plugins": "Surfaces",
+    "pluginsTab": "Surfaces",
     "appsTab": "Apps",
     "mcpsTab": "MCPs",
     "searchDirectory": "Search directory",
     "noMatches": "No matching entries.",
     "browseDirectoryHint": "The directory is bundled with AI Desktop. Enable the ones you use.",
+    "pluginsHint": "These switches hide a surface from the interface — they do not uninstall or disable anything. Providers, connections and integrations are configured in their own settings tab.",
+    "pluginsConfigure": "Configure",
+    "catalogProviderStatus": "A model provider — add its key and pick its models in Settings → Providers.",
+    "catalogConnectionStatus": "A connection — add servers and keys in Settings → Connections.",
+    "catalogGitHubStatus": "An integration — connect your account in Settings → GitHub.",
+    "catalogOperationStatus": "An operation set the agent uses inside a project — there is nothing to switch off.",
     "browser": "Browser",
     "browserHint": "Control which websites the agent may open. New sites always ask first.",
     "websitePlaceholder": "example.com",
@@ -990,5 +996,13 @@
     "getSystemHealth": "the server health",
     "askUser": "your answer",
     "unknown": "{{tool}}"
+  },
+  "capabilities": {
+    "browser": "Browser",
+    "browserHint": "The in-app browser surface. Website permissions are unchanged by this switch.",
+    "terminal": "Terminal",
+    "terminalHint": "The integrated terminal panel.",
+    "filesystem": "Filesystem",
+    "filesystemHint": "The project file browser and the file views."
   }
 }
