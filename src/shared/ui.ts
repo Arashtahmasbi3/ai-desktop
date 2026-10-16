@@ -43,6 +43,11 @@ export interface ProjectRecord extends ProjectMetadata {
 /** Provider settings safe to display in the renderer (no key material). */
 export interface ProviderSettingsView {
   hasApiKey: boolean
+  /**
+   * v3.1: how many keys this provider holds. The keys themselves never reach the renderer — this is
+   * the only thing it is told about them, and it is what the Settings panel counts.
+   */
+  keyCount: number
   model?: string
   baseUrl?: string
 }

@@ -15,7 +15,7 @@ describe('resolveSelection', () => {
   it('uses the active provider and its saved model', () => {
     const view = settings({
       activeProvider: 'openai',
-      providers: { openai: { hasApiKey: true, model: 'gpt-4o' } }
+      providers: { openai: { hasApiKey: true, keyCount: 1, model: 'gpt-4o' } }
     })
     expect(resolveSelection(view)).toEqual({ provider: 'openai', model: 'gpt-4o' })
   })

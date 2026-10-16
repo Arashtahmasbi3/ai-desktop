@@ -450,8 +450,18 @@ export class AppServices {
     view.session = await this.sessionProfile.state()
     for (const [provider, value] of Object.entries(settings.providers)) {
       if (!value) continue
+      /*
+       * v3.1: a provider's keys can live in the pool (`apiKeysEnc`) rather than in the single-key
+       * field, so `hasApiKey` must consider both — reporting "no key" for a provider that has two
+       * would be worse than reporting nothing. `keyCount` is the count the Settings panel shows, and
+       * it is the only thing about the keys that ever crosses to the renderer.
+       */
+      const pooled = Array.isArray(value.apiKeysEnc)
+        ? value.apiKeysEnc.filter((entry) => typeof entry === 'string' && entry !== '').length
+        : 0
       view.providers[provider as keyof SettingsView['providers']] = {
-        hasApiKey: Boolean(value.apiKeyEnc),
+        hasApiKey: Boolean(value.apiKeyEnc) || pooled > 0,
+        keyCount: pooled > 0 ? pooled : value.apiKeyEnc ? 1 : 0,
         ...(value.model ? { model: value.model } : {}),
         ...(value.baseUrl ? { baseUrl: value.baseUrl } : {})
       }
