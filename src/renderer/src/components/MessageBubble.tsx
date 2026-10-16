@@ -15,7 +15,7 @@ const MARKDOWN_COMPONENTS: Components = {
     return <CodeBlock code={code} language={language} />
   },
   code: ({ children }) => (
-    <code className="rounded bg-bg-primary px-1 py-0.5 font-mono text-[0.85em] text-accent">
+    <code className="rounded-shape-sm border border-border bg-bg-primary px-1 py-0.5 font-mono text-[0.85em] text-accent">
       {children}
     </code>
   )
@@ -92,14 +92,23 @@ export default function MessageBubble({ message }: { message: ChatMessage }): JS
           isUser ? 'items-end' : 'items-start'
         }`}
       >
-        <span className="mb-0.5 px-1 text-3xs uppercase tracking-wide text-fg-muted">
+        <span className="brutal-label mb-0.5 px-1">
           {t(ROLE_LABEL[message.role])}
         </span>
+        {/* v4.0: a message is a bordered block, not a pillow. The speaker is told apart by the
+            border colour — the user's own words take the accent, the assistant's take ink, a system
+            notice takes the warning colour — instead of by a soft fill, and each keeps its own
+            label, so nothing depends on colour alone. */}
         <div
           dir="auto"
-          className={`chat-markdown w-full rounded-xl px-3 py-2 text-sm leading-relaxed ${
-            isUser ? 'bg-accent-solid/20 text-fg-strong' : 'bg-bg-tertiary text-fg'
-          } ${message.role === 'system' ? 'border border-warning/30' : ''}`}
+          data-testid={`message-${message.role}`}
+          className={`chat-markdown w-full rounded-shape border-2 px-3 py-2 text-sm leading-relaxed ${
+            isUser
+              ? 'border-accent bg-accent-solid/10 text-fg-strong'
+              : message.role === 'system'
+                ? 'border-warning bg-bg-tertiary text-fg'
+                : 'border-border-strong bg-bg-tertiary text-fg'
+          }`}
         >
           <ReactMarkdown components={MARKDOWN_COMPONENTS}>{message.content}</ReactMarkdown>
         </div>

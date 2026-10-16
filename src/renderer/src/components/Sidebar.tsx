@@ -760,7 +760,9 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
             className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-2xs text-fg-muted hover:bg-bg-tertiary hover:text-fg"
           >
             <Plug className="h-3 w-3" />
-            Plugins
+            {/* Was a hard-coded "Plugins": untranslated, and it kept the old name after the section
+                became Surfaces. */}
+            {t('settings.plugins')}
           </button>
           <button
             type="button"
