@@ -51,6 +51,19 @@ fails, a tool is missing, or the budget ran out — ask rather than guess).
 
 ## Status
 
+**v3.0.0 released — Restrained Clay, auto-update, image previews.** The whole interface moved
+onto a real design-token layer (three-step radius, per-theme dual shadows, motion and z-index
+scales, a warmer neutral ramp with the brand accent pinned by a test) and clay depth is applied
+in tiers — full on touchable surfaces, soft on cards, and deliberately absent from tables, logs
+and every security dialog. The app can finally update itself: a dependency-free updater reads a
+dedicated **public** feed repository, verifies the installer against the release's published
+SHA-256 before running it, and never acts without a click. Attached images get a preview
+generated in main so the desktop path still never reaches the renderer. Fixed a diagnostics
+probe that silently answered about a different server than the one asked about. The tree is
+sanitised of the user's private infrastructure identifiers (history still holds them; recorded,
+not rewritten). 267 test files / 2221+ tests green, typecheck and production build clean.
+(2026-10-16)
+
 **v2.9.2 released — a disconnected remote project is no longer reported as a missing path.**
 Found by installing the app on the user's own machine and reading the live sidebar: main
 defines a remote project's `exists` as "its VPS is connected", and `projectState()` in the

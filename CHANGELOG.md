@@ -7,6 +7,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] — 2026-10-16
+
+### Changed — the whole interface: "Restrained Clay"
+
+The user's verdict on the previous UI was blunt and fair: flat, no depth, no hierarchy, and
+motion that was either instant or the browser's default. The restyle answers that without
+trading away the density a developer tool needs.
+
+- **A real token layer.** The app had **zero** radius and shadow variables and no motion
+  tokens at all. It now has a three-step radius scale (12/18/24), per-theme dual shadows (a
+  bright top-left highlight plus a dark bottom-right), a motion scale with a soft easing curve,
+  a z-index scale, and icon sizes. Overlays stop guessing with arbitrary `z-[N]`.
+- **The neutral ramp warms up.** Clay is a matte physical material; on the cool blue-grey the
+  app used, soft shadows read as *concrete*. Both palettes are now warm, with every text token
+  hand-recomputed so the existing WCAG contract still passes — verified, not assumed. **The
+  brand accent is untouched** at `#6D43FF`, and a test pins that it cannot drift.
+- **Depth is applied in tiers.** Full clay on the surfaces a user touches (composer, modals,
+  primary buttons, project cards, the empty state); soft clay on cards; and **no clay at all**
+  on tables, log/diff viewers, the status bar and every approval/security dialog, where
+  seriousness and readability outrank charm. The `clay-press` signature — lift on hover, press
+  in on active — is what makes a surface feel physical.
+- **Motion honours `prefers-reduced-motion`** at the stylesheet level rather than relying on
+  each component to remember.
+
+### Added — the app can update itself
+
+There was no update path whatsoever (`publish: null`, no feed reader, no UI): a user could sit
+on an old build indefinitely. The updater is **dependency-free** on purpose — the packaged app
+ships exactly one runtime dependency — and it verifies the downloaded installer against the
+release's own `SHA256SUMS.txt` **before** running it. A mismatch deletes the file and aborts; a
+release that publishes no checksum is offered as *unverified* rather than silently trusted.
+Nothing is fetched or installed without a click. The feed is a dedicated **public** repository
+holding only binaries and checksums, so the source repository stays private.
+
+### Added — image previews on attachments
+
+An attached image showed only its file name and size, so there was no way to confirm the right
+picture had been picked. The preview is generated in **main** (Electron's `nativeImage`) and
+crosses the bridge as a small data URL: the desktop path still never reaches the renderer.
+
+### Added — a Sources / Outputs panel
+
+The composer now opens a panel that states what a run may read and what it should produce:
+attached files, added folders, a GitHub repository recorded as a source, the existing
+"View all" context preview, and a declared output (file / site / folder) that is passed to the
+agent as an explicit instruction rather than left implicit. Web search is shown but
+deliberately **disabled**: it needs a new agent tool, a network policy and approvals, and
+shipping a half-wired one would be worse than naming it as not-yet-available.
+
+### Fixed — a diagnostics probe answered about the wrong server
+
+A user asked for one server's health and got another's hostname and disk back, which reasonably
+read as "these two records point at the same machine". They do not. The four named diagnostics
+require a `server_id` while the executor deliberately ignores it (a probe must never reach
+another host), so a mismatched id was accepted **silently** and the wrong machine's data was
+returned as the answer. It is now refused with a message naming both hosts, and the schemas no
+longer promise a choice the tools do not have.
+
+### Changed — the repository is safe to publish
+
+Eleven working documents and ~30 test files carried the user's real project and server names,
+plus two live VPS IPs. They are replaced with reserved documentation values (RFC 5737 addresses
+for the IPs). The git history still contains the old values, which is recorded rather than
+silently rewritten: purging it would invalidate every existing tag and release.
+
+**Suite: 267 test files / 2221+ tests green; typecheck and production build clean.**
+
+
 ## [2.9.2] — 2026-10-15
 
 ### Fixed — a disconnected remote project looked like a deleted folder
@@ -1079,7 +1147,8 @@ First stable release. Ships as a Windows x64 NSIS installer and a portable execu
   `node_modules` are shipped inside the app package.
 - Optional code signing via `CSC_LINK` / `CSC_KEY_PASSWORD` (skipped safely when absent).
 
-[Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.9.2...HEAD
+[Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.9.2...v3.0.0
 [2.9.2]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.9.1...v2.9.2
 [2.9.1]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.9.0...v2.9.1
 [2.9.0]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.8.0...v2.9.0
