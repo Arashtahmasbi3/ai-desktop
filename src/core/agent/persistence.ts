@@ -343,6 +343,18 @@ export async function migrateSettings(
       if (!isRecord(value)) continue
       const settings: ProviderSettings = {}
       if (typeof value.apiKeyEnc === 'string') settings.apiKeyEnc = value.apiKeyEnc
+      /*
+       * v3.1: the key pool. Omitting this dropped every key after the first on the next read, so a
+       * user's rotation keys vanished on restart — silent data loss, caught by the migration test
+       * rather than by review. Only non-empty strings survive, so a corrupt entry cannot smuggle a
+       * non-string into the cipher.
+       */
+      if (Array.isArray(value.apiKeysEnc)) {
+        const keys = value.apiKeysEnc.filter(
+          (entry): entry is string => typeof entry === 'string' && entry !== ''
+        )
+        if (keys.length > 0) settings.apiKeysEnc = keys
+      }
       if (typeof value.model === 'string') settings.model = value.model
       if (typeof value.baseUrl === 'string') settings.baseUrl = value.baseUrl
       next.providers[key as ProviderId] = settings

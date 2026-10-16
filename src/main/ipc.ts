@@ -71,6 +71,17 @@ export function registerIpc(
         return changed()
       }
     ],
+    /*
+     * v3.1: key management. `settings:setApiKey` replaces the provider's single key; these add and
+     * remove keys in the pool so a rate-limited credential can be rotated. Both return the whole
+     * settings view, which carries `keyCount` and never a key.
+     */
+    ['settings:addApiKey', (provider: ProviderId, apiKey: string) => services.addProviderKey(provider, apiKey)],
+    ['settings:removeApiKeyAt', (provider: ProviderId, index: number) =>
+      services.removeProviderKeyAt(provider, index)
+    ],
+    ['settings:keyHealth', () => services.agent.keyHealth()],
+
     [
       'settings:removeApiKey',
       async (provider: ProviderId) => {

@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import type { SandboxManager } from '@shared/sandbox'
 import type { AgentEvent, DiagnosticStatus, RemoteStatus, SettingsView, WorkerStatus } from '@shared/ui'
 import type { ProjectRecord } from '@shared/ui'
+import type { ProviderId } from '@shared/types'
 import type { InvestigateScope, SessionProfile } from '@shared/profile'
 import type { Persistence } from '@core/agent/persistence'
 import type { SessionStore } from '@core/agent/session-store'
@@ -516,6 +517,18 @@ export class AppServices {
       content: message.content
     }))
     return this.agent.learnFacts({ messages, task: chat.title })
+  }
+
+  /** v3.1: add a key to a provider's pool and return the redacted settings view. */
+  async addProviderKey(provider: ProviderId, apiKey: string): Promise<unknown> {
+    await this.persistence.addApiKey(provider, apiKey)
+    return this.settingsView()
+  }
+
+  /** v3.1: remove one key from a provider's pool by position. */
+  async removeProviderKeyAt(provider: ProviderId, index: number): Promise<unknown> {
+    await this.persistence.removeApiKeyAt(provider, index)
+    return this.settingsView()
   }
 
   static sessionDir(dir = appDataDir()): string {

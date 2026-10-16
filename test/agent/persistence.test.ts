@@ -103,6 +103,55 @@ describe('Persistence', () => {
     expect(serialised).not.toContain('enc:')
   })
 
+  it('still reads a settings file written by v3.0, which knew only one key (v3.1)', async () => {
+    /*
+     * The migration guarantee: an existing install's settings.json has `apiKeyEnc` and no
+     * `apiKeysEnc`. Upgrading must not lose a credential, so the file below is written by hand in
+     * the old shape rather than through the new API — writing it through the new API would test
+     * nothing about upgrades, which is exactly the kind of test that passes while the app breaks.
+     */
+    const encrypted = await cipher.encrypt('sk-from-an-older-version')
+    await fs.writeFile(
+      file,
+      JSON.stringify({
+        version: SETTINGS_SCHEMA_VERSION,
+        activeProvider: 'deepseek',
+        providers: { deepseek: { apiKeyEnc: encrypted, model: 'deepseek-chat' } }
+      }),
+      'utf8'
+    )
+
+    const store = new Persistence({ file, cipher })
+
+    expect(await store.getApiKeys('deepseek')).toEqual(['sk-from-an-older-version'])
+    expect(await store.getApiKey('deepseek')).toBe('sk-from-an-older-version')
+    expect(store.redacted().providers.deepseek).toMatchObject({ hasApiKey: true, keyCount: 0 })
+
+    // And adding a second key upgrades the file without dropping the first.
+    await store.addApiKey('deepseek', 'sk-newly-added')
+    expect(await store.getApiKeys('deepseek')).toEqual([
+      'sk-from-an-older-version',
+      'sk-newly-added'
+    ])
+    expect(store.redacted().providers.deepseek?.keyCount).toBe(2)
+  })
+
+  it('skips an undecryptable key instead of losing the whole provider (v3.1)', async () => {
+    // A corrupted entry must not make a working credential unusable.
+    const good = await cipher.encrypt('sk-still-good')
+    await fs.writeFile(
+      file,
+      JSON.stringify({
+        version: SETTINGS_SCHEMA_VERSION,
+        providers: { deepseek: { apiKeysEnc: ['not-a-ciphertext-at-all', good] } }
+      }),
+      'utf8'
+    )
+
+    const store = new Persistence({ file, cipher })
+    expect(await store.getApiKeys('deepseek')).toEqual(['sk-still-good'])
+  })
+
   it('resolves both an old single-key file and a new pool file (v3.1)', async () => {
     const store = new Persistence({ file, cipher })
     await store.setApiKeys('deepseek', ['sk-a-value', 'sk-b-value'])
@@ -110,6 +159,14 @@ describe('Persistence', () => {
     expect(await store.getApiKeys('deepseek')).toHaveLength(2)
     // `getApiKey` is the first of the pool, so older callers keep working unchanged.
     expect(await store.getApiKey('deepseek')).toBe('sk-a-value')
+
+    /*
+     * A restarted app: a brand-new instance reading the same file. This is the assertion that
+     * matters, because the migration step drops fields it does not know — and dropping
+     * `apiKeysEnc` silently lost every key after the first until the test above caught it.
+     */
+    const restarted = new Persistence({ file, cipher })
+    expect(await restarted.getApiKeys('deepseek')).toEqual(['sk-a-value', 'sk-b-value'])
 
     await store.removeApiKeyAt('deepseek', 0)
     expect(await store.getApiKeys('deepseek')).toEqual(['sk-b-value'])

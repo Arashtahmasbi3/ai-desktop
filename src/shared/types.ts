@@ -181,6 +181,21 @@ export interface CustomProviderTestResult {
   message?: string
 }
 
+/** One key's health, as the UI may see it (v3.1). Never carries the key itself. */
+export interface ProviderKeyHealth {
+  id: string
+  label?: string
+  state: 'ready' | 'cooling'
+  failures: number
+  cooldownUntil?: number
+}
+
+/** A provider's key pool state (v3.1). */
+export interface ProviderKeyHealthView {
+  provider: string
+  keys: ProviderKeyHealth[]
+}
+
 /** The contract every provider adapter must fulfil. */
 export interface BaseLLMAdapter {
   readonly provider: ProviderId
