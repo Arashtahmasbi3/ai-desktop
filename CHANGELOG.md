@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.1] — 2026-10-16
+
+### Fixed — dropping a file no longer opens it as a project
+
+Two things were wrong, and the second was worse than the gap:
+
+- There was **no paste or drag-drop attachment path** at all.
+- The **only** drop handler in the tree treated every dropped item as a **project**, so dropping a
+  screenshot onto the window opened a project named `screenshot.png` pointing at a file.
+
+### Added — attach by dropping or pasting
+
+- The composer intercepts its own drops (with `stopPropagation`, which is the line that stops the
+  app-level handler from also opening a project), so **dropping onto the chat attaches** while
+  dropping elsewhere keeps the existing behaviour. It also shows itself as a drop target while a file
+  is held over it.
+- **Paste attaches a real file** copied in a file manager, and leaves an ordinary **text** paste
+  completely alone so typing behaves exactly as before.
+- A bitmap from a screenshot tool carries image data with **no file behind it**, so there is no path
+  for main to register. That case is reported rather than dropped silently; supporting it needs main
+  to accept renderer-provided bytes, which is a separate, security-relevant change and is not
+  pretended otherwise.
+- The decision lives in a pure helper, because each direction of getting it wrong is a real bug:
+  attaching when the user meant to paste text breaks typing, ignoring a real file loses their action.
+  The picker, the drop and the paste all go through one path, and **main remains the only side that
+  reads a file** — it stats it, refuses a credential-shaped path and returns an opaque id.
+
+**Suite green at 284 test files / 2393 tests; typecheck and production build clean.**
+
+
 ## [3.2.0] — 2026-10-16
 
 ### Added — decision checkpoints
@@ -1271,7 +1301,8 @@ First stable release. Ships as a Windows x64 NSIS installer and a portable execu
   `node_modules` are shipped inside the app package.
 - Optional code signing via `CSC_LINK` / `CSC_KEY_PASSWORD` (skipped safely when absent).
 
-[Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v3.2.0...HEAD
+[Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v3.2.1...HEAD
+[3.2.1]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v3.2.0...v3.2.1
 [3.2.0]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v3.1.1...v3.2.0
 [3.1.1]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v3.1.0...v3.1.1
 [3.1.0]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v3.0.0...v3.1.0

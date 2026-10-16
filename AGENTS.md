@@ -51,6 +51,18 @@ fails, a tool is missing, or the budget ran out — ask rather than guess).
 
 ## Status
 
+**v3.2.1 released — attach by dropping or pasting, instead of opening a project.** Closing the
+approved plan's item 4. The app had **no** paste or drag-drop attachment path, and the only drop
+handler in the tree treated every dropped item as a **project** — dropping a screenshot opened a
+project named `screenshot.png` pointing at a file. The composer now intercepts its own drops (with
+`stopPropagation`, so the app-level handler cannot also open a project) and shows itself as a drop
+target; a real file pasted from a file manager attaches, while an ordinary **text** paste is left
+entirely alone. A screenshot tool's bitmap has no file behind it and is reported rather than dropped
+silently — supporting it needs main to accept renderer-provided bytes, a separate security-relevant
+change. The decision is a pure, tested helper because each direction of getting it wrong is a bug;
+main remains the only side that reads a file. 284 test files / 2393 tests green, typecheck and
+production build clean. (2026-10-16)
+
 **v3.2.0 released — decision checkpoints.** The last item of phase 4, and with it phase 4 is
 complete. Per step the app already knew what the agent intended and what it chose; it can now judge
 **how much a decision matters** by whether it can be undone, keep an **append-only log** of the
