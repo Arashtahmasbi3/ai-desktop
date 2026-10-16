@@ -51,6 +51,17 @@ fails, a tool is missing, or the budget ran out — ask rather than guess).
 
 ## Status
 
+**v3.1.0 released — the app remembers the project, and a spend cap that stops a send.** Phase 4
+of the approved plan: a **project fact ledger** with validity windows (a newer observation
+supersedes an older one and keeps its history; facts reach the prompt as dated prior beliefs
+that a current observation overrides; an invented `supersedes` id cannot invalidate anything;
+learning is one bounded call that can never break a session) with a Settings → Memory view that
+shows live, superseded and expired facts and can delete them. Plus a daily spend cap that warns
+and then **refuses the send before the call**, reports an unpriced model as a lower bound rather
+than counting it as free, and a flaky sandbox test fixed. Still outstanding from phase 4: key
+rotation with a circuit breaker and 429-aware backoff, and decision-checkpoint mode. 276 test
+files / 2312 tests green, typecheck and production build clean. (2026-10-16)
+
 **v3.0.0 released — Restrained Clay, auto-update, image previews.** The whole interface moved
 onto a real design-token layer (three-step radius, per-theme dual shadows, motion and z-index
 scales, a warmer neutral ramp with the brand accent pinned by a test) and clay depth is applied

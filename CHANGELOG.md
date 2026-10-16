@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.0] — 2026-10-16
+
+### Added — the app remembers your project
+
+The verified gap: beyond `AGENTS.md`/`AI_CONTEXT.md` truncated to a character budget there was
+**no cross-session memory at all** — no embedding, no vector store, no graph anywhere in `src/`.
+
+It is now a **fact ledger**: statements with a validity window. A new observation *supersedes* an
+older one instead of overwriting it, so "staging listens on 3001" is not deleted when it becomes
+false — it becomes false *from a date*, and both "what is it now" and "what was it then" stay
+answerable. The window closes at the same instant the next one opens, so the timeline has no gap
+and no overlap.
+
+- Facts are injected into the system prompt as **prior beliefs, with the date each was
+  observed**, and framed so a current observation wins: a memory that quietly overrides what the
+  agent can see would be worse than none.
+- **The ledger is bounded** (1200 characters) so memory can never crowd out the task.
+- **Learning is one bounded call** (at most five facts, the last 24 messages, character-capped)
+  and can never break a session: a provider error, a junk reply or an empty chat returns
+  *why*, not an exception.
+- **An invented `supersedes` id cannot invalidate anything** — only ids the model was shown are
+  honoured, so a hallucination cannot close somebody else's belief.
+- **Settings → Memory** lists what the app believes, newest first, with superseded facts
+  de-emphasised but **never hidden** (that history is the point), a per-fact delete, and
+  "forget everything" behind a confirm.
+
+### Added — a spend cap that stops a send
+
+Usage and cost were already recorded and shown; what was missing is the part that acts. A daily
+cap now warns at a threshold and **refuses the send at the cap, before the call** — checking
+afterwards would report a cost already paid. A model with no published price is reported as
+making the total a lower bound rather than counted as free. Settings → Usage configures it, the
+status bar shows it (only when a cap exists), and a refusal names the number and the way out.
+
+### Fixed
+
+- A flaky sandbox test: it ran `sleep 5` against vitest's default 5s test timeout, so under the
+  parallel suite it failed as "Test timed out in 5000ms" rather than as a regression.
+
+**Suite: 276 test files / 2312 tests green; typecheck and production build clean.**
+
+
 ## [3.0.0] — 2026-10-16
 
 ### Changed — the whole interface: "Restrained Clay"
@@ -1147,7 +1189,8 @@ First stable release. Ships as a Windows x64 NSIS installer and a portable execu
   `node_modules` are shipped inside the app package.
 - Optional code signing via `CSC_LINK` / `CSC_KEY_PASSWORD` (skipped safely when absent).
 
-[Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v3.0.0...HEAD
+[Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v3.1.0...HEAD
+[3.1.0]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.9.2...v3.0.0
 [2.9.2]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.9.1...v2.9.2
 [2.9.1]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v2.9.0...v2.9.1
