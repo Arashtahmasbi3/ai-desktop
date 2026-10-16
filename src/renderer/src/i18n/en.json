@@ -264,7 +264,8 @@
     "liveElapsedSuffix": "· {{seconds}}s",
     "goalSummaryTitle": "Ongoing goal",
     "approvalGrantServer": "Approve every command on {{server}} for 30 minutes",
-    "approvalGrantScope": "Scoped to this server and this project, expires automatically, revocable from the composer. The deny list still blocks dangerous commands, and nothing is remembered permanently."
+    "approvalGrantScope": "Scoped to this server and this project, expires automatically, revocable from the composer. The deny list still blocks dangerous commands, and nothing is remembered permanently.",
+    "pasteImageUnsupported": "This image was copied without a file behind it, so it cannot be attached yet. Save it, then drop the file here or use the paperclip."
   },
   "vpsSelector": {
     "label": "VPS",

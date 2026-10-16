@@ -44,6 +44,7 @@ import { FullAccessBanner, FullAccessToggle } from './FullAccessToggle'
 import { filterSlashCommands, resolveSlashCommand } from '../lib/slash'
 import { decideSend, type PendingAttachment } from '../lib/context-gate'
 import { modelSupportsVision } from '@shared/attachments'
+import { attachmentPaths, dedupePaths, pasteIntent } from '../lib/attach-drop'
 import { workspaceStatus, shouldShowWorkspaceBanner } from '../lib/project-status'
 import { CHAT_MAX_WIDTH } from '../lib/layout'
 import { visibleChatMessages } from '../lib/tool-rows'
@@ -107,6 +108,8 @@ export default function ChatPanel(): JSX.Element {
    * gives back an opaque id; the chip shows the name so the user sees what will be sent.
    */
   const [attached, setAttached] = useState<PendingAttachment[]>([])
+  /** v3.1: true while a file is held over the composer, so the drop target is visible. */
+  const [attachDragOver, setAttachDragOver] = useState(false)
   const pushToast = useStore((state) => state.pushToast)
   // v2.9.0: whether the selected model can actually be shown an image. Mirrors each
   // adapter's getCapabilities().vision, which stays the runtime authority.
@@ -313,17 +316,21 @@ export default function ChatPanel(): JSX.Element {
     if (picked) await addProject(basename(picked), picked)
   }
 
-  const attach = async (): Promise<void> => {
-    const picked = await window.api.dialog.pickFile()
-    if (picked.length === 0) return
-    // Main is the only side that reads the file: it stat()s it, refuses a
-    // credential-shaped path, and returns an opaque id.
-    const refs = await window.api.attachments.register(picked)
+  /**
+   * v3.1: attach files by path — the one path shared by the picker, a drop and a paste.
+   *
+   * Main remains the only side that reads a file: it stat()s it, refuses a credential-shaped path
+   * and returns an opaque id, so nothing here widens what the renderer may see.
+   */
+  const attachPaths = async (input: string[]): Promise<void> => {
+    const paths = dedupePaths(input)
+    if (paths.length === 0) return
+    const refs = await window.api.attachments.register(paths)
     if (refs.length === 0) {
       pushToast('error', t('chat.attachFailed'))
       return
     }
-    if (refs.length < picked.length) pushToast('warning', t('chat.attachSkipped'))
+    if (refs.length < paths.length) pushToast('warning', t('chat.attachSkipped'))
     setAttached((current) => [
       ...current,
       ...refs.map((ref) => ({
@@ -336,6 +343,55 @@ export default function ChatPanel(): JSX.Element {
         ...(ref.thumbnail ? { thumbnail: ref.thumbnail } : {})
       }))
     ])
+  }
+
+  const attach = async (): Promise<void> => {
+    await attachPaths(await window.api.dialog.pickFile())
+  }
+
+  /** The OS paths of a dropped or pasted payload, via the pure helper the tests can drive. */
+  const pathsFrom = (data: DataTransfer | null): string[] =>
+    attachmentPaths(data?.files ?? null, (entry) =>
+      window.api.webUtils.pathForFile(entry as File)
+    )
+
+  /**
+   * v3.1: a drop on the composer attaches.
+   *
+   * `stopPropagation` is the important line: the app-level drop handler adds whatever is dropped as
+   * a **project**, so without it dropping a screenshot opens it as a project instead of attaching it.
+   */
+  const onComposerDrop = (event: React.DragEvent): void => {
+    event.preventDefault()
+    event.stopPropagation()
+    setAttachDragOver(false)
+    void attachPaths(pathsFrom(event.dataTransfer))
+  }
+
+  /**
+   * v3.1: a paste attaches the files it carries, and is otherwise left completely alone so pasting
+   * text into the composer behaves exactly as it did before.
+   */
+  const onComposerPaste = (event: React.ClipboardEvent): void => {
+    /*
+     * The decision is a pure function so it can be tested directly: attaching when the user meant to
+     * paste text would break typing, and ignoring a real file would lose their action.
+     */
+    const intent = pasteIntent({
+      files: event.clipboardData?.files ?? null,
+      items: event.clipboardData?.items ?? null,
+      pathForFile: (entry) => window.api.webUtils.pathForFile(entry as File)
+    })
+    if (intent === 'attach') {
+      event.preventDefault()
+      void attachPaths(pathsFrom(event.clipboardData))
+      return
+    }
+    if (intent === 'image-unsupported') {
+      event.preventDefault()
+      pushToast('warning', t('chat.pasteImageUnsupported'))
+    }
+    // 'text' falls through untouched, so an ordinary paste behaves exactly as before.
   }
 
   /**
@@ -554,8 +610,25 @@ export default function ChatPanel(): JSX.Element {
           ) : null}
 
           {/* v3.0 clay: the composer is the app's primary touchable surface — the full
-              clay tier. The field is a recessed well inside the raised hero. */}
-          <div className="clay-hero p-2">
+              clay tier. The field is a recessed well inside the raised hero.
+              v3.1: this is also where a drop or a paste lands, so the handlers sit on
+              the hero rather than on the textarea — the whole composer is the target,
+              which is what a user aims at. */}
+          <div
+            className={`clay-hero p-2 transition-shadow duration-base ${
+              attachDragOver ? 'ring-2 ring-accent' : ''
+            }`}
+            data-testid="composer-hero"
+            onDragOver={(event) => {
+              // preventDefault is what makes this element a valid drop target at all.
+              event.preventDefault()
+              event.stopPropagation()
+              setAttachDragOver(true)
+            }}
+            onDragLeave={() => setAttachDragOver(false)}
+            onDrop={onComposerDrop}
+            onPaste={onComposerPaste}
+          >
           <div className="flex items-end gap-2">
             <button
               type="button"
