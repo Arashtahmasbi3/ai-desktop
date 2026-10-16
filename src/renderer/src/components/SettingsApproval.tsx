@@ -9,6 +9,7 @@ export default function SettingsApproval(): JSX.Element {
   const settings = useStore((state) => state.settings)
   const setApprovalMode = useStore((state) => state.setApprovalMode)
   const setRememberApprovalMode = useStore((state) => state.setRememberApprovalMode)
+  const setCheckpointMode = useStore((state) => state.setCheckpointMode)
 
   return (
     <section className="flex flex-col gap-3">
@@ -52,6 +53,36 @@ export default function SettingsApproval(): JSX.Element {
           />
           {t('settings.rememberApprovalMode')}
         </label>
+      </div>
+
+      {/*
+        v3.1: decision checkpoints. Deliberately its own card rather than a fourth approval mode —
+        it answers a different question ("which decisions should I be able to review?") and it can
+        ask even when the approval mode above would have proceeded.
+      */}
+      <div className="flex flex-col gap-2 rounded-lg border border-border bg-bg-primary p-3">
+        <div>
+          <p className="text-xs font-medium text-fg">{t('settings.checkpointTitle')}</p>
+          <p className="mt-0.5 text-2xs text-fg-muted">{t('settings.checkpointHint')}</p>
+        </div>
+        {(
+          [
+            ['off', 'settings.checkpointOff'],
+            ['record', 'settings.checkpointRecord'],
+            ['confirm', 'settings.checkpointConfirm']
+          ] as const
+        ).map(([value, labelKey]) => (
+          <label key={value} className="flex cursor-pointer items-center gap-2 text-xs text-fg">
+            <input
+              type="radio"
+              name="checkpoint-mode"
+              checked={(settings?.checkpointMode ?? 'off') === value}
+              onChange={() => void setCheckpointMode(value)}
+              className="accent-accent"
+            />
+            {t(labelKey)}
+          </label>
+        ))}
       </div>
 
       <ApprovedCommandsSection />

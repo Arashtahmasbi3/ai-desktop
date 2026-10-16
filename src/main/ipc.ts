@@ -3,6 +3,7 @@ import type { CustomProviderInput, ProviderId } from '@shared/types'
 import type { ApprovalMode, ApprovalOutcome } from '@shared/approval'
 import type { InvestigateScope, SessionProfile } from '@shared/profile'
 import type { PlanDecision } from '@shared/plan'
+import type { CheckpointMode } from '@shared/decision-checkpoint'
 import type { PreflightChoice } from '@shared/preflight'
 import type { ProjectMetadataPatch } from '@shared/project-metadata'
 import type { GitCommitInput } from '@shared/github'
@@ -117,6 +118,18 @@ export function registerIpc(
           await services.sessionProfile.setProfile('develop')
           await services.sessionProfile.revokeElevation()
         }
+        return changed()
+      }
+    ],
+    /*
+     * v3.1: decision checkpoints. `off` writes nothing; `record` keeps a durable log of
+     * consequential decisions; `confirm` also stops before one. Returns the whole settings view so
+     * the UI refreshes from one source.
+     */
+    [
+      'settings:setCheckpointMode',
+      async (mode: CheckpointMode) => {
+        await services.persistence.setCheckpointMode(mode)
         return changed()
       }
     ],

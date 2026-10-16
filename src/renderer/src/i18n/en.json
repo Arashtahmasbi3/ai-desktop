@@ -531,7 +531,12 @@
     "budgetCap": "Cap (USD, 0 = off)",
     "budgetBlock": "Refuse to send when the cap is reached",
     "budgetHint": "Counted from the calls this app recorded today, using published per-model prices. A send is refused only while the option above is on.",
-    "budgetUnpriced": "At least one call today used a model with no published price, so this total is a lower bound."
+    "budgetUnpriced": "At least one call today used a model with no published price, so this total is a lower bound.",
+    "checkpointTitle": "Decision checkpoints",
+    "checkpointHint": "A durable record of the decisions that matter, judged by whether they can be undone. In \"confirm\", anything that cannot be undone is put to you even when the approval mode above would have proceeded.",
+    "checkpointOff": "Off — record nothing",
+    "checkpointRecord": "Record consequential decisions",
+    "checkpointConfirm": "Ask before a change (and always before an irreversible one)"
   },
   "github": {
     "title": "GitHub",

@@ -79,6 +79,13 @@ import type { CustomProviderStore } from './custom-providers'
 import { existsSync } from 'node:fs'
 import { loadProjectMemory } from './project-memory'
 import { renderFactLedger, type ProjectFact, type TranscriptMessage } from '@shared/memory-facts'
+import {
+  classifyImpact,
+  describeAction,
+  recordsCheckpoints,
+  type CheckpointMode
+} from '@shared/decision-checkpoint'
+import type { CheckpointStore } from './checkpoint-store'
 import type { FactStore } from './fact-store'
 import { FactLearner, type LearnResult } from './fact-learning'
 
@@ -438,6 +445,8 @@ export interface AgentServiceOptions {
   vps?: RemoteHost
   /** Optional: detaches long remote commands as tracked jobs (v2.4, A.1). */
   jobs?: RemoteJobRunner
+  /** v3.1: where decision checkpoints are recorded. */
+  checkpoints?: CheckpointStore
   /**
    * v3.1: the project fact ledger. When present, what earlier sessions learned about the active
    * project is added to the system prompt, and learnFacts() can grow it.
@@ -592,6 +601,11 @@ export class AgentService {
    * and the round-robin cursor keeps rotating instead of restarting at key one every run.
    */
   private readonly keyPools = new Map<string, KeyPool>()
+  /**
+   * v3.1: decision checkpoints. The store is injected; the mode is read once per run so every
+   * decision in a run is judged by the same rule.
+   */
+  private readonly checkpoints?: CheckpointStore
   private readonly facts?: FactStore
   private readonly planTrust: PlanTrustRegistry
   private runCounter = 0
@@ -607,6 +621,7 @@ export class AgentService {
     this.now = options.now ?? (() => Date.now())
     if (options.userDataDir) this.userDataDir = options.userDataDir
     if (options.facts) this.facts = options.facts
+    if (options.checkpoints) this.checkpoints = options.checkpoints
     this.planTrust = new PlanTrustRegistry(() => this.now())
     if (options.customProviders) this.customProviders = options.customProviders
     if (options.vps) this.vps = options.vps
@@ -1091,6 +1106,31 @@ export class AgentService {
     const approvalMode =
       profileState?.approvalMode ?? settings.approvalMode ?? DEFAULT_APPROVAL_MODE
     const planMode = request.planMode ?? profileState?.planMode ?? settings.planModeDefault ?? false
+    /*
+     * v3.1: read the checkpoint mode once for the whole run. A run that changed its mind halfway
+     * would be worse than either behaviour, and it keeps the gate's per-action judgement cheap.
+     */
+    const checkpointMode: CheckpointMode = this.checkpoints
+      ? ((await this.persistence.getCheckpointMode()) as CheckpointMode)
+      : 'off'
+    const checkpointing = this.checkpoints !== undefined && recordsCheckpoints(checkpointMode)
+    /**
+     * Judge one action against the project the run is actually working in.
+     *
+     * `productionHost` is deliberately not passed here: the host policy is evaluated at the **SSH
+     * layer** (`SshManager.exec`), and a second opinion derived from a different source would be a
+     * way for the two to disagree. The classifier supports the input and is tested with it; this
+     * call site passes what it can actually see — the tool, its arguments, credentials and
+     * destructive command patterns.
+     */
+    const judge = (
+      action: { name: string; arguments: Record<string, unknown> }
+    ): ReturnType<typeof classifyImpact> =>
+      classifyImpact({
+        tool: action.name,
+        args: action.arguments ?? {},
+        ...(activeProject && activeProject.type !== 'remote' ? { projectRoot: activeProject.path } : {})
+      })
     const requestApproval = this.requestApproval
     const requestPlan = this.requestPlan
     const now = (): number => this.now()
@@ -1149,7 +1189,51 @@ export class AgentService {
           requestApproval: (action, reason) => requestApproval(runId, action, reason),
           reasonFor: (action) =>
             activeTrust() ? 'outside_plan' : describeApprovalReason(action),
-          onSuggestion: (tool, count) => this.emit({ type: 'approval:suggestion', tool, count })
+          onSuggestion: (tool, count) => this.emit({ type: 'approval:suggestion', tool, count }),
+          ...(checkpointing && this.checkpoints
+            ? {
+                checkpoint: {
+                  mode: checkpointMode,
+                  classify: judge,
+                  record: async (input: {
+                    action: { name: string; arguments: Record<string, unknown> }
+                    verdict: ReturnType<typeof classifyImpact>
+                  }) => {
+                    const checkpoint = {
+                      id: `cp-${runId}-${this.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+                      runId,
+                      ...(activeProject ? { projectId: activeProject.id } : {}),
+                      intent: (request.task ?? '').slice(0, 300),
+                      action: describeAction(input.action.name, input.action.arguments),
+                      impact: input.verdict.impact,
+                      reason: input.verdict.reason,
+                      at: this.now()
+                    }
+                    // A project is required: the log is per project, and an unscoped record would be
+                    // unfindable. Recording is best-effort — a checkpoint must never fail a run.
+                    if (!activeProject) return undefined
+                    await this.checkpoints!.append(checkpoint).catch(() => undefined)
+                    return checkpoint.id
+                  },
+                  resolve: async (id: string, decision: 'approved' | 'rejected' | 'timeout') => {
+                    if (!activeProject) return
+                    await this.checkpoints!
+                      .append({
+                        id: `${id}-result`,
+                        runId,
+                        projectId: activeProject.id,
+                        intent: 'resolution',
+                        action: id,
+                        impact: 'routine',
+                        reason: decision,
+                        at: this.now(),
+                        resolved: { decision, at: this.now() }
+                      })
+                      .catch(() => undefined)
+                  }
+                }
+              }
+            : {})
         })
       : undefined
 
@@ -1157,7 +1241,16 @@ export class AgentService {
     // and only within the exact scope it was granted for (v2.6.2 T4.2).
     const approvalGate = baseGate
       ? async (action: AgentAction): Promise<boolean> => {
-          if (shouldAutoApprove(activeTrust(), action, now(), planScope)) return true
+          if (shouldAutoApprove(activeTrust(), action, now(), planScope)) {
+            /*
+             * v3.1: a trusted plan auto-approves its own steps *before* the gate is consulted, so a
+             * checkpoint that lived only inside the gate would be skipped for exactly the runs that
+             * mutate the most. A trusted plan is consent to the plan, not to the irreversible:
+             * anything that cannot be undone still goes through the gate and therefore to the user.
+             */
+            const verdict = checkpointing ? judge(action) : undefined
+            if (!(checkpointMode === 'confirm' && verdict?.impact === 'irreversible')) return true
+          }
           return baseGate(action)
         }
       : undefined
@@ -1388,6 +1481,15 @@ export class AgentService {
       complete: (prompt) => this.completeOnce(prompt)
     })
     return learner.learn({ projectId: project.id, task: input.task, messages: input.messages })
+  }
+
+  /** v3.1: the active project's decision log, newest first. */
+  async checkpointsForProject(limit?: number): Promise<unknown[]> {
+    const project = this.persistence.getActiveProject()
+    if (!this.checkpoints || !project) return []
+    return limit === undefined
+      ? this.checkpoints.list(project.id)
+      : this.checkpoints.list(project.id, limit)
   }
 
   /** Everything ever learned about the active project, for the Settings view. */

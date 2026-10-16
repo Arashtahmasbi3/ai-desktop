@@ -6,6 +6,7 @@ import type {
 } from '@shared/approval'
 import type { AgentAction } from '@shared/agent'
 import { classifyAction, isDenyListedAction, requiresApproval } from '@core/agent/approval'
+import { type CheckpointMode, type ImpactVerdict } from '@shared/decision-checkpoint'
 import type { ApprovedCommands } from '@core/agent/approved-commands'
 import { canRememberTool, createRememberedApproval } from '@core/agent/remember-policy'
 import { isCommandAlwaysAllowed, isReadOnlyShellCommand } from '@core/remote/command-whitelist'
@@ -37,6 +38,8 @@ export interface ApprovalGateOptions {
   suggestionAt?: number
   /** Notified when the same tool crosses the suggestion threshold. */
   onSuggestion?: (tool: string, count: number) => void
+  /** v3.1: judge and record consequential actions, and optionally pause for them. */
+  checkpoint?: ApprovalCheckpoint
 }
 
 const DEFAULT_SUGGESTION_AT = 3
@@ -50,6 +53,27 @@ const DEFAULT_SUGGESTION_AT = 3
 const READ_ONLY_REMOTE_TOOLS = new Set(
   [...READ_ONLY_TOOL_NAMES].filter((name) => name !== 'read_file' && name !== 'list_dir')
 )
+
+/**
+ * v3.1: decision checkpoints.
+ *
+ * \`classify\` judges how much an action matters and \`record\` appends it to the durable log. In
+ * \`confirm\` mode an **irreversible** action is put to the user even when it would otherwise have
+ * been auto-approved or remembered: "you told me this tool is fine" is not the same statement as
+ * "go ahead and delete it", and that gap is the entire point of a checkpoint.
+ */
+export interface ApprovalCheckpoint {
+  mode: CheckpointMode
+  classify: (action: { name: string; arguments: Record<string, unknown> }) => ImpactVerdict
+  /** Build and persist a record. Returns the id so the resolution can be attached to it. */
+  record: (input: {
+    action: { name: string; arguments: Record<string, unknown> }
+    verdict: ImpactVerdict
+    intent?: string
+  }) => Promise<string | undefined>
+  /** Called after the user answered, so the log says how it ended rather than only what was asked. */
+  resolve?: (id: string, decision: 'approved' | 'rejected' | 'timeout') => Promise<void>
+}
 
 export interface ApprovalRequirement {
   required: boolean
@@ -137,9 +161,33 @@ export function createApprovalGate(
 
   return async (action: AgentAction): Promise<boolean> => {
     const denyListed = isDenyListedAction(action)
+
+    /*
+     * v3.1: judge the action once, up front, and write it down before anything else can decide to
+     * skip it. A record that only exists when the user was asked would miss exactly the decisions
+     * the app took on its own — which are the ones a review is for.
+     */
+    const verdict = options.checkpoint
+      ? options.checkpoint.classify({ name: action.name, arguments: action.arguments ?? {} })
+      : undefined
+    const consequential = verdict !== undefined && verdict.impact !== 'routine'
+    const recordId =
+      options.checkpoint && verdict && (options.checkpoint.mode !== 'off')
+        ? await options.checkpoint
+            .record({ action: { name: action.name, arguments: action.arguments ?? {} }, verdict })
+            .catch(() => undefined)
+        : undefined
+
     if (!denyListed) {
       if (approvedCommands?.isApproved(action.name, action.arguments, sessionId, scope)) {
-        return true
+        /*
+         * A remembered approval covers an ordinary change, but not something that cannot be undone.
+         * If it did, the checkpoint would be decorative: the noisiest, most dangerous actions are
+         * exactly the ones a user is tempted to "always allow".
+         */
+        if (!(options.checkpoint?.mode === 'confirm' && verdict?.impact === 'irreversible')) {
+          return true
+        }
       }
       /*
        * v2.8.1: a scoped, expiring server grant suppresses the *user approval* only. It sits
@@ -147,8 +195,16 @@ export function createApprovalGate(
        * auto-approved; the host policy, remote path containment, the secret-path guard, the
        * rate limiter and the audit log all run downstream and are unaffected.
        */
-      if (scope && approvedCommands?.isServerGranted(scope)) return true
-      if (!requiresApproval(options.mode, action)) return true
+      if (scope && approvedCommands?.isServerGranted(scope)) {
+        // Same rule as a remembered approval: a time-boxed grant is not consent to the irreversible.
+        if (!(options.checkpoint?.mode === 'confirm' && verdict?.impact === 'irreversible')) {
+          return true
+        }
+      }
+      if (!requiresApproval(options.mode, action)) {
+        // v3.1: confirm mode asks about a consequential action the mode would have allowed.
+        if (!(options.checkpoint?.mode === 'confirm' && consequential)) return true
+      }
       // v2.5.5: a whitelisted or read-only command (and the remote read-only
       // tools) never pushes a prompt. Containment is still enforced downstream.
       if (!shouldRequireApproval(action).required) return true
@@ -156,6 +212,11 @@ export function createApprovalGate(
 
     const reason = options.reasonFor?.(action) ?? shouldRequireApproval(action).reason
     const outcome = await options.requestApproval(action, reason)
+    if (recordId && options.checkpoint?.resolve) {
+      await options.checkpoint
+        .resolve(recordId, outcome.approved ? 'approved' : 'rejected')
+        .catch(() => undefined)
+    }
     if (!outcome.approved) return false
 
     if (outcome.remember && !denyListed) await remember(action, outcome.remember)

@@ -10,6 +10,7 @@ import type { ChatMessage, ProviderId, Usage } from './types'
 import type { VpsConnectionState } from './vps'
 import type { ApprovalMode, ApprovalReason } from './approval'
 import type { Plan, ApprovedPlan, PlanDecision, PlanWarning } from './plan'
+import type { CheckpointMode } from './decision-checkpoint'
 import type { ProjectMetadata } from './project-metadata'
 import type { ResolvedProfile } from './profile'
 import type { TaskPlan, TaskStep } from './task-plan'
@@ -63,6 +64,12 @@ export interface SettingsView {
   /** When the agent must ask before acting. */
   approvalMode?: ApprovalMode
   rememberApprovalMode?: boolean
+  /**
+   * v3.1: `off` (default) / `record` / `confirm` decision checkpoints. Present so the UI can show
+   * the current mode; `off` is reported as `off` rather than omitted, because "not set" and
+   * "deliberately off" look the same to a user and only one of them is a decision.
+   */
+  checkpointMode?: CheckpointMode
   /** Whether new chats start in Plan Mode. */
   planModeDefault?: boolean
   /** Effective Session Profile + elevation state (v2.6.2, Topic 1). */

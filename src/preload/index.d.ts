@@ -9,6 +9,7 @@ import type { AttachmentRefView } from '@shared/attachments'
 import type { UpdateCheckResult, UpdateDownloadResult } from '@shared/update'
 import type { LearnResultView, ProjectFact } from '@shared/memory-facts'
 import type { ProviderKeyHealthView } from '@shared/types'
+import type { CheckpointMode } from '@shared/decision-checkpoint'
 import type { ApprovalMode, ApprovalHistoryEntry, ApprovalOutcome, ApprovedCommandView } from '@shared/approval'
 import type { PlanDecision } from '@shared/plan'
 import type { PreflightChoice } from '@shared/preflight'
@@ -85,6 +86,7 @@ export interface Api {
   }
   settings: {
     get(): Promise<SettingsView>
+    setCheckpointMode(mode: CheckpointMode): Promise<SettingsView>
     setApiKey(provider: ProviderId, apiKey: string): Promise<SettingsView>
     /** v3.1: grow the provider's key pool (rotation) and prune it. */
     addApiKey(provider: ProviderId, apiKey: string): Promise<SettingsView>

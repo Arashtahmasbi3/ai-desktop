@@ -3,6 +3,7 @@ import type { CustomProviderInput, CustomProviderTestResult, CustomProviderView,
 import type { OnboardingStatus } from '@shared/onboarding'
 import type { LearnResultView, ProjectFact } from '@shared/memory-facts'
 import type { ProviderKeyHealthView } from '@shared/types'
+import type { CheckpointMode } from '@shared/decision-checkpoint'
 import type { ApprovalMode, ApprovalHistoryEntry, ApprovalOutcome, ApprovedCommandView } from '@shared/approval'
 import type { InvestigateScope, ResolvedProfile, SessionProfile } from '@shared/profile'
 import type { PlanDecision } from '@shared/plan'
@@ -84,6 +85,8 @@ export const api = {
 
   settings: {
     get: (): Promise<SettingsView> => invoke('settings:get'),
+    setCheckpointMode: (mode: CheckpointMode): Promise<SettingsView> =>
+      invoke('settings:setCheckpointMode', mode),
     setApiKey: (provider: ProviderId, apiKey: string): Promise<SettingsView> =>
       invoke('settings:setApiKey', provider, apiKey),
     /** v3.1: grow the provider's key pool (rotation) and prune it. */

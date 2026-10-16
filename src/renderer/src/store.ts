@@ -52,6 +52,7 @@ import {
   saveUsage,
   type UsageRecord
 } from './lib/usage'
+import type { CheckpointMode } from '@shared/decision-checkpoint'
 import { budgetBlockMessage, budgetState, readBudget } from './lib/budget'
 import { redact } from '@core/agent/redact'
 import i18n from './i18n'
@@ -542,6 +543,8 @@ interface AppState {
   rememberApprovalTool: (tool: string) => Promise<void>
   dismissApprovalSuggestion: () => void
   setRememberApprovalMode: (enabled: boolean) => Promise<void>
+  /** v3.1: off / record / confirm decision checkpoints. */
+  setCheckpointMode: (mode: CheckpointMode) => Promise<void>
   applyFileChange: (id: string) => Promise<void>
   rejectFileChange: (id: string) => Promise<void>
   pushToast: (kind: ToastKind, message: string) => void
@@ -1059,6 +1062,9 @@ export const useStore = create<AppState>((set, get) => ({
   },
   async setRememberApprovalMode(enabled) {
     set({ settings: await window.api.settings.setRememberApprovalMode(enabled) })
+  },
+  async setCheckpointMode(mode) {
+    set({ settings: await window.api.settings.setCheckpointMode(mode) })
   },
   async setPlanModeDefault(value) {
     set({ settings: await window.api.settings.setPlanModeDefault(value) })

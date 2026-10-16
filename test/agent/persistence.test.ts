@@ -177,6 +177,40 @@ describe('Persistence', () => {
     expect(store.redacted().providers.deepseek?.keyCount).toBe(0)
   })
 
+  it('defaults decision checkpoints to off and round-trips a real mode (v3.1)', async () => {
+    const store = new Persistence({ file, cipher })
+
+    // Off by default: a log nothing reads and prompts nobody asked for are not features.
+    expect(await store.getCheckpointMode()).toBe('off')
+
+    await store.setCheckpointMode('confirm')
+    expect(await store.getCheckpointMode()).toBe('confirm')
+
+    // A restart keeps the choice — and keeps it for a *new* instance, not just this one.
+    const restarted = new Persistence({ file, cipher })
+    expect(await restarted.getCheckpointMode()).toBe('confirm')
+
+    // Turning it off clears the field rather than storing a no-op, so a file that never opted in
+    // stays byte-identical to one written before this feature existed.
+    await store.setCheckpointMode('off')
+    const written = JSON.parse(await fs.readFile(file, 'utf8')) as {
+      checkpointMode?: string
+    }
+    expect(written.checkpointMode).toBeUndefined()
+    expect(await store.getCheckpointMode()).toBe('off')
+  })
+
+  it('falls back to off, not to blocking, for a junk checkpoint mode (v3.1)', async () => {
+    // A corrupted value must not switch a safety feature on behind the user's back.
+    await fs.writeFile(
+      file,
+      JSON.stringify({ version: SETTINGS_SCHEMA_VERSION, checkpointMode: 'yes-please' }),
+      'utf8'
+    )
+    const store = new Persistence({ file, cipher })
+    expect(await store.getCheckpointMode()).toBe('off')
+  })
+
   it('removes a key when set to an empty string', async () => {
     const store = new Persistence({ file, cipher })
     await store.setApiKey('deepseek', 'sk-123')

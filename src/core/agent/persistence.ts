@@ -6,6 +6,7 @@ import { writeFileAtomic } from '@core/atomic-write'
 import type { ProviderId } from '@shared/types'
 import { isWindowsAbsolutePath } from '@shared/paths'
 import { coerceApprovalMode, type ApprovalMode } from '@shared/approval'
+import { normalizeCheckpointMode, recordsCheckpoints, type CheckpointMode } from '@shared/decision-checkpoint'
 import {
   coerceInvestigateScope,
   coerceSessionProfile,
@@ -64,6 +65,12 @@ export interface AppSettings {
   projects: ProjectRecord[]
   /** When the agent must ask before acting (v2). */
   approvalMode?: ApprovalMode
+  /**
+   * v3.1: decision checkpoints. `off` (the default) writes nothing, `record` keeps a durable log of
+   * consequential decisions, `confirm` also stops before one. Off by default on purpose: a log
+   * nothing reads, and prompts nobody asked for, are not features.
+   */
+  checkpointMode?: CheckpointMode
   /** Start new chats in Plan Mode by default (v2). */
   planModeDefault?: boolean
   /** Keep the chosen approval mode across restarts instead of resetting to Ask (v2.3). */
@@ -302,6 +309,12 @@ export async function migrateSettings(
   const applyPrefs = (settings: AppSettings): void => {
     const mode = coerceApprovalMode(raw.approvalMode)
     if (mode) settings.approvalMode = mode
+    /*
+     * Only persist a checkpoint mode that actually does something. `record`/`confirm` are kept;
+     * `off` is omitted, so a settings file that never opted in stays byte-identical to before.
+     */
+    const checkpointMode = normalizeCheckpointMode(raw.checkpointMode)
+    if (recordsCheckpoints(checkpointMode)) settings.checkpointMode = checkpointMode
     if (typeof raw.planModeDefault === 'boolean') settings.planModeDefault = raw.planModeDefault
     if (typeof raw.rememberApprovalMode === 'boolean') {
       settings.rememberApprovalMode = raw.rememberApprovalMode
@@ -565,6 +578,21 @@ export class Persistence {
 
   async removeApiKey(provider: ProviderId): Promise<void> {
     await this.setApiKey(provider, '')
+  }
+
+  /** v3.1: the decision-checkpoint mode, defaulting to `off`. */
+  async getCheckpointMode(): Promise<CheckpointMode> {
+    await this.load()
+    return this.settings.checkpointMode ?? 'off'
+  }
+
+  /** v3.1: set the checkpoint mode. `off` clears the field rather than storing a no-op. */
+  async setCheckpointMode(mode: CheckpointMode): Promise<void> {
+    await this.load()
+    const normalized = normalizeCheckpointMode(mode)
+    if (recordsCheckpoints(normalized)) this.settings.checkpointMode = normalized
+    else delete this.settings.checkpointMode
+    await this.persist()
   }
 
   async setProviderModel(provider: ProviderId, model: string): Promise<void> {

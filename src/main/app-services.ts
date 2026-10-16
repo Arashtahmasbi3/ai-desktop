@@ -4,6 +4,7 @@ import type { SandboxManager } from '@shared/sandbox'
 import type { AgentEvent, DiagnosticStatus, RemoteStatus, SettingsView, WorkerStatus } from '@shared/ui'
 import type { ProjectRecord } from '@shared/ui'
 import type { ProviderId } from '@shared/types'
+import type { CheckpointMode } from '@shared/decision-checkpoint'
 import type { InvestigateScope, SessionProfile } from '@shared/profile'
 import type { Persistence } from '@core/agent/persistence'
 import type { SessionStore } from '@core/agent/session-store'
@@ -26,6 +27,7 @@ import { app, nativeImage } from 'electron'
 import { spawn } from 'node:child_process'
 import { AttachmentService } from './attachment-service'
 import { FactStore } from './fact-store'
+import { CheckpointStore } from './checkpoint-store'
 import type { TranscriptMessage } from '@shared/memory-facts'
 import { UpdateService, sha256OfFile, streamToFile } from './updater'
 import { ChatStore } from './chat-store'
@@ -110,6 +112,12 @@ export class AppServices {
    * atomically; the agent gets a bounded, dated view of it in every system prompt.
    */
   readonly facts = new FactStore({ dir: join(appDataDir(), 'facts') })
+
+  /**
+   * v3.1: the append-only decision log. One JSONL per project, written only when the user turns
+   * checkpoints on; nothing reads or grows it otherwise.
+   */
+  readonly checkpoints = new CheckpointStore({ dir: join(appDataDir(), 'checkpoints') })
 
   readonly updates = new UpdateService({
     currentVersion: app.getVersion(),
@@ -231,6 +239,7 @@ export class AppServices {
     })
     this.agent = new AgentService({
       facts: this.facts,
+      checkpoints: this.checkpoints,
       sandbox: this.sandbox,
       persistence: this.persistence,
       sessionStore: this.sessions,
@@ -445,6 +454,8 @@ export class AppServices {
     if (settings.rememberApprovalMode !== undefined) {
       view.rememberApprovalMode = settings.rememberApprovalMode
     }
+    // v3.1: reported even when off, so the UI shows a choice rather than an empty field.
+    view.checkpointMode = settings.checkpointMode ?? 'off'
     // The effective Session Profile (profile + grant-validated mode) travels with
     // the settings snapshot so the renderer never derives it on its own (P0-5).
     view.session = await this.sessionProfile.state()
@@ -527,6 +538,12 @@ export class AppServices {
       content: message.content
     }))
     return this.agent.learnFacts({ messages, task: chat.title })
+  }
+
+  /** v3.1: set the decision-checkpoint mode and return the settings view. */
+  async setCheckpointMode(mode: CheckpointMode): Promise<SettingsView> {
+    await this.persistence.setCheckpointMode(mode)
+    return this.settingsView()
   }
 
   /** v3.1: add a key to a provider's pool and return the redacted settings view. */
