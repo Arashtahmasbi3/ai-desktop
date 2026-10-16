@@ -51,6 +51,25 @@ fails, a tool is missing, or the budget ran out — ask rather than guess).
 
 ## Status
 
+**v4.0.0 released — a brutalist design language, and a settings page that stopped lying.** The
+report was "still cluttered, messy, over-saturated, confusing, not beautiful", so the layer *under*
+the colours was rebuilt and the colours were kept: the warm ramps, the brand accent and the WCAG
+contrast contract are untouched. Clay's three-step radius, blurred dual shadows and bezier easing are
+gone, replaced by square geometry, a **single hard offset shadow with zero blur**, instant linear
+motion, uppercase micro-labels, monospace data and an offset focus ring. The largest single fix is
+invisible in a screenshot: 180 borders sat at roughly **1.1:1** against the page, so they were raised
+into a real hierarchy (1px separator → 2px ink container → 2px ink + shadow for primary surfaces) —
+the one deliberate palette adjustment. Restraint is enforced by tests, not hoped for: depth only on
+touchable surfaces, never two shouting elements, and the security dialogs keep the border with no
+offset shadow. `clay-tokens.test.ts` became `brutal-tokens.test.ts` (zero blur, square geometry,
+per-theme shadows, instant motion, the surface vocabulary, and no clay class anywhere). Separately,
+`Settings → Plugins` was a page of switches that persisted a key **nothing read**; it is now
+*Surfaces*, with three real switches that genuinely hide their surface (and its button), and four
+informational rows that point at where they are really configured via a Configure button that lands on
+that exact tab. 285 test files / 2408 tests green, typecheck and production build clean. Verified by
+launching the app against an isolated profile and screenshotting both themes — every pass was driven
+by what the screenshot showed. (2026-10-16)
+
 **v3.2.1 released — attach by dropping or pasting, instead of opening a project.** Closing the
 approved plan's item 4. The app had **no** paste or drag-drop attachment path, and the only drop
 handler in the tree treated every dropped item as a **project** — dropping a screenshot opened a

@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.0] — 2026-10-16
+
+### Changed — a brutalist design language, with the palette untouched
+
+The report was "still cluttered, messy, over-saturated, confusing, and not beautiful". That is about
+the layer **under** the colours, so the colours stayed: the warm light and dark ramps, the brand accent
+`#6D43FF`, and the WCAG text-contrast contract are all unchanged and still green.
+
+- **Soft clay → hard edges.** Radius 12/18/24px → **0** (2px for inputs and chips). Two blurred
+  shadows pretending to be a light source → **one hard offset with zero blur** (`4px 4px 0`).
+  Motion 120–320ms with a bezier curve → **60–90ms, linear** — a switch, not a bounce. Labels became
+  uppercase tracked micro-labels, data became monospace with tabular figures, and keyboard focus
+  became a 2px accent outline offset from the edge.
+- **The biggest fix is invisible in a screenshot.** 180 borders used `--border: 228 225 220` on a
+  `245 244 241` page — about **1.1:1**. The app was a field of boxes nobody could see, which is what
+  "messy" looks like. The border colours were raised into a real hierarchy: 1px for separators and
+  dense rows, 2px ink for containers, 2px ink plus the offset shadow for primary surfaces. This is the
+  one deliberate palette adjustment — a border nobody can see is a missing edge, not a colour choice.
+- **Restraint is enforced, not hoped for.** Brutalism applied everywhere *is* the over-saturation
+  complaint, so two rules are pinned by tests: depth is for things you can touch (a static container
+  gets a border and no shadow), and a heavy-bordered surface never also takes the accent fill — with
+  the approval, plan and preflight dialogs keeping the border and **no** offset shadow, because a
+  decision about a destructive command should not look playful. The blurred modal backdrop is gone.
+- `clay-tokens.test.ts` is replaced by `brutal-tokens.test.ts`, which pins zero blur on every offset
+  shadow, square geometry, per-theme shadow colours, instant linear motion, the surface vocabulary,
+  the security-dialog rule, and that no component reaches for a clay class again.
+
+### Fixed — a page of switches that gated nothing
+
+`Settings → Plugins` rendered a switch for all seven catalogue entries and persisted them under
+`plugins.enabled` — a key **nothing else in the codebase read**. Every switch reported a state change
+that never happened.
+
+- **Real switches** — *Browser*, *Terminal*, *Filesystem*: surfaces that exist and can honestly be
+  hidden, owned by a new pure `lib/capabilities.ts` that defaults to **on** and is versioned under a
+  new key so the dead map cannot resurrect a stale value. Hiding a surface now also removes the button
+  that opens it.
+- **No switch** — *DeepSeek* (a provider), *SSH/VPS* (a connection), *GitHub* (an integration), *Git*
+  (an operation set). Each row states where it is configured, and **Configure** takes you to that exact
+  tab (the store carries a requested tab now; every `configureTab` is asserted to name a real tab).
+- The section and its nav entry are retitled *Surfaces*, matching the page's own tab strip.
+
+**Suite green at 285 test files / 2408 tests; typecheck and production build clean.**
+
+
 ## [3.2.1] — 2026-10-16
 
 ### Fixed — dropping a file no longer opens it as a project
@@ -1301,7 +1346,8 @@ First stable release. Ships as a Windows x64 NSIS installer and a portable execu
   `node_modules` are shipped inside the app package.
 - Optional code signing via `CSC_LINK` / `CSC_KEY_PASSWORD` (skipped safely when absent).
 
-[Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v3.2.1...HEAD
+[Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v4.0.0...HEAD
+[4.0.0]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v3.2.1...v4.0.0
 [3.2.1]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v3.2.0...v3.2.1
 [3.2.0]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v3.1.1...v3.2.0
 [3.1.1]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v3.1.0...v3.1.1
