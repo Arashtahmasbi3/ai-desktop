@@ -180,6 +180,51 @@ function hasWriteIndicator(command: string): boolean {
   return false
 }
 
+/**
+ * Split a command on top-level separators, ignoring any separator inside quotes (v4.1).
+ *
+ * `ssh host 'a; b'` is ONE command whose argument happens to contain a semicolon. Splitting it blindly
+ * invented a second command (`ssh host 'a`) whose first word was a dangling quote — and that phantom
+ * segment is why read-only diagnostics kept asking for approval.
+ */
+export function splitTopLevel(command: string, separators: readonly string[]): string[] {
+  const parts: string[] = []
+  let current = ''
+  let quote: '"' | "'" | null = null
+
+  for (let index = 0; index < command.length; index += 1) {
+    const char = command[index]!
+    if (quote !== null) {
+      current += char
+      if (char === '\\' && quote === '"') {
+        current += command[index + 1] ?? ''
+        index += 1
+        continue
+      }
+      if (char === quote) quote = null
+      continue
+    }
+    if (char === '"' || char === "'") {
+      quote = char
+      current += char
+      continue
+    }
+    const pair = command.slice(index, index + 2)
+    const matched = separators.find((candidate) =>
+      candidate.length === 2 ? pair === candidate : char === candidate
+    )
+    if (matched !== undefined) {
+      parts.push(current)
+      current = ''
+      index += matched.length - 1
+      continue
+    }
+    current += char
+  }
+  parts.push(current)
+  return parts.map((part) => part.trim())
+}
+
 /** True when a token looks like an inline environment assignment (`FOO=bar`). */
 function isEnvAssignment(token: string): boolean {
   return /^[A-Za-z_][A-Za-z0-9_]*=/.test(token)
@@ -292,12 +337,21 @@ export function unwrapShellWrapper(command: string): string | undefined {
   return undefined
 }
 
-/** Remove \`'…'\` or \`"…"\` around the whole string. */
+/**
+ * Remove the quotes a wrapper put around its payload (v4.1).
+ *
+ * The opening quote must be first, but the closing one need not be last: a redirection can follow it
+ * (`'df -h /opt' 2>&1`), and requiring both ends is exactly why a quoted remote read stayed graded as a
+ * write. Whatever trails the closing quote is kept, so a real write hidden behind it still counts.
+ */
 function stripOuterQuotes(text: string): string {
-  const quoted =
-    text.length >= 2 &&
-    ((text.startsWith("'") && text.endsWith("'")) || (text.startsWith('"') && text.endsWith('"')))
-  return quoted ? text.slice(1, -1) : text
+  const quote = text[0]
+  if (quote !== "'" && quote !== '"') return text
+  const close = text.indexOf(quote, 1)
+  if (close === -1) return text
+  const inner = text.slice(1, close)
+  const rest = text.slice(close + 1).trim()
+  return rest === '' ? inner : `${inner} ${rest}`
 }
 
 export function isReadOnlyShellCommand(command: string): boolean {
@@ -319,16 +373,18 @@ export function isReadOnlyShellCommand(command: string): boolean {
    * secret guard all still run afterwards.
    */
   const unwrapped = unwrapShellWrapper(trimmed)
-  if (unwrapped !== undefined) return isReadOnlyShellCommand(unwrapped)
+  /*
+   * v4.1: strip the quotes the wrapper carried. `ssh host 'df -h'` returned `'df -h'`, so the first
+   * segment's base command was `'df` — unrecognised, therefore graded as a write, therefore prompted.
+   * Every read-only probe written the natural way (a quoted remote command) paid a click for this.
+   */
+  if (unwrapped !== undefined) return isReadOnlyShellCommand(stripOuterQuotes(unwrapped))
 
-  const segments = trimmed
-    .split(/\s*(?:;|&&|\|\|)\s*/)
-    .map((segment) => segment.trim())
-    .filter(Boolean)
+  const segments = splitTopLevel(trimmed, [';', '&&', '||']).filter(Boolean)
   if (segments.length === 0) return false
 
   return segments.every((segment) =>
-    segment.split('|').every((part) => {
+    splitTopLevel(segment, ['|']).every((part) => {
       const tokens = part.trim().split(/\s+/).filter(Boolean)
       const hadTokens = tokens.length > 0
       while (tokens.length > 0 && isEnvAssignment(tokens[0])) tokens.shift()
@@ -342,7 +398,8 @@ export function isReadOnlyShellCommand(command: string): boolean {
       // v2.8.1: a wrapper as one stage of a chain is judged by the stage it runs.
       if (!READ_ONLY_BASE_COMMANDS.has(base)) {
         const inner = unwrapShellWrapper(part.trim())
-        return inner !== undefined && isReadOnlyShellCommand(inner)
+        // Same quote problem one level down: a wrapper used as a pipeline stage.
+        return inner !== undefined && isReadOnlyShellCommand(stripOuterQuotes(inner))
       }
       if (base === 'find' && tokens.some((token) => /^-(exec|delete|ok)$/.test(token))) return false
       // `cd` is only a read when the target is absolute; a relative target (esp.
