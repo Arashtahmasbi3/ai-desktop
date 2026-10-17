@@ -85,6 +85,9 @@ export default function ExecutionBar({
   const setPlanMode = useStore((state) => state.setPlanMode)
   const terminalOpen = useStore((state) => state.terminalOpen)
   const toggleTerminal = useStore((state) => state.toggleTerminal)
+  // Checklist item 13: the terminal and the file tree are advanced panes. In simple mode
+  // their toggles are not offered at all, so the header stays about the run itself.
+  const advanced = useStore((state) => state.uiMode === 'advanced')
   const newSession = useStore((state) => state.newSession)
   const approvalMode = useStore((state) => state.settings?.approvalMode ?? 'ask')
   const setApprovalMode = useStore((state) => state.setApprovalMode)
@@ -127,7 +130,7 @@ export default function ExecutionBar({
       {/* Line 1 — identity: project / server / path */}
       <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
         {/* v4.0: the toggle goes with the surface it opens (Settings → Surfaces). */}
-        {isCapabilityEnabled('filesystem') ? (
+        {advanced && isCapabilityEnabled('filesystem') ? (
           <button
             type="button"
             onClick={toggleChatTree}
@@ -240,7 +243,7 @@ export default function ExecutionBar({
           >
             <Activity className="h-3.5 w-3.5" />
           </button>
-          {isCapabilityEnabled('terminal') ? (
+          {advanced && isCapabilityEnabled('terminal') ? (
             <button
               type="button"
               onClick={toggleTerminal}

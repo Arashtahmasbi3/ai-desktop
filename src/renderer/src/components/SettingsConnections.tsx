@@ -81,6 +81,9 @@ export default function SettingsConnections(): JSX.Element {
   const [pcEnabled, setPcEnabled] = useState(() => readPrefs<boolean>('conn.pc', true))
   const setView = useStore((state) => state.setView)
   const toggleTerminal = useStore((state) => state.toggleTerminal)
+  // Checklist item 13: this button opens the local terminal, an advanced pane. Offering it in
+  // simple mode would be a button that does nothing (the store refuses the pane there).
+  const advanced = useStore((state) => state.uiMode === 'advanced')
   const closeSettings = useStore((state) => state.closeSettings)
   const projects = useStore((state) => state.settings?.projects ?? [])
   const vpsServers = useStore((state) => state.vpsServers)
@@ -137,18 +140,20 @@ export default function SettingsConnections(): JSX.Element {
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setView('chat')
-                closeSettings()
-                toggleTerminal()
-              }}
-              className="brutal-btn flex items-center gap-1"
-            >
-              <Terminal className="h-3.5 w-3.5" />
-              {t('settings.openTerminal')}
-            </button>
+            {advanced ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setView('chat')
+                  closeSettings()
+                  toggleTerminal()
+                }}
+                className="brutal-btn flex items-center gap-1"
+              >
+                <Terminal className="h-3.5 w-3.5" />
+                {t('settings.openTerminal')}
+              </button>
+            ) : null}
             {/* A square switch: the track carries the state, the ink block is the knob. */}
             <button
               type="button"

@@ -67,7 +67,9 @@ beforeEach(() => {
     logs: [],
     changedFiles: [],
     reasoningByStep: {},
-    fileChanges: []
+    fileChanges: [],
+    // Checklist item 13: the reasoning row is advanced-only, and this file is about showing it.
+    uiMode: 'advanced'
   })
 })
 

@@ -985,7 +985,11 @@
     "remote": "remote: {{target}}",
     "remoteOff": "off",
     "agentUnknown": "Agent: —",
-    "agentTitleUnknown": "No agent status has been reported yet."
+    "agentTitleUnknown": "No agent status has been reported yet.",
+    "uiMode": "Interface",
+    "uiModeSimple": "Simple",
+    "uiModeAdvanced": "Advanced",
+    "uiModeHint": "Simple mode rests the terminal, the chat file tree and the model's raw reasoning until you ask for them."
   },
   "fileExplorer": {
     "noProjects": "No project added yet. Add a project folder from Settings, or drop a folder onto the window.",

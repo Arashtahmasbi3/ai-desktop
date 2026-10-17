@@ -7,6 +7,7 @@ import {
   MoreHorizontal,
   Server,
   ShieldCheck,
+  SlidersHorizontal,
   Wallet,
   Zap,
   Wifi,
@@ -17,6 +18,7 @@ import { nextApprovalMode } from '@shared/approval'
 import { useStore } from '../store'
 import { CONNECTION_TONE_CLASS, useConnectionStatus } from '../lib/connection-status'
 import { budgetState, readBudget } from '../lib/budget'
+import { uiModeLabelKey } from '../lib/ui-mode'
 
 /** `ok: null` renders the neutral "unknown" dot (v2.7.0). */
 function Dot({ ok }: { ok: boolean | null }): JSX.Element {
@@ -55,6 +57,13 @@ export default function StatusBar(): JSX.Element {
   const locale = useStore((state) => state.locale)
   const setLocale = useStore((state) => state.setLocale)
   const approvalMode = useStore((state) => state.settings?.approvalMode ?? 'ask')
+  /**
+   * Checklist item 13: the interface mode. It lives here, in the bar's overflow menu, because
+   * that menu already owns the preferences a run does not change (language, online/offline) —
+   * one control, and the value is named so the current mode is never a guess.
+   */
+  const uiMode = useStore((state) => state.uiMode)
+  const setUiMode = useStore((state) => state.setUiMode)
   const connection = useConnectionStatus()
   const usageRecords = useStore((state) => state.usageRecords)
   /*
@@ -242,6 +251,23 @@ export default function StatusBar(): JSX.Element {
             <span dir="ltr">{t('statusBar.session', { id: effectiveSessionId.slice(0, 8) })}</span>
           </div>
           <div className="mt-1 border-t border-border pt-1">
+            {/* Checklist item 13: simple ↔ advanced. Simple is the default; the hint says what
+                the advanced panes are, so the label alone is not a riddle. */}
+            <button
+              type="button"
+              data-testid="status-menu-ui-mode"
+              data-mode={uiMode}
+              aria-pressed={uiMode === 'advanced'}
+              onClick={() => setUiMode(uiMode === 'advanced' ? 'simple' : 'advanced')}
+              title={t('statusBar.uiModeHint')}
+              className="flex w-full items-center gap-1.5 px-3 py-1 text-start hover:bg-bg-tertiary hover:text-fg"
+            >
+              <SlidersHorizontal className="h-3 w-3 shrink-0" />
+              <span className="flex-1">{t('statusBar.uiMode')}</span>
+              <span className="shrink-0 font-semibold text-fg">
+                {t(uiModeLabelKey(uiMode))}
+              </span>
+            </button>
             <button
               type="button"
               data-testid="status-menu-locale"

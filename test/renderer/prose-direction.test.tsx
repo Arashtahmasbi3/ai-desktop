@@ -67,7 +67,9 @@ beforeEach(() => {
     changedFiles: [],
     reasoningByStep: {},
     pendingPlan: null,
-    activePlan: null
+    activePlan: null,
+    // Checklist item 13: the reasoning block is advanced-only, and this file pins its direction.
+    uiMode: 'advanced'
   })
 })
 

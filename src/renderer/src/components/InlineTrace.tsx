@@ -41,6 +41,12 @@ export default function InlineTrace(): JSX.Element | null {
   const changedFiles = useStore((state) => state.changedFiles)
   // v2.8.0: the model's reasoning per step, keyed by `runId:step` — the trace id.
   const reasoningByStep = useStore((state) => state.reasoningByStep)
+  /*
+   * Checklist item 13: the raw reasoning is advanced detail. In simple mode the trace keeps its
+   * row and its verdict — what ran, whether it worked — and folds the model's chain of thought
+   * away entirely, so the collapsed disclosure is not offered either.
+   */
+  const showReasoning = useStore((state) => state.uiMode === 'advanced')
 
   // U-11: `toolsFor` used to filter the entire message list once per visible
   // decision (O(steps x messages) every render). Index the tool messages by
@@ -183,7 +189,7 @@ export default function InlineTrace(): JSX.Element | null {
                   Collapsed by default — it is context for the reader, not the answer —
                   and only shown where the provider actually sent something.
                 */}
-                {reasoningFor(decision) ? (
+                {showReasoning && reasoningFor(decision) ? (
                   <li className="ml-5 list-none">
                     <details data-testid="trace-reasoning" className="group">
                       <summary className="cursor-pointer text-3xs text-fg-subtle hover:text-fg-muted">

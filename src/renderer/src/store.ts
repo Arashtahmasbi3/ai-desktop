@@ -46,6 +46,7 @@ import {
 } from './lib/chat-transfer'
 import type { ChatTransferChoice, ChatTransferPreference } from './lib/chat-transfer'
 import { readEnabledTools } from './lib/tool-toggles'
+import { getUiMode, setUiMode as persistUiMode, type UiMode } from './lib/ui-mode'
 import {
   appendUsage,
   loadUsage,
@@ -218,6 +219,15 @@ function readChatTreeOpen(): boolean {
     return globalThis.localStorage?.getItem(CHAT_TREE_KEY) === '1'
   } catch {
     return false
+  }
+}
+
+/** Persist the tree toggle, so switching to simple mode cannot be undone by a restart. */
+function writeChatTreeOpen(value: boolean): void {
+  try {
+    globalThis.localStorage?.setItem(CHAT_TREE_KEY, value ? '1' : '0')
+  } catch {
+    // Persisting the preference is best-effort.
   }
 }
 
@@ -484,6 +494,11 @@ interface AppState {
   /** v2.6.4 Fix E: show the composer's context-filling warning (default off). */
   showContextWarning: boolean
   /**
+   * Checklist item 13: `simple` (the default) rests the advanced panes — the local terminal,
+   * the chat file tree and the model's raw reasoning — until the user switches to `advanced`.
+   */
+  uiMode: UiMode
+  /**
    * v3.0: what the user declared this run should produce (the composer's Outputs
    * section). Prompt text only — it never grants access to anything.
    */
@@ -564,6 +579,12 @@ interface AppState {
   /** v2.6.3: toggle raw tool rows (persisted). */
   setShowRawToolRows: (value: boolean) => void
   setShowContextWarning: (value: boolean) => void
+  /**
+   * Checklist item 13: switch interface mode. Going simple closes the panes it does not offer,
+   * because a pane left open behind a hidden toggle is the same lie as a switch that gates
+   * nothing.
+   */
+  setUiMode: (mode: UiMode) => void
   /** v3.0: declare one output for the next run (the Outputs section). */
   addRunOutput: (kind: RunOutputKind, target?: string) => void
   removeRunOutput: (id: string) => void
@@ -817,7 +838,9 @@ export const useStore = create<AppState>((set, get) => ({
   changedFiles: [],
   reasoningByStep: {},
   toasts: [],
-  chatTreeOpen: readChatTreeOpen(),
+  // Checklist item 13: the tree is an advanced pane. A persisted "open" must not resurrect it in
+  // simple mode — the mode wins at startup, not the stale preference.
+  chatTreeOpen: getUiMode() === 'advanced' && readChatTreeOpen(),
   workspacePanelOpen: true,
   workspacePanelTab: 'output',
   sourcesPanelOpen: false,
@@ -831,6 +854,9 @@ export const useStore = create<AppState>((set, get) => ({
   showJobsPanelAlways: readShowJobsPanelAlways(),
   showRawToolRows: readShowRawToolRows(),
   showContextWarning: readShowContextWarning(),
+  // Checklist item 13: the calm default. `getUiMode` is the persisted value (simple unless the
+  // user chose advanced).
+  uiMode: getUiMode(),
   runOutputs: [],
   runSources: [],
   zoomLevel: readZoomLevel(),
@@ -991,7 +1017,15 @@ export const useStore = create<AppState>((set, get) => ({
       const concernsSelection = !serverId || !state.vpsServerId || state.vpsServerId === serverId
       return { vpsStates, ...(concernsSelection ? { vpsStatus: status } : {}) }
     }),
-  toggleTerminal: () => set({ terminalOpen: !get().terminalOpen }),
+  /*
+   * Checklist item 13: the terminal is an advanced surface. The guard lives here rather than at
+   * each caller (the header button, the keyboard shortcuts, Settings → Connections) so no path
+   * can open a pane that simple mode does not offer.
+   */
+  toggleTerminal: () => {
+    if (get().uiMode !== 'advanced') return
+    set({ terminalOpen: !get().terminalOpen })
+  },
   setSearchOpen: (open) => set({ searchOpen: open, ...(open ? {} : { searchResults: [] }) }),
   async runCodeSearch(query) {
     const trimmed = query.trim()
@@ -1024,13 +1058,11 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
   toggleChatTree() {
+    // Checklist item 13: same guard as the terminal — the tree is an advanced pane.
+    if (get().uiMode !== 'advanced') return
     const value = !get().chatTreeOpen
     set({ chatTreeOpen: value })
-    try {
-      globalThis.localStorage?.setItem(CHAT_TREE_KEY, value ? '1' : '0')
-    } catch {
-      // Persisting the preference is best-effort.
-    }
+    writeChatTreeOpen(value)
   },
   setPlanMode: (value) => set({ planMode: value }),
   toggleWorkspacePanel: () => set({ workspacePanelOpen: !get().workspacePanelOpen }),
@@ -1242,6 +1274,22 @@ export const useStore = create<AppState>((set, get) => ({
     } catch {
       // Persisting the preference is best-effort.
     }
+  },
+  /**
+   * Checklist item 13: switch between the calm and the full interface.
+   *
+   * Persist through `lib/ui-mode` (the single source the rest of the app reads) and close the
+   * panes simple mode does not offer. Closing the tree also writes its own flag off, so a restart
+   * in simple mode does not reopen what the mode has just hidden.
+   */
+  setUiMode(mode) {
+    persistUiMode(mode)
+    if (mode === 'simple') {
+      set({ uiMode: mode, chatTreeOpen: false, terminalOpen: false })
+      writeChatTreeOpen(false)
+      return
+    }
+    set({ uiMode: mode })
   },
   applyZoom(level) {
     const clamped = clampZoom(level)
