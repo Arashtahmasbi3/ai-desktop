@@ -42,7 +42,7 @@ export default function LoopStopCard({ stop, onContinue, onCorrect, onStop }: Pr
   const { t } = useTranslation()
   const model = buildLoopStopModel(stop)
   const [showRecent, setShowRecent] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied] = useState<string | null>(null)
   const emphasisClass = (action: LoopStopAction): string =>
     model.emphasis === action ? 'ring-2 ring-warning/70' : ''
   const isQuestion = model.kind === 'question'
@@ -50,10 +50,10 @@ export default function LoopStopCard({ stop, onContinue, onCorrect, onStop }: Pr
   const copyCommand = async (command: string): Promise<void> => {
     try {
       await navigator.clipboard?.writeText(command)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1500)
+      setCopied(command)
+      window.setTimeout(() => setCopied(null), 1500)
     } catch {
-      setCopied(false)
+      setCopied(null)
     }
   }
 
@@ -138,8 +138,47 @@ export default function LoopStopCard({ stop, onContinue, onCorrect, onStop }: Pr
                     className="brutal-btn shrink-0 px-1.5 py-1 text-3xs"
                     aria-label={t('chat.copy')}
                   >
-                    {copied ? <Check className="h-3 w-3 text-success" /> : <Copy className="h-3 w-3" />}
+                    {copied === model.verdict.actionCommand ? (
+                      <Check className="h-3 w-3 text-success" />
+                    ) : (
+                      <Copy className="h-3 w-3" />
+                    )}
                   </button>
+                </div>
+              ) : null}
+
+              {/* v4.1 (item 18): the second route, when the direct one is blocked. */}
+              {model.verdict.alternate ? (
+                <div data-testid="loop-stop-alternate" className="mt-2">
+                  <p className="brutal-label">{t('chat.verdictAltTitle')}</p>
+                  <p dir="auto" className="mt-0.5 text-2xs leading-relaxed text-fg">
+                    {t(model.verdict.alternate.textKey, model.verdict.alternate.detail ?? {})}
+                  </p>
+                  <div className="mt-1 flex min-w-0 items-start gap-1">
+                    <pre
+                      dir="ltr"
+                      className="m-0 min-w-0 flex-1 overflow-x-auto rounded-shape-sm border border-border bg-bg-primary px-1.5 py-1 font-mono text-3xs leading-relaxed text-fg"
+                    >
+                      {model.verdict.alternate.command}
+                    </pre>
+                    <button
+                      type="button"
+                      onClick={() => void copyCommand(model.verdict?.alternate?.command ?? '')}
+                      className="brutal-btn shrink-0 px-1.5 py-1 text-3xs"
+                      aria-label={t('chat.copy')}
+                    >
+                      {copied === model.verdict.alternate.command ? (
+                        <Check className="h-3 w-3 text-success" />
+                      ) : (
+                        <Copy className="h-3 w-3" />
+                      )}
+                    </button>
+                  </div>
+                  {model.verdict.alternate.noteKey ? (
+                    <p dir="auto" className="mt-1 text-3xs leading-relaxed text-fg-muted">
+                      {t(model.verdict.alternate.noteKey)}
+                    </p>
+                  ) : null}
                 </div>
               ) : null}
             </div>

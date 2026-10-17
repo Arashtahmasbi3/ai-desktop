@@ -34,6 +34,19 @@ export interface LoopStopVerdict {
   actionKey?: string
   /** A command the reader can run themselves to confirm the conclusion. */
   actionCommand?: string
+  /**
+   * A second, working route when the direct one is blocked (v4.1, checklist item 18).
+   *
+   * The usual cause is that the source host cannot reach the target while this computer can reach both. The
+   * route streams the tree through the machine the user is sitting at, with their own keys, in two steps.
+   */
+  alternate?: {
+    textKey: string
+    command: string
+    /** Why the app does not just do it itself, in the app's own words. */
+    noteKey?: string
+    detail?: Record<string, string>
+  }
 }
 
 /**
@@ -119,6 +132,31 @@ function isSshAttempt(observation: Observation): boolean {
   )
 }
 
+/**
+ * The `user@host` a failing ssh command was trying to reach, so the offered route can name it.
+ *
+ * Best-effort and clearly so: when it cannot tell, the caller keeps a placeholder rather than inventing a host.
+ * A regex could not do this reliably — the first token after `ssh` is usually a flag such as `-o`, and `-` is
+ * a legal hostname character, so it was read as a destination and then rejected.
+ */
+function targetHostOf(command?: string): string | undefined {
+  if (typeof command !== 'string') return undefined
+  const tokens = command.split(/\s+/)
+  const at = tokens.findIndex((token) => token === 'ssh')
+  if (at === -1) return undefined
+  const takesValue = /^-(?:o|p|i|l|F|J|c|e|m|D|Q|W|b)$/
+  for (let index = at + 1; index < tokens.length; ) {
+    const token = tokens[index]!
+    if (token.startsWith('-')) {
+      index += takesValue.test(token) ? 2 : 1
+      continue
+    }
+    const host = token.replace(/['"]/g, '')
+    return host === '' ? undefined : host
+  }
+  return undefined
+}
+
 /** A port scan or probe, which is what an agent reaches for when it cannot tell why SSH failed. */
 function scanCommand(stop: LoopStopInfo): string | undefined {
   return stop.recentActions.find((action) => /dev\/tcp|nc\s|nmap|port/i.test(action))
@@ -172,11 +210,26 @@ function buildVerdict(stop: LoopStopInfo): LoopStopVerdict | undefined {
       params: { name: sshTimeout.name, error: sshTimeout.text.slice(0, 200) }
     })
     if (scan) evidence.push({ textKey: 'chat.verdictEvidenceScan', params: { command: scan } })
+    const target = targetHostOf(sshTimeout.command)
     return {
       textKey: 'chat.verdictSshTimeout',
       evidence,
       actionKey: 'chat.verdictActionTargetFirewall',
-      actionCommand: 'ss -ltnp | grep -E \'^LISTEN\' ; ufw status ; fail2ban-client status sshd'
+      actionCommand: 'ss -ltnp | grep -E \'^LISTEN\' ; ufw status ; fail2ban-client status sshd',
+      /*
+       * v4.1 (item 18): the alternative route, offered automatically rather than waiting to be thought of. It
+       * runs on this computer, which can usually reach both hosts, and it streams — so nothing is staged on disk
+       * and no file passes through a text-only API.
+       */
+      alternate: {
+        textKey: 'chat.verdictAltViaComputer',
+        command: [
+          `ssh ${target ?? 'USER@TARGET'} 'tar -C /REMOTE/PARENT -cf - PROJECT' | tar -C . -xf -`,
+          `tar -C . -cf - PROJECT | ssh ${target ?? 'USER@TARGET'} 'tar -C /REMOTE/PARENT -xf -'`
+        ].join('\n'),
+        noteKey: 'chat.verdictAltNote',
+        ...(target ? { detail: { target } } : {})
+      }
     }
   }
 
