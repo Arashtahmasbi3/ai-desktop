@@ -51,6 +51,28 @@ export default defineConfig({
     },
     plugins: [react()],
     esbuild: { drop: ['debugger'] },
-    build: optimizeBuild
+    build: {
+      ...optimizeBuild,
+      rollupOptions: {
+        ...optimizeBuild.rollupOptions,
+        /*
+         * v4.1: split the renderer bundle.
+         *
+         * esbuild passes any payload above an internal size limit to its native binary through a temp file. The
+         * renderer used to be a single ~2 MB chunk, and on this machine removing that temp file is denied by the
+         * OS, which aborted the build after all 2265 modules had been transformed. Keeping each chunk under the
+         * threshold avoids the temp file entirely — and a stable vendor chunk is better for updates anyway: app
+         * code changes no longer invalidate the whole bundle.
+         */
+        output: {
+          manualChunks: {
+            'react-vendor': ['react', 'react-dom', 'react/jsx-runtime'],
+            'markdown-vendor': ['react-markdown', 'remark-parse', 'remark-rehype', 'unified'],
+            'i18n-vendor': ['i18next', 'react-i18next'],
+            'terminal-vendor': ['@xterm/xterm', '@xterm/addon-fit']
+          }
+        }
+      }
+    }
   }
 })

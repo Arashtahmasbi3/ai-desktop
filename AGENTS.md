@@ -51,6 +51,24 @@ fails, a tool is missing, or the budget ran out — ask rather than guess).
 
 ## Status
 
+**v4.1.0 released — a stopped run explains itself, and the network became a kind of action.** The report was "I am
+not satisfied, it keeps getting stuck", backed by a screenshot and, crucially, by the session log, which changed
+the diagnosis twice. A run ended with "It looks like I got stuck" while the app knew that SSH to the target had
+timed out and every probed port was filtered — the target's firewall was blocking the source server. `LoopStopInfo`
+now carries the failed observations, the step count and any pending question, and a **deterministic verdict**
+(no model call) names the cause, lists the evidence and ends with one next step; a question is no longer labelled
+a fault, and the heading no longer claims a loop when the clock simply ran out. The turn clock became an **idle**
+timer with a hard ceiling, because a 300s budget was being spent on network timeouts while the run was still
+making progress. Two bugs came straight out of that log: `ssh host 'df -h /opt'` was refused as "outside project
+root" because the guard compared one host's filesystem with another host's project root (`ssh`/`mosh` payloads are
+no longer scanned; `bash -c` still is, or a shell wrapper would be a one-line bypass), and four read-only
+diagnostics each demanded a click because a `;` inside a quoted payload invented a phantom segment and a wrapper's
+payload arrived still quoted. Network actions became their own class (`/dev/tcp`, `nc`, `nmap`) asked about in
+those words before any read-only shortcut, and a real per-server **connection test** landed so the agent never has
+to improvise a port scan. The window lost its duplicates: one Stop, one Sources entry point, four status items,
+and a chat row that is no longer mistaken for a form. Simple mode is the default. 296 test files / ~2500 tests
+green, typecheck and production build clean. (2026-10-18)
+
 **v4.0.1 released — the chat transcript, which the 4.0 restyle had missed.** Found by reading a real
 conversation rather than the component list: `MessageBubble` used no clay classes, so the mechanical
 rename never touched it and it never made a sweep list — and it is the most-used surface in the app.

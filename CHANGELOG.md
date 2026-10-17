@@ -7,6 +7,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.1.0] — 2026-10-18
+
+### Changed — a stopped run now explains itself
+
+Every stop used to end with "It looks like I got stuck", a heading that always claimed "paused to avoid a loop"
+(even when the clock had run out), and an offer to Continue / Correct / Stop. The app knew which tool had failed
+and why, and said none of it.
+
+- **A deterministic verdict, with no model call.** `LoopStopInfo` now carries the failed observations, the step
+  count and any pending question; a verdict built from them names the cause — *"the SSH connection to the target
+  timed out"*, *"a path outside the project was refused"*, *"the clock ran out after N steps"* — lists the evidence
+  and ends with one concrete next step. Every branch has a next step, asserted for all five reasons.
+- **The heading matches the cause**, and a question asked with `ask_user` is a question, not a fault: it no longer
+  reads "Stuck on ask_user" and no longer offers a re-run.
+- **The turn clock measures idleness.** A 300s budget was being spent on network timeouts (a ping, an `nc` probe,
+  two SSH attempts, then a port scan) and the run died while it was making progress. The window now slides forward
+  on every productive step, with a hard ceiling of four windows, and the stop message says which limit fired.
+- **A reachability failure offers the through-this-computer route** — two streaming commands using the reader's own
+  ssh keys. The app does not relay it itself, and the card says why: the remote file API is text-only, so relaying
+  a project would corrupt binaries.
+
+### Fixed — two bugs found in the user's own session log
+
+- **A remote payload is not a local path.** `ssh host 'df -h /opt'` was refused with "Path \"/opt\" is outside
+  project root", because the guard checked one host's filesystem against another host's project root. The payloads
+  of `ssh`/`mosh` are no longer scanned; `bash -c` and `sh -c` still are, since they run locally — otherwise a
+  shell wrapper would be a one-line bypass of the workspace boundary.
+- **Four approval prompts for read-only diagnostics.** `ping`, `du` and `df` are read-only, but every probe asked,
+  because a `;` inside a quoted remote payload invented a phantom segment whose command was a dangling quote, and
+  a wrapper's payload arrived still quoted. A quote-aware splitter and a tolerant quote strip fix both; `nc` and
+  `/dev/tcp` scans are still asked, now as network actions.
+
+### Added
+
+- **Network actions are their own class.** `/dev/tcp`, `nc`, `nmap` and `telnet` are detected and described, and
+  the gate asks about them **before** any read-only shortcut: "this command reaches another host". `curl`,
+  `wget`, `ping` and `ssh` are excluded on purpose, so the friction that was just removed does not return.
+- **A real per-server connection test.** One TCP connection from this computer, reported as open/timeout/refused/
+  unreachable with the latency, a copyable result and an explicit "from this computer" — so the agent never has to
+  improvise a port scan again.
+- **Simple mode by default.** The terminal, the chat file tree and the model's raw reasoning rest until asked for,
+  with one switch to advanced.
+
+### Fixed — presentation
+
+- The execution trace printed `##`, `**` and `|` literally. The chat's markdown pipeline is now shared, so the
+  trace, the plan card and the tool card render prose the same way the message bubble does. Labels, tool ids and
+  paths stay plain text.
+- Right-to-left prose was pinned to LTR in the trace, plan and tool cards: `dir="auto"` on a container resolves
+  once, from the container's own first strong character, and the trace starts with an English label. Each prose
+  element now decides for itself, while commands and paths carry an explicit `dir="ltr"`.
+- A failed tool card showed a middle-truncated prefix of a long compound command while the error named a part far
+  to the right. The card now shows the segment the error quotes, matched by whole token.
+
+### Changed — the window
+
+- **One Stop** (in the composer), **one entry point to Sources/Outputs** (the rail's own tabs), **four status
+  items** with the rest in a right-click menu, and a chat row that is title, time and one `⋯` menu instead of a
+  glyph that read as a checkbox.
+
+**Suite: 296+ test files, ~2500 tests green; typecheck and production build clean.**
+
 ## [4.0.1] — 2026-10-16
 
 ### Fixed — the chat transcript, which the restyle had missed entirely
@@ -1381,7 +1443,8 @@ First stable release. Ships as a Windows x64 NSIS installer and a portable execu
   `node_modules` are shipped inside the app package.
 - Optional code signing via `CSC_LINK` / `CSC_KEY_PASSWORD` (skipped safely when absent).
 
-[Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v4.0.1...HEAD
+[Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v4.1.0...HEAD
+[4.1.0]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v4.0.1...v4.1.0
 [4.0.1]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v4.0.0...v4.0.1
 [4.0.0]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v3.2.1...v4.0.0
 [3.2.1]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v3.2.0...v3.2.1
