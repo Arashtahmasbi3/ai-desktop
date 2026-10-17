@@ -344,6 +344,43 @@
 }
 
 /*
+ * v4.0.2 - compact markdown. A chat bubble is a document; a trace step is a line in a log. The
+ * execution trace and the plan card render the model's prose through the same pipeline
+ * (`MarkdownProse`), so `##` and `**` become a heading and bold instead of literal characters —
+ * but at the row's own scale and with the spacing tightened, because a step must not grow into a
+ * document. Only the spacing and heading size differ; every colour still comes from a token.
+ */
+.compact-markdown p,
+.compact-markdown ul,
+.compact-markdown ol,
+.compact-markdown pre,
+.compact-markdown blockquote,
+.compact-markdown table {
+  margin: 0.15rem 0;
+}
+
+.compact-markdown ul,
+.compact-markdown ol {
+  padding-inline-start: 1rem;
+}
+
+.compact-markdown h1,
+.compact-markdown h2,
+.compact-markdown h3,
+.compact-markdown h4,
+.compact-markdown h5,
+.compact-markdown h6 {
+  margin: 0.2rem 0 0.1rem;
+  font-size: 1em;
+  font-weight: 600;
+  color: rgb(var(--fg-strong));
+}
+
+.compact-markdown pre {
+  padding: 0.35rem 0.5rem;
+}
+
+/*
  * Brutalist surfaces (v4.0). These classes are the whole vocabulary; components pick a tier
  * instead of inventing their own borders, shadows and padding.
  *

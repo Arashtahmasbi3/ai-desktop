@@ -76,7 +76,11 @@ export default function ToolResultCard(props: ToolCallView): JSX.Element {
         <StatusIcon
           className={`h-3.5 w-3.5 shrink-0 ${ok ? 'text-success' : 'text-danger'}`}
         />
-        <span className="shrink-0 text-[13px] text-fg" title={raw ?? name}>
+        {/*
+          The headline is a sentence ("Ran a command on the server"), so it resolves its own
+          direction; the command preview next to it stays LTR like the rest of the card.
+        */}
+        <span dir="auto" className="shrink-0 text-[13px] text-fg" title={raw ?? name}>
           {headline}
         </span>
         <span className={`shrink-0 text-3xs ${ok ? 'text-success' : 'text-danger'}`}>
@@ -113,7 +117,16 @@ export default function ToolResultCard(props: ToolCallView): JSX.Element {
       </button>
 
       {open && hasBody ? (
-        <div className="flex flex-col gap-2 border-t border-border px-3 py-2">
+        /*
+         * The body is where free text lives (an error cause, tool output, a legacy detail) and it
+         * may be Persian, so it resolves its own direction instead of inheriting the card's LTR —
+         * while every command and path inside keeps an explicit `dir="ltr"` of its own.
+         */
+        <div
+          data-testid="tool-card-body"
+          dir="auto"
+          className="flex flex-col gap-2 border-t border-border px-3 py-2"
+        >
           {error ? (
             <div>
               <p className="mb-0.5 text-3xs uppercase tracking-wide text-danger">
@@ -167,19 +180,28 @@ export default function ToolResultCard(props: ToolCallView): JSX.Element {
               {serverId ? (
                 <span className="flex items-center gap-1">
                   <Server className="h-3 w-3 shrink-0 text-info" />
-                  {t('chat.toolServer')}: <span className="font-mono text-fg">{serverId}</span>
+                  {t('chat.toolServer')}:{' '}
+                  <span dir="ltr" className="font-mono text-fg">
+                    {serverId}
+                  </span>
                 </span>
               ) : null}
               {cwd ? (
                 <span className="flex items-center gap-1">
                   <CornerDownRight className="h-3 w-3 shrink-0" />
-                  {t('chat.toolCwd')}: <span className="font-mono text-fg">{cwd}</span>
+                  {t('chat.toolCwd')}:{' '}
+                  <span dir="ltr" className="font-mono text-fg">
+                    {cwd}
+                  </span>
                 </span>
               ) : null}
               {command && path ? (
                 <span className="flex items-center gap-1">
                   <FileText className="h-3 w-3 shrink-0" />
-                  {t('chat.toolPath')}: <span className="font-mono text-fg">{path}</span>
+                  {t('chat.toolPath')}:{' '}
+                  <span dir="ltr" className="font-mono text-fg">
+                    {path}
+                  </span>
                 </span>
               ) : null}
             </div>

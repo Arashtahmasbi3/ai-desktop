@@ -1,25 +1,11 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import ReactMarkdown, { type Components } from 'react-markdown'
-import CodeBlock from './CodeBlock'
+import ReactMarkdown from 'react-markdown'
 import ToolResultCard from './ToolResultCard'
-import { readCode } from '../lib/markdown-code'
+import { MARKDOWN_COMPONENTS } from './Markdown'
 import { AlertTriangle, Bot, Check, Copy, GitFork, Server, User } from 'lucide-react'
 import { useStore, type ChatMessage } from '../store'
 import { toolLabel } from '../lib/tool-labels'
-
-const MARKDOWN_COMPONENTS: Components = {
-  pre: ({ node }) => {
-    const { code, language } = readCode(node)
-    if (!code) return null
-    return <CodeBlock code={code} language={language} />
-  },
-  code: ({ children }) => (
-    <code className="rounded-shape-sm border border-border bg-bg-primary px-1 py-0.5 font-mono text-[0.85em] text-accent">
-      {children}
-    </code>
-  )
-}
 
 const ROLE_LABEL: Record<ChatMessage['role'], string> = {
   user: 'chat.roleUser',

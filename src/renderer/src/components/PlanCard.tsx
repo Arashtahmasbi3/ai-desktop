@@ -117,7 +117,13 @@ export default function PlanCard(): JSX.Element | null {
                 >
                   <div className="flex items-baseline gap-2">
                     <span className="text-xs font-semibold text-fg-muted">{index + 1}.</span>
-                    <span className="text-xs text-fg">{step.title}</span>
+                    {/*
+                      The step title is the model's prose, so it picks its own direction — Persian
+                      reads right-to-left here while the command below stays LTR.
+                    */}
+                    <span data-testid="plan-step-title" dir="auto" className="text-xs text-fg">
+                      {step.title}
+                    </span>
                     <code
                       className="ml-auto rounded bg-black/30 px-1.5 py-0.5 font-mono text-3xs text-accent"
                       title={step.tool}

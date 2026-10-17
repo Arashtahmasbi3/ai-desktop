@@ -2,6 +2,7 @@ import { Fragment, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Activity, AlertCircle, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react'
 import DecisionCard from './DecisionCard'
+import { InlineMarkdown, MarkdownProse } from './Markdown'
 import { useStore, type ChatMessage } from '../store'
 import { summarizeActivity, toolHeadline } from '../lib/tool-labels'
 import type { TraceDecision } from '@shared/trace'
@@ -110,7 +111,15 @@ export default function InlineTrace(): JSX.Element | null {
         >
           {decisions.length}
         </span>
-        <span className="min-w-0 flex-1 truncate text-2xs text-fg-muted">{latest}</span>
+        {/* The latest intent is the model's own prose, so it resolves its own direction and
+            renders its markdown (as an inline one-line preview, keeping the row a row). */}
+        <span
+          data-testid="trace-latest"
+          dir="auto"
+          className="min-w-0 flex-1 truncate text-2xs text-fg-muted"
+        >
+          <InlineMarkdown text={latest} />
+        </span>
         <span className="shrink-0 text-fg-muted">
           {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
         </span>
@@ -180,12 +189,19 @@ export default function InlineTrace(): JSX.Element | null {
                       <summary className="cursor-pointer text-3xs text-fg-subtle hover:text-fg-muted">
                         {t('trace.reasoningLabel')}
                       </summary>
-                      <p
+                      {/*
+                        The model's reasoning is prose — headings, bold, lists — so it goes through
+                        the chat's markdown pipeline instead of printing `##` and `**` literally.
+                        The prose (not the row's labels, tool ids or the changed-file paths) is what
+                        goes through the parser. `dir="auto"` because it is Persian here and English
+                        there, in the same run.
+                      */}
+                      <MarkdownProse
+                        testId="trace-reasoning-text"
                         dir="auto"
-                        className="mt-0.5 whitespace-pre-wrap border-l-2 border-border pl-2 text-3xs text-fg-muted"
-                      >
-                        {reasoningFor(decision)}
-                      </p>
+                        text={reasoningFor(decision) ?? ''}
+                        className="mt-0.5 border-l-2 border-border pl-2 text-3xs leading-snug text-fg-muted"
+                      />
                     </details>
                   </li>
                 ) : null}

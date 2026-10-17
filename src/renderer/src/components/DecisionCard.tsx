@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import type { TraceDecision, TraceEvidence, TraceExplanation, TracePhase } from '@shared/trace'
 import { TRACE_PHASES } from '@shared/trace'
+import { InlineMarkdown, MarkdownProse } from './Markdown'
 
 /** Colour + icon per phase, matching the dark timeline palette. */
 const PHASE_STYLE: Record<TracePhase, { icon: typeof Eye; className: string }> = {
@@ -89,8 +90,17 @@ export default function DecisionCard({ decision, compact, onExplain }: DecisionC
           <Icon className="h-3 w-3" />
           {t(`trace.phase${decision.phase[0].toUpperCase()}${decision.phase.slice(1)}`)}
         </span>
-        <span className="min-w-0 flex-1 truncate text-2xs text-fg">
-          {decision.intent.summary}
+        {/*
+          The intent is the model's own thought: free prose that may contain markdown and may be
+          Persian. It resolves its own direction (`dir="auto"`) and renders its markdown, but as an
+          inline preview so the row stays one truncated line — the full rendering is in the body.
+        */}
+        <span
+          data-testid="decision-summary"
+          dir="auto"
+          className="min-w-0 flex-1 truncate text-2xs text-fg"
+        >
+          <InlineMarkdown text={decision.intent.summary} />
         </span>
         {decision.outcome ? (
           <span
@@ -108,17 +118,25 @@ export default function DecisionCard({ decision, compact, onExplain }: DecisionC
       </button>
 
       {open ? (
-        <div className="space-y-2 border-t border-border px-2.5 py-2">
+        <div data-testid="decision-body" className="space-y-2 border-t border-border px-2.5 py-2">
           <section>
             <h4 className="text-3xs font-semibold uppercase tracking-wide text-fg-muted">
               {t('trace.intent')}
             </h4>
-            <p className="mt-0.5 text-2xs leading-snug text-fg">{decision.intent.summary}</p>
+            <MarkdownProse
+              dir="auto"
+              text={decision.intent.summary}
+              className="mt-0.5 text-2xs leading-snug text-fg"
+            />
             {decision.intent.rationale ? (
-              <p className="mt-1 text-2xs leading-snug text-fg-muted">
+              <div className="mt-1 text-2xs leading-snug text-fg-muted">
                 <span className="text-fg-muted">{t('trace.assessment')}: </span>
-                {decision.intent.rationale}
-              </p>
+                <MarkdownProse
+                  dir="auto"
+                  text={decision.intent.rationale}
+                  className="mt-0.5 leading-snug"
+                />
+              </div>
             ) : null}
           </section>
 
