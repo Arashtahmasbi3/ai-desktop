@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import i18n from '../../src/renderer/src/i18n'
 import SourcesOutputsPanel from '../../src/renderer/src/components/SourcesOutputsPanel'
 import ChatPanel from '../../src/renderer/src/components/ChatPanel'
+import WorkspacePanel from '../../src/renderer/src/components/WorkspacePanel'
 import { useStore } from '../../src/renderer/src/store'
 
 /**
@@ -143,7 +144,7 @@ describe('v3.0 — the Sources section', () => {
   })
 })
 
-describe('v3.0 — the composer opens the panel', () => {
+describe('v4.1 — the right rail is the only way in', () => {
   beforeEach(() => {
     useStore.setState({
       messages: [],
@@ -154,11 +155,14 @@ describe('v3.0 — the composer opens the panel', () => {
       error: null,
       loopStop: null,
       warnings: [],
-      showContextBeforeSend: false
+      showContextBeforeSend: false,
+      workspacePanelOpen: true,
+      workspacePanelTab: 'sources',
+      sourcesPanelOpen: false
     })
   })
 
-  it('8. the slider button opens it, and "+ Add files" uses the existing picker', async () => {
+  it('8. the rail’s Sources tab opens it, and "+ Add files" uses the existing picker', async () => {
     const pickFile = vi.fn().mockResolvedValue(['C:\\Users\\me\\shot.png'])
     const register = vi.fn().mockResolvedValue([
       { id: 'att-1', name: 'shot.png', kind: 'image', bytes: 2048, thumbnail: PNG }
@@ -172,10 +176,18 @@ describe('v3.0 — the composer opens the panel', () => {
       attachments: { register }
     }
 
-    render(<ChatPanel />)
+    // v4.1 item 11: the composer's slider icon is gone, so the rail is mounted with the
+    // chat — its Sources tab is the single entry point to the declared sources/outputs.
+    render(
+      <>
+        <WorkspacePanel />
+        <ChatPanel />
+      </>
+    )
+    expect(screen.queryByTestId('composer-sources-toggle')).toBeNull()
     expect(screen.queryByTestId('sources-outputs-panel')).toBeNull()
 
-    fireEvent.click(screen.getByTestId('composer-sources-toggle'))
+    fireEvent.click(screen.getByTestId('rail-declare-sources'))
     expect(screen.getByTestId('sources-outputs-panel')).toBeTruthy()
 
     fireEvent.click(screen.getByTestId('run-sources-add-files'))

@@ -351,7 +351,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                 onClick={() => setWorkspaceOpen(false)}
                 aria-hidden="true"
               />
-              <div className="absolute left-1 right-1 top-10 z-50 overflow-hidden rounded-lg border border-border bg-bg-secondary py-1 text-xs shadow-2xl">
+              <div className="absolute left-1 right-1 top-10 z-50 overflow-hidden rounded-shape border-2 border-border-strong bg-bg-secondary py-1 text-xs shadow-shape">
                 {projects.map((project) => (
                   <button
                     key={project.id}
@@ -532,7 +532,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                       />
                       <div
                         role="menu"
-                        className="absolute right-1 top-8 z-50 w-40 overflow-hidden rounded-lg border border-border bg-bg-secondary py-1 text-xs shadow-2xl"
+                        className="absolute right-1 top-8 z-50 w-40 overflow-hidden rounded-shape border-2 border-border-strong bg-bg-secondary py-1 text-xs shadow-shape"
                       >
                         <button
                           type="button"
@@ -629,7 +629,10 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                       ? (projectNameFor(group.projectId) ?? t('sidebar.noProject'))
                       : t('sidebar.noProject')}
                   </span>
-                  <span className="ms-auto shrink-0 font-normal text-fg-subtle">
+                  <span
+                    data-testid="chat-group-count"
+                    className="ms-auto shrink-0 text-3xs uppercase tracking-wide text-fg-subtle"
+                  >
                     {group.chats.length}
                   </span>
                   {group.projectId ? (
@@ -646,39 +649,36 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                   ) : null}
                 </p>
                 {group.chats.map((chat) => (
-              <div key={chat.id} className="group relative">
+              <div key={chat.id} data-testid={`chat-row-${chat.id}`} className="group relative flex items-center">
+                {/*
+                 * v4.1 item 14: a row is a title, when it was last touched, and one
+                 * overflow trigger. The conversation glyph that read as a checkbox is
+                 * gone, and the trigger is a real <button> beside the title button
+                 * (not a role="button" span inside it) so the row keeps one action and
+                 * the keyboard can reach the menu.
+                 */}
                 <button
                   type="button"
                   onClick={() => void loadSession(chat.id)}
-                  className={`flex w-full items-center gap-2 rounded-shape-sm px-2 py-1.5 text-left transition ${
+                  className={`flex min-w-0 flex-1 items-center gap-2 rounded-shape-sm px-2 py-1.5 text-left transition ${
                     activeChatId === chat.id
                       ? 'bg-accent-solid/15 text-fg-strong'
                       : 'text-fg hover:bg-bg-tertiary'
                   }`}
                 >
-                  <MessageSquare className="h-3.5 w-3.5 shrink-0 text-fg-muted" />
                   <span className="min-w-0 flex-1 truncate text-xs">{chat.title}</span>
-                  <span className="shrink-0 text-3xs text-fg-muted">
+                  <span data-testid="chat-row-time" className="shrink-0 text-3xs text-fg-muted">
                     {relativeTime(chat.updatedAt)}
                   </span>
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    aria-label={t('common.more')}
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      setChatMenuFor(chatMenuFor === chat.id ? null : chat.id)
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        event.stopPropagation()
-                        setChatMenuFor(chat.id)
-                      }
-                    }}
-                    className="hidden shrink-0 rounded p-0.5 text-fg-muted hover:bg-bg-primary hover:text-fg focus-visible:block group-hover:block group-focus-within:block"
-                  >
-                    <MoreHorizontal className="h-3.5 w-3.5" />
-                  </span>
+                </button>
+                <button
+                  type="button"
+                  aria-label={t('common.more')}
+                  data-testid={`chat-row-more-${chat.id}`}
+                  onClick={() => setChatMenuFor(chatMenuFor === chat.id ? null : chat.id)}
+                  className="hidden shrink-0 items-center justify-center rounded-shape-sm p-1 text-fg-muted hover:bg-bg-tertiary hover:text-fg focus-visible:block group-hover:block group-focus-within:block"
+                >
+                  <MoreHorizontal className="h-3.5 w-3.5" />
                 </button>
 
                 {chatMenuFor === chat.id ? (
@@ -690,7 +690,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                     />
                     <div
                       role="menu"
-                      className="absolute right-1 top-7 z-50 w-32 overflow-hidden rounded-lg border border-border bg-bg-secondary py-1 text-xs shadow-2xl"
+                      className="absolute right-1 top-7 z-50 w-32 overflow-hidden rounded-shape border-2 border-border-strong bg-bg-secondary py-1 text-xs shadow-shape"
                     >
                       <button
                         type="button"

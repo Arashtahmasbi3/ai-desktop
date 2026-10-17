@@ -675,7 +675,11 @@
     "noServers": "هیچ VPS تنظیم نشده",
     "removeConfirm": "VPS «{{name}}» حذف شود؟",
     "refresh": "به‌روزرسانی",
-    "addServer": "افزودن سرور"
+    "addServer": "افزودن سرور",
+    "testConnection": "تست اتصال",
+    "testing": "در حال تست…",
+    "testOpen": "پورت {{port}} باز است · {{ms}} میلی‌ثانیه",
+    "testFailed": "پورت {{port}}: {{reason}}"
   },
   "slash": {
     "new": "شروع چت جدید",

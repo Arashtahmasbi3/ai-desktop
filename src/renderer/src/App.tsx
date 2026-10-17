@@ -331,9 +331,9 @@ export default function App(): JSX.Element {
                     <ChatTree mode={layout.tree} onClose={toggleChatTree} />
                   ) : null}
                   <ChatPanel />
-                  {workspacePanelOpen ? (
-                    <WorkspacePanel overlay={layout.workspace === 'overlay'} />
-                  ) : null}
+                  {/* v4.1 item 11: always mounted, because the rail's own collapsed
+                      tab strip is the single way to open it again. */}
+                  <WorkspacePanel overlay={layout.workspace === 'overlay'} />
                 </div>
               ) : null}
               {view === 'tasks' ? <TaskPanel /> : null}

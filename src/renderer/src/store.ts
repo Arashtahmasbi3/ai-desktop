@@ -458,6 +458,11 @@ interface AppState {
   workspacePanelOpen: boolean
   /** Active tab of the right workspace column. */
   workspacePanelTab: WorkspacePanelTab
+  /**
+   * v4.1: whether the declared Sources/Outputs editor is open. Its only opener is the
+   * right rail's Sources tab, so the flag has to outlive the rail's own local state.
+   */
+  sourcesPanelOpen: boolean
   /** Whether the local terminal panel is open under the chat. */
   terminalOpen: boolean
   /** Whether the codebase search modal is open. */
@@ -574,6 +579,8 @@ interface AppState {
   toggleChatTree: () => void
   toggleWorkspacePanel: () => void
   setWorkspacePanelTab: (tab: WorkspacePanelTab) => void
+  /** v4.1: open/close the declared Sources/Outputs editor from the rail. */
+  setSourcesPanelOpen: (open: boolean) => void
   toggleTerminal: () => void
   runTerminalCommand: (command: string) => Promise<void>
   setSearchOpen: (open: boolean) => void
@@ -813,6 +820,7 @@ export const useStore = create<AppState>((set, get) => ({
   chatTreeOpen: readChatTreeOpen(),
   workspacePanelOpen: true,
   workspacePanelTab: 'output',
+  sourcesPanelOpen: false,
   terminalOpen: false,
   terminalLines: [],
   searchOpen: false,
@@ -1027,6 +1035,7 @@ export const useStore = create<AppState>((set, get) => ({
   setPlanMode: (value) => set({ planMode: value }),
   toggleWorkspacePanel: () => set({ workspacePanelOpen: !get().workspacePanelOpen }),
   setWorkspacePanelTab: (tab) => set({ workspacePanelTab: tab, workspacePanelOpen: true }),
+  setSourcesPanelOpen: (open) => set({ sourcesPanelOpen: open }),
   /**
    * v3.0: the composer's Sources/Outputs declarations. `send` reads them back and
    * appends `buildRunIntentBlock` to the task; nothing else consumes them.

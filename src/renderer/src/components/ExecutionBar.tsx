@@ -6,10 +6,8 @@ import {
   Lock,
   LockOpen,
   PanelLeft,
-  PanelRight,
   Server,
   ShieldAlert,
-  Square,
   Terminal,
   Trash2,
   Wifi,
@@ -87,10 +85,6 @@ export default function ExecutionBar({
   const setPlanMode = useStore((state) => state.setPlanMode)
   const terminalOpen = useStore((state) => state.terminalOpen)
   const toggleTerminal = useStore((state) => state.toggleTerminal)
-  const workspacePanelOpen = useStore((state) => state.workspacePanelOpen)
-  const toggleWorkspacePanel = useStore((state) => state.toggleWorkspacePanel)
-  const running = useStore((state) => state.running)
-  const abort = useStore((state) => state.abort)
   const newSession = useStore((state) => state.newSession)
   const approvalMode = useStore((state) => state.settings?.approvalMode ?? 'ask')
   const setApprovalMode = useStore((state) => state.setApprovalMode)
@@ -257,28 +251,6 @@ export default function ExecutionBar({
               <Terminal className="h-3.5 w-3.5" />
             </button>
           ) : null}
-          {running ? (
-            <button
-              type="button"
-              data-testid="exec-stop"
-              onClick={abort}
-              title={t('chat.stop')}
-              className="flex items-center gap-1 rounded bg-danger/20 px-1.5 py-0.5 text-danger hover:bg-danger/30"
-            >
-              <Square className="h-3 w-3" />
-              {t('chat.stop')}
-            </button>
-          ) : null}
-          <button
-            type="button"
-            onClick={toggleWorkspacePanel}
-            title={t('workspace.open')}
-            aria-label={t('workspace.open')}
-            aria-pressed={workspacePanelOpen}
-            className={iconButton(workspacePanelOpen)}
-          >
-            <PanelRight className="h-3.5 w-3.5" />
-          </button>
         </span>
       </div>
     </header>

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import i18n from '../../src/renderer/src/i18n'
 import ExecutionBar from '../../src/renderer/src/components/ExecutionBar'
 import { useStore } from '../../src/renderer/src/store'
@@ -150,12 +150,16 @@ describe('v2.6.1 B.3 - execution bar', () => {
     expect(formatCountdown(25 * 60 * 1000)).toBe('25:00')
   })
 
-  it('5. run controls appear only while the agent is running', () => {
+  /**
+   * v4.1 item 10: the header used to grow a second red Stop beside the composer's
+   * send/stop button. The composer keeps it (`chat-stop-single.test.tsx` pins that),
+   * so this now asserts the duplicate is gone rather than that clicking it aborts.
+   */
+  it('5. renders no second Stop — the composer owns the only one', () => {
     useStore.setState({ running: true })
     render(<ExecutionBar timelineOpen={false} onToggleTimeline={() => undefined} />)
-    const stop = screen.getByTestId('exec-stop')
-    fireEvent.click(stop)
-    expect((window.api as unknown as { agent: { abort: ReturnType<typeof vi.fn> } }).agent.abort).toHaveBeenCalled()
+    expect(screen.queryByTestId('exec-stop')).toBeNull()
+    expect(screen.queryByRole('button', { name: /stop/i })).toBeNull()
   })
 
   it('6. stays readable in a narrow window (wrap + truncate, never clip)', () => {

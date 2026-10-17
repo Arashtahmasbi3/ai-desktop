@@ -675,7 +675,11 @@
     "noServers": "No VPS configured",
     "removeConfirm": "Remove VPS \"{{name}}\"?",
     "refresh": "Refresh",
-    "addServer": "Add server"
+    "addServer": "Add server",
+    "testConnection": "Test connection",
+    "testing": "testing…",
+    "testOpen": "port {{port}} open · {{ms}} ms",
+    "testFailed": "port {{port}}: {{reason}}"
   },
   "slash": {
     "new": "Start a new chat",

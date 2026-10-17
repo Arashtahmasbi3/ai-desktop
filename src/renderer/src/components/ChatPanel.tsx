@@ -7,7 +7,6 @@ import {
   Eye,
   Paperclip,
   Send,
-  SlidersHorizontal,
   Square
 } from 'lucide-react'
 import { basename, useStore } from '../store'
@@ -117,8 +116,10 @@ export default function ChatPanel(): JSX.Element {
   const [atBottom, setAtBottom] = useState(true)
   const [commandIndex, setCommandIndex] = useState(0)
   const [timelineOpen, setTimelineOpen] = useState(false)
-  /** v3.0: the composer's Sources / Outputs panel. */
-  const [sourcesPanelOpen, setSourcesPanelOpen] = useState(false)
+  /** v3.0: the composer's Sources / Outputs panel. Its only opener is the right rail's
+   * Sources tab (v4.1 item 11), so the open flag lives in the store instead of here. */
+  const sourcesPanelOpen = useStore((state) => state.sourcesPanelOpen)
+  const setSourcesPanelOpen = useStore((state) => state.setSourcesPanelOpen)
   const [contextCard, setContextCard] = useState<{
     preview: ContextPreview
     body: string
@@ -658,25 +659,10 @@ export default function ChatPanel(): JSX.Element {
             <span className="shrink-0">
               <ModelSwitcher />
             </span>
-            {/* v3.0 clay: the Sources/Outputs panel lives at the composer's top-right,
-                in the same control row as the model and send buttons so it costs no
-                extra height. */}
-            <button
-              type="button"
-              data-testid="composer-sources-toggle"
-              onClick={() => setSourcesPanelOpen((open) => !open)}
-              title={t('runPanel.open')}
-              aria-label={t('runPanel.open')}
-              aria-pressed={sourcesPanelOpen}
-              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-shape-sm transition-colors duration-fast hover:bg-bg-tertiary ${
-                sourcesPanelOpen ? 'text-accent' : 'text-fg-muted hover:text-fg'
-              }`}
-            >
-              <SlidersHorizontal className="h-4 w-4" />
-            </button>
             {running ? (
               <button
                 type="button"
+                data-testid="composer-stop"
                 onClick={abort}
                 title={`${t('chat.stop')} (Shift+Esc)`}
                 aria-label={`${t('chat.stop')} (Shift+Esc)`}
