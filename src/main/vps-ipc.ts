@@ -12,6 +12,7 @@ import { getSystemHealth } from '@core/remote/system-health'
 import { buildGitSetupCommands, type GitSetupOptions } from '@core/remote/git-setup'
 import { assertInstallAllowed, buildInstallCommands, getInstallRecipe } from '@core/agent/install-recipes'
 import { runRemoteCommands } from '@core/remote/run-commands'
+import { testServerConnection } from './server-connection-test'
 import type { AppServices } from './app-services'
 
 /** POSIX single-quote a value so it can be safely embedded in a shell command. */
@@ -154,6 +155,27 @@ export function registerVpsIpc(services: AppServices): () => void {
       }
     ],
     ['vps:connected', () => services.vps.connectedServers()],
+    /*
+     * v4.1: answer "is it reachable from here?" without a model call and without SSH credentials. A TCP
+     * connect from this computer is the honest version of what the agent used to do with /dev/tcp.
+     */
+    [
+      'vps:testConnection',
+      async (id: string) => {
+        const server = (await services.vpsServers.list()).find((entry) => entry.id === id)
+        if (server === undefined) {
+          return {
+            ok: false,
+            host: '',
+            port: 0,
+            outcome: 'invalid' as const,
+            message: 'unknown server',
+            from: 'this-machine' as const
+          }
+        }
+        return testServerConnection({ host: server.host, port: server.port })
+      }
+    ],
     ['vps:connect', (id: string) => services.vps.connect(id)],
     ['vps:disconnect', (id: string) => services.vps.disconnect(id)],
     ['vps:approveFingerprint', (id: string) => services.vps.approveFingerprint(id)],

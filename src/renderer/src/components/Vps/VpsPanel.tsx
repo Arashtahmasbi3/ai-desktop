@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plug, PlugZap, Plus, RefreshCw, ShieldAlert, Trash2 } from 'lucide-react'
-import type { AuditEntryView, VpsConnectionState, VpsServerView } from '@shared/vps'
+import { Activity, Plug, PlugZap, Plus, RefreshCw, ShieldAlert, Trash2 } from 'lucide-react'
+import type {
+  AuditEntryView,
+  ConnectionTestResult,
+  VpsConnectionState,
+  VpsServerView
+} from '@shared/vps'
 import { useStore } from '../../store'
 import { vpsStateFor } from '../../lib/vps-state'
 import RemoteFileExplorer from './RemoteFileExplorer'
@@ -10,6 +15,20 @@ import VpsTerminal from './VpsTerminal'
 import DiagnosticsPanel from '../DiagnosticsPanel'
 
 type Tab = 'terminal' | 'files' | 'audit'
+
+/**
+ * One sentence for a reachability result (v4.1).
+ *
+ * Words, not a coloured dot: "port 22 open · 82 ms" and "port 22 timed out" are different facts, and a user who
+ * is debugging a firewall needs the difference.
+ */
+function testSummary(
+  result: ConnectionTestResult,
+  t: (key: string, options?: Record<string, unknown>) => string
+): string {
+  if (result.ok) return t('vps.testOpen', { port: result.port, ms: result.latencyMs ?? 0 })
+  return t('vps.testFailed', { port: result.port, reason: result.message ?? result.outcome })
+}
 
 function text(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
@@ -26,6 +45,30 @@ const STATUS_COLOR: Record<VpsConnectionState['status'], string> = {
 export default function VpsPanel(): JSX.Element {
   const { t } = useTranslation()
   const [servers, setServers] = useState<VpsServerView[]>([])
+  /*
+   * v4.1: the last reachability test per server. Kept per id so testing one server never overwrites another's
+   * answer.
+   */
+  const [tests, setTests] = useState<Record<string, ConnectionTestResult | 'running'>>({})
+  const testConnection = async (id: string): Promise<void> => {
+    setTests((current) => ({ ...current, [id]: 'running' }))
+    try {
+      const result = await window.api.vps.testConnection(id)
+      setTests((current) => ({ ...current, [id]: result }))
+    } catch (error) {
+      setTests((current) => ({
+        ...current,
+        [id]: {
+          ok: false,
+          host: '',
+          port: 0,
+          outcome: 'unreachable',
+          message: String((error as Error)?.message ?? error),
+          from: 'this-machine'
+        }
+      }))
+    }
+  }
   const [activeId, setActiveId] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [tab, setTab] = useState<Tab>('terminal')
@@ -199,6 +242,37 @@ export default function VpsPanel(): JSX.Element {
                 <div className="truncate text-3xs text-fg-muted">
                   {server.username}@{server.host}:{server.port}
                 </div>
+                {tests[server.id] ? (
+                  /*
+                   * A span, not a div: this sits inside the connect button, and a button may only contain
+                   * phrasing content. `block` keeps it on its own line.
+                   */
+                  <span
+                    data-testid={`connection-test-${server.id}`}
+                    dir="auto"
+                    className={`block truncate text-3xs ${
+                      tests[server.id] === 'running'
+                        ? 'text-fg-muted'
+                        : (tests[server.id] as ConnectionTestResult).ok
+                          ? 'text-success'
+                          : 'text-warning'
+                    }`}
+                  >
+                    {tests[server.id] === 'running'
+                      ? t('vps.testing')
+                      : testSummary(tests[server.id] as ConnectionTestResult, t)}
+                  </span>
+                ) : null}
+              </button>
+              <button
+                onClick={() => void testConnection(server.id)}
+                disabled={tests[server.id] === 'running'}
+                className="brutal-btn shrink-0 px-1.5 py-0.5 text-3xs disabled:opacity-50"
+                title={t('vps.testConnection')}
+                aria-label={t('vps.testConnection')}
+                data-testid={`connection-test-button-${server.id}`}
+              >
+                <Activity className="h-3 w-3" />
               </button>
               <button
                 onClick={() => void remove(server.id, server.name)}

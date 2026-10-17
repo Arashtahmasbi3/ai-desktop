@@ -17,6 +17,7 @@ import type { ChatSaveInput, ChatSummary, StoredChat } from '@shared/chat'
 import type {
   AuditEntryView,
   HealthCheckConfig,
+  ConnectionTestResult,
   HealthCheckOutcome,
   RemoteFileEntry,
   SshConfigHost,
@@ -176,6 +177,8 @@ export interface Api {
     disconnect(id: string): Promise<VpsConnectionState>
     /** Refresh a server's idle stamp so the watchdog keeps an open project's host up. */
     keepAlive(id: string): Promise<VpsConnectionState>
+  /** v4.1: one TCP connect from this computer, so reachability is a button and not a port scan. */
+  testConnection(id: string): Promise<ConnectionTestResult>
     approveFingerprint(id: string): Promise<VpsConnectionState>
     exec(id: string, command: string): Promise<VpsExecResult>
     audit(): Promise<AuditEntryView[]>

@@ -84,6 +84,25 @@ export interface VpsServerView {
   policy?: HostPolicy
 }
 
+export type ConnectionOutcome = 'open' | 'timeout' | 'refused' | 'unreachable' | 'invalid'
+
+/**
+ * The answer to "can this computer reach that server?" (v4.1).
+ *
+ * It exists so the app can answer that question instead of the model improvising a port scan with
+ * `/dev/tcp` — which is how a firewall problem once looked like a broken agent.
+ */
+export interface ConnectionTestResult {
+  ok: boolean
+  host: string
+  port: number
+  outcome: ConnectionOutcome
+  latencyMs?: number
+  message?: string
+  /** The test always runs from this computer, and says so. */
+  from: 'this-machine'
+}
+
 export type VpsStatus = 'disconnected' | 'connecting' | 'connected' | 'error'
 
 export interface VpsConnectionState {

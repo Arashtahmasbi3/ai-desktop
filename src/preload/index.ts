@@ -12,6 +12,7 @@ import type { ChatSaveInput, ChatSummary, StoredChat } from '@shared/chat'
 import type {
   AuditEntryView,
   HealthCheckConfig,
+  ConnectionTestResult,
   HealthCheckOutcome,
   RemoteFileEntry,
   SshConfigHost,
@@ -211,6 +212,8 @@ export const api = {
     remove: (id: string): Promise<boolean> => invoke('vps:remove', id),
     status: (): Promise<VpsConnectionState> => invoke('vps:status'),
     connected: (): Promise<string[]> => invoke('vps:connected'),
+    testConnection: (id: string): Promise<ConnectionTestResult> =>
+      invoke('vps:testConnection', id),
     connect: (id: string): Promise<VpsConnectionState> => invoke('vps:connect', id),
     disconnect: (id: string): Promise<VpsConnectionState> => invoke('vps:disconnect', id),
     keepAlive: (id: string): Promise<VpsConnectionState> => invoke('vps:keepAlive', id),
