@@ -147,6 +147,8 @@ export interface ToolHeadlineInput {
   command?: string
   path?: string
   serverId?: string
+  /** The failure text. Its quoted token decides which part of the command is shown on a failed card. */
+  error?: string
 }
 
 export interface ToolHeadline {
@@ -254,6 +256,32 @@ export function truncateMiddle(text: string, max: number = DEFAULT_MAX_LENGTH): 
  * middle-truncated. `summarizeCommand('echo "== test =="; timeout 8 bash -c …')`
  * therefore reads `timeout 8 bash -c …` instead of the whole pipeline.
  */
+/**
+ * The part of a compound command that a failure refers to (v4.1).
+ *
+ * The guard and the host policy quote the offending token ("Path \"/opt\" is outside…"), so the segment
+ * containing that token is the one worth showing. Returns undefined when the error names nothing concrete, in
+ * which case the caller keeps its existing summary.
+ */
+export function failingSegment(command?: string, error?: string): string | undefined {
+  if (typeof command !== 'string' || typeof error !== 'string') return undefined
+  const quoted = /"([^"]{1,200})"/.exec(error)?.[1]
+  if (quoted === undefined || quoted === '') return undefined
+  const segments = command
+    .split(/(?:&&|\|\||;|\|)/)
+    .map((segment) => segment.trim())
+    .filter(Boolean)
+  /*
+   * Token-exact first. `/opt` is a token of `df -h /opt` but only a PREFIX of `/opt/sepehr-motor`, so a plain
+   * substring match picked the harmless first segment and reproduced the very confusion this is meant to
+   * remove.
+   */
+  const exact = segments.find((segment) =>
+    segment.split(/[\s'"=<>|;&()]+/).filter(Boolean).includes(quoted)
+  )
+  return exact ?? segments.find((segment) => segment.includes(quoted))
+}
+
 export function summarizeCommand(command: string, maxLength: number = DEFAULT_MAX_LENGTH): string {
   const sanitized = sanitizeText(command)
   if (!sanitized) return ''
@@ -302,8 +330,14 @@ export function toolHeadline(call: ToolHeadlineInput, t: Translate): ToolHeadlin
   const suffix = remote ? 'Remote' : ''
   const headline = t(`tools.headline${verb.charAt(0).toUpperCase()}${verb.slice(1)}${suffix}`)
 
-  const detail = call.command
-    ? summarizeCommand(call.command)
+  /*
+   * v4.1: on a failure, name the part that failed. A long compound command was middle-truncated to its first
+   * segments, so the refused part was invisible and the card looked like it was blaming innocent text.
+   */
+  const command = typeof call.command === 'string' && call.command !== '' ? call.command : undefined
+  const failedSegment = call.ok === false ? failingSegment(command, call.error) : undefined
+  const detail = command
+    ? summarizeCommand(failedSegment ?? command)
     : call.path
       ? summarizePath(call.path)
       : undefined

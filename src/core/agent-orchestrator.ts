@@ -25,6 +25,7 @@ import type {
   AgentToolResult,
   LoopDetectionPolicy,
   LoopStopInfo,
+  LoopStopFailure,
   LoopWarning,
   ProviderEntry,
   ToolRecoveryInfo
@@ -572,6 +573,14 @@ export interface LlmCallOutcome {
  * asks the LLM what to do, runs the requested tools in a sandbox, feeds the
  * observations back, detects loops and recovers from failures.
  */
+/**
+ * How many idle windows a productive run may string together before the hard ceiling applies (v4.1).
+ *
+ * The idle timer alone would let a run that keeps advancing continue forever; the ceiling keeps "no progress
+ * for 300s" and "we have been at this for 20 minutes" as two separate, explainable limits.
+ */
+const TURN_HARD_MULTIPLE = 4
+
 export class AgentOrchestrator {
   private readonly sandbox: SandboxManager
   private readonly providers: ProviderEntry[]
@@ -714,7 +723,7 @@ export class AgentOrchestrator {
     let providerUsed: ProviderId | undefined
     let sandboxId: string | null = null
     let stopInfo: LoopStopInfo | undefined
-    const deadline = this.turnTimeoutMs > 0 ? startedAt + this.turnTimeoutMs : null
+    // v4.1: the turn clock is an idle timer now — see `turnIsOverdue`.
 
     this.log('info', 'run.start', runId, { task })
 
@@ -866,12 +875,16 @@ export class AgentOrchestrator {
           message = 'Run aborted by caller'
           break
         }
-        if (deadline !== null && this.now() >= deadline) {
-          this.log('warn', 'loop.turn_timeout', runId, { step: index })
+        const turnClock = this.turnIsOverdue(steps, startedAt)
+        if (turnClock.overdue) {
+          this.log('warn', 'loop.turn_timeout', runId, { step: index, idle: turnClock.idle })
+          const windowSeconds = Math.round(this.turnTimeoutMs / 1000)
           warnings.push({
             kind: 'turn_timeout',
             count: index,
-            message: `Turn exceeded ${Math.round(this.turnTimeoutMs / 1000)}s budget`
+            message: turnClock.idle
+              ? `No progress for ${windowSeconds}s, so the turn was stopped`
+              : `The turn reached its ${Math.round((this.turnTimeoutMs * TURN_HARD_MULTIPLE) / 1000)}s ceiling`
           })
           stopInfo = this.buildStopInfo('turn_timeout', steps)
           status = 'needs_input'
@@ -1544,6 +1557,24 @@ export class AgentOrchestrator {
   }
 
   /** Build the user-facing stop summary, including the most recent actions. */
+  /**
+   * Decide whether the turn's time is up (v4.1).
+   *
+   * The clock runs from the last **productive** step, not from the start of the run: a step that discovers
+   * something resets it, while waiting on a network timeout does not. `idle` distinguishes "nothing has
+   * happened for a while" from "we hit the ceiling", because the two need different advice.
+   */
+  private turnIsOverdue(steps: AgentStep[], startedAt: number): { overdue: boolean; idle: boolean } {
+    if (this.turnTimeoutMs <= 0) return { overdue: false, idle: false }
+    const lastProgressAt = steps.reduce(
+      (latest, step) => (step.productive ? Math.max(latest, step.finishedAt) : latest),
+      startedAt
+    )
+    const now = this.now()
+    if (now >= startedAt + this.turnTimeoutMs * TURN_HARD_MULTIPLE) return { overdue: true, idle: false }
+    return { overdue: now - lastProgressAt >= this.turnTimeoutMs, idle: true }
+  }
+
   private buildStopInfo(reason: LoopStopInfo['reason'], steps: AgentStep[]): LoopStopInfo {
     const last = steps[steps.length - 1]
     const recentActions =
@@ -1558,15 +1589,40 @@ export class AgentOrchestrator {
       failure_streak: 'several steps in a row failed',
       reasoning_loop: 'the same reasoning was repeated without a new action',
       no_progress: 'several steps in a row made no progress',
-      turn_timeout: 'the turn exceeded its time budget'
+      turn_timeout: 'the turn ran out of time'
     }
+    /*
+     * v4.1: carry what failed, how far the run got, and any question it was waiting on. The card used to end
+     * with a generic "I got stuck", so the user had to infer from the trace whether the run had been blocked,
+     * refused or simply slow.
+     */
+    const recentFailures: LoopStopFailure[] = []
+    for (const step of steps.slice(-3)) {
+      for (const observation of step.observations) {
+        if (observation.ok) continue
+        recentFailures.push({
+          name: observation.name,
+          ...(observation.error ? { error: observation.error } : {}),
+          ...(observation.output ? { output: observation.output.slice(0, 400) } : {}),
+          ...(observation.command ? { command: observation.command } : {}),
+          ...(observation.serverId ? { serverId: observation.serverId } : {})
+        })
+      }
+    }
+    const pendingAction = last?.actions.find((action) => action.name === 'ask_user')
+    const pendingQuestion =
+      typeof pendingAction?.arguments.question === 'string'
+        ? (pendingAction.arguments.question as string)
+        : undefined
+
     return {
       reason,
       message:
-        `⚠️ It looks like I got stuck: ${label[reason]}. ` +
-        'I stopped so I do not keep repeating myself. Review the recent actions and ' +
-        'reply with **Continue**, **Correct**, or **Stop**.',
-      recentActions
+        'It stopped before finishing: ' + label[reason] + '. The reason and the next step are in the card below.',
+      recentActions,
+      recentFailures,
+      steps: steps.length,
+      ...(pendingQuestion ? { pendingQuestion } : {})
     }
   }
 

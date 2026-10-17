@@ -125,11 +125,31 @@ export interface LoopWarning {
 /** Why a run was stopped early because it looked stuck. */
 export type LoopStopReason = LoopWarningKind
 
+/** One failed tool result, as the run saw it (v4.1). */
+export interface LoopStopFailure {
+  name: string
+  error?: string
+  /** A bounded slice of the output; enough to classify it, never a whole log. */
+  output?: string
+  command?: string
+  serverId?: string
+}
+
 export interface LoopStopInfo {
   reason: LoopStopReason
   message: string
   /** Recent actions (tool name + short args) so the user can see what happened. */
   recentActions: string[]
+  /**
+   * v4.1: what actually failed. The stop card used to end with a generic "I got stuck", so the user had to
+   * infer from the trace whether the run had been blocked, refused or simply slow. A deterministic verdict
+   * built from these observations replaces that guesswork — no extra model call.
+   */
+  recentFailures?: LoopStopFailure[]
+  /** v4.1: how many steps the run completed before stopping. */
+  steps?: number
+  /** v4.1: set when the agent was waiting on a question, so the card asks instead of calling it a loop. */
+  pendingQuestion?: string
 }
 
 export interface LoopDetectionPolicy {
