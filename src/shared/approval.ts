@@ -61,6 +61,12 @@ export type ApprovalReason =
   | 'write'
   | 'dangerous'
   | 'outside_plan'
+  /**
+   * v4.1: the command reaches another host (a port probe or a scan). It is asked about in those words, even
+   * when the command is otherwise read-only, because "read-only" describes the local filesystem and says
+   * nothing about pointing six ports at somebody else's machine.
+   */
+  | 'network_action'
 
 /** The user's answer to an approval prompt. */
 export interface ApprovalOutcome {

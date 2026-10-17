@@ -198,6 +198,7 @@
     "approvalReasonOutsidePlan": "بخشی از طرح تأییدشده نیست",
     "approvalReasonWrite": "عملیات نوشتن",
     "approvalReasonDangerous": "دستور خطرناک",
+    "approvalReasonNetwork": "کنش شبکه‌ای — این دستور به یک ماشین دیگر وصل می‌شود.",
     "approvalReasonReadOnly": "عملیات فقط-خواندنی",
     "approvalWriteWarning": "این یک عملیات نوشتن است و نیاز به تأیید صریح دارد.",
     "approvalTool": "ابزار",

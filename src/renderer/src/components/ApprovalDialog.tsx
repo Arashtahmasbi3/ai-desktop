@@ -69,6 +69,8 @@ function reasonKey(reason: string): string {
       return 'chat.approvalReasonWrite'
     case 'dangerous':
       return 'chat.approvalReasonDangerous'
+    case 'network_action':
+      return 'chat.approvalReasonNetwork'
     case 'read_only_tool':
     case 'read_only_shell':
     case 'whitelisted_command':

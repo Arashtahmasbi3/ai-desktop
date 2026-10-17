@@ -10,6 +10,8 @@ import { type CheckpointMode, type ImpactVerdict } from '@shared/decision-checkp
 import type { ApprovedCommands } from '@core/agent/approved-commands'
 import { canRememberTool, createRememberedApproval } from '@core/agent/remember-policy'
 import { isCommandAlwaysAllowed, isReadOnlyShellCommand } from '@core/remote/command-whitelist'
+import { detectNetworkAction } from '@core/remote/network-action'
+import { classifyShellCommand } from '@core/agent/approval'
 import { READ_ONLY_TOOL_NAMES } from '@shared/profile'
 
 export interface ApprovalGateOptions {
@@ -100,8 +102,19 @@ export function shouldRequireApproval(action: {
   if (action.name === 'remote_shell') {
     const command = action.arguments.command
     if (typeof command === 'string') {
+      /*
+       * v4.1: a network action is asked about in its own words, before any read-only shortcut. A port scan is
+       * not "read-only" in the sense the user cares about: it touches machines that are not this project.
+       */
+      if (detectNetworkAction(command) !== undefined) return { required: true, reason: 'network_action' }
       if (isCommandAlwaysAllowed(command)) return { required: false, reason: 'whitelisted_command' }
       if (isReadOnlyShellCommand(command)) return { required: false, reason: 'read_only_shell' }
+      /*
+       * v4.1: say "this changes files" when that is what it does. `remote_shell` classifies as `shell`, so the
+       * fallback below could only ever say "not whitelisted" — a sentence that tells the user nothing about a
+       * destructive command.
+       */
+      if (classifyShellCommand(command) === 'write') return { required: true, reason: 'write' }
     }
   }
 

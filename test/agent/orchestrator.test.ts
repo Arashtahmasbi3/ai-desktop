@@ -447,7 +447,15 @@ describe('AgentOrchestrator context and sessions (Stage 5)', () => {
     expect(result.status).toBe('needs_input')
     expect(result.finalAnswer).toBeNull()
     expect(result.stop?.reason).toBe('repeated_action')
-    expect(result.stop?.message).toContain('stuck')
+    /*
+     * v4.1: the message names the reason and no longer says "I got stuck". The old assertion pinned that
+     * phrase, so it now pins the contract that replaced it: the stop explains itself, says how far it got, and
+     * carries the observations a verdict is built from.
+     */
+    expect(result.stop?.message).toContain('repeated')
+    expect(result.stop?.message).not.toContain('got stuck')
+    expect(result.stop?.steps).toBeGreaterThan(0)
+    expect(Array.isArray(result.stop?.recentFailures)).toBe(true)
     expect(result.stop?.recentActions.length).toBeGreaterThan(0)
     expect(logger.count('loop.stop')).toBe(1)
     await manager.dispose()
