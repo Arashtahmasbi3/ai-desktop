@@ -95,22 +95,25 @@ describe('QuestionBroker (v2.8.0)', () => {
   })
 })
 
-describe('parseQuestion / formatQuestionAnswer (v2.8.0)', () => {
-  it('reads the question and trims a closed set of options', () => {
-    expect(parseQuestion({ question: '  Pick one  ', options: [' a ', 'b', '', 3] })).toEqual({
-      prompt: 'Pick one',
-      options: ['a', 'b']
+describe('parseQuestion / formatQuestionAnswer (v2.8.0, options B2-5)', () => {
+  it('reads the question and a closed set of options', () => {
+    expect(parseQuestion({ question: '  Pick one  ', options: [' a ', 'b'] })).toEqual({
+      ok: true,
+      question: { prompt: 'Pick one', options: ['a', 'b'] }
     })
   })
 
   it('rejects an empty question so a malformed call cannot hang the run', () => {
-    expect(parseQuestion({})).toBeUndefined()
-    expect(parseQuestion({ question: '   ' })).toBeUndefined()
+    expect(parseQuestion({})).toMatchObject({ ok: false })
+    expect(parseQuestion({ question: '   ' })).toMatchObject({ ok: false })
   })
 
-  it('caps the option list', () => {
+  it('refuses an over-long option list instead of silently capping it', () => {
     const options = Array.from({ length: 20 }, (_value, index) => `o${index}`)
-    expect(parseQuestion({ question: 'q', options })?.options).toHaveLength(6)
+    const parsed = parseQuestion({ question: 'q', options })
+    expect(parsed.ok).toBe(false)
+    if (parsed.ok) throw new Error('unreachable')
+    expect(parsed.error).toMatch(/at most 6/)
   })
 
   it('tells the model plainly when nobody answered', () => {

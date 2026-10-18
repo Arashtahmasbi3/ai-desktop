@@ -129,8 +129,21 @@ export async function answerAskUser(
   runId: string,
   step: number
 ): Promise<AgentToolResult> {
-  const question = parseQuestion(action.arguments)
-  const answer = question ? await deps.questionGate(question, { runId, step }) : null
+  const parsed = parseQuestion(action.arguments)
+  if (!parsed.ok) {
+    // B2-5: a malformed option list is a correction, not a silent repair. The model
+    // must hear what was wrong (and the way out) before it can ask a usable question,
+    // and the run continues instead of showing the user a half-repaired card.
+    const invalid = failedToolResult(action, parsed.error, 'invalid_arguments')
+    deps.log('warn', 'agent.question_invalid', runId, { step, error: parsed.error })
+    deps.context.appendToolResult({
+      toolCallId: action.id,
+      name: action.name,
+      content: formatObservation(invalid)
+    })
+    return invalid
+  }
+  const answer = await deps.questionGate(parsed.question, { runId, step })
   const content = formatQuestionAnswer(answer)
   deps.log('info', 'agent.question', runId, {
     step,

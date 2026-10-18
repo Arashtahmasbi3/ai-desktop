@@ -15,6 +15,16 @@ import type { ToolDefinition } from '@shared/types'
  * awaits the renderer's answer, appends it as the tool's result, and continues the
  * same run — same sandbox, same loop budget, same context.
  */
+
+/**
+ * B2-5: the model may suggest answers, and the card renders them as buttons.
+ *
+ * Six is the most that stays a shortcut rather than a menu, and it is enforced in
+ * {@link parseQuestion} — not in the renderer, because a silently trimmed list would
+ * leave the model believing it offered a choice the user never saw.
+ */
+export const MAX_QUESTION_OPTIONS = 6
+
 export const ASK_USER_TOOL: ToolDefinition = {
   name: 'ask_user',
   description:
@@ -33,8 +43,11 @@ export const ASK_USER_TOOL: ToolDefinition = {
       options: {
         type: 'array',
         items: { type: 'string' },
+        maxItems: MAX_QUESTION_OPTIONS,
         description:
-          'Short suggested answers, when the choice is closed. The user may still type their own.'
+          'Optional 2 to 6 short suggested answers, when the choice is closed. They become ' +
+          'one-click buttons, and the user may still type their own answer instead. Omit the ' +
+          'field (or pass an empty list) to ask a free-text question.'
       }
     },
     required: ['question'],
@@ -48,17 +61,114 @@ export interface AgentQuestion {
   options?: string[]
 }
 
-/** Read the question out of a tool call, tolerating a malformed payload. */
-export function parseQuestion(args: Record<string, unknown>): AgentQuestion | undefined {
+/**
+ * The result of reading a tool call: a question to ask, or a correction for the model.
+ *
+ * B2-5: every malformed option list is refused with the reason and the fix, never
+ * repaired behind the model's back. Dropping a blank entry or the seventh option
+ * produced a card that showed fewer buttons than the model thought it had offered,
+ * and the model then read "the user picked X" for a set it had not designed.
+ */
+export type ParsedQuestion = { ok: true; question: AgentQuestion } | { ok: false; error: string }
+
+/** Appended to every option error, so the model always has the way out. */
+const FREE_TEXT_HINT = 'Send no "options" (or an empty list) for a free-text question.'
+
+function describeType(value: unknown): string {
+  if (value === null) return 'null'
+  return Array.isArray(value) ? 'an array' : typeof value
+}
+
+/**
+ * Read the question out of a tool call, validating the optional options list.
+ *
+ * `options` absent, `null` or `[]` means today's free-text question — behaviour that
+ * must not change, so the field stays optional in the schema and in the payload.
+ */
+export function parseQuestion(args: Record<string, unknown>): ParsedQuestion {
   const prompt = typeof args.question === 'string' ? args.question.trim() : ''
-  if (!prompt) return undefined
-  const raw = Array.isArray(args.options) ? args.options : []
-  const options = raw
-    .filter((option): option is string => typeof option === 'string')
-    .map((option) => option.trim())
-    .filter((option) => option.length > 0)
-    .slice(0, 6)
-  return options.length > 0 ? { prompt, options } : { prompt }
+  if (!prompt) {
+    return {
+      ok: false,
+      error:
+        'ask_user needs a non-empty "question" string, written in the language the user is using.'
+    }
+  }
+
+  const raw = args.options
+  if (raw === undefined || raw === null) return { ok: true, question: { prompt } }
+  if (!Array.isArray(raw)) {
+    return {
+      ok: false,
+      error:
+        '"options" must be an array of short strings, but it was ' +
+        describeType(raw) +
+        '. ' +
+        FREE_TEXT_HINT
+    }
+  }
+  if (raw.length === 0) return { ok: true, question: { prompt } }
+  if (raw.length > MAX_QUESTION_OPTIONS) {
+    return {
+      ok: false,
+      error:
+        'ask_user got ' +
+        raw.length +
+        ' options; at most ' +
+        MAX_QUESTION_OPTIONS +
+        ' fit on the card. Keep the ' +
+        MAX_QUESTION_OPTIONS +
+        ' most likely answers, or ask a free-text question. ' +
+        FREE_TEXT_HINT
+    }
+  }
+
+  const options: string[] = []
+  const seen = new Set<string>()
+  for (let index = 0; index < raw.length; index += 1) {
+    const value: unknown = raw[index]
+    if (typeof value !== 'string') {
+      return {
+        ok: false,
+        error:
+          'ask_user option ' +
+          (index + 1) +
+          ' is ' +
+          describeType(value) +
+          ', not a string. Every option must be a short string. ' +
+          FREE_TEXT_HINT
+      }
+    }
+    const text = value.trim()
+    if (text === '') {
+      return {
+        ok: false,
+        error:
+          'ask_user option ' +
+          (index + 1) +
+          ' is empty. Every option must be a non-empty short string. ' +
+          FREE_TEXT_HINT
+      }
+    }
+    // Compared after trimming, case-sensitively: the labels are buttons, so two
+    // byte-identical entries are indistinguishable, while "Start" and "start" are
+    // different answers the user can tell apart.
+    if (seen.has(text)) {
+      return {
+        ok: false,
+        error:
+          'ask_user repeats the option "' +
+          text +
+          '". Options render as buttons, so two identical labels cannot be told apart — ' +
+          'make every option unique. ' +
+          FREE_TEXT_HINT
+      }
+    }
+    seen.add(text)
+    options.push(text)
+  }
+
+  return { ok: true, question: { prompt, options } }
 }
 
 /**

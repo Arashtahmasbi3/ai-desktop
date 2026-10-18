@@ -16,6 +16,12 @@ import { useStore } from '../store'
  *
  * Rendered as a banner above the composer rather than a modal: it is a question, not a
  * gate, and the user may want to look at the conversation before answering.
+ *
+ * B2-5: when the model supplied `options`, each one is a button that answers with
+ * exactly its own text. The buttons are a shortcut, not a cage — the free-text field
+ * stays, and both ways call the same `submit` below, so both produce an identical
+ * `respondQuestion` payload (`{ id, answer }`). Duplicating that path is how "continue
+ * the same run" breaks, so there is deliberately only one.
  */
 export default function QuestionCard(): JSX.Element | null {
   const { t } = useTranslation()
@@ -43,19 +49,31 @@ export default function QuestionCard(): JSX.Element | null {
       </p>
 
       {pending.options && pending.options.length > 0 ? (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {pending.options.map((option) => (
-            <button
-              key={option}
-              type="button"
-              data-testid={`question-option-${option}`}
-              onClick={() => submit(option)}
-              className="rounded-lg border border-border bg-bg-primary px-2 py-1 text-2xs text-fg transition hover:border-accent/50 hover:bg-bg-tertiary"
-            >
-              {option}
-            </button>
-          ))}
-        </div>
+        <>
+          <div
+            role="group"
+            aria-label={t('chat.questionOptionsLabel', { defaultValue: 'Suggested answers' })}
+            data-testid="question-options"
+            className="mt-2 flex flex-wrap gap-1.5"
+          >
+            {pending.options.map((option) => (
+              <button
+                key={option}
+                type="button"
+                data-testid={`question-option-${option}`}
+                onClick={() => submit(option)}
+                className="rounded-lg border border-border bg-bg-primary px-2 py-1 text-2xs text-fg transition hover:border-accent/50 hover:bg-bg-tertiary"
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1.5 text-2xs text-fg-subtle">
+            {t('chat.questionOptionsHint', {
+              defaultValue: 'These are shortcuts — you can still type your own answer.'
+            })}
+          </p>
+        </>
       ) : null}
 
       <form
