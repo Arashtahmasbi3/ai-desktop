@@ -26,6 +26,7 @@ import { RemoteFsToolExecutor } from '@core/tools/remote-fs-executor'
 import { MIGRATE_PROJECT_TOOL, type MigrateProjectDeps } from '@core/tools/migrate-project-tool'
 import { MigrateProjectToolExecutor } from '@core/tools/migrate-project-executor'
 import { CompositeToolExecutor, type ToolRoute } from '@core/tools/composite-executor'
+import { ToolsetBuilder } from '@core/tools/toolset'
 import { LIST_SERVERS_TOOL, ListServersToolExecutor, type ServerSummary } from '@core/tools/server-tools'
 import { wrapServerRefRoutes } from '@core/tools/server-ref-executor'
 import { DIAGNOSE_CRASH_TOOL } from '@core/tools/crash-diagnosis-tool'
@@ -194,20 +195,13 @@ export function planRemoteRuntime(
    * have?" is exactly the question the model must be able to answer before it can pick
    * one. It returns data only and can never select a server.
    */
-  const rosterTools: ToolDefinition[] = []
-  const rosterRoutes: ToolRoute[] = []
+  const tools = new ToolsetBuilder()
   if (typeof vps.listServers === 'function') {
     const listServers = (): Promise<ServerSummary[]> => vps.listServers!()
-    rosterTools.push(LIST_SERVERS_TOOL)
-    rosterRoutes.push({
-      names: new Set([LIST_SERVERS_TOOL.name]),
+    tools.add({
+      definitions: [LIST_SERVERS_TOOL],
       executor: new ListServersToolExecutor({ listServers })
     })
-  }
-  const rosterSuffix = {
-    ...(rosterTools.length > 0
-      ? { extraTools: rosterTools, extraExecutor: new CompositeToolExecutor(rosterRoutes) }
-      : {})
   }
   // A VPS is "wanted" when the task talks about one, or when a VPS-only tool
   // group was explicitly enabled. Either way we never guess a server (P0-4).
@@ -224,10 +218,10 @@ export function planRemoteRuntime(
   })
   if (!resolution.ok) {
     return {
-      ...rosterSuffix,
+      ...tools.build(),
       systemHint:
         `${resolution.error} Do not assume or auto-select a server. ` +
-        (rosterTools.length > 0
+        (tools.toolCount > 0
           ? 'Call "list_servers" to see every saved server (id, name, host, connected), then ' +
             'ask the user which one to use if it is still ambiguous. '
           : 'Ask the user to pick one ') +
@@ -241,13 +235,13 @@ export function planRemoteRuntime(
   if (!connected.includes(target)) {
     if (wants) {
       return {
-        ...rosterSuffix,
+        ...tools.build(),
         systemHint:
           `The selected VPS "${target}" is not connected. Tell the user to add or connect it ` +
           'in Settings -> Connections, then retry.'
       }
     }
-    return { ...rosterSuffix }
+    return tools.build()
   }
   const shellTool: ToolDefinition = {
     ...REMOTE_SHELL_TOOL,
@@ -264,16 +258,12 @@ export function planRemoteRuntime(
     target
   )
 
-  const extraTools: ToolDefinition[] = [...rosterTools, shellTool]
-  const routes: ToolRoute[] = [
-    ...rosterRoutes,
-    { names: new Set([REMOTE_SHELL_TOOL.name]), executor: shellExecutor }
-  ]
+  tools.add({ definitions: [shellTool], executor: shellExecutor })
   let hint =
     `You have access to the "remote_shell" tool on the connected VPS "${target}". ` +
     'Use it for tasks about that server; call it with server_id ' +
     `"${target}" and the shell command to run.` +
-    (rosterTools.length > 0
+    (tools.toolCount > 0
       ? ' To work with a DIFFERENT server, call "list_servers" first to get its id, name or host' +
         ' — never ask the user for an id.'
       : '')
@@ -296,11 +286,7 @@ export function planRemoteRuntime(
       ...tool,
       description: `${tool.description} Target server: "${target}".`
     }))
-    extraTools.push(...fsTools)
-    routes.push({
-      names: new Set(fsTools.map((tool) => tool.name)),
-      executor: new RemoteFsToolExecutor(fsDeps, target)
-    })
+    tools.add({ definitions: fsTools, executor: new RemoteFsToolExecutor(fsDeps, target) })
     hint +=
       ` You also have the remote file tools ${fsTools.map((tool) => tool.name).join(', ')} ` +
       'for reading, writing, listing, grepping and checking git status on that server.'
@@ -317,8 +303,12 @@ export function planRemoteRuntime(
     },
     target
   )
-  extraTools.push({ ...DIAGNOSE_CRASH_TOOL, description: `${DIAGNOSE_CRASH_TOOL.description} Target server: "${target}".` })
-  routes.push({ names: new Set([DIAGNOSE_CRASH_TOOL.name]), executor: diagnosisExecutor })
+  tools.add({
+    definitions: [
+      { ...DIAGNOSE_CRASH_TOOL, description: `${DIAGNOSE_CRASH_TOOL.description} Target server: "${target}".` }
+    ],
+    executor: diagnosisExecutor
+  })
   hint +=
     ' You can also call "diagnose_crash" to run a fixed set of read-only probes ' +
     '(process managers, logs, resources, network) and get a probable cause with ' +
@@ -338,11 +328,7 @@ export function planRemoteRuntime(
     ...tool,
     description: `${tool.description} Target server: "${target}".`
   }))
-  extraTools.push(...namedDiagnostics)
-  routes.push({
-    names: new Set(namedDiagnostics.map((tool) => tool.name)),
-    executor: diagnosticsExecutor
-  })
+  tools.add({ definitions: namedDiagnostics, executor: diagnosticsExecutor })
   hint +=
     ' For read-only host introspection use get_service_logs, get_disk_usage, ' +
     'get_system_health and get_process_list instead of free-form shell commands.'
@@ -357,9 +343,8 @@ export function planRemoteRuntime(
     if (typeof vps.recordAudit === 'function') {
       migrateDeps.audit = (entry) => vps.recordAudit!(entry).then(() => undefined)
     }
-    extraTools.push(MIGRATE_PROJECT_TOOL)
-    routes.push({
-      names: new Set([MIGRATE_PROJECT_TOOL.name]),
+    tools.add({
+      definitions: [MIGRATE_PROJECT_TOOL],
       executor: new MigrateProjectToolExecutor(migrateDeps)
     })
     hint +=
@@ -383,9 +368,10 @@ export function planRemoteRuntime(
     },
     enabledTools
   )
-  extraTools.push(...v24.extraTools)
-  routes.push(...v24.routes)
-  if (v24.hint) hint += ` ${v24.hint}`
+  tools
+    .add({ definitions: v24.extraTools })
+    .addRoutes(v24.routes)
+    .addHint(v24.hint)
 
   /*
    * v2.8.1: any server_id / source_vps_id / target_vps_id the model supplies is
@@ -393,6 +379,7 @@ export function planRemoteRuntime(
    * covers all fifteen id-taking tools, and an unknown reference comes back with the
    * roster so the model can retry instead of asking the user.
    */
+  const routes: ToolRoute[] = tools.routes()
   const routable =
     typeof vps.listServers === 'function'
       ? wrapServerRefRoutes(routes, {
@@ -405,7 +392,7 @@ export function planRemoteRuntime(
       ? shellExecutor
       : new CompositeToolExecutor(routable)
 
-  return { extraTools, extraExecutor: executor, systemHint: hint }
+  return tools.build({ systemHint: hint, executor })
 }
 
 /** Forwards orchestrator log entries to a sink (the renderer, in the app). */
