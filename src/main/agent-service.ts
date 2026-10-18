@@ -1,492 +1,80 @@
-import type { AgentAction, AgentLogEntry, AgentLogger } from '@shared/agent'
-import type { AgentRunResult } from '@shared/agent'
-import type { ProviderId, ContentPart, ToolDefinition } from '@shared/types'
-import type { RemoteFileEntry, VpsExecResult } from '@shared/vps'
+import type { AgentAction, AgentLogEntry, AgentLogger, AgentRunResult } from '@shared/agent'
+import type { ApprovalOutcome, ApprovalReason } from '@shared/approval'
+import type { ProjectFact, TranscriptMessage } from '@shared/memory-facts'
+import type { McpServerConfig, McpServerStatus } from '@shared/mcp'
+import type { Plan, PlanDecision, PlanWarning } from '@shared/plan'
+import type { PreflightChoice, PreflightPromptTier } from '@shared/preflight'
+import type { ResolvedProfile } from '@shared/profile'
+import type { SandboxManager } from '@shared/sandbox'
+import type { ContentPart } from '@shared/types'
+import type { TraceDecision, TraceExplanation } from '@shared/trace'
 import type {
   AgentEvent,
   AgentRunRequest,
   FileChangeView,
-  ProjectRecord,
   SessionInfo,
-  SessionRecordView,
-  SessionMemoryView
+  SessionMemoryView,
+  SessionRecordView
 } from '@shared/ui'
-import { AgentOrchestrator } from '@core/agent-orchestrator'
-import type { FileChange } from '@core/agent-orchestrator'
-import type { ProviderEntry } from '@core/agent-orchestrator'
-import type { ToolExecutor } from '@core/agent/tools'
-import { PROVIDERS, createAdapterForConfig } from '@core/llm-adapters/registry'
-import { KeyPool, poolForKeys, type KeySnapshot } from '@core/llm-adapters/key-pool'
-import { withKeyHealth } from '@core/llm-adapters/key-health'
-import type { AuditEntry } from '@core/agent/audit-log'
-import { REMOTE_SHELL_TOOL, type RemoteJobRunner } from '@core/tools/remote-shell-tool'
-import { RemoteShellToolExecutor } from '@core/tools/remote-shell-executor'
-import { REMOTE_FS_TOOLS, type RemoteFsDeps } from '@core/tools/remote-fs-tools'
-import { RemoteFsToolExecutor } from '@core/tools/remote-fs-executor'
-import { MIGRATE_PROJECT_TOOL, type MigrateProjectDeps } from '@core/tools/migrate-project-tool'
-import { MigrateProjectToolExecutor } from '@core/tools/migrate-project-executor'
-import { CompositeToolExecutor, type ToolRoute } from '@core/tools/composite-executor'
-import { ToolsetBuilder, type ToolGroup } from '@core/tools/toolset'
-import { LIST_SERVERS_TOOL, ListServersToolExecutor, type ServerSummary } from '@core/tools/server-tools'
-import { wrapServerRefRoutes } from '@core/tools/server-ref-executor'
-import { DIAGNOSE_CRASH_TOOL } from '@core/tools/crash-diagnosis-tool'
-import { CrashDiagnosisToolExecutor } from '@core/tools/crash-diagnosis-tool'
-import { DiagnosticsToolExecutor, NAMED_DIAGNOSTIC_TOOLS } from '@core/tools/diagnostics-tools'
-import { planV24Tools, enabledV24ToolNames } from './v24-tools-wiring'
-import { routeToolCall, remoteWorkspaceHint } from '@core/agent/remote-routing'
-import type { RoutingDecision } from '@core/agent/remote-routing'
-import { detectWorkspace } from '@core/remote/workspace-detect'
-import type { DiagnosticPolicy } from '@core/remote/diagnostic-policy'
-import { createReadScopePolicy, mergeReadPolicies } from '@core/remote/diagnostic-policy'
-import { preflight, preflightActionFor, type PreflightResult, type PreflightTier } from '@core/agent/preflight'
-import { extractPreflightReason } from '@core/agent/preflight-override'
-import type { AgentQuestion } from '@core/agent/question'
-import type { PreflightChoice, PreflightPromptTier } from '@shared/preflight'
-import { buildWorkspaceSystemHint } from '@core/agent/workspace-prompt'
 import type { RemoteWorkspaceInfo } from '@shared/workspace-info'
-import { DEFAULT_APPROVAL_MODE } from '@core/agent/approval'
-import { resolveVpsForRun, requiresVps, reconcileRunServer } from '@core/agent/vps-resolver'
-import type { ApprovedPlan, Plan, PlanDecision, PlanScopeContext, PlanWarning } from '@shared/plan'
-import { PLAN_REAPPROVE_MESSAGE } from '@shared/plan'
-import type { ResolvedProfile } from '@shared/profile'
-import type { TraceDecision, TraceExplanation } from '@shared/trace'
-import type { McpServerConfig, McpServerStatus } from '@shared/mcp'
-import { TraceStore } from '@core/agent/trace-store'
-import { AuditTrail, auditFileFor, auditLineFromDecision, auditLineFromPreflightOverride, type AuditVerifyResult } from '@core/agent/audit-trail'
-import { resolveUserDataDir } from '@core/agent/persistence'
-import { redactValue } from '@core/agent/redact'
-import { allowsTool, resolveToolExposure, toolPolicyFor, type ToolExposure } from '@core/agent/tool-policy'
-import {
-  createApprovedPlan,
-  shouldAutoApprove
-} from '@core/agent/approved-plan'
-import { PlanTrustRegistry, PLAN_TRUST_METADATA_KEY } from '@core/agent/plan-trust'
+import { AgentOrchestrator, type FileChange, type ProviderEntry } from '@core/agent-orchestrator'
+import type { ApprovedCommands } from '@core/agent/approved-commands'
+import type { AuditVerifyResult } from '@core/agent/audit-trail'
 import { resolveRunGoal, type RunGoalContext } from '@core/agent/goal-context'
 import type { GoalStore } from '@core/agent/goal-store'
-import { createApprovalGate, describeApprovalReason } from './approval-gate'
-import { registerMcpTools, type McpBridgeResult } from './mcp/bridge'
-import { connectMcpServer, type McpServerHandle } from './mcp/client'
-import type { McpServerStore } from './mcp/store'
-import { StdioTransport } from './mcp/transport'
-import { loadSkills, type SkillRoot } from './skills/loader'
-import { USE_SKILL_TOOL, UseSkillToolExecutor } from './skills/tool'
-import type { ApprovalOutcome, ApprovalReason } from '@shared/approval'
-import type { ApprovedCommands } from '@core/agent/approved-commands'
 import type { Persistence } from '@core/agent/persistence'
-import type { SessionStore } from '@core/agent/session-store'
+import { PlanTrustRegistry } from '@core/agent/plan-trust'
+import type { AgentQuestion } from '@core/agent/question'
 import { RunStore } from '@core/agent/run-store'
-import type { RunFileIO } from '@core/agent/run-store'
-import type { SandboxManager } from '@shared/sandbox'
-import {
-  buildAttachmentBlock,
-  planAttachmentPaths,
-  type AttachmentRef
-} from '@shared/attachments'
-import type { AttachmentService } from './attachment-service'
-import type { CustomProviderStore } from './custom-providers'
+import type { SessionStore } from '@core/agent/session-store'
+import { resolveToolExposure, toolPolicyFor } from '@core/agent/tool-policy'
+import { TraceStore } from '@core/agent/trace-store'
+import type { KeySnapshot } from '@core/llm-adapters/key-pool'
+import type { RemoteJobRunner } from '@core/tools/remote-shell-tool'
+import type { PreflightResult } from '@core/agent/preflight'
+import type { DiagnosticPolicy } from '@core/remote/diagnostic-policy'
 import { existsSync } from 'node:fs'
-import { join } from 'node:path'
-import { loadProjectMemory } from './project-memory'
-import { renderFactLedger, type ProjectFact, type TranscriptMessage } from '@shared/memory-facts'
+import { buildAttachmentContext } from './agent-service/attachments'
+import { AuditTrails } from './agent-service/audit'
+import { ChangeRecorder, type ProjectFiles } from './agent-service/changes'
+import { MemoryService } from './agent-service/memory'
+import { ProviderFactory, type ProviderSelection } from './agent-service/providers'
+import type { RemoteHost } from './agent-service/remote-runtime'
+import { RunGateFactory } from './agent-service/run-gates'
 import {
-  classifyImpact,
-  describeAction,
-  recordsCheckpoints,
-  type CheckpointMode
-} from '@shared/decision-checkpoint'
+  clearSessionMemory,
+  listSessionViews,
+  loadSessionView,
+  sessionMemoryView
+} from './agent-service/session-views'
+import { defaultMcpConnect, ToolingAssembler } from './agent-service/tooling'
+import type { AttachmentService } from './attachment-service'
 import type { CheckpointStore } from './checkpoint-store'
+import type { CustomProviderStore } from './custom-providers'
 import type { FactStore } from './fact-store'
-import { FactLearner, type LearnResult } from './fact-learning'
+import type { LearnResult } from './fact-learning'
+import type { McpBridgeResult } from './mcp/bridge'
+import type { McpServerHandle } from './mcp/client'
+import type { McpServerStore } from './mcp/store'
 
-/**
- * The slice of the SSH manager the agent needs to run remote commands. Kept as
- * an interface so tests can inject a fake without a real SSH backend.
+/*
+ * F0-4: `agent-service.ts` was split so no file exceeds 800 lines. The remote runtime,
+ * provider/key handling, tooling assembly, attachments, memory, change review, audit
+ * trails, session views and run gates each moved to a module under ./agent-service/.
+ * Every symbol that was exported from this file is still exported from this file, so no
+ * caller and no test had to change — only where the bodies live.
  */
-export interface RemoteShellHost {
-  connectedServers(): string[]
-  exec(serverId: string, command: string): Promise<VpsExecResult>
-}
+export type { ProjectFiles } from './agent-service/changes'
+export { providerOrder, type ProviderSelection } from './agent-service/providers'
+export type { RemoteHost } from './agent-service/remote-runtime'
+export type {
+  RemoteFsHost,
+  RemoteServerList,
+  RemoteServerResolver,
+  RemoteShellHost
+} from './agent-service/remote-runtime'
+export { activeRemoteProjectHint, planRemoteRuntime } from './agent-service/remote-runtime'
 
-/** SFTP surface the remote-fs tools use. Optional so older hosts still work. */
-export interface RemoteFsHost {
-  readFile(serverId: string, path: string): Promise<string>
-  writeFile(serverId: string, path: string, content: string): Promise<void>
-  listFiles(serverId: string, path: string): Promise<RemoteFileEntry[]>
-  recordAudit?(entry: Omit<AuditEntry, 'at'>): Promise<unknown>
-}
-
-/**
- * Hosts that can enumerate the saved servers (v2.8.1). Without this the model has no way
- * to learn a server id and ends up asking the user for a UUID the UI never shows.
- */
-export interface RemoteServerList {
-  listServers(): Promise<ServerSummary[]>
-}
-
-/** Hosts that can resolve a saved server's connection details (for migrations). */
-export interface RemoteServerResolver {
-  resolveServer(
-    id: string
-  ): Promise<{ host: string; port: number; username: string } | undefined>
-}
-
-export type RemoteHost = RemoteShellHost &
-  Partial<RemoteFsHost> &
-  Partial<RemoteServerResolver> &
-  Partial<RemoteServerList>
-/** Project-bound file access used to review and apply agent edits. */
-export interface ProjectFiles extends RunFileIO {
-  read(relativePath: string): Promise<string>
-  write(relativePath: string, content: string): Promise<void>
-}
-
-/** Keywords that make the agent reach for `remote_shell` on a default chat. */
-const VPS_KEYWORDS = /\b(vps|ssh|server|remote|سرور|ریموت)\b/i
-
-interface RemoteRuntime {
-  extraTools?: ToolDefinition[]
-  extraExecutor?: ToolExecutor
-  systemHint?: string
-  /** Remote-first routing for local file/shell tools (v2.3.2, A.1). */
-  toolRouting?: (toolName: string, args: Record<string, unknown>) => RoutingDecision
-}
-
-/**
- * F0-2c / F0-3: extra groups (MCP servers, skills) as runtime fields, for the one path through
- * `buildRemoteRuntime` that returns before `planRemoteRuntime` is consulted (a remote project
- * whose VPS is missing or offline). Those runs still get their groups: an MCP server and a
- * skill both live on *this* machine, so neither has anything to do with the project's host
- * being down.
- *
- * The hint travels with the definitions for the same reason it does everywhere else: a skill
- * the model can call is useless if it is never told the name, and a name it is told must be a
- * tool it can actually call.
- */
-function withExtraRuntime(groups: ReadonlyArray<ToolGroup | undefined>): RemoteRuntime {
-  const present = groups.filter((group): group is ToolGroup => group !== undefined)
-  if (present.length === 0) return {}
-  const executor = composeGroupExecutors(present)
-  const hint = present
-    .map((group) => group.hint ?? '')
-    .filter((part) => part !== '')
-    .join(' ')
-  return {
-    extraTools: present.flatMap((group) => group.definitions),
-    ...(executor === undefined ? {} : { extraExecutor: executor }),
-    ...(hint === '' ? {} : { systemHint: hint })
-  }
-}
-
-/**
- * `ToolsetBuilder.build()` takes a single executor on purpose (it collects, the caller
- * composes). A run that stops at an early return never reaches the composition at the bottom of
- * `planRemoteRuntime`, so the groups' executors are composed here instead — otherwise the model
- * would be offered a tool nothing can run.
- */
-function composeGroupExecutors(
-  groups: ReadonlyArray<ToolGroup | undefined>
-): ToolExecutor | undefined {
-  const routes: ToolRoute[] = []
-  for (const group of groups) {
-    if (group?.executor === undefined) continue
-    routes.push({
-      names: new Set(group.definitions.map((definition) => definition.name)),
-      executor: group.executor
-    })
-  }
-  const [only] = routes
-  if (only === undefined) return undefined
-  return routes.length === 1 ? only.executor : new CompositeToolExecutor(routes)
-}
-
-/**
- * When the active project is remote but its VPS is missing or disconnected,
- * return a system hint telling the model to relay a clear message instead of
- * falling back to local file tools. Returns `undefined` for local projects or a
- * connected remote project (the caller then plans the normal remote runtime).
- */
-export function activeRemoteProjectHint(
-  project: ProjectRecord | undefined,
-  connectedServers: string[]
-): string | undefined {
-  if (project?.type !== 'remote') return undefined
-  if (!project.vpsId) {
-    return (
-      `The active project "${project.name}" is a remote project with no VPS selected. ` +
-      'Tell the user to choose a VPS for it in Settings -> Projects, then retry.'
-    )
-  }
-  if (!connectedServers.includes(project.vpsId)) {
-    return (
-      `The active project "${project.name}" lives on VPS "${project.vpsId}", which is not ` +
-      'connected. Tell the user: "VPS متصل نیست. در Settings -> Connections وصل شوید." ' +
-      'Do not attempt local file operations for this project.'
-    )
-  }
-  return undefined
-}
-
-/**
- * Pure decision function: does this task get the `remote_shell` tool, and if so
- * which server is it pinned to? Exported so it can be unit-tested without a real
- * SSH backend or LLM.
- */
-export function planRemoteRuntime(
-  task: string,
-  vpsServerId: string | undefined,
-  vps: RemoteHost | undefined,
-  jobs?: RemoteJobRunner,
-  enabledTools?: string[],
-  /** Absolute root of the active remote project; enables path containment (P0-2). */
-  projectRoot?: string,
-  /** Read-only widening while Diagnostic Mode is on (v2.5.3). */
-  diagnostic?: DiagnosticPolicy | null,
-  /**
-   * F0-2c: the MCP servers' tools, already connected by the caller. Registered first (below) so
-   * every early return in this function carries them — including a local run with no VPS, where
-   * they are the only extra tools the run has.
-   */
-  mcp?: ToolGroup,
-  /**
-   * F0-3: this run's skills, discovered from disk by the caller. Registered beside the MCP group
-   * and before every early return for the same reason: a local run with no VPS is exactly the run
-   * whose only extra tool is `use_skill`.
-   */
-  skills?: ToolGroup
-): RemoteRuntime {
-  /*
-   * F0-2c / F0-3: both groups go into the builder **before** anything else, and their composed
-   * executor is handed to every `build()` call in this function. Both halves matter: an early
-   * return that listed the definitions without the executor would offer the model a tool nothing
-   * can run, and `build()` deliberately does not compose one.
-   */
-  const tools = new ToolsetBuilder()
-  if (mcp) tools.add(mcp)
-  if (skills) tools.add(skills)
-  const extras = composeGroupExecutors([mcp, skills])
-  if (!vps) return tools.build({ executor: extras })
-  const connected = vps.connectedServers()
-
-  /*
-   * v2.8.1: the roster is offered on every path below — with no pinned server, with a
-   * pinned-but-disconnected server, and on a plain task — because "which servers do I
-   * have?" is exactly the question the model must be able to answer before it can pick
-   * one. It returns data only and can never select a server.
-   */
-  const hasRoster = typeof vps.listServers === 'function'
-  if (hasRoster) {
-    const listServers = (): Promise<ServerSummary[]> => vps.listServers!()
-    tools.add({
-      definitions: [LIST_SERVERS_TOOL],
-      executor: new ListServersToolExecutor({ listServers })
-    })
-  }
-  // A VPS is "wanted" when the task talks about one, or when a VPS-only tool
-  // group was explicitly enabled. Either way we never guess a server (P0-4).
-  // `enabledTools === undefined` means "all enabled", which is not a request for
-  // a VPS, so only an explicit list counts here.
-  const enabledRequiresVps = enabledTools
-    ? [...enabledV24ToolNames(enabledTools), ...enabledTools].some((tool) => requiresVps(tool))
-    : false
-  const wants = VPS_KEYWORDS.test(task) || enabledRequiresVps
-
-  const resolution = resolveVpsForRun({
-    ...(vpsServerId ? { explicitVpsId: vpsServerId } : {}),
-    requiresVps: wants
-  })
-  if (!resolution.ok) {
-    return {
-      ...tools.build({ executor: extras }),
-      systemHint:
-        `${resolution.error} Do not assume or auto-select a server. ` +
-        (hasRoster
-          ? 'Call "list_servers" to see every saved server (id, name, host, connected), then ' +
-            'ask the user which one to use if it is still ambiguous. '
-          : 'Ask the user to pick one ') +
-        'in the chat header (or select a remote project), then retry.'
-    }
-  }
-
-  const target = resolution.vpsId
-  if (!target) return tools.build({ executor: extras })
-
-  if (!connected.includes(target)) {
-    if (wants) {
-      return {
-        ...tools.build({ executor: extras }),
-        systemHint:
-          `The selected VPS "${target}" is not connected. Tell the user to add or connect it ` +
-          'in Settings -> Connections, then retry.'
-      }
-    }
-    return tools.build({ executor: extras })
-  }
-  const shellTool: ToolDefinition = {
-    ...REMOTE_SHELL_TOOL,
-    description: `${REMOTE_SHELL_TOOL.description} Use server_id="${target}".`
-  }
-  const shellExecutor = new RemoteShellToolExecutor(
-    {
-      exec: (serverId, command) => vps.exec(serverId, command),
-      connectedServers: () => vps.connectedServers(),
-      ...(jobs ? { jobs } : {}),
-      ...(projectRoot ? { projectRoot } : {}),
-      ...(diagnostic ? { diagnostic } : {})
-    },
-    target
-  )
-
-  tools.add({ definitions: [shellTool], executor: shellExecutor })
-  let hint =
-    `You have access to the "remote_shell" tool on the connected VPS "${target}". ` +
-    'Use it for tasks about that server; call it with server_id ' +
-    `"${target}" and the shell command to run.` +
-    (tools.toolCount > 0
-      ? ' To work with a DIFFERENT server, call "list_servers" first to get its id, name or host' +
-        ' — never ask the user for an id.'
-      : '')
-
-  // Remote file tools are only offered when the host exposes SFTP.
-  if (typeof vps.readFile === 'function') {
-    const fsDeps: RemoteFsDeps = {
-      connectedServers: () => vps.connectedServers(),
-      readFile: (serverId, path) => vps.readFile!(serverId, path),
-      writeFile: (serverId, path, content) => vps.writeFile!(serverId, path, content),
-      listFiles: (serverId, path) => vps.listFiles!(serverId, path),
-      exec: (serverId, command) => vps.exec(serverId, command),
-      ...(projectRoot ? { projectRoot } : {}),
-      ...(diagnostic ? { diagnostic } : {})
-    }
-    if (typeof vps.recordAudit === 'function') {
-      fsDeps.audit = (entry) => vps.recordAudit!(entry).then(() => undefined)
-    }
-    const fsTools = REMOTE_FS_TOOLS.map((tool) => ({
-      ...tool,
-      description: `${tool.description} Target server: "${target}".`
-    }))
-    tools.add({ definitions: fsTools, executor: new RemoteFsToolExecutor(fsDeps, target) })
-    hint +=
-      ` You also have the remote file tools ${fsTools.map((tool) => tool.name).join(', ')} ` +
-      'for reading, writing, listing, grepping and checking git status on that server.'
-  }
-
-  // Structured crash diagnosis (v2.5.6): a fixed, read-only probe set the model
-  // calls instead of guessing commands.
-  const diagnosisExecutor = new CrashDiagnosisToolExecutor(
-    {
-      connectedServers: () => vps.connectedServers(),
-      exec: (serverId, command) => vps.exec(serverId, command),
-      ...(projectRoot ? { projectRoot } : {}),
-      ...(diagnostic ? { diagnostic } : {})
-    },
-    target
-  )
-  tools.add({
-    definitions: [
-      { ...DIAGNOSE_CRASH_TOOL, description: `${DIAGNOSE_CRASH_TOOL.description} Target server: "${target}".` }
-    ],
-    executor: diagnosisExecutor
-  })
-  hint +=
-    ' You can also call "diagnose_crash" to run a fixed set of read-only probes ' +
-    '(process managers, logs, resources, network) and get a probable cause with ' +
-    'recommendations when the user asks why the project is crashing or failing.'
-
-  // v2.6.2 T2.3: named diagnostics. Fixed, read-only probes with validated
-  // arguments, so production can be investigated without free path-based reads.
-  const diagnosticsExecutor = new DiagnosticsToolExecutor(
-    {
-      connectedServers: () => vps.connectedServers(),
-      exec: (serverId, command) => vps.exec(serverId, command),
-      ...(projectRoot ? { projectRoot } : {})
-    },
-    target
-  )
-  const namedDiagnostics = NAMED_DIAGNOSTIC_TOOLS.map((tool) => ({
-    ...tool,
-    description: `${tool.description} Target server: "${target}".`
-  }))
-  tools.add({ definitions: namedDiagnostics, executor: diagnosticsExecutor })
-  hint +=
-    ' For read-only host introspection use get_service_logs, get_disk_usage, ' +
-    'get_system_health and get_process_list instead of free-form shell commands.'
-
-  // Cross-server project migration needs to resolve both saved servers' hosts.
-  if (typeof vps.resolveServer === 'function') {
-    const migrateDeps: MigrateProjectDeps = {
-      connectedServers: () => vps.connectedServers(),
-      resolveServer: (id) => vps.resolveServer!(id),
-      exec: (serverId, command) => vps.exec(serverId, command)
-    }
-    if (typeof vps.recordAudit === 'function') {
-      migrateDeps.audit = (entry) => vps.recordAudit!(entry).then(() => undefined)
-    }
-    tools.add({
-      definitions: [MIGRATE_PROJECT_TOOL],
-      executor: new MigrateProjectToolExecutor(migrateDeps)
-    })
-    hint +=
-      ` You can also call "migrate_project" to copy a project directory from a connected ` +
-      'source VPS to another saved VPS with rsync over SSH. Pass the target as target_vps_id ' +
-      'using its id, name or host (call "list_servers" to see them), or use target_host for a ' +
-      'server that is not saved here — the source must already have key access to it.'
-  }
-
-  // v2.4.1: database/docker migration, project scaffold, per-project user and worktrees.
-  const v24 = planV24Tools(
-    {
-      connectedServers: () => vps.connectedServers(),
-      exec: (serverId, command) => vps.exec(serverId, command),
-      ...(typeof vps.resolveServer === 'function'
-        ? { resolveServer: (id: string) => vps.resolveServer!(id) }
-        : {}),
-      ...(typeof vps.recordAudit === 'function'
-        ? { recordAudit: (entry: Omit<AuditEntry, 'at'>) => vps.recordAudit!(entry) }
-        : {})
-    },
-    enabledTools
-  )
-  tools
-    .add({ definitions: v24.extraTools })
-    .addRoutes(v24.routes)
-    .addHint(v24.hint)
-
-  /*
-   * v2.8.1: any server_id / source_vps_id / target_vps_id the model supplies is
-   * canonicalised from id, name or host to the saved id before the tool runs. One wrapper
-   * covers all fifteen id-taking tools, and an unknown reference comes back with the
-   * roster so the model can retry instead of asking the user.
-   */
-  const routes: ToolRoute[] = tools.routes()
-  /*
-   * F0-2c: the MCP group is composed here like every other route, but it is deliberately **not**
-   * passed through `wrapServerRefRoutes`. That wrapper canonicalises `server_id` /
-   * `source_vps_id` / `target_vps_id` arguments to a saved VPS id, which is right for our own
-   * remote tools and wrong for a foreign one — a database MCP server's `server_id` is not a VPS in
-   * this app, so rewriting it would hand the tool arguments the user never wrote.
-   */
-  const foreignRoute = (route: ToolRoute): boolean =>
-    [...route.names].every((name) => name.startsWith('mcp__'))
-  const routable =
-    typeof vps.listServers === 'function'
-      ? [
-          ...wrapServerRefRoutes(
-            routes.filter((route) => !foreignRoute(route)),
-            {
-              listServers: () => vps.listServers!(),
-              connectedServers: () => vps.connectedServers()
-            }
-          ),
-          ...routes.filter(foreignRoute)
-        ]
-      : routes
-  const executor: ToolExecutor =
-    routable.length === 1 && routes.length === 1
-      ? shellExecutor
-      : new CompositeToolExecutor(routable)
-
-  return tools.build({ systemHint: hint, executor })
-}
 
 /** Forwards orchestrator log entries to a sink (the renderer, in the app). */
 class EmittingLogger implements AgentLogger {
@@ -611,25 +199,6 @@ export interface AgentServiceOptions {
   mcpConnect?: (config: McpServerConfig) => Promise<McpServerHandle>
 }
 
-/** Which provider/model to put first for an agent run. */
-export interface ProviderSelection {
-  preferred?: ProviderId
-  model?: string
-  customProviderId?: string
-}
-
-export function providerOrder(
-  ids: ProviderId[],
-  preferred?: ProviderId,
-  active?: ProviderId
-): ProviderId[] {
-  const order: ProviderId[] = []
-  for (const id of [preferred, active, ...ids]) {
-    if (id && !order.includes(id)) order.push(id)
-  }
-  return order
-}
-
 /**
  * Runs the agent orchestrator on behalf of the renderer: builds provider
  * entries from the encrypted settings, streams events, and supports abort.
@@ -642,35 +211,11 @@ export class AgentService {
   private readonly now: () => number
   /** v2.6.2 T3.2: recent decisions, keyed by run, for "Ask Why". */
   private readonly traceStore = new TraceStore()
-  /** v2.6.2 T3.3: audit trails, one per project file. */
-  private readonly audits = new Map<string, AuditTrail>()
-  private readonly userDataDir?: string
-  private readonly customProviders?: CustomProviderStore
-  private readonly vps?: RemoteHost
-  private readonly jobs?: RemoteJobRunner
-  private readonly requestApproval?: (
-    runId: string,
-    action: AgentAction,
-    reason?: ApprovalReason
-  ) => Promise<ApprovalOutcome>
   private readonly cancelApprovals?: () => void
-  private readonly requestPlan?: (
-    runId: string,
-    plan: Plan,
-    warnings: PlanWarning[]
-  ) => Promise<PlanDecision>
   private readonly cancelPlans?: () => void
-  private readonly requestPreflight?: (
-    runId: string,
-    action: AgentAction,
-    result: PreflightResult,
-    tier: PreflightPromptTier,
-    context: { attempt: number }
-  ) => Promise<PreflightChoice>
   private readonly cancelPreflights?: () => void
   private readonly requestQuestion?: (runId: string, question: AgentQuestion) => Promise<string | null>
   private readonly cancelQuestions?: () => void
-  private readonly approvedCommands?: ApprovedCommands
   private readonly files?: ProjectFiles
   /** v2.9.0: desktop files/images the user attached to a run. */
   private readonly attachments?: AttachmentService
@@ -679,37 +224,26 @@ export class AgentService {
   private readonly resolveVpsName?: (id: string) => Promise<string | undefined>
   private readonly sessionProfile?: { state(): Promise<ResolvedProfile> }
   private readonly goalStore?: GoalStore
-  /*
-   * F0-2c: MCP servers are optional, and a run must do nothing when there are none. `mcpStatus`
-   * is what the last run learned about each server, which is the only source `mcp:status` has:
-   * a status is an observation from a real connection, never a guess at one.
-   */
-  private readonly mcpServers?: McpServerStore
-  private readonly mcpConnect: (config: McpServerConfig) => Promise<McpServerHandle>
-  private mcpStatus: McpServerStatus[] = []
   private readonly controllers = new Set<AbortController>()
-  private readonly changes = new Map<string, FileChangeView>()
   /**
    * Trusted plans, keyed by session (v2.6.1 Fix 3). A trusted plan survives the
    * run that created it so it keeps auto-approving across a chat's messages,
    * until its TTL lapses.
    */
-  /**
-   * v3.1: one key pool per provider, kept across runs so a key parked by a rate limit stays parked
-   * and the round-robin cursor keeps rotating instead of restarting at key one every run.
-   */
-  private readonly keyPools = new Map<string, KeyPool>()
-  /**
-   * v3.1: decision checkpoints. The store is injected; the mode is read once per run so every
-   * decision in a run is judged by the same rule.
-   */
-  private readonly checkpoints?: CheckpointStore
-  private readonly facts?: FactStore
   private readonly planTrust: PlanTrustRegistry
   private runCounter = 0
-  private changeCounter = 0
-  /** 30s cache of detected remote workspaces, keyed `${serverId}:${path}` (A.1). */
-  private readonly workspaceCache = new Map<string, { info: RemoteWorkspaceInfo; at: number }>()
+  /*
+   * F0-4: the cohesive groups that used to be methods on this class. Each is built here
+   * from the same options, so the public surface of AgentService — its constructor
+   * options, its methods and their return types — is unchanged; only where the bodies
+   * live moved.
+   */
+  private readonly providers: ProviderFactory
+  private readonly tooling: ToolingAssembler
+  private readonly projectMemory: MemoryService
+  private readonly changeLog: ChangeRecorder
+  private readonly audits: AuditTrails
+  private readonly runGates: RunGateFactory
 
   constructor(options: AgentServiceOptions) {
     this.sandbox = options.sandbox
@@ -717,22 +251,12 @@ export class AgentService {
     this.sessionStore = options.sessionStore
     this.emit = options.emit
     this.now = options.now ?? (() => Date.now())
-    if (options.userDataDir) this.userDataDir = options.userDataDir
-    if (options.facts) this.facts = options.facts
-    if (options.checkpoints) this.checkpoints = options.checkpoints
     this.planTrust = new PlanTrustRegistry(() => this.now())
-    if (options.customProviders) this.customProviders = options.customProviders
-    if (options.vps) this.vps = options.vps
-    if (options.jobs) this.jobs = options.jobs
-    this.requestApproval = options.requestApproval
     this.cancelApprovals = options.cancelApprovals
-    this.requestPlan = options.requestPlan
     this.cancelPlans = options.cancelPlans
-    this.requestPreflight = options.requestPreflight
+    this.cancelPreflights = options.cancelPreflights
     this.requestQuestion = options.requestQuestion
     this.cancelQuestions = options.cancelQuestions
-    this.cancelPreflights = options.cancelPreflights
-    if (options.approvedCommands) this.approvedCommands = options.approvedCommands
     if (options.files) this.files = options.files
     if (options.attachments) this.attachments = options.attachments
     this.runStore = options.runStore ?? new RunStore()
@@ -740,16 +264,50 @@ export class AgentService {
     this.resolveVpsName = options.resolveVpsName
     this.sessionProfile = options.sessionProfile
     if (options.goalStore) this.goalStore = options.goalStore
-    if (options.mcpServers) this.mcpServers = options.mcpServers
-    this.mcpConnect =
-      options.mcpConnect ??
-      ((config) =>
-        connectMcpServer(
-          config,
-          new StdioTransport(config.command, config.args, {
-            ...(config.env === undefined ? {} : { env: config.env })
-          })
-        ))
+
+    this.providers = new ProviderFactory({
+      persistence: options.persistence,
+      now: () => this.now(),
+      ...(options.customProviders ? { customProviders: options.customProviders } : {})
+    })
+    this.tooling = new ToolingAssembler({
+      persistence: options.persistence,
+      now: () => this.now(),
+      ...(options.userDataDir ? { userDataDir: options.userDataDir } : {}),
+      ...(options.vps ? { vps: options.vps } : {}),
+      ...(options.jobs ? { jobs: options.jobs } : {}),
+      ...(options.getDiagnosticPolicy ? { getDiagnosticPolicy: options.getDiagnosticPolicy } : {}),
+      ...(options.mcpServers ? { mcpServers: options.mcpServers } : {}),
+      mcpConnect: options.mcpConnect ?? defaultMcpConnect
+    })
+    this.projectMemory = new MemoryService({
+      persistence: options.persistence,
+      now: () => this.now(),
+      ...(options.facts ? { facts: options.facts } : {}),
+      ...(options.checkpoints ? { checkpoints: options.checkpoints } : {}),
+      complete: (prompt) => this.providers.completeOnce(prompt)
+    })
+    this.changeLog = new ChangeRecorder({
+      persistence: options.persistence,
+      runStore: this.runStore,
+      emit: this.emit,
+      now: () => this.now(),
+      ...(options.files ? { files: options.files } : {})
+    })
+    this.audits = new AuditTrails(options.persistence, options.userDataDir)
+    this.runGates = new RunGateFactory({
+      persistence: options.persistence,
+      sessionStore: options.sessionStore,
+      planTrust: this.planTrust,
+      emit: this.emit,
+      now: () => this.now(),
+      ...(options.vps ? { vps: options.vps } : {}),
+      ...(options.approvedCommands ? { approvedCommands: options.approvedCommands } : {}),
+      ...(options.checkpoints ? { checkpoints: options.checkpoints } : {}),
+      ...(options.requestApproval ? { requestApproval: options.requestApproval } : {}),
+      ...(options.requestPlan ? { requestPlan: options.requestPlan } : {}),
+      ...(options.requestPreflight ? { requestPreflight: options.requestPreflight } : {})
+    })
   }
 
   isRunning(): boolean {
@@ -757,245 +315,11 @@ export class AgentService {
   }
 
   /**
-   * Decide whether this run gets the `remote_shell` tool and, if so, build the
-   * runtime that pins it to a server.
-   */
-  /**
-   * v2.9.0: turn the attachment ids the composer sent into (a) the text block the model
-   * is told about, (b) inline image parts when the selected model can actually see them.
-   *
-   * The order of `refs` is the registry order filtered by the requested ids, which is
-   * exactly what `AttachmentService.stage` walks — so the workspace path the model is
-   * told about is the path that gets written, including the `-2` suffix for a duplicate
-   * file name. Vision is decided by the adapter's `getCapabilities`, the runtime
-   * authority; the prompt says so plainly when the answer is no, so the model cannot
-   * pretend to have looked at an image.
-   */
-  private async buildAttachmentContext(
-    ids: string[] | undefined,
-    entry: ProviderEntry | undefined
-  ): Promise<{ refs: AttachmentRef[]; hint: string; imageParts?: ContentPart[] }> {
-    if (!this.attachments || !Array.isArray(ids) || ids.length === 0) {
-      return { refs: [], hint: '' }
-    }
-    const wanted = new Set(ids)
-    const refs = this.attachments.refs().filter((ref) => wanted.has(ref.id))
-    if (refs.length === 0) return { refs: [], hint: '' }
-
-    const vision = entry ? entry.adapter.getCapabilities(entry.config.model).vision : false
-    const planned = planAttachmentPaths(refs.map((ref) => ({ id: ref.id, name: ref.name })))
-    const pathById = new Map(planned.map((item) => [item.id, item.workspacePath]))
-
-    const imageParts: ContentPart[] = []
-    if (vision) {
-      for (const ref of refs) {
-        if (ref.kind !== 'image' || ref.mediaType === undefined) continue
-        try {
-          const image = await this.attachments.readImage(ref.id)
-          imageParts.push({ type: 'image', mediaType: image.mediaType, base64: image.base64 })
-        } catch {
-          // A file that vanished between registering and running must not fail the run:
-          // the prompt still names it, so the model can report it honestly.
-        }
-      }
-    }
-
-    const hint = buildAttachmentBlock(
-      refs.map((ref) => {
-        const workspacePath = pathById.get(ref.id)
-        return {
-          name: ref.name,
-          ...(workspacePath ? { workspacePath } : {}),
-          kind: ref.kind,
-          bytes: ref.bytes,
-          vision
-        }
-      })
-    )
-    return { refs, hint, ...(imageParts.length > 0 ? { imageParts } : {}) }
-  }
-
-  /**
-   * Connect the configured MCP servers and hand back their tool group (F0-2c).
-   *
-   * `undefined` when nothing is configured — the common case, and the one that must not touch a
-   * process. A server that cannot start becomes a status entry rather than an exception
-   * (`registerMcpTools` guarantees that), so a missing or broken MCP server can never take the
-   * chat down: its tools are absent and the reason is visible in Settings → MCP.
-   */
-  private async openMcpTools(): Promise<
-    { bridge: McpBridgeResult; group: ToolGroup | undefined } | undefined
-  > {
-    const store = this.mcpServers
-    if (store === undefined) return undefined
-    let servers: McpServerConfig[]
-    try {
-      servers = await store.list()
-    } catch {
-      // An unreadable server list is "no servers", never a failed run.
-      return undefined
-    }
-    if (servers.length === 0) return undefined
-
-    const builder = new ToolsetBuilder()
-    const bridge = await registerMcpTools({ builder, servers, connect: this.mcpConnect })
-    this.mcpStatus = bridge.statuses
-    return { bridge, group: bridge.group }
-  }
-
-  /**
    * What the last run observed about each MCP server (F0-2d, `mcp:status`). A status is an
    * observation from a real connection, so before the first run it is empty rather than invented.
    */
   mcpStatuses(): McpServerStatus[] {
-    return [...this.mcpStatus]
-  }
-
-  /**
-   * F0-3: this run's skills, as a tool group — `undefined` when there are none.
-   *
-   * A skill is a folder holding a `SKILL.md`. Discovery parses the frontmatter and records the
-   * file path but keeps no body: the body is read only when the model calls `use_skill` for that
-   * exact name, because it is the expensive half and most runs need none of it.
-   *
-   * Two roots, project first: `<projectRoot>/.ai-desktop/skills` wins over `<userData>/skills` for
-   * the same name, so a repository can pin the procedure it needs (see `loadSkills`). A remote
-   * project has no local folder, so only the user root applies to it.
-   *
-   * Nothing here may fail a run. Having no skills is the normal state, and an unreadable folder is
-   * reported as "no skills" rather than as an exception.
-   */
-  private async skillTools(
-    project: ProjectRecord | undefined,
-    exposure: ToolExposure | undefined
-  ): Promise<ToolGroup | undefined> {
-    /*
-     * Loading a skill is a read, but a scope that does not expose `use_skill` at all (Investigate
-     * on a production host) must not be told about skills either: a hint that names a tool the
-     * model cannot call is worse than no hint. The group is absent rather than half-present.
-     */
-    if (exposure !== undefined && !allowsTool(exposure, USE_SKILL_TOOL.name)) return undefined
-    try {
-      const roots: SkillRoot[] = []
-      if (project !== undefined && project.type !== 'remote') {
-        roots.push({ dir: join(project.path, '.ai-desktop', 'skills'), source: 'project' })
-      }
-      const userData = this.userDataDir ?? resolveUserDataDir({ appName: 'AI Desktop' })
-      roots.push({ dir: join(userData, 'skills'), source: 'user' })
-      const registry = await loadSkills({ roots })
-      if (registry.size === 0) return undefined
-      return {
-        definitions: [USE_SKILL_TOOL],
-        executor: new UseSkillToolExecutor({ registry }),
-        hint: registry.hint()
-      }
-    } catch {
-      // Skills are optional; a broken skills directory must never take the chat down.
-      return undefined
-    }
-  }
-
-  private async buildRemoteRuntime(
-    task: string,
-    vpsServerId?: string,
-    enabledTools?: string[],
-    exposure?: ToolExposure,
-    /** F0-2c: the connected MCP servers' tools, registered into every path of this runtime. */
-    mcpGroup?: ToolGroup
-  ): Promise<RemoteRuntime> {
-    const settings = await this.persistence.load()
-    const active = settings.projects.find((project) => project.id === settings.activeProjectId)
-    /*
-     * F0-3: the skills this run can use, read from disk before any branch is taken below. A local
-     * run with no VPS — the ordinary case — is exactly the one that must still have `use_skill`, so
-     * discovery happens here rather than inside `planRemoteRuntime`.
-     */
-    const skillGroup = await this.skillTools(active, exposure)
-    const connectedServers = this.vps ? this.vps.connectedServers() : []
-    const isRemote = active?.type === 'remote'
-    // v2.6.4: the chat-header VPS only overrides the project's server when it is
-    // actually connected. Falling back to the active project keeps the routing
-    // decision and the tool runtime pinned to the *same* host, so a stale header
-    // selection can no longer make the UI say "Connected" while the tools
-    // report "Not connected".
-    const runServer = reconcileRunServer({
-      ...(vpsServerId ? { requestedVpsId: vpsServerId } : {}),
-      ...(active?.vpsId ? { projectVpsId: active.vpsId } : {}),
-      connectedServers
-    })
-    const serverId = runServer.serverId
-    const connected = runServer.connected
-    // Read the diagnostic policy once per run so a toggle mid-run does not change
-    // the containment rules under the agent's feet (v2.5.3). T2.4 unions it with
-    // the environment's Investigate read roots: a dev box may be read anywhere,
-    // staging only in logs/proc/tmp, production not at all (named tools only).
-    const diagnostic = mergeReadPolicies(
-      this.getDiagnosticPolicy?.() ?? null,
-      createReadScopePolicy(exposure?.readRoots ?? [])
-    )
-
-    // A1: for a remote project, always install routing so a stray local tool call
-    // is rewritten (when the VPS is connected) or answered with a clear error.
-    const routing: RemoteRuntime = isRemote
-      ? {
-          toolRouting: (toolName, args) =>
-            routeToolCall(toolName, args, {
-              workspaceType: 'remote',
-              ...(serverId ? { serverId } : {}),
-              ...(active?.path ? { remotePath: active.path } : {}),
-              connected,
-              ...(diagnostic ? { diagnostic } : {})
-            })
-        }
-      : {}
-
-    const hint = activeRemoteProjectHint(active, connectedServers)
-    if (hint) {
-      // B-11: never swap or lose the chat-header host silently.
-      const withWarning = [hint, runServer.warning].filter(Boolean).join(' ')
-      const extra = withExtraRuntime([mcpGroup, skillGroup])
-      return {
-        ...extra,
-        systemHint: [withWarning, extra.systemHint].filter(Boolean).join(' '),
-        ...routing
-      }
-    }
-
-    // Resolve the target explicitly: the user's chat-header choice wins, then the
-    // active remote project's own VPS. Never inferred from the task text (P0-4).
-    const resolved = resolveVpsForRun({
-      ...(serverId ? { explicitVpsId: serverId } : {}),
-      ...(active ? { project: active } : {}),
-      requiresVps: false
-    })
-    const pinned = resolved.ok ? resolved.vpsId : undefined
-    const runtime = planRemoteRuntime(
-      task,
-      pinned,
-      this.vps,
-      this.jobs,
-      enabledTools,
-      isRemote ? active?.path : undefined,
-      diagnostic,
-      mcpGroup,
-      skillGroup
-    )
-    // B-11: the resolver's reconciliation (a stale chat-header VPS dropped in
-    // favour of the project's server) must reach the agent prompt, not vanish.
-    if (runServer.warning) {
-      runtime.systemHint = [runtime.systemHint, runServer.warning].filter(Boolean).join(' ')
-    }
-    if (isRemote && connected && serverId && active?.path) {
-      const remoteHint = remoteWorkspaceHint(serverId, active.path)
-      runtime.systemHint = [runtime.systemHint, remoteHint].filter(Boolean).join(' ')
-      const workspace = await this.getWorkspaceInfo(serverId, active.path)
-      if (workspace) {
-        runtime.systemHint = [runtime.systemHint, buildWorkspaceSystemHint(workspace)]
-          .filter(Boolean)
-          .join('\n\n')
-      }
-    }
-    return { ...runtime, ...routing }
+    return this.tooling.mcpStatuses()
   }
 
   /**
@@ -1003,165 +327,14 @@ export class AgentService {
    * Returns undefined when the host is unreachable so callers just skip the hint.
    */
   async getWorkspaceInfo(serverId: string, path: string): Promise<RemoteWorkspaceInfo | undefined> {
-    if (!this.vps) return undefined
-    const key = `${serverId}:${path}`
-    const cached = this.workspaceCache.get(key)
-    if (cached && this.now() - cached.at < 30_000) return cached.info
-    try {
-      const info = await detectWorkspace((command) => this.vps!.exec(serverId, command), path)
-      this.workspaceCache.set(key, { info, at: this.now() })
-      return info
-    } catch {
-      return undefined
-    }
-  }
-
-  /**
-   * System hint built from the active project's AI_CONTEXT.md / AGENTS.md.
-   * Remote projects are skipped (their files are not on this machine).
-   */
-  private async projectMemoryHint(): Promise<string | undefined> {
-    try {
-      const settings = await this.persistence.load()
-      const active = settings.projects.find(
-        (project) => project.id === settings.activeProjectId
-      )
-      if (!active || active.type === 'remote') return undefined
-      return await loadProjectMemory(active.path)
-    } catch {
-      return undefined
-    }
+    return this.tooling.getWorkspaceInfo(serverId, path)
   }
 
   /** Build provider entries (with keys) ordered by preference. */
   async buildProviders(options: ProviderSelection = {}): Promise<ProviderEntry[]> {
-    const settings = await this.persistence.load()
-    const ids = Object.keys(PROVIDERS) as ProviderId[]
-    const order = providerOrder(ids, options.preferred, settings.activeProvider)
-
-    const entries: ProviderEntry[] = []
-    let primaryIsCustom = false
-
-    if (options.customProviderId) {
-      const custom = this.customProviders
-        ? await this.customProviders.getDecrypted(options.customProviderId)
-        : null
-      if (!custom) {
-        throw new Error('Selected custom provider was not found. Re-add it in Settings.')
-      }
-      // Custom endpoints speak the OpenAI protocol, so they reuse that adapter.
-      const config = {
-        provider: 'openai' as ProviderId,
-        apiKey: custom.apiKey,
-        model: options.model ?? custom.model,
-        baseUrl: custom.baseUrl,
-        ...(custom.headers ? { headers: custom.headers } : {})
-      }
-      entries.push({ provider: 'openai', adapter: createAdapterForConfig(config), config })
-      primaryIsCustom = true
-    }
-
-    const candidates: Array<{
-      id: ProviderId
-      apiKey: string
-      keyId?: string
-      pool?: KeyPool
-      model?: string
-      baseUrl?: string
-    }> = []
-    for (const id of order) {
-      const stored = settings.providers[id]
-      if (!stored?.apiKeyEnc && !stored?.apiKeysEnc?.length) continue
-      const keys = await this.persistence.getApiKeys(id)
-      if (keys.length === 0) continue
-
-      /*
-       * v3.1: one candidate per key. The pool hands them out in its own order and **skips a key
-       * that is cooling down**, so the fallback loop that already existed now rotates credentials
-       * as well as providers — which is what a rate limit actually needs.
-       */
-      const pool = this.ensureKeyPool(id, keys)
-      for (let slot = 0; slot < pool.size; slot += 1) {
-        const next = pool.next()
-        if (!next) break
-        candidates.push({
-          id,
-          apiKey: next.apiKey,
-          keyId: next.id,
-          pool,
-          ...(stored.model ? { model: stored.model } : {}),
-          ...(stored.baseUrl ? { baseUrl: stored.baseUrl } : {})
-        })
-      }
-    }
-
-    /*
-     * v3.1: the chat header's model override belongs to the **primary provider**, not to whichever
-     * candidate happens to sit at index 0. With a key pool, index 0 is only the first *key* of that
-     * provider, so keying the override off the index alone made a rotated key silently drop back to
-     * the provider's configured model — a different model than the user picked, with nothing to say
-     * so. With one key per provider the two rules are identical, so nothing changes for anyone who
-     * has not added a second key.
-     */
-    const primaryProvider = candidates[0]?.id
-
-    entries.push(
-      ...candidates.map((candidate) => {
-        const descriptor = PROVIDERS[candidate.id]
-        const model =
-          !primaryIsCustom && candidate.id === primaryProvider && options.model
-            ? options.model
-            : (candidate.model ?? descriptor.defaultModel)
-        const config = {
-          provider: candidate.id,
-          apiKey: candidate.apiKey,
-          model,
-          baseUrl: candidate.baseUrl ?? descriptor.defaultBaseUrl
-        }
-        const adapter = createAdapterForConfig(config)
-        return {
-          provider: candidate.id,
-          /*
-           * Wrapped so the pool learns the outcome: a key is parked after a rate limit (honouring
-           * the provider's Retry-After) or repeated failures, and cleared on success. The wrapper
-           * rethrows the original error, so recovery still sees its code.
-           */
-          adapter:
-            candidate.pool && candidate.keyId
-              ? withKeyHealth(adapter, candidate.pool, candidate.keyId)
-              : adapter,
-          config
-        }
-      })
-    )
-
-    if (entries.length === 0) {
-      throw new Error('No API key configured. Add one in Settings.')
-    }
-
-    return entries
+    return this.providers.build(options)
   }
 
-  /**
-   * v2.4 A.2 — build a preflight gate for the active remote project, if any. The
-   * workspace state is read over the existing SSH exec before sensitive actions.
-   */
-  private async buildPreflightGate(): Promise<
-    ((action: AgentAction) => Promise<PreflightResult | undefined>) | undefined
-  > {
-    if (!this.vps) return undefined
-    const project = this.persistence.getActiveProject()
-    if (!project || project.type !== 'remote' || !project.vpsId) return undefined
-    const serverId = project.vpsId
-    if (!this.vps.connectedServers().includes(serverId)) return undefined
-    const path = project.path
-    const vps = this.vps
-    return (action) => {
-      const kind = preflightActionFor(action.name, action.arguments)
-      if (!kind) return Promise.resolve(undefined)
-      return preflight((command) => vps.exec(serverId, command), { path, isGitRepo: true }, kind)
-    }
-  }
 
   async run(request: AgentRunRequest, externalSignal?: AbortSignal): Promise<AgentRunResult> {
     /*
@@ -1189,7 +362,7 @@ export class AgentService {
     externalSignal: AbortSignal | undefined,
     mcpRuns: { current?: McpBridgeResult }
   ): Promise<AgentRunResult> {
-    const providers = await this.buildProviders({
+    const providers = await this.providers.build({
       ...(request.provider ? { preferred: request.provider } : {}),
       ...(request.model ? { model: request.model } : {}),
       ...(request.customProviderId ? { customProviderId: request.customProviderId } : {})
@@ -1209,28 +382,17 @@ export class AgentService {
      * `planRemoteRuntime` — a local run with no VPS, a missing or disconnected host, the plain
      * local case — carries their tools, and the holder hands the handles to the caller's finally.
      */
-    const mcp = await this.openMcpTools()
+    const mcp = await this.tooling.openMcpTools()
     mcpRuns.current = mcp?.bridge
-    const remote = await this.buildRemoteRuntime(
+    const remote = await this.tooling.buildRemoteRuntime(
       request.task,
       request.vpsServerId,
       request.enabledTools,
       exposure,
       mcp?.group
     )
-    const memory = await this.projectMemoryHint()
-    /*
-     * v3.1: what earlier sessions learned about this project, rendered as *prior beliefs* with
-     * the date each was observed (see renderFactLedger) rather than as truth, and bounded to a
-     * character budget so memory can never crowd out the task. A failure to read the ledger is
-     * not fatal: having no memory is a normal state, not an error.
-     */
-    const factLedger =
-      this.facts && activeProject
-        ? renderFactLedger(await this.facts.live(activeProject.id).catch(() => []), {
-            now: this.now()
-          })
-        : ''
+    const memory = await this.projectMemory.projectMemoryHint()
+    const factLedger = await this.projectMemory.factLedgerHint(activeProject?.id)
     /*
      * v2.9.1: for a LOCAL project the run's workspace IS the project folder.
      *
@@ -1309,7 +471,11 @@ export class AgentService {
     // one lands in its workspace, and inline the images when the selected model can
     // actually see them. The task the model receives is the attachment block plus
     // the user's own text — never the raw desktop path.
-    const attachmentContext = await this.buildAttachmentContext(request.attachments, providers[0])
+    const attachmentContext = await buildAttachmentContext(
+      this.attachments,
+      request.attachments,
+      providers[0]
+    )
     const attachmentIds = attachmentContext.refs.map((ref) => ref.id)
     const task = attachmentContext.hint
       ? `${attachmentContext.hint}\n\n${request.task}`
@@ -1336,227 +502,18 @@ export class AgentService {
           ...(activeProject.environment ? { environment: activeProject.environment } : {})
         }
       : undefined
-    // P0-5 (v2.6.2): approval comes from the Session Profile resolved at the top
-    // of this run; the legacy `settings.approvalMode` remains only as a fallback
-    // for callers that did not inject a Session Profile service (older tests).
-    const approvalMode =
-      profileState?.approvalMode ?? settings.approvalMode ?? DEFAULT_APPROVAL_MODE
-    const planMode = request.planMode ?? profileState?.planMode ?? settings.planModeDefault ?? false
-    /*
-     * v3.1: read the checkpoint mode once for the whole run. A run that changed its mind halfway
-     * would be worse than either behaviour, and it keeps the gate's per-action judgement cheap.
-     */
-    const checkpointMode: CheckpointMode = this.checkpoints
-      ? ((await this.persistence.getCheckpointMode()) as CheckpointMode)
-      : 'off'
-    const checkpointing = this.checkpoints !== undefined && recordsCheckpoints(checkpointMode)
-    /**
-     * Judge one action against the project the run is actually working in.
-     *
-     * `productionHost` is deliberately not passed here: the host policy is evaluated at the **SSH
-     * layer** (`SshManager.exec`), and a second opinion derived from a different source would be a
-     * way for the two to disagree. The classifier supports the input and is tested with it; this
-     * call site passes what it can actually see — the tool, its arguments, credentials and
-     * destructive command patterns.
-     */
-    const judge = (
-      action: { name: string; arguments: Record<string, unknown> }
-    ): ReturnType<typeof classifyImpact> =>
-      classifyImpact({
-        tool: action.name,
-        args: action.arguments ?? {},
-        ...(activeProject && activeProject.type !== 'remote' ? { projectRoot: activeProject.path } : {})
-      })
-    const requestApproval = this.requestApproval
-    const requestPlan = this.requestPlan
-    const now = (): number => this.now()
-
-    // v2.6.2 T4.2: the identity a trusted plan is bound to. A plan trusted here
-    // can only auto-approve while this project/VPS/branch/environment is live, so
-    // switching project or moving to production invalidates the trust.
-    const planScope: PlanScopeContext = {
-      ...(activeProject ? { projectId: activeProject.id } : {}),
-      ...(activeProject?.vpsId ? { vpsId: activeProject.vpsId } : {}),
-      ...(activeProject?.repository?.branch ? { branch: activeProject.repository.branch } : {}),
-      ...(activeProject?.environment ? { environment: activeProject.environment } : {})
-    }
-
-    // v2.6.1 Fix 3: rehydrate any trusted plan persisted with the session (e.g.
-    // after a restart) so it keeps auto-approving in this chat.
-    if (request.sessionId) {
-      try {
-        const stored = await this.sessionStore.load(request.sessionId)
-        const raw = stored?.metadata?.[PLAN_TRUST_METADATA_KEY]
-        const restored = this.planTrust.restore(sessionKey, raw)
-        if (restored === 'restored') {
-          this.emit({ type: 'plan:active', plan: this.planTrust.get(sessionKey)!, at: now() })
-        } else if (restored === 'legacy') {
-          // Pre-v2.6.2 trust without a scope: never inherited, ask to re-approve.
-          this.emit({
-            type: 'plan:inactive',
-            at: now(),
-            reason: 'legacy',
-            message: PLAN_REAPPROVE_MESSAGE
-          })
-        }
-      } catch {
-        // A missing/corrupt session must never block the run.
-      }
-    }
-
-    // v2.5.5: the plan the user chose to trust for this session, or null. Expiry
-    // is evaluated lazily; when it lapses we tell the chip to hide.
-    const activeTrust = (): ApprovedPlan | null => {
-      if (this.planTrust.prune(sessionKey)) {
-        this.emit({ type: 'plan:inactive', at: now(), reason: 'expired' })
-      }
-      return this.planTrust.get(sessionKey)
-    }
-
-    const baseGate = requestApproval
-      ? createApprovalGate({
-          mode: approvalMode,
-          ...(this.approvedCommands ? { approvedCommands: this.approvedCommands } : {}),
-          ...(request.sessionId ? { sessionId: request.sessionId } : {}),
-          // Scope remembered approvals to the active project + its VPS (P0-3).
-          ...(activeProject
-            ? { projectId: activeProject.id, vpsId: activeProject.vpsId ?? '' }
-            : {}),
-          requestApproval: (action, reason) => requestApproval(runId, action, reason),
-          reasonFor: (action) =>
-            activeTrust() ? 'outside_plan' : describeApprovalReason(action),
-          onSuggestion: (tool, count) => this.emit({ type: 'approval:suggestion', tool, count }),
-          ...(checkpointing && this.checkpoints
-            ? {
-                checkpoint: {
-                  mode: checkpointMode,
-                  classify: judge,
-                  record: async (input: {
-                    action: { name: string; arguments: Record<string, unknown> }
-                    verdict: ReturnType<typeof classifyImpact>
-                  }) => {
-                    const checkpoint = {
-                      id: `cp-${runId}-${this.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
-                      runId,
-                      ...(activeProject ? { projectId: activeProject.id } : {}),
-                      intent: (request.task ?? '').slice(0, 300),
-                      action: describeAction(input.action.name, input.action.arguments),
-                      impact: input.verdict.impact,
-                      reason: input.verdict.reason,
-                      at: this.now()
-                    }
-                    // A project is required: the log is per project, and an unscoped record would be
-                    // unfindable. Recording is best-effort — a checkpoint must never fail a run.
-                    if (!activeProject) return undefined
-                    await this.checkpoints!.append(checkpoint).catch(() => undefined)
-                    return checkpoint.id
-                  },
-                  resolve: async (id: string, decision: 'approved' | 'rejected' | 'timeout') => {
-                    if (!activeProject) return
-                    await this.checkpoints!
-                      .append({
-                        id: `${id}-result`,
-                        runId,
-                        projectId: activeProject.id,
-                        intent: 'resolution',
-                        action: id,
-                        impact: 'routine',
-                        reason: decision,
-                        at: this.now(),
-                        resolved: { decision, at: this.now() }
-                      })
-                      .catch(() => undefined)
-                  }
-                }
-              }
-            : {})
-        })
-      : undefined
-
-    // A trusted plan auto-approves its own steps — never a deny-listed command,
-    // and only within the exact scope it was granted for (v2.6.2 T4.2).
-    const approvalGate = baseGate
-      ? async (action: AgentAction): Promise<boolean> => {
-          if (shouldAutoApprove(activeTrust(), action, now(), planScope)) {
-            /*
-             * v3.1: a trusted plan auto-approves its own steps *before* the gate is consulted, so a
-             * checkpoint that lived only inside the gate would be skipped for exactly the runs that
-             * mutate the most. A trusted plan is consent to the plan, not to the irreversible:
-             * anything that cannot be undone still goes through the gate and therefore to the user.
-             */
-            const verdict = checkpointing ? judge(action) : undefined
-            if (!(checkpointMode === 'confirm' && verdict?.impact === 'irreversible')) return true
-          }
-          return baseGate(action)
-        }
-      : undefined
-
-    const planGate = requestPlan
-      ? async (plan: Plan, warnings: PlanWarning[]): Promise<PlanDecision> => {
-          const decision = await requestPlan(runId, plan, warnings)
-          const approved = createApprovedPlan(plan, sessionKey, decision, now(), {
-            scope: planScope
-          })
-          if (approved) {
-            this.planTrust.set(sessionKey, approved)
-            this.emit({ type: 'plan:active', plan: approved, at: now() })
-          } else if (this.planTrust.clear(sessionKey)) {
-            this.emit({ type: 'plan:inactive', at: now(), reason: 'cleared' })
-          }
-          return decision
-        }
-      : undefined
-
-    const preflightGate = await this.buildPreflightGate()
-
-    // v2.6.2 T3.3: every decision this run emits is also appended to the active
-    // project's tamper-evident audit trail (redacted, never blocking the run).
-    const audit = activeProject ? this.auditTrailFor(activeProject) : undefined
-    const onDecision =
-      audit && activeProject
-        ? (decision: TraceDecision) => {
-            void audit
-              .append(
-                auditLineFromDecision(decision, {
-                  projectId: activeProject.id,
-                  ...(activeProject.vpsId ? { vpsId: activeProject.vpsId } : {})
-                })
-              )
-              .catch(() => undefined)
-          }
-        : undefined
-
-    // v2.6.3 T3.2: turn a preflight block into an interactive, audited decision.
-    // Only wired when a gate exists (remote projects); every answer is recorded.
-    const preflightOverride =
-      preflightGate && this.requestPreflight && audit && activeProject
-        ? async (
-            action: AgentAction,
-            result: PreflightResult,
-            tier: PreflightTier,
-            context: { attempt: number }
-          ): Promise<PreflightChoice> => {
-            // The orchestrator only calls this for block/critical, but narrow
-            // explicitly so the audited tier and the broker agree by type.
-            if (tier !== 'block' && tier !== 'critical') return 'cancel'
-            const choice = await this.requestPreflight!(runId, action, result, tier, context)
-            void audit
-              .append(
-                auditLineFromPreflightOverride({
-                  projectId: activeProject.id,
-                  ...(activeProject.vpsId ? { vpsId: activeProject.vpsId } : {}),
-                  runId,
-                  tool: action.name,
-                  tier,
-                  reason: extractPreflightReason(result.checks),
-                  choice,
-                  ...(goalContext.goal ? { goalId: goalContext.goal.id } : {})
-                })
-              )
-              .catch(() => undefined)
-            return choice
-          }
-        : undefined
+    const gates = await this.runGates.assemble({
+      activeProject,
+      request,
+      runId,
+      sessionKey,
+      profileState,
+      settings,
+      goalContext,
+      audit: activeProject ? this.audits.trailFor(activeProject) : undefined
+    })
+    const { approvalMode, planMode } = gates
+    const { approvalGate, planGate, preflightGate, preflightOverride, onDecision } = gates
 
     const orchestrator = new AgentOrchestrator({
       sandbox: this.sandbox,
@@ -1598,7 +555,12 @@ export class AgentService {
       ...(this.files
         ? {
             onFileWritten: (change: FileChange) =>
-              this.captureChange(runId, request.sessionId, change, Boolean(directWorkspace))
+              this.changeLog.captureChange(
+                runId,
+                request.sessionId,
+                change,
+                Boolean(directWorkspace)
+              )
           }
         : {}),
       // v2.5.2: stream redacted/capped tool detail to the renderer so the chat can
@@ -1683,79 +645,33 @@ export class AgentService {
     // will give — the outstanding questions resolve as unanswered.
     this.cancelQuestions?.()
   }
-  /** Root-scoped file IO for the run store, or undefined when files are disabled. */
-  private fileIO(): RunFileIO | undefined {
-    const files = this.files
-    if (!files) return undefined
-    return {
-      readAt: (root, path) => files.readAt(root, path),
-      writeAt: (root, path, content) => files.writeAt(root, path, content)
-    }
-  }
-  /**
-   * v3.1: learn durable facts from a finished session.
-   *
-   * Best-effort by design: memory is an optimisation, so a provider error, a junk reply or an
-   * empty chat returns a reason instead of throwing, and the session that triggered it is
-   * unaffected. The model call resolves a provider exactly as a run does, one-shot, at
-   * temperature 0, and is bounded by the extraction prompt itself.
-   */
+
+  /** v3.1: learn durable facts from a finished session (see ./agent-service/memory). */
   async learnFacts(input: {
     messages: readonly TranscriptMessage[]
     task: string
   }): Promise<LearnResult> {
-    const store = this.facts
-    const project = this.persistence.getActiveProject()
-    if (!store) {
-      return { learned: 0, superseded: 0, skipped: 'model-error', error: 'memory is disabled' }
-    }
-    if (!project) return { learned: 0, superseded: 0, skipped: 'no-transcript' }
-
-    const learner = new FactLearner({
-      store,
-      now: () => this.now(),
-      complete: (prompt) => this.completeOnce(prompt)
-    })
-    return learner.learn({ projectId: project.id, task: input.task, messages: input.messages })
+    return this.projectMemory.learn(input)
   }
 
   /** v3.1: the active project's decision log, newest first. */
   async checkpointsForProject(limit?: number): Promise<unknown[]> {
-    const project = this.persistence.getActiveProject()
-    if (!this.checkpoints || !project) return []
-    return limit === undefined
-      ? this.checkpoints.list(project.id)
-      : this.checkpoints.list(project.id, limit)
+    return this.projectMemory.checkpointsForProject(limit)
   }
 
   /** Everything ever learned about the active project, for the Settings view. */
   async projectFacts(): Promise<ProjectFact[]> {
-    const project = this.persistence.getActiveProject()
-    if (!this.facts || !project) return []
-    return this.facts.list(project.id)
+    return this.projectMemory.projectFacts()
   }
 
   /** Forget one fact. Always possible: memory the user cannot delete is a liability. */
   async forgetFact(factId: string): Promise<boolean> {
-    const project = this.persistence.getActiveProject()
-    if (!this.facts || !project) return false
-    return this.facts.forget(project.id, factId)
+    return this.projectMemory.forgetFact(factId)
   }
 
   /** Forget everything about the active project. */
   async clearFacts(): Promise<void> {
-    const project = this.persistence.getActiveProject()
-    if (!this.facts || !project) return
-    await this.facts.clear(project.id)
-  }
-
-  /** The pool for a provider, rebuilt only when the set of keys actually changed. */
-  private ensureKeyPool(provider: ProviderId, keys: readonly string[]): KeyPool {
-    const existing = this.keyPools.get(provider)
-    if (existing && existing.size === keys.length) return existing
-    const pool = poolForKeys(provider, keys, { now: () => this.now() })
-    this.keyPools.set(provider, pool)
-    return pool
+    return this.projectMemory.clearFacts()
   }
 
   /**
@@ -1763,150 +679,33 @@ export class AgentService {
    * and until when. Never the keys: `KeyPool.snapshot()` cannot return them.
    */
   keyHealth(): Array<{ provider: string; keys: KeySnapshot[] }> {
-    return [...this.keyPools.entries()].map(([provider, pool]) => ({
-      provider,
-      keys: pool.snapshot()
-    }))
+    return this.providers.keyHealth()
   }
 
-  /** One bounded, non-streaming completion with the user's own provider and key. */
-  private async completeOnce(prompt: string): Promise<string> {
-    const settings = await this.persistence.load()
-    const ids = Object.keys(settings.providers) as ProviderId[]
-    const order = providerOrder(ids, undefined, settings.activeProvider)
-    for (const id of order) {
-      const stored = settings.providers[id]
-      if (!stored?.apiKeyEnc) continue
-      const apiKey = await this.persistence.getApiKey(id)
-      if (!apiKey) continue
-      const descriptor = PROVIDERS[id]
-      const config = {
-        provider: id,
-        apiKey,
-        model: stored.model ?? descriptor.defaultModel,
-        baseUrl: stored.baseUrl ?? descriptor.defaultBaseUrl
-      }
-      const response = await createAdapterForConfig(config).chat(
-        { model: config.model, temperature: 0, messages: [{ role: 'user', content: prompt }] },
-        config
-      )
-      return response.content ?? ''
-    }
-    throw new Error('no provider is configured, so memory cannot be extracted')
-  }
-
-  /** Records an agent edit and surfaces it in the chat for review. */
-  private captureChange(
-    runId: string,
-    sessionId: string | undefined,
-    change: FileChange,
-    /** v2.9.1: the run wrote straight into the project, so the edit is already applied. */
-    directWrite = false
-  ): void {
-    const id = `change-${++this.changeCounter}`
-    const io = this.fileIO()
-    void (async () => {
-      let before = change.before
-      /*
-       * In direct-write mode the project file already contains the new content, so
-       * re-reading it would produce `before === after` and an empty diff. The sandbox
-       * write's own before/after is the only honest source, and the change is recorded as
-       * already applied — there is nothing to review and no Reject that could undo it.
-       */
-      if (io && !directWrite) {
-        // Read the file from the run's own root and remember its hash so apply
-        // can detect external edits (P0-1). A read failure means a new file.
-        before = (
-          await this.runStore.capturePatch({
-            runId,
-            path: change.path,
-            fallbackBefore: change.before,
-            io
-          })
-        ).before
-      }
-      const view: FileChangeView = {
-        id,
-        runId,
-        path: change.path,
-        before,
-        after: change.after,
-        ...(sessionId ? { sessionId } : {}),
-        ...(directWrite ? { applied: true } : {})
-      }
-      this.changes.set(id, view)
-      this.emit({ type: 'file:change', change: view, at: this.now() })
-    })()
-  }
   /** Writes the agent's edit into the project the run belongs to. */
   async applyChange(id: string): Promise<boolean> {
-    const change = this.changes.get(id)
-    if (!change || !this.files) return false
-    const io = this.fileIO()
-    if (!io) return false
-    const result = await this.runStore.applyPatch({
-      runId: change.runId,
-      activeProjectId: this.persistence.getActiveProject()?.id,
-      path: change.path,
-      content: change.after,
-      io
-    })
-    if (!result.ok) return false
-    this.changes.delete(id)
-    this.emit({ type: 'file:change:resolved', id, status: 'accepted', at: this.now() })
-    return true
+    return this.changeLog.applyChange(id)
   }
   /** Discards an agent edit without touching the project. */
   rejectChange(id: string): boolean {
-    if (!this.changes.has(id)) return false
-    this.changes.delete(id)
-    this.emit({ type: 'file:change:resolved', id, status: 'rejected', at: this.now() })
-    return true
+    return this.changeLog.rejectChange(id)
   }
   /** Pending edits, used by tests and diagnostics. */
   pendingChanges(): FileChangeView[] {
-    return [...this.changes.values()]
+    return this.changeLog.pendingChanges()
   }
 
   async loadSession(id: string): Promise<SessionRecordView | null> {
-    const session = await this.sessionStore.load(id)
-    if (!session) return null
-    return {
-      id: session.id,
-      task: session.task,
-      status: session.status,
-      summary: session.summary ?? null,
-      messages: session.messages
-    }
+    return loadSessionView(this.sessionStore, id)
   }
 
   async listSessions(): Promise<SessionInfo[]> {
-    const sessions = await this.sessionStore.list()
-    return sessions.map((session) => ({
-      id: session.id,
-      task: session.task,
-      status: session.status,
-      updatedAt: session.updatedAt
-    }))
+    return listSessionViews(this.sessionStore)
   }
 
   /** v2.6.1 Fix 5: what this chat still remembers, for the Sources tab panel. */
   async memory(id: string): Promise<SessionMemoryView> {
-    let session: Awaited<ReturnType<SessionStore['load']>> = null
-    try {
-      session = await this.sessionStore.load(id)
-    } catch {
-      // An unknown/invalid id just means there is nothing stored yet.
-    }
-    const plan = this.planTrust.get(id)
-    return {
-      sessionId: id,
-      messages: session?.messages.length ?? 0,
-      turns: session?.messages.filter((message) => message.role === 'user').length ?? 0,
-      summary: session?.summary ?? null,
-      updatedAt: session?.updatedAt ?? 0,
-      trustedPlan: plan ? { steps: plan.stepIds.length, expiresAt: plan.expiresAt } : null
-    }
+    return sessionMemoryView(this.sessionStore, this.planTrust, id)
   }
 
   /**
@@ -1914,16 +713,7 @@ export class AgentService {
    * the next message starts with no history. The renderer's visible messages stay.
    */
   async clearMemory(id: string): Promise<boolean> {
-    let removed = false
-    try {
-      await this.sessionStore.delete(id)
-      removed = true
-    } catch {
-      removed = false
-    }
-    const trustCleared = this.planTrust.clear(id)
-    if (trustCleared) this.emit({ type: 'plan:inactive', at: this.now() })
-    return removed || trustCleared
+    return clearSessionMemory(this.sessionStore, this.planTrust, this.emit, () => this.now(), id)
   }
 
   /**
@@ -1941,8 +731,7 @@ export class AgentService {
 
   /** Absolute path of the active project's audit file, when there is one. */
   auditPath(): string | null {
-    const project = this.persistence.getActiveProject()
-    return project ? this.auditTrailFor(project).path : null
+    return this.audits.auditPath()
   }
 
   /**
@@ -1950,18 +739,6 @@ export class AgentService {
    * Settings → Verify audit; also the hook tamper detection will use.
    */
   async verifyAudit(): Promise<AuditVerifyResult | null> {
-    const project = this.persistence.getActiveProject()
-    if (!project) return null
-    return this.auditTrailFor(project).verify()
-  }
-
-  /** One trail per project file, reused so appends continue the same chain. */
-  private auditTrailFor(project: ProjectRecord): AuditTrail {
-    const file = auditFileFor(project, this.userDataDir ?? resolveUserDataDir({ appName: 'AI Desktop' }))
-    const cached = this.audits.get(file)
-    if (cached) return cached
-    const trail = new AuditTrail({ file, redact: (line) => redactValue(line) })
-    this.audits.set(file, trail)
-    return trail
+    return this.audits.verify()
   }
 }
