@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   Eye,
   FilePen,
+  Globe,
   History,
   ShieldAlert,
   Terminal,
@@ -16,6 +17,7 @@ import { evaluateProjectCommandWarning } from '../lib/policy-warning'
 import PolicyWarningBanner from './PolicyWarningBanner'
 import Modal from './ui/Modal'
 import { canRememberTool } from '@core/agent/remember-policy'
+import { describeNetworkTarget, detectNetworkAction } from '@core/remote/network-action'
 import type {
   ApprovalHistoryEntry,
   ApprovalOutcome,
@@ -181,6 +183,13 @@ export default function ApprovalDialog(): JSX.Element | null {
     request.preview ?? request.summary
   )
 
+  /*
+   * B2-3: name the host a network action reaches. The gate says "network action"; this says *where* —
+   * the difference between `curl http://localhost:3000` and a probe of somebody else's machine.
+   */
+  const network = detectNetworkAction(request.preview ?? '')
+  const networkTarget = network === undefined ? '' : describeNetworkTarget(network)
+
   const pick = (scope: ApprovalRememberScope): void => {
     setRememberCommand(scope === 'action')
     setRememberTool(scope === 'tool')
@@ -271,6 +280,18 @@ export default function ApprovalDialog(): JSX.Element | null {
             <ShieldAlert className="h-3.5 w-3.5 shrink-0 text-fg-muted" />
             {t('chat.approvalReason')}:{' '}
             <span className="font-medium text-fg">{t(reasonKey(request.reason))}</span>
+          </p>
+        ) : null}
+
+        {network !== undefined ? (
+          <p
+            className="flex items-center gap-2 text-2xs text-fg-muted"
+            data-testid="approval-network-target"
+          >
+            <Globe className="h-3.5 w-3.5 shrink-0 text-fg-muted" />
+            {networkTarget === ''
+              ? t('chat.approvalNetworkTargetUnknown')
+              : t('chat.approvalNetworkTarget', { target: networkTarget })}
           </p>
         ) : null}
       </div>

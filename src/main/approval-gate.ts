@@ -102,6 +102,17 @@ export function shouldRequireApproval(action: {
   // v4.2: an MCP server's tool is a foreign process. Ask, in those words, before it runs.
   if (action.name.startsWith('mcp__')) return { required: true, reason: 'mcp_tool' }
 
+  /*
+   * B2-3: the local shell is classified for the network too. This only changes the *reason* the dialog
+   * shows — `run_command` already asks in every mode that asks — so it cannot widen the read-only set.
+   */
+  if (action.name === 'run_command') {
+    const command = action.arguments.command
+    if (typeof command === 'string' && detectNetworkAction(command) !== undefined) {
+      return { required: true, reason: 'network_action' }
+    }
+  }
+
   if (action.name === 'remote_shell') {
     const command = action.arguments.command
     if (typeof command === 'string') {
