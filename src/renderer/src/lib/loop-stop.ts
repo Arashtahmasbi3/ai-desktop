@@ -1,4 +1,6 @@
+import { VERDICT_PATTERNS } from '@core/agent/verdict'
 import type { LoopStopInfo, LoopStopReason } from '@shared/agent'
+import i18n from '../i18n'
 
 export type LoopStopAction = 'continue' | 'correct' | 'stop'
 
@@ -118,6 +120,65 @@ function observationsOf(stop: LoopStopInfo): Observation[] {
   }))
 }
 
+/**
+ * Every row id the table can produce. A stop naming anything else did not come from the table this
+ * build was compiled against — a newer core, or a hand-edited session — so its keys are not trusted.
+ */
+const KNOWN_PATTERN_IDS: ReadonlySet<string> = new Set(VERDICT_PATTERNS.map((pattern) => pattern.id))
+
+/**
+ * True when the active locale — or its `en` fallback — can actually say this key.
+ *
+ * This is what keeps a raw `verdict.causeFirewall` out of the card. A key is only a sentence if i18n
+ * can resolve it; asking the key's shape or prefix would happily print the key itself to the user.
+ */
+function translatable(key: string): boolean {
+  return typeof key === 'string' && key.trim() !== '' && i18n.exists(key)
+}
+
+/**
+ * The failed observations the conclusion is based on, already phrased for the reader.
+ *
+ * The verdict names the cause; these lines are the proof under it, exactly as the card showed them
+ * before the table existed. Bounded because `recentFailures` is bounded (three steps) but one step
+ * can fail several tools.
+ */
+function failureEvidence(stop: LoopStopInfo): VerdictEvidence[] {
+  return observationsOf(stop)
+    .filter((observation) => observation.text !== '')
+    .slice(0, 3)
+    .map((observation) => ({
+      textKey: 'chat.verdictEvidenceError',
+      params: { name: observation.name, error: observation.text.slice(0, 200) }
+    }))
+}
+
+/**
+ * The verdict the run itself carries, as a renderable model (B2-1).
+ *
+ * `stop.verdict` is the pattern table's own answer, filled in by `buildStopInfo`: `causeKey` says what
+ * happened, `nextStepKey` says what to do, and both are i18n keys, so one stop reads correctly in
+ * every locale. That is the whole point of the table — the renderer must not re-derive the cause from
+ * the same observations with its own `if`s, or the two answers drift apart.
+ *
+ * Returns undefined — so the caller keeps the hand-built guess — in three cases: the stop carries no
+ * verdict, its `patternId` is not a row this build knows, or either key cannot be translated here.
+ * The last two are the safety rule: a stale key renders as itself, and `verdict.causeFirewall` in the
+ * middle of a Persian sentence is worse than the older text it replaces.
+ */
+function verdictFromTable(stop: LoopStopInfo): LoopStopVerdict | undefined {
+  const verdict = stop.verdict
+  if (!verdict) return undefined
+  if (verdict.patternId !== undefined && !KNOWN_PATTERN_IDS.has(verdict.patternId)) return undefined
+  if (!translatable(verdict.causeKey) || !translatable(verdict.nextStepKey)) return undefined
+  return {
+    textKey: verdict.causeKey,
+    ...(verdict.params ? { params: verdict.params } : {}),
+    evidence: failureEvidence(stop),
+    actionKey: verdict.nextStepKey
+  }
+}
+
 /** True when an observation looks like a connection that timed out. */
 function isTimeout(observation: Observation): boolean {
   return /timed out|timeout|operation timed out|connect to host/i.test(observation.text)
@@ -163,13 +224,36 @@ function scanCommand(stop: LoopStopInfo): string | undefined {
 }
 
 /**
- * Build the conclusion. Rules are ordered: the most specific, most actionable explanation wins.
+ * Build the conclusion the card shows: the run's own verdict first, the hand-built guess as fallback.
+ *
+ * The guess is kept on purpose, and must not be deleted. Every stop produced by `buildStopInfo` now
+ * carries `verdict`, but chat history persisted by an older build has none, and neither do the
+ * hand-built fixtures in the tests — for those a missing chain would mean a card with no explanation
+ * at all. It is also the only place that knows the runnable command and the alternate route for a
+ * blocked SSH target, so those affordances are carried over when the table answers instead. The
+ * *words* come from the table; a command and a second route are not conclusions.
+ */
+function buildVerdict(stop: LoopStopInfo): LoopStopVerdict | undefined {
+  const guess = guessVerdict(stop)
+  const fromTable = verdictFromTable(stop)
+  if (!fromTable) return guess
+  return {
+    ...fromTable,
+    ...(guess?.actionCommand ? { actionCommand: guess.actionCommand } : {}),
+    ...(guess?.alternate ? { alternate: guess.alternate } : {})
+  }
+}
+
+/**
+ * The older, hand-built conclusion, used only when the stop carries no usable verdict.
+ *
+ * Rules are ordered: the most specific, most actionable explanation wins.
  *
  * The first rule exists because of one concrete run: the target answered ping, SSH timed out on 22, and every
  * probed port came back filtered — a firewall on the target. The app knew all of that and still told the user
  * "I got stuck".
  */
-function buildVerdict(stop: LoopStopInfo): LoopStopVerdict | undefined {
+function guessVerdict(stop: LoopStopInfo): LoopStopVerdict | undefined {
   const observations = observationsOf(stop)
 
   /*

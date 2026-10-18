@@ -294,7 +294,11 @@
     "goalSummaryTitle": "Ongoing goal",
     "approvalGrantServer": "Approve every command on {{server}} for 30 minutes",
     "approvalGrantScope": "Scoped to this server and this project, expires automatically, revocable from the composer. The deny list still blocks dangerous commands, and nothing is remembered permanently.",
-    "pasteImageUnsupported": "This image was copied without a file behind it, so it cannot be attached yet. Save it, then drop the file here or use the paperclip."
+    "pasteImageUnsupported": "This image was copied without a file behind it, so it cannot be attached yet. Save it, then drop the file here or use the paperclip.",
+    "questionOptionsLabel": "Suggested answers",
+    "questionOptionsHint": "These are shortcuts — you can still type your own answer.",
+    "approvalNetworkTarget": "Contacts {{target}}",
+    "approvalNetworkTargetUnknown": "Target could not be read from the arguments"
   },
   "vpsSelector": {
     "label": "VPS",
@@ -1123,5 +1127,35 @@
     "terminalHint": "The integrated terminal panel.",
     "filesystem": "Filesystem",
     "filesystemHint": "The project file browser and the file views."
+  },
+  "verdict": {
+    "causeFiltered": "The target dropped the connection: the port is filtered, which means a firewall or a security group on the target — not a dead service.",
+    "causeRefused": "The host answered and refused the connection, so nothing is listening on that port.",
+    "causeDns": "The name did not resolve, so the problem is the name or its DNS records, not the service.",
+    "causeSshKey": "The SSH server rejected the key it was offered, so this is the SSH key for that server, not the command.",
+    "causeApiKey": "The provider rejected the API key (401), so the key stored in Settings is wrong or expired.",
+    "causePermission": "The command was right but this identity may not run it: the system refused the operation (EACCES / root required).",
+    "causeForbidden": "The server understood the request and refused it with 403: the token or the role lacks this permission.",
+    "causeDiskFull": "The filesystem is full (ENOSPC), so the write did not happen.",
+    "causeMissingTool": "A program this command needs is not installed on this machine.",
+    "causeMissingToolNamed": "{{tool}} is not installed on this machine, so every command that calls it fails the same way.",
+    "causeTimeout": "That step was too slow: it hit its time limit and the output names no other error.",
+    "causeStalled": "Several steps made no progress and no error was recorded — this is the loop itself.",
+    "causeTurnBudget": "The turn used its whole time window; no step failed.",
+    "causeUnknown": "The run stopped and recorded no specific cause: the output matches no known failure pattern.",
+    "nextFiltered": "Open the port on the target for this machine's address (ufw or the cloud security group), or run the same test from the other host to prove it is the network between them.",
+    "nextRefused": "Start the service that should listen on that port, or check with `ss -ltnp` which port it really listens on, then send the same command again.",
+    "nextDns": "Check the host name and its DNS record (or /etc/hosts), then run it once the name resolves.",
+    "nextSshKey": "Fix the SSH key for that server: the key path and its permissions, and that the public key is in that account's authorized_keys.",
+    "nextApiKey": "Replace the API key for that provider in Settings and run the step again; the old key will keep returning 401.",
+    "nextPermission": "Run the same command with the privilege it needs (sudo, or a user that owns the path); a different command fails in exactly the same place.",
+    "nextForbidden": "Use a token or a role that holds this permission and send the same request again; the command itself is fine.",
+    "nextDiskFull": "Free space first (df -h, then delete or rotate what filled the disk) and only then repeat the write; repeating it now fails in exactly the same way.",
+    "nextMissingTool": "Install the missing program on that host and run the same command again.",
+    "nextMissingToolNamed": "Install {{tool}} on that host (your package manager, or the vendor's own installer) and run the same command again.",
+    "nextTimeout": "Run a narrower version of that step (one file, one host, a smaller range) or give it a longer budget; the same command with the same limit hits the same wall.",
+    "nextStalled": "Change the instruction, not the wording: name the exact file or command, or say which alternative to try next.",
+    "nextTurnBudget": "Continue from where it stopped; nothing failed, the clock simply ran out.",
+    "nextUnknown": "Read the trace above and give a narrower instruction than the one that stalled; the run has no evidence that could name a cause."
   }
 }

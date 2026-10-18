@@ -135,6 +135,24 @@ export interface LoopStopFailure {
   serverId?: string
 }
 
+/**
+ * The deterministic stop verdict, as i18n keys (B2-1).
+ *
+ * Core decides *what* happened; the renderer decides how to say it. Carrying keys instead of an
+ * English sentence means the same conclusion reads correctly in `en` and in `fa`, and means the
+ * knowledge lives in one table (`core/agent/verdict.ts`) instead of growing as branches.
+ * `patternId` is for logs and tests — it is never shown — and its absence means no pattern matched,
+ * so `causeKey`/`nextStepKey` are the honest fallback rather than a guess.
+ */
+export interface StopVerdictKeys {
+  /** The pattern that answered, e.g. `port-filtered`. Absent when the fallback answered. */
+  patternId?: string
+  causeKey: string
+  nextStepKey: string
+  /** Interpolation values for the two keys above, e.g. the tool that is not installed. */
+  params?: Record<string, string>
+}
+
 export interface LoopStopInfo {
   reason: LoopStopReason
   message: string
@@ -150,6 +168,13 @@ export interface LoopStopInfo {
   steps?: number
   /** v4.1: set when the agent was waiting on a question, so the card asks instead of calling it a loop. */
   pendingQuestion?: string
+  /**
+   * B2-1: the same conclusion as translatable keys, produced by the pattern table in
+   * `core/agent/verdict.ts`. Added alongside `message` rather than instead of it: `message` is this
+   * run's English sentence and existing callers/tests read it, while `verdict` is what a renderer in
+   * any locale needs. Optional so a stored or hand-built stop without it stays valid.
+   */
+  verdict?: StopVerdictKeys
 }
 
 export interface LoopDetectionPolicy {

@@ -1,0 +1,362 @@
+/**
+ * The verdict library: evidence in, one named cause and one next step out (B2-1).
+ *
+ * A stopped run explains itself from what it observed, with no model call. That knowledge used to
+ * be a chain of `if`s that grew with every new failure mode, so the advice for a filtered port, a
+ * refused connection and a dead service lived in three places and had to be kept in step by hand.
+ * It now lives in one table — {@link VERDICT_PATTERNS} — where a failure mode is a row rather than
+ * a branch. A row is `{ id, matches, causeKey, nextStepKey, weight }`, plus an optional `detail`
+ * for the case where the output itself names the thing to fix (the package that is not installed).
+ *
+ * Three rules make this a library rather than a longer `if`:
+ *
+ *  1. **The strongest match wins.** Every matching row is considered and the highest `weight`
+ *     answers, so a generic "something timed out" can never hide the firewall that dropped the
+ *     packets.
+ *  2. **Equal weights are settled by declaration order** — the earlier row wins. That is the only
+ *     tie-break there is, so it is deliberate and pinned by a test: re-ordering two equally strong
+ *     rows changes the answer for text that matches both.
+ *  3. **No match is an answer too.** Unknown evidence returns {@link FALLBACK_VERDICT}, which claims
+ *     no cause at all rather than guessing the nearest one.
+ *
+ * Nothing here is prose: a row carries i18n keys and the renderer translates them, which is why the
+ * same verdict reads correctly in `en` and in `fa`. Matching is case-insensitive, ignores ANSI
+ * colour codes and tolerates anything around the signal, because a real observation is a pile of
+ * terminal output rather than a clean string.
+ */
+import type { LoopStopInfo, LoopStopReason, StopVerdictKeys } from '@shared/agent'
+
+/** Everything a pattern may look at, flattened from a stopped run. */
+export interface VerdictEvidence {
+  /** Every recorded failure, `error` and `output` joined: a pile of output, not a clean string. */
+  text: string
+  /** The loop detector's own reason for stopping, when it had one. */
+  reason?: LoopStopReason
+  /** How many failed observations were recorded. */
+  failures?: number
+  /** How many steps ran before the stop. */
+  steps?: number
+}
+
+/** The extra wording a pattern gets when the output itself names the thing to fix. */
+export interface VerdictDetail {
+  /** Any of these may match; the first non-empty capture group is the value. */
+  patterns: readonly RegExp[]
+  /** Used instead of {@link VerdictPattern.causeKey} once a value was captured. */
+  causeKey: string
+  /** Used instead of {@link VerdictPattern.nextStepKey} once a value was captured. */
+  nextStepKey: string
+  /** Interpolation name for the captured value. Defaults to `name`. */
+  param?: string
+}
+
+/** One row of the table: the evidence it recognises, and the two keys that answer it. */
+export interface VerdictPattern {
+  /** Stable id. Used in logs and by tests; never shown to a user. */
+  id: string
+  /** How much the evidence proves. See the tier table above {@link VERDICT_PATTERNS}. */
+  weight: number
+  /** i18n key naming what happened. */
+  causeKey: string
+  /** i18n key with the one next step that follows from it. */
+  nextStepKey: string
+  /** True when this row recognises the evidence. Case-insensitive by construction. */
+  matches: (evidence: VerdictEvidence) => boolean
+  /** Optional: name what the output points at, and use different keys once it does. */
+  detail?: VerdictDetail
+}
+
+/** ANSI colour codes, which terminal output carries whether anyone wants them or not. */
+const ANSI = /\u001b\[[0-9;]*[a-zA-Z]/g
+
+/** The text as a reader sees it, with colour codes removed. */
+function plain(text: string): string {
+  return text.replace(ANSI, '')
+}
+
+/** True when the text mentions any of these phrases, in any case, whatever surrounds them. */
+function mentions(text: string, ...needles: string[]): boolean {
+  const haystack = text.toLowerCase()
+  return needles.some((needle) => haystack.includes(needle))
+}
+
+/** False only when the run recorded no failure detail at all — the genuine "no error" case. */
+function hasFailureText(evidence: VerdictEvidence): boolean {
+  return evidence.text.trim() !== '' || (evidence.failures ?? 0) > 0
+}
+
+/** An HTTP status as it really appears: `401`, `HTTP/2 401`, `"status":"403"`, but not `4010`. */
+const HTTP_401 = /(?:\D|^)401(?:\D|$)/
+const HTTP_403 = /(?:\D|^)403(?:\D|$)/
+
+/** A connection that was dropped rather than answered: the shape of a filtered port. */
+const CONNECT_TIMEOUT = /connect(?:ion)? (?:timed out|timeout)|timed out during banner exchange/i
+
+/**
+ * The table. Read it top-down: it is ordered by weight, and the rows that can tie are grouped so the
+ * tie-break is visible where it matters.
+ *
+ * Weights are confidence tiers, not a score. A lower tier is usually a *consequence* of the tier
+ * above it, which is why it loses when both are present in the same pile of output:
+ *
+ * | weight | tier                       | why it wins over what is below it                          |
+ * | ------ | -------------------------- | ---------------------------------------------------------- |
+ * | 95     | a credential was refused   | the output names the identity; nothing else can be the cause |
+ * | 92     | a privilege was refused    | the command was right, this identity may not run it        |
+ * | 90     | storage or toolchain       | the machine said exactly what is missing                   |
+ * | 80     | the name did not resolve   | nothing downstream can be trusted when the name is wrong   |
+ * | 75     | the port is filtered       | packets were dropped, so the target's policy is the suspect |
+ * | 70     | the connection was refused | the host answered: one service is down, the host is not     |
+ * | 60     | the step was too slow      | an absence of evidence, so it loses to every real signal    |
+ * | 30     | no failure evidence at all | the clock or the loop itself, which is not a failure mode   |
+ *
+ * A tie only exists inside one tier, and the two ties here are between rows that describe the same
+ * kind of refusal through different worlds: an SSH key versus an API key, and a POSIX `EACCES`
+ * versus an HTTP `403`. When a pile contains both, the row declared first answers.
+ */
+export const VERDICT_PATTERNS: readonly VerdictPattern[] = [
+  {
+    id: 'auth-ssh-key',
+    weight: 95,
+    causeKey: 'verdict.causeSshKey',
+    nextStepKey: 'verdict.nextSshKey',
+    matches: ({ text }) =>
+      /permission denied \(\s*(?:publickey|password|keyboard)/i.test(text) ||
+      mentions(
+        text,
+        'no supported authentication methods available',
+        'too many authentication failures',
+        'agent admitted failure to sign'
+      )
+  },
+  {
+    id: 'auth-api-key',
+    weight: 95,
+    causeKey: 'verdict.causeApiKey',
+    nextStepKey: 'verdict.nextApiKey',
+    matches: ({ text }) =>
+      HTTP_401.test(text) ||
+      mentions(
+        text,
+        'invalid api key',
+        'invalid_api_key',
+        'incorrect api key',
+        'api key not valid',
+        'api_key_invalid',
+        'unauthorized',
+        'authentication failed'
+      )
+  },
+  {
+    id: 'authz-posix',
+    weight: 92,
+    causeKey: 'verdict.causePermission',
+    nextStepKey: 'verdict.nextPermission',
+    matches: ({ text }) =>
+      /*
+       * A bare POSIX "Permission denied" is authorisation, while "Permission denied (publickey)." —
+       * the parenthesised form — is authentication and belongs to the row above.
+       */
+      /permission denied(?!\s*\()/i.test(text) ||
+      mentions(
+        text,
+        'eacces',
+        'eperm',
+        'operation not permitted',
+        'must be root',
+        'are you root',
+        'requires root',
+        'sudo: a password is required',
+        'sudo: no tty present'
+      )
+  },
+  {
+    id: 'authz-http',
+    weight: 92,
+    causeKey: 'verdict.causeForbidden',
+    nextStepKey: 'verdict.nextForbidden',
+    matches: ({ text }) =>
+      HTTP_403.test(text) || mentions(text, 'forbidden', 'insufficient permissions')
+  },
+  {
+    id: 'disk-full',
+    weight: 90,
+    causeKey: 'verdict.causeDiskFull',
+    nextStepKey: 'verdict.nextDiskFull',
+    matches: ({ text }) =>
+      mentions(
+        text,
+        'no space left on device',
+        'enospc',
+        'disk quota exceeded',
+        'not enough space on the disk'
+      )
+  },
+  {
+    id: 'missing-tool',
+    weight: 90,
+    causeKey: 'verdict.causeMissingTool',
+    nextStepKey: 'verdict.nextMissingTool',
+    matches: ({ text }) =>
+      mentions(
+        text,
+        'command not found',
+        'enoent',
+        'not installed',
+        'is not recognized as an internal or external command'
+      ),
+    /*
+     * The one place the advice is different because the output named the culprit: the same missing
+     * program is "install it" when it has a name and "install the missing program" when it does not.
+     */
+    detail: {
+      param: 'tool',
+      causeKey: 'verdict.causeMissingToolNamed',
+      nextStepKey: 'verdict.nextMissingToolNamed',
+      patterns: [
+        /([\w.+-]+): command not found/i,
+        /'([^']+)' is not recognized as an internal or external command/i,
+        /([\w.+-]+): not found\b/i,
+        /([\w.+-]+)(?::| is)? not installed/i
+      ]
+    }
+  },
+  {
+    id: 'dns-lookup-failed',
+    weight: 80,
+    causeKey: 'verdict.causeDns',
+    nextStepKey: 'verdict.nextDns',
+    matches: ({ text }) =>
+      mentions(
+        text,
+        'could not resolve',
+        'name or service not known',
+        'nodename nor servname provided',
+        'temporary failure in name resolution',
+        'no address associated with hostname',
+        'getaddrinfo enotfound',
+        'unknown host'
+      )
+  },
+  {
+    id: 'port-filtered',
+    weight: 75,
+    causeKey: 'verdict.causeFiltered',
+    nextStepKey: 'verdict.nextFiltered',
+    matches: ({ text }) => CONNECT_TIMEOUT.test(text) || mentions(text, 'filtered')
+  },
+  {
+    id: 'connection-refused',
+    weight: 70,
+    causeKey: 'verdict.causeRefused',
+    nextStepKey: 'verdict.nextRefused',
+    matches: ({ text }) => mentions(text, 'connection refused', 'econnrefused')
+  },
+  {
+    id: 'tool-timeout',
+    weight: 60,
+    causeKey: 'verdict.causeTimeout',
+    nextStepKey: 'verdict.nextTimeout',
+    matches: ({ text }) =>
+      mentions(text, 'timed out', 'timeout', 'etimedout', 'deadline exceeded')
+  },
+  {
+    id: 'turn-budget',
+    weight: 30,
+    causeKey: 'verdict.causeTurnBudget',
+    nextStepKey: 'verdict.nextTurnBudget',
+    matches: (evidence) => evidence.reason === 'turn_timeout' && !hasFailureText(evidence)
+  },
+  {
+    id: 'stalled-no-error',
+    weight: 30,
+    causeKey: 'verdict.causeStalled',
+    nextStepKey: 'verdict.nextStalled',
+    matches: (evidence) => evidence.reason !== 'turn_timeout' && !hasFailureText(evidence)
+  }
+]
+
+/**
+ * The answer for evidence that matches nothing: it says that no cause was recorded and asks for a
+ * narrower instruction. It deliberately names no failure mode — a wrong specific cause is worse
+ * than an honest "not known", which is the whole reason this module is data-driven.
+ */
+export const FALLBACK_VERDICT: Readonly<StopVerdictKeys> = {
+  causeKey: 'verdict.causeUnknown',
+  nextStepKey: 'verdict.nextUnknown'
+}
+
+/** The first captured value across `patterns`, so a row can name what it found. */
+function capture(patterns: readonly RegExp[], text: string): string | undefined {
+  for (const pattern of patterns) {
+    const match = pattern.exec(text)
+    // Only a capture group is a value; the whole match would just be the phrase again.
+    const value = match?.slice(1).find((group) => typeof group === 'string' && group !== '')
+    if (value) return value
+  }
+  return undefined
+}
+
+/**
+ * The rule itself: the strongest matching row wins, and an equal weight keeps the row declared
+ * first.
+ *
+ * It takes the table as an argument on purpose. The real table is written in weight order, so a
+ * test that only ever reads it cannot tell "strongest weight" apart from "first row wins" — both
+ * give the same answer. Handing the rule a re-ordered table is what proves which of the two it is.
+ */
+export function resolve(
+  patterns: readonly VerdictPattern[],
+  evidence: VerdictEvidence
+): VerdictPattern | undefined {
+  let winner: VerdictPattern | undefined
+  for (const pattern of patterns) {
+    if (!pattern.matches(evidence)) continue
+    if (winner === undefined || pattern.weight > winner.weight) winner = pattern
+  }
+  return winner
+}
+
+/**
+ * Diagnose evidence: one cause key, one next-step key, and the pattern that produced them.
+ *
+ * `patternId` is absent when the fallback answered, so a caller (or a log) can tell a named cause
+ * from an honest "unknown" without inspecting the keys.
+ */
+export function diagnose(evidence: VerdictEvidence): StopVerdictKeys {
+  const text = plain(evidence.text)
+  const winner = resolve(VERDICT_PATTERNS, { ...evidence, text })
+  if (winner === undefined) return { ...FALLBACK_VERDICT }
+  const detail = winner.detail ? capture(winner.detail.patterns, text) : undefined
+  if (winner.detail && detail !== undefined) {
+    return {
+      patternId: winner.id,
+      causeKey: winner.detail.causeKey,
+      nextStepKey: winner.detail.nextStepKey,
+      params: { [winner.detail.param ?? 'name']: detail }
+    }
+  }
+  return {
+    patternId: winner.id,
+    causeKey: winner.causeKey,
+    nextStepKey: winner.nextStepKey
+  }
+}
+
+/** Flatten a stopped run into the evidence the table reads. */
+export function evidenceFromStop(stop: LoopStopInfo): VerdictEvidence {
+  const failures = stop.recentFailures ?? []
+  return {
+    text: failures
+      .map((failure) => (failure.error ?? '') + '\n' + (failure.output ?? ''))
+      .join('\n'),
+    reason: stop.reason,
+    failures: failures.length,
+    steps: stop.steps ?? 0
+  }
+}
+
+/** Diagnose a stopped run: the same conclusion the card shows, as translatable keys. */
+export function diagnoseStop(stop: LoopStopInfo): StopVerdictKeys {
+  return diagnose(evidenceFromStop(stop))
+}

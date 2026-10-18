@@ -99,7 +99,11 @@ export default function LoopStopCard({ stop, onContinue, onCorrect, onStop }: Pr
           {model.verdict ? (
             <div data-testid="loop-stop-verdict" className="mt-2 border-t-2 border-warning/40 pt-2">
               <p className="brutal-label">{t('chat.verdictTitle')}</p>
-              <p dir="auto" className="mt-0.5 text-2xs leading-relaxed text-fg">
+              <p
+                data-testid="loop-stop-verdict-cause"
+                dir="auto"
+                className="mt-0.5 text-2xs leading-relaxed text-fg"
+              >
                 {t(model.verdict.textKey, model.verdict.params ?? {})}
               </p>
               {model.verdict.evidence.length > 0 ? (
@@ -119,8 +123,13 @@ export default function LoopStopCard({ stop, onContinue, onCorrect, onStop }: Pr
               {model.verdict.actionKey ? (
                 <>
                   <p className="brutal-label mt-2">{t('chat.verdictNext')}</p>
-                  <p dir="auto" className="mt-0.5 text-2xs leading-relaxed text-fg">
-                    {t(model.verdict.actionKey)}
+                  <p
+                    data-testid="loop-stop-verdict-next"
+                    dir="auto"
+                    className="mt-0.5 text-2xs leading-relaxed text-fg"
+                  >
+                    {/* The table's next-step keys can carry params too (the tool that is missing). */}
+                    {t(model.verdict.actionKey, model.verdict.params ?? {})}
                   </p>
                 </>
               ) : null}

@@ -14,6 +14,7 @@ import type {
   LoopWarning
 } from '@shared/agent'
 import type { OrchestratorLog } from './orchestrator-log'
+import { diagnoseStop } from './verdict'
 
 /**
  * How many idle windows a productive run may string together before the hard ceiling applies (v4.1).
@@ -87,7 +88,7 @@ export function buildStopInfo(reason: LoopStopInfo['reason'], steps: AgentStep[]
       ? (pendingAction.arguments.question as string)
       : undefined
 
-  return {
+  const stop: LoopStopInfo = {
     reason,
     message:
       'It stopped before finishing: ' + label[reason] + '. The reason and the next step are in the card below.',
@@ -96,6 +97,12 @@ export function buildStopInfo(reason: LoopStopInfo['reason'], steps: AgentStep[]
     steps: steps.length,
     ...(pendingQuestion ? { pendingQuestion } : {})
   }
+  /*
+   * B2-1: the same observations, named by the pattern table instead of by a sentence. `message`
+   * stays English and unchanged — existing callers and tests read it — while `verdict` carries the
+   * cause and the one next step as i18n keys, so the card can render either locale.
+   */
+  return { ...stop, verdict: diagnoseStop(stop) }
 }
 
 export interface TurnClock {

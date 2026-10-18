@@ -90,4 +90,24 @@ describe('item 18 — the through-this-computer route', () => {
     }
     expect(buildLoopStopModel(refusedPath).verdict?.alternate).toBeUndefined()
   })
+
+  it('survives the switch to the pattern table verdict', () => {
+    /*
+     * `buildStopInfo` now puts the table's answer on the stop and the card prefers it. The route is an
+     * affordance, not a conclusion, so it must survive the change of data source: the words come from
+     * the table, and the runnable command and the two streaming steps still come from the evidence.
+     */
+    const withVerdict: LoopStopInfo = {
+      ...blockedTarget,
+      verdict: {
+        patternId: 'port-filtered',
+        causeKey: 'verdict.causeFiltered',
+        nextStepKey: 'verdict.nextFiltered'
+      }
+    }
+    const model = buildLoopStopModel(withVerdict)
+    expect(model.verdict?.textKey).toBe('verdict.causeFiltered')
+    expect(model.verdict?.alternate?.textKey).toBe('chat.verdictAltViaComputer')
+    expect(model.verdict?.actionCommand).toContain('ufw')
+  })
 })
