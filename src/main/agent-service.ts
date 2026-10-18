@@ -55,7 +55,7 @@ import { TraceStore } from '@core/agent/trace-store'
 import { AuditTrail, auditFileFor, auditLineFromDecision, auditLineFromPreflightOverride, type AuditVerifyResult } from '@core/agent/audit-trail'
 import { resolveUserDataDir } from '@core/agent/persistence'
 import { redactValue } from '@core/agent/redact'
-import { resolveToolExposure, toolPolicyFor, type ToolExposure } from '@core/agent/tool-policy'
+import { allowsTool, resolveToolExposure, toolPolicyFor, type ToolExposure } from '@core/agent/tool-policy'
 import {
   createApprovedPlan,
   shouldAutoApprove
@@ -68,6 +68,8 @@ import { registerMcpTools, type McpBridgeResult } from './mcp/bridge'
 import { connectMcpServer, type McpServerHandle } from './mcp/client'
 import type { McpServerStore } from './mcp/store'
 import { StdioTransport } from './mcp/transport'
+import { loadSkills, type SkillRoot } from './skills/loader'
+import { USE_SKILL_TOOL, UseSkillToolExecutor } from './skills/tool'
 import type { ApprovalOutcome, ApprovalReason } from '@shared/approval'
 import type { ApprovedCommands } from '@core/agent/approved-commands'
 import type { Persistence } from '@core/agent/persistence'
@@ -83,6 +85,7 @@ import {
 import type { AttachmentService } from './attachment-service'
 import type { CustomProviderStore } from './custom-providers'
 import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import { loadProjectMemory } from './project-memory'
 import { renderFactLedger, type ProjectFact, type TranscriptMessage } from '@shared/memory-facts'
 import {
@@ -149,17 +152,51 @@ interface RemoteRuntime {
 }
 
 /**
- * F0-2c: an MCP group as runtime fields, for the one path through `buildRemoteRuntime` that
- * returns before `planRemoteRuntime` is consulted (a remote project whose VPS is missing or
- * offline). Those runs still get their MCP tools: an MCP server runs on this machine, so it has
- * nothing to do with the project's host being down.
+ * F0-2c / F0-3: extra groups (MCP servers, skills) as runtime fields, for the one path through
+ * `buildRemoteRuntime` that returns before `planRemoteRuntime` is consulted (a remote project
+ * whose VPS is missing or offline). Those runs still get their groups: an MCP server and a
+ * skill both live on *this* machine, so neither has anything to do with the project's host
+ * being down.
+ *
+ * The hint travels with the definitions for the same reason it does everywhere else: a skill
+ * the model can call is useless if it is never told the name, and a name it is told must be a
+ * tool it can actually call.
  */
-function withMcpRuntime(group: ToolGroup | undefined): RemoteRuntime {
-  if (group === undefined) return {}
+function withExtraRuntime(groups: ReadonlyArray<ToolGroup | undefined>): RemoteRuntime {
+  const present = groups.filter((group): group is ToolGroup => group !== undefined)
+  if (present.length === 0) return {}
+  const executor = composeGroupExecutors(present)
+  const hint = present
+    .map((group) => group.hint ?? '')
+    .filter((part) => part !== '')
+    .join(' ')
   return {
-    extraTools: group.definitions,
-    ...(group.executor === undefined ? {} : { extraExecutor: group.executor })
+    extraTools: present.flatMap((group) => group.definitions),
+    ...(executor === undefined ? {} : { extraExecutor: executor }),
+    ...(hint === '' ? {} : { systemHint: hint })
   }
+}
+
+/**
+ * `ToolsetBuilder.build()` takes a single executor on purpose (it collects, the caller
+ * composes). A run that stops at an early return never reaches the composition at the bottom of
+ * `planRemoteRuntime`, so the groups' executors are composed here instead — otherwise the model
+ * would be offered a tool nothing can run.
+ */
+function composeGroupExecutors(
+  groups: ReadonlyArray<ToolGroup | undefined>
+): ToolExecutor | undefined {
+  const routes: ToolRoute[] = []
+  for (const group of groups) {
+    if (group?.executor === undefined) continue
+    routes.push({
+      names: new Set(group.definitions.map((definition) => definition.name)),
+      executor: group.executor
+    })
+  }
+  const [only] = routes
+  if (only === undefined) return undefined
+  return routes.length === 1 ? only.executor : new CompositeToolExecutor(routes)
 }
 
 /**
@@ -209,18 +246,25 @@ export function planRemoteRuntime(
    * every early return in this function carries them — including a local run with no VPS, where
    * they are the only extra tools the run has.
    */
-  mcp?: ToolGroup
+  mcp?: ToolGroup,
+  /**
+   * F0-3: this run's skills, discovered from disk by the caller. Registered beside the MCP group
+   * and before every early return for the same reason: a local run with no VPS is exactly the run
+   * whose only extra tool is `use_skill`.
+   */
+  skills?: ToolGroup
 ): RemoteRuntime {
   /*
-   * F0-2c: the MCP group goes into the builder **before** anything else, and its executor is
-   * handed to every `build()` call in this function. Both halves matter: an early return that
-   * listed the definitions without the executor would offer the model a tool nothing can run, and
-   * `build()` deliberately does not compose one.
+   * F0-2c / F0-3: both groups go into the builder **before** anything else, and their composed
+   * executor is handed to every `build()` call in this function. Both halves matter: an early
+   * return that listed the definitions without the executor would offer the model a tool nothing
+   * can run, and `build()` deliberately does not compose one.
    */
   const tools = new ToolsetBuilder()
   if (mcp) tools.add(mcp)
-  const mcpExecutor = mcp?.executor
-  if (!vps) return tools.build({ executor: mcpExecutor })
+  if (skills) tools.add(skills)
+  const extras = composeGroupExecutors([mcp, skills])
+  if (!vps) return tools.build({ executor: extras })
   const connected = vps.connectedServers()
 
   /*
@@ -252,7 +296,7 @@ export function planRemoteRuntime(
   })
   if (!resolution.ok) {
     return {
-      ...tools.build({ executor: mcpExecutor }),
+      ...tools.build({ executor: extras }),
       systemHint:
         `${resolution.error} Do not assume or auto-select a server. ` +
         (hasRoster
@@ -264,18 +308,18 @@ export function planRemoteRuntime(
   }
 
   const target = resolution.vpsId
-  if (!target) return tools.build({ executor: mcpExecutor })
+  if (!target) return tools.build({ executor: extras })
 
   if (!connected.includes(target)) {
     if (wants) {
       return {
-        ...tools.build({ executor: mcpExecutor }),
+        ...tools.build({ executor: extras }),
         systemHint:
           `The selected VPS "${target}" is not connected. Tell the user to add or connect it ` +
           'in Settings -> Connections, then retry.'
       }
     }
-    return tools.build({ executor: mcpExecutor })
+    return tools.build({ executor: extras })
   }
   const shellTool: ToolDefinition = {
     ...REMOTE_SHELL_TOOL,
@@ -807,6 +851,50 @@ export class AgentService {
     return [...this.mcpStatus]
   }
 
+  /**
+   * F0-3: this run's skills, as a tool group — `undefined` when there are none.
+   *
+   * A skill is a folder holding a `SKILL.md`. Discovery parses the frontmatter and records the
+   * file path but keeps no body: the body is read only when the model calls `use_skill` for that
+   * exact name, because it is the expensive half and most runs need none of it.
+   *
+   * Two roots, project first: `<projectRoot>/.ai-desktop/skills` wins over `<userData>/skills` for
+   * the same name, so a repository can pin the procedure it needs (see `loadSkills`). A remote
+   * project has no local folder, so only the user root applies to it.
+   *
+   * Nothing here may fail a run. Having no skills is the normal state, and an unreadable folder is
+   * reported as "no skills" rather than as an exception.
+   */
+  private async skillTools(
+    project: ProjectRecord | undefined,
+    exposure: ToolExposure | undefined
+  ): Promise<ToolGroup | undefined> {
+    /*
+     * Loading a skill is a read, but a scope that does not expose `use_skill` at all (Investigate
+     * on a production host) must not be told about skills either: a hint that names a tool the
+     * model cannot call is worse than no hint. The group is absent rather than half-present.
+     */
+    if (exposure !== undefined && !allowsTool(exposure, USE_SKILL_TOOL.name)) return undefined
+    try {
+      const roots: SkillRoot[] = []
+      if (project !== undefined && project.type !== 'remote') {
+        roots.push({ dir: join(project.path, '.ai-desktop', 'skills'), source: 'project' })
+      }
+      const userData = this.userDataDir ?? resolveUserDataDir({ appName: 'AI Desktop' })
+      roots.push({ dir: join(userData, 'skills'), source: 'user' })
+      const registry = await loadSkills({ roots })
+      if (registry.size === 0) return undefined
+      return {
+        definitions: [USE_SKILL_TOOL],
+        executor: new UseSkillToolExecutor({ registry }),
+        hint: registry.hint()
+      }
+    } catch {
+      // Skills are optional; a broken skills directory must never take the chat down.
+      return undefined
+    }
+  }
+
   private async buildRemoteRuntime(
     task: string,
     vpsServerId?: string,
@@ -817,6 +905,12 @@ export class AgentService {
   ): Promise<RemoteRuntime> {
     const settings = await this.persistence.load()
     const active = settings.projects.find((project) => project.id === settings.activeProjectId)
+    /*
+     * F0-3: the skills this run can use, read from disk before any branch is taken below. A local
+     * run with no VPS — the ordinary case — is exactly the one that must still have `use_skill`, so
+     * discovery happens here rather than inside `planRemoteRuntime`.
+     */
+    const skillGroup = await this.skillTools(active, exposure)
     const connectedServers = this.vps ? this.vps.connectedServers() : []
     const isRemote = active?.type === 'remote'
     // v2.6.4: the chat-header VPS only overrides the project's server when it is
@@ -859,7 +953,12 @@ export class AgentService {
     if (hint) {
       // B-11: never swap or lose the chat-header host silently.
       const withWarning = [hint, runServer.warning].filter(Boolean).join(' ')
-      return { ...withMcpRuntime(mcpGroup), systemHint: withWarning, ...routing }
+      const extra = withExtraRuntime([mcpGroup, skillGroup])
+      return {
+        ...extra,
+        systemHint: [withWarning, extra.systemHint].filter(Boolean).join(' '),
+        ...routing
+      }
     }
 
     // Resolve the target explicitly: the user's chat-header choice wins, then the
@@ -878,7 +977,8 @@ export class AgentService {
       enabledTools,
       isRemote ? active?.path : undefined,
       diagnostic,
-      mcpGroup
+      mcpGroup,
+      skillGroup
     )
     // B-11: the resolver's reconciliation (a stale chat-header VPS dropped in
     // favour of the project's server) must reach the agent prompt, not vanish.

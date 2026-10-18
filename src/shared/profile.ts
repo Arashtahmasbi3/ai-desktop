@@ -141,6 +141,11 @@ export const READ_ONLY_TOOL_NAMES: ReadonlySet<string> = new Set([
   'remote_git_status',
   // Read-only git/worktree inspection.
   'worktree_list',
+  // F0-3 capability-as-data: `use_skill` reads one `SKILL.md` from a skills folder that was
+  // discovered at run start (a name is a lookup key, never a path). It is a read, so it must
+  // not raise an approval dialog in `auto-write` — and it must not disappear from Investigate,
+  // which would leave the run's skills hint naming a tool the model cannot call.
+  'use_skill',
   // Named diagnostics (fixed probes, no model-chosen paths on production).
   'diagnose_crash',
   'get_service_logs',
