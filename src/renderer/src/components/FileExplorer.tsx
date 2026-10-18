@@ -69,6 +69,7 @@ export default function FileExplorer({ onClose }: FileExplorerProps = {}): JSX.E
             type="button"
             onClick={() => void refreshFiles()}
             title={t('fileExplorer.refresh')}
+            aria-label={t('fileExplorer.refresh')}
             className="rounded p-0.5 hover:bg-bg-tertiary hover:text-fg"
           >
             <RefreshCw className="h-3 w-3" />
@@ -114,6 +115,7 @@ export default function FileExplorer({ onClose }: FileExplorerProps = {}): JSX.E
                 onClick={goUp}
                 disabled={cwd === '.'}
                 title={t('fileExplorer.upOneLevel')}
+                aria-label={t('fileExplorer.upOneLevel')}
                 className="rounded p-1 hover:bg-bg-tertiary disabled:opacity-30"
               >
                 <ArrowRight className="h-3.5 w-3.5" />

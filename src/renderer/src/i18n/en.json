@@ -22,7 +22,8 @@
     "clear": "Clear",
     "clearChatConfirm": "Start a new chat? The current messages, logs and pending file changes will be cleared.",
     "clearTerminalConfirm": "Clear the terminal history?",
-    "duplicate": "Duplicate"
+    "duplicate": "Duplicate",
+    "refresh": "Refresh"
   },
   "titlebar": {
     "newChat": "New chat",
@@ -305,6 +306,20 @@
     "general": "General",
     "providers": "Providers",
     "customProviders": "Custom providers",
+    "customProvidersTitle": "Custom providers (OpenAI-compatible)",
+    "noCustomProviders": "No custom providers yet.",
+    "customProviderNamePlaceholder": "Name (e.g. Together)",
+    "customProviderBaseUrlPlaceholder": "Base URL (https://.../v1)",
+    "customProviderModelPlaceholder": "Model id",
+    "customProviderApiKeyPlaceholder": "API key (leave blank to keep)",
+    "customProviderApiKey": "API key",
+    "customProviderHeadersPlaceholder": "Extra headers JSON (optional, e.g. {\"X-Title\":\"AI Desktop\"})",
+    "customProviderAdd": "Add provider",
+    "customProviderUpdate": "Update",
+    "customProviderCancelEdit": "Cancel edit",
+    "customProviderTestOk": "OK ({{ms}} ms)",
+    "customProviderTestFailed": "Failed",
+    "customProviderHeadersError": "Headers must be a JSON object",
     "github": "GitHub",
     "vps": "VPS",
     "projects": "Projects",
@@ -616,7 +631,9 @@
     "signInAgain": "Sign in again",
     "disconnectTitle": "Disconnect GitHub in AI Desktop only. Your gh CLI login is left untouched.",
     "disconnect": "Disconnect",
-    "accountUnknown": "unknown"
+    "accountUnknown": "unknown",
+    "panelOpenProject": "Open a project to see its git status.",
+    "panelConnect": "Connect GitHub in Settings to list your repositories."
   },
   "toast": {
     "dismiss": "Dismiss",
@@ -682,7 +699,14 @@
     "testConnection": "Test connection",
     "testing": "testing…",
     "testOpen": "port {{port}} open · {{ms}} ms",
-    "testFailed": "port {{port}}: {{reason}}"
+    "testFailed": "port {{port}}: {{reason}}",
+    "noServersHint": "No servers yet. Add one to connect.",
+    "selectServer": "Select a server to connect.",
+    "unverifiedKey": "Unverified host key. Confirm this fingerprint belongs to your server:",
+    "trustConnect": "Trust & connect",
+    "noCommands": "No commands yet.",
+    "privateKeyPath": "Private key path",
+    "keyPassphraseOptional": "Key passphrase (optional)"
   },
   "slash": {
     "new": "Start a new chat",
@@ -965,7 +989,9 @@
     "source": "Source",
     "previewTitle": "Preview markdown",
     "sourceTitle": "Show source",
-    "unsaved": "Unsaved changes — preview shows a diff against the file on disk."
+    "unsaved": "Unsaved changes — preview shows a diff against the file on disk.",
+    "prevMatch": "Previous match",
+    "nextMatch": "Next match"
   },
   "statusBar": {
     "ready": "Ready",
@@ -998,6 +1024,34 @@
     "upOneLevel": "Up one level",
     "filter": "Filter files…",
     "empty": "Empty folder."
+  },
+  "browser": {
+    "title": "In-app browser",
+    "hint": "Pages load in a sandboxed webview. Only http(s) is allowed.",
+    "back": "Back",
+    "forward": "Forward",
+    "reload": "Reload"
+  },
+  "diagnostics": {
+    "recommendations": "⚠️ Recommendations",
+    "allPresent": "All essentials are present.",
+    "needsRoot": "This recipe needs root. Confirm you want to run these commands with sudo."
+  },
+  "gitSetup": {
+    "title": "Setup Git for this project?",
+    "createGitignore": "Create .gitignore",
+    "initialCommit": "Initial commit",
+    "pushRemote": "Push to remote"
+  },
+  "previewPane": {
+    "noPreview": "No in-app preview for this file type. Open the URL in the Browser tab or edit the file directly."
+  },
+  "providerWarning": {
+    "noKey": "No API key for {{provider}}. Add one to start chatting.",
+    "openSettings": "Open Settings"
+  },
+  "tasks": {
+    "noLogs": "No log entries yet."
   },
   "tools": {
     "headlineRun": "Ran a command",

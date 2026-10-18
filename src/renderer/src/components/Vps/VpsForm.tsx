@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Plus, X } from 'lucide-react'
 import type { VpsAuthType } from '@shared/vps'
 
@@ -12,6 +13,7 @@ const inputClass =
 
 /** Form to add a VPS. Secrets are sent once and encrypted in the main process. */
 export default function VpsForm({ onSaved, onClose }: VpsFormProps): JSX.Element {
+  const { t } = useTranslation()
   const [name, setName] = useState('')
   const [host, setHost] = useState('')
   const [port, setPort] = useState('22')
@@ -53,7 +55,12 @@ export default function VpsForm({ onSaved, onClose }: VpsFormProps): JSX.Element
     >
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-fg">Add VPS</h3>
-        <button type="button" onClick={onClose} className="text-fg-muted hover:text-fg">
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={t('common.close')}
+          className="text-fg-muted hover:text-fg"
+        >
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -97,7 +104,7 @@ export default function VpsForm({ onSaved, onClose }: VpsFormProps): JSX.Element
         </label>
         {authType === 'key' ? (
           <label className="col-span-2 flex flex-col gap-1 text-xs text-fg-muted">
-            Private key path
+            {t('vps.privateKeyPath')}
             <input
               className={inputClass}
               placeholder="C:\\Users\\me\\.ssh\\id_ed25519"
@@ -117,7 +124,7 @@ export default function VpsForm({ onSaved, onClose }: VpsFormProps): JSX.Element
           </label>
         )}
         <label className="flex flex-col gap-1 text-xs text-fg-muted">
-          Key passphrase (optional)
+          {t('vps.keyPassphraseOptional')}
           <input
             className={inputClass}
             type="password"

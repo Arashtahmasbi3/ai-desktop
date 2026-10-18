@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   AlertTriangle,
   Ban,
@@ -50,6 +51,7 @@ function LogRow({ entry }: { entry: AgentLogEntry }): JSX.Element {
 }
 
 export default function TaskPanel(): JSX.Element {
+  const { t } = useTranslation()
   const logs = useStore((state) => state.logs)
   const warnings = useStore((state) => state.warnings)
   const running = useStore((state) => state.running)
@@ -112,7 +114,7 @@ export default function TaskPanel(): JSX.Element {
 
       <div className="min-h-0 flex-1 overflow-y-auto bg-bg-primary">
         {filtered.length === 0 ? (
-          <p className="px-3 py-4 text-xs text-fg-subtle">No log entries yet.</p>
+          <p className="px-3 py-4 text-xs text-fg-subtle">{t('tasks.noLogs')}</p>
         ) : (
           filtered.map((entry, index) => <LogRow key={`${entry.ts}-${index}`} entry={entry} />)
         )}
@@ -205,7 +207,8 @@ export default function TaskPanel(): JSX.Element {
                     <button
                       type="button"
                       onClick={() => void cancelJob(job.id)}
-                      title="Cancel"
+                      title={t('common.cancel')}
+                      aria-label={t('common.cancel')}
                       className="text-fg-muted hover:text-danger"
                     >
                       <Ban className="h-3 w-3" />

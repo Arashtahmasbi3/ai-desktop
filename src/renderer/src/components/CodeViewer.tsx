@@ -212,10 +212,20 @@ export default function CodeViewer(): JSX.Element {
             <span>
               {matchLines.length === 0 ? 0 : matchIndex + 1}/{matchLines.length}
             </span>
-            <button type="button" onClick={() => jump(-1)} className="rounded p-0.5 hover:bg-bg-tertiary">
+            <button
+              type="button"
+              onClick={() => jump(-1)}
+              aria-label={t('codeViewer.prevMatch')}
+              className="rounded p-0.5 hover:bg-bg-tertiary"
+            >
               <ChevronUp className="h-3 w-3" />
             </button>
-            <button type="button" onClick={() => jump(1)} className="rounded p-0.5 hover:bg-bg-tertiary">
+            <button
+              type="button"
+              onClick={() => jump(1)}
+              aria-label={t('codeViewer.nextMatch')}
+              className="rounded p-0.5 hover:bg-bg-tertiary"
+            >
               <ChevronDown className="h-3 w-3" />
             </button>
           </div>

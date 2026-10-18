@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { CheckCircle2, Cpu, HardDrive, RefreshCw, Server, X, XCircle } from 'lucide-react'
 import type { HealthRecommendation, SystemHealth, ToolHealth } from '@shared/system-health'
 import { healthRecommendations } from '@core/remote/system-health'
@@ -39,6 +40,7 @@ function ToolRow({ label, tool }: { label: string; tool: ToolHealth }): JSX.Elem
  * approved) install for missing tools. Auto-refreshes every 5 minutes.
  */
 export default function DiagnosticsPanel({ serverId, serverName, onClose }: Props): JSX.Element {
+  const { t } = useTranslation()
   const [health, setHealth] = useState<SystemHealth | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -93,7 +95,8 @@ export default function DiagnosticsPanel({ serverId, serverName, onClose }: Prop
               type="button"
               onClick={() => void load()}
               disabled={busy}
-              title="Refresh"
+              title={t('common.refresh')}
+              aria-label={t('common.refresh')}
               aria-busy={busy}
               className="flex h-6 w-6 items-center justify-center rounded text-fg-muted hover:bg-bg-tertiary hover:text-fg disabled:opacity-50"
             >
@@ -102,6 +105,7 @@ export default function DiagnosticsPanel({ serverId, serverName, onClose }: Prop
             <button
               type="button"
               onClick={onClose}
+              aria-label={t('common.close')}
               className="flex h-6 w-6 items-center justify-center rounded text-fg-muted hover:bg-bg-tertiary hover:text-fg"
             >
               <X className="h-4 w-4" />
@@ -137,7 +141,7 @@ export default function DiagnosticsPanel({ serverId, serverName, onClose }: Prop
 
               {recommendations.length > 0 ? (
                 <div className="space-y-2">
-                  <p className="text-xs font-medium text-warning">⚠️ Recommendations</p>
+                  <p className="text-xs font-medium text-warning">{t('diagnostics.recommendations')}</p>
                   {recommendations.map((rec) => (
                     <div
                       key={rec.id}
@@ -159,7 +163,7 @@ export default function DiagnosticsPanel({ serverId, serverName, onClose }: Prop
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-success">All essentials are present.</p>
+                <p className="text-xs text-success">{t('diagnostics.allPresent')}</p>
               )}
 
               {log ? (
@@ -195,6 +199,7 @@ function InstallConfirm({
   onCancel: () => void
   onConfirm: (elevated: boolean) => void
 }): JSX.Element {
+  const { t } = useTranslation()
   const recipe = getInstallRecipe(tool)
   if (!recipe) return <></>
   return (
@@ -205,9 +210,7 @@ function InstallConfirm({
           {[recipe.preCheck, ...recipe.commands, recipe.verify].join('\n')}
         </pre>
         {recipe.requiresSudo ? (
-          <p className="mb-3 text-2xs text-warning">
-            This recipe needs root. Confirm you want to run these commands with sudo.
-          </p>
+          <p className="mb-3 text-2xs text-warning">{t('diagnostics.needsRoot')}</p>
         ) : null}
         <div className="flex justify-end gap-2">
           <button

@@ -1,4 +1,5 @@
 import ReactMarkdown from 'react-markdown'
+import { useTranslation } from 'react-i18next'
 import { FileQuestion } from 'lucide-react'
 
 export type PreviewKind = 'markdown'
@@ -58,16 +59,14 @@ export default function PreviewPane({
   path: string
   content: string
 }): JSX.Element {
+  const { t } = useTranslation()
   const kind = previewKind(path)
 
   if (kind !== 'markdown') {
     return (
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 bg-bg-primary text-fg-subtle">
         <FileQuestion className="h-7 w-7" />
-        <p className="max-w-xs text-center text-xs">
-          No in-app preview for this file type. Open the URL in the Browser tab or edit the file
-          directly.
-        </p>
+        <p className="max-w-xs text-center text-xs">{t('previewPane.noPreview')}</p>
       </div>
     )
   }

@@ -190,6 +190,7 @@ export default function VpsPanel(): JSX.Element {
               aria-busy={refreshing}
               className="rounded p-1 text-fg-muted hover:bg-bg-tertiary hover:text-fg disabled:opacity-50"
               title={t('vps.refresh')}
+              aria-label={t('vps.refresh')}
             >
               <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
@@ -197,6 +198,7 @@ export default function VpsPanel(): JSX.Element {
               onClick={() => setFormOpen((open) => !open)}
               className="rounded p-1 text-fg-muted hover:bg-bg-tertiary hover:text-fg"
               title={t('vps.addServer')}
+              aria-label={t('vps.addServer')}
             >
               <Plus className="h-4 w-4" />
             </button>
@@ -217,7 +219,7 @@ export default function VpsPanel(): JSX.Element {
           ) : null}
 
           {servers.length === 0 && !formOpen ? (
-            <p className="px-1 py-2 text-xs text-fg-subtle">No servers yet. Add one to connect.</p>
+            <p className="px-1 py-2 text-xs text-fg-subtle">{t('vps.noServersHint')}</p>
           ) : null}
 
           {servers.map((server) => (
@@ -278,6 +280,7 @@ export default function VpsPanel(): JSX.Element {
                 onClick={() => void remove(server.id, server.name)}
                 className="rounded p-1 text-fg-muted opacity-0 transition hover:text-danger focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
                 title={t('common.remove')}
+                aria-label={t('common.remove')}
               >
                 <Trash2 className="h-3.5 w-3.5 text-fg-muted hover:text-danger" />
               </button>
@@ -289,7 +292,7 @@ export default function VpsPanel(): JSX.Element {
       <section className="flex min-h-0 min-w-0 flex-1 flex-col">
         {!activeId ? (
           <div className="flex flex-1 items-center justify-center text-sm text-fg-subtle">
-            Select a server to connect.
+            {t('vps.selectServer')}
           </div>
         ) : (
           <>
@@ -326,7 +329,7 @@ export default function VpsPanel(): JSX.Element {
               <div className="flex items-center gap-3 border-b border-warning/50 bg-warning/30 px-3 py-2">
                 <ShieldAlert className="h-4 w-4 shrink-0 text-warning" />
                 <div className="min-w-0 text-xs text-warning">
-                  <div>Unverified host key. Confirm this fingerprint belongs to your server:</div>
+                  <div>{t('vps.unverifiedKey')}</div>
                   <div className="truncate font-mono text-3xs text-warning">
                     {status.pendingFingerprint}
                   </div>
@@ -335,7 +338,7 @@ export default function VpsPanel(): JSX.Element {
                   onClick={() => void approve(activeId)}
                   className="ml-auto shrink-0 rounded bg-warning px-2 py-1 text-xs font-medium text-black"
                 >
-                  Trust & connect
+                  {t('vps.trustConnect')}
                 </button>
               </div>
             ) : null}
@@ -379,7 +382,7 @@ export default function VpsPanel(): JSX.Element {
               ) : (
                 <div className="h-full overflow-auto p-3 font-mono text-2xs">
                   {audit.length === 0 ? (
-                    <p className="text-fg-subtle">No commands yet.</p>
+                    <p className="text-fg-subtle">{t('vps.noCommands')}</p>
                   ) : (
                     audit
                       .slice()

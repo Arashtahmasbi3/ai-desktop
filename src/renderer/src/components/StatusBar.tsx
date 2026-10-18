@@ -7,7 +7,6 @@ import {
   MoreHorizontal,
   Server,
   ShieldCheck,
-  SlidersHorizontal,
   Wallet,
   Zap,
   Wifi,
@@ -190,6 +189,37 @@ export default function StatusBar(): JSX.Element {
             <span className="max-w-[12rem] truncate text-fg-muted">· {connection.detail}</span>
           ) : null}
         </span>
+
+        {/*
+          U3-1: a visible segmented control, not a row in the right-click menu. A control that changes what
+          the interface offers has to be on screen; the guidelines warn that menus get clipped and are harder
+          to use. Two options, both labelled, the current one pressed.
+        */}
+        <div
+          role="group"
+          aria-label={t('statusBar.uiMode')}
+          data-testid="status-ui-mode"
+          data-mode={uiMode}
+          className="flex shrink-0 items-center overflow-hidden rounded-shape-sm border border-border"
+        >
+          {(['simple', 'advanced'] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              data-testid={`status-ui-mode-${mode}`}
+              aria-pressed={uiMode === mode}
+              title={t('statusBar.uiModeHint')}
+              onClick={() => setUiMode(mode)}
+              className={`px-1.5 py-0.5 text-3xs font-semibold uppercase tracking-label ${
+                uiMode === mode
+                  ? 'bg-fg-strong text-bg-primary'
+                  : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
+              }`}
+            >
+              {t(uiModeLabelKey(mode))}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* A quiet hint that the bar holds more; it is not a control of its own. */}
@@ -251,23 +281,6 @@ export default function StatusBar(): JSX.Element {
             <span dir="ltr">{t('statusBar.session', { id: effectiveSessionId.slice(0, 8) })}</span>
           </div>
           <div className="mt-1 border-t border-border pt-1">
-            {/* Checklist item 13: simple ↔ advanced. Simple is the default; the hint says what
-                the advanced panes are, so the label alone is not a riddle. */}
-            <button
-              type="button"
-              data-testid="status-menu-ui-mode"
-              data-mode={uiMode}
-              aria-pressed={uiMode === 'advanced'}
-              onClick={() => setUiMode(uiMode === 'advanced' ? 'simple' : 'advanced')}
-              title={t('statusBar.uiModeHint')}
-              className="flex w-full items-center gap-1.5 px-3 py-1 text-start hover:bg-bg-tertiary hover:text-fg"
-            >
-              <SlidersHorizontal className="h-3 w-3 shrink-0" />
-              <span className="flex-1">{t('statusBar.uiMode')}</span>
-              <span className="shrink-0 font-semibold text-fg">
-                {t(uiModeLabelKey(uiMode))}
-              </span>
-            </button>
             <button
               type="button"
               data-testid="status-menu-locale"

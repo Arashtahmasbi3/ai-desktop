@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { GitBranch, X } from 'lucide-react'
 import type { GitProjectType, GitSetupOptions } from '@shared/workspace-info'
 import { buildGitSetupCommands } from '@core/remote/git-setup'
@@ -23,6 +24,7 @@ export default function GitSetupDialog({
   onClose,
   onDone
 }: Props): JSX.Element {
+  const { t } = useTranslation()
   const [init, setInit] = useState(true)
   const [gitignore, setGitignore] = useState(true)
   const [commit, setCommit] = useState(true)
@@ -64,11 +66,12 @@ export default function GitSetupDialog({
         <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-2.5">
           <div className="flex items-center gap-2 text-sm text-fg">
             <GitBranch className="h-4 w-4 text-accent" />
-            Setup Git for this project?
+            {t('gitSetup.title')}
           </div>
           <button
             type="button"
             onClick={onClose}
+            aria-label={t('common.close')}
             className="flex h-6 w-6 items-center justify-center rounded text-fg-muted hover:bg-bg-tertiary hover:text-fg"
           >
             <X className="h-4 w-4" />
@@ -88,7 +91,7 @@ export default function GitSetupDialog({
               checked={gitignore}
               onChange={(e) => setGitignore(e.target.checked)}
             />
-            Create .gitignore
+            {t('gitSetup.createGitignore')}
           </label>
           {gitignore ? (
             <select
@@ -103,11 +106,11 @@ export default function GitSetupDialog({
           ) : null}
           <label className={rowClass}>
             <input type="checkbox" checked={commit} onChange={(e) => setCommit(e.target.checked)} />
-            Initial commit
+            {t('gitSetup.initialCommit')}
           </label>
           <label className={rowClass}>
             <input type="checkbox" checked={push} onChange={(e) => setPush(e.target.checked)} />
-            Push to remote
+            {t('gitSetup.pushRemote')}
           </label>
           {push ? (
             <input

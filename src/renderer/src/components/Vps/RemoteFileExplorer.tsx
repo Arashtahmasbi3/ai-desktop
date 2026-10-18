@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ArrowUp, File as FileIcon, Folder, RefreshCw, Save } from 'lucide-react'
 import type { RemoteFileEntry } from '@shared/vps'
 
@@ -8,6 +9,7 @@ function text(error: unknown): string {
 
 /** Browses and edits files on a connected VPS over SFTP. */
 export default function RemoteFileExplorer({ serverId }: { serverId: string }): JSX.Element {
+  const { t } = useTranslation()
   const [path, setPath] = useState('/')
   const [entries, setEntries] = useState<RemoteFileEntry[]>([])
   const [selected, setSelected] = useState<string | null>(null)
@@ -76,7 +78,8 @@ export default function RemoteFileExplorer({ serverId }: { serverId: string }): 
           onClick={() => void list(parent)}
           disabled={path === '/' || busy}
           className="rounded p-1 text-fg-muted hover:bg-bg-tertiary hover:text-fg-strong disabled:opacity-30"
-          title="Up"
+          title={t('fileExplorer.upOneLevel')}
+          aria-label={t('fileExplorer.upOneLevel')}
         >
           <ArrowUp className="h-3.5 w-3.5" />
         </button>
@@ -85,7 +88,8 @@ export default function RemoteFileExplorer({ serverId }: { serverId: string }): 
           disabled={busy}
           aria-busy={busy}
           className="rounded p-1 text-fg-muted hover:bg-bg-tertiary hover:text-fg-strong disabled:opacity-50"
-          title="Refresh"
+          title={t('common.refresh')}
+          aria-label={t('common.refresh')}
         >
           <RefreshCw className={`h-3.5 w-3.5 ${busy ? 'animate-spin' : ''}`} />
         </button>

@@ -115,6 +115,7 @@ export default function SettingsDeveloper(): JSX.Element {
                 onClick={() => copy('url', baseUrl)}
                 className="brutal-btn shrink-0 p-1"
                 title={t('settings.copy')}
+                aria-label={t('settings.copy')}
               >
                 {copied === 'url' ? <Check className="h-3 w-3 text-success" /> : <Copy className="h-3 w-3" />}
               </button>
@@ -143,6 +144,7 @@ export default function SettingsDeveloper(): JSX.Element {
                 onClick={() => copy('token', remote.token ?? '')}
                 className="brutal-btn shrink-0 p-1"
                 title={t('settings.copy')}
+                aria-label={t('settings.copy')}
               >
                 {copied === 'token' ? <Check className="h-3 w-3 text-success" /> : <Copy className="h-3 w-3" />}
               </button>

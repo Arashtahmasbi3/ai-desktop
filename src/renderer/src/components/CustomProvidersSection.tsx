@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Check, Plug, Trash2, X } from 'lucide-react'
 import type { CustomProviderTestResult } from '@shared/types'
 import { useStore } from '../store'
@@ -11,6 +12,7 @@ const fieldClass =
  * Handles create/update (click a row to edit), delete and a live connection test.
  */
 export default function CustomProvidersSection(): JSX.Element {
+  const { t } = useTranslation()
   const customProviders = useStore((state) => state.customProviders)
   const saveCustomProvider = useStore((state) => state.saveCustomProvider)
   const removeCustomProvider = useStore((state) => state.removeCustomProvider)
@@ -55,7 +57,7 @@ export default function CustomProvidersSection(): JSX.Element {
     if (!text) return undefined
     const parsed: unknown = JSON.parse(text)
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-      throw new Error('Headers must be a JSON object')
+      throw new Error(t('settings.customProviderHeadersError'))
     }
     return parsed as Record<string, string>
   }
@@ -90,7 +92,7 @@ export default function CustomProvidersSection(): JSX.Element {
     <section className="mt-6">
       <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
         <Plug className="h-3.5 w-3.5" />
-        Custom providers (OpenAI-compatible)
+        {t('settings.customProvidersTitle')}
       </h3>
 
       <div className="rounded-xl border border-border bg-bg-primary p-3">
@@ -98,20 +100,20 @@ export default function CustomProvidersSection(): JSX.Element {
           <input
             value={label}
             onChange={(event) => setLabel(event.target.value)}
-            placeholder="Name (e.g. Together)"
+            placeholder={t('settings.customProviderNamePlaceholder')}
             className={`${fieldClass} w-40`}
           />
           <input
             value={baseUrl}
             onChange={(event) => setBaseUrl(event.target.value)}
-            placeholder="Base URL (https://.../v1)"
+            placeholder={t('settings.customProviderBaseUrlPlaceholder')}
             dir="ltr"
             className={`${fieldClass} min-w-[14rem] flex-1 font-mono`}
           />
           <input
             value={model}
             onChange={(event) => setModel(event.target.value)}
-            placeholder="Model id"
+            placeholder={t('settings.customProviderModelPlaceholder')}
             dir="ltr"
             className={`${fieldClass} w-48 font-mono`}
           />
@@ -122,7 +124,11 @@ export default function CustomProvidersSection(): JSX.Element {
             type="password"
             value={apiKey}
             onChange={(event) => setApiKey(event.target.value)}
-            placeholder={editingId ? 'API key (leave blank to keep)' : 'API key'}
+            placeholder={
+              editingId
+                ? t('settings.customProviderApiKeyPlaceholder')
+                : t('settings.customProviderApiKey')
+            }
             dir="ltr"
             autoComplete="off"
             className={`${fieldClass} min-w-[14rem] flex-1 font-mono`}
@@ -130,7 +136,7 @@ export default function CustomProvidersSection(): JSX.Element {
           <input
             value={headersText}
             onChange={(event) => setHeadersText(event.target.value)}
-            placeholder='Extra headers JSON (optional, e.g. {"X-Title":"AI Desktop"})'
+            placeholder={t('settings.customProviderHeadersPlaceholder')}
             dir="ltr"
             className={`${fieldClass} min-w-[16rem] flex-1 font-mono`}
           />
@@ -143,7 +149,7 @@ export default function CustomProvidersSection(): JSX.Element {
             onClick={() => void submit('save')}
             className="rounded bg-accent-solid px-3 py-1 text-xs text-white hover:bg-accent-solid-hover disabled:opacity-40"
           >
-            {editingId ? 'Update' : 'Add provider'}
+            {editingId ? t('settings.customProviderUpdate') : t('settings.customProviderAdd')}
           </button>
           <button
             type="button"
@@ -151,7 +157,7 @@ export default function CustomProvidersSection(): JSX.Element {
             onClick={() => void submit('test')}
             className="rounded border border-border px-3 py-1 text-xs text-fg hover:bg-bg-tertiary disabled:opacity-40"
           >
-            Test connection
+            {t('settings.testConnection')}
           </button>
           {editingId ? (
             <button
@@ -160,7 +166,7 @@ export default function CustomProvidersSection(): JSX.Element {
               className="flex items-center gap-1 rounded px-2 py-1 text-xs text-fg-muted hover:text-fg"
             >
               <X className="h-3 w-3" />
-              Cancel edit
+              {t('settings.customProviderCancelEdit')}
             </button>
           ) : null}
 
@@ -173,7 +179,9 @@ export default function CustomProvidersSection(): JSX.Element {
               }`}
             >
               {result.ok ? <Check className="h-3 w-3" /> : null}
-              {result.ok ? `OK (${result.latencyMs} ms)` : (result.message ?? 'Failed')}
+              {result.ok
+                ? t('settings.customProviderTestOk', { ms: result.latencyMs })
+                : (result.message ?? t('settings.customProviderTestFailed'))}
             </span>
           ) : null}
           {error ? <span className="text-2xs text-danger">{error}</span> : null}
@@ -181,7 +189,7 @@ export default function CustomProvidersSection(): JSX.Element {
       </div>
 
       {customProviders.length === 0 ? (
-        <p className="mt-2 text-xs text-fg-subtle">No custom providers yet.</p>
+        <p className="mt-2 text-xs text-fg-subtle">{t('settings.noCustomProviders')}</p>
       ) : (
         <div className="mt-2 overflow-hidden rounded-xl border border-border">
           {customProviders.map((provider) => (
@@ -200,17 +208,18 @@ export default function CustomProvidersSection(): JSX.Element {
                 </span>
                 {provider.hasApiKey ? (
                   <span className="ml-2 rounded bg-success/15 px-1.5 py-0.5 text-3xs text-success">
-                    key saved
+                    {t('settings.keySaved')}
                   </span>
                 ) : (
                   <span className="ml-2 rounded bg-bg-tertiary px-1.5 py-0.5 text-3xs text-fg-muted">
-                    no key
+                    {t('settings.noKey')}
                   </span>
                 )}
               </button>
               <button
                 type="button"
                 onClick={() => void removeCustomProvider(provider.id)}
+                aria-label={t('common.remove')}
                 className="rounded p-1 text-fg-muted hover:bg-bg-tertiary hover:text-danger"
               >
                 <Trash2 className="h-3.5 w-3.5" />

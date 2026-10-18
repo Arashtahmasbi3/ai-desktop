@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -21,6 +22,7 @@ function text(error: unknown): string {
 
 /** GitHub view: local git status/actions plus repository PRs and issues. */
 export default function GitHubPanel(): JSX.Element {
+  const { t } = useTranslation()
   const settings = useStore((state) => state.settings)
   const active = settings?.projects.find((project) => project.id === settings.activeProjectId)
   const cwd = active?.path
@@ -126,7 +128,8 @@ export default function GitHubPanel(): JSX.Element {
           onClick={() => (tab === 'status' ? void refreshStatus() : void loadTab())}
           disabled={busy}
           className="ml-auto rounded p-1 text-fg-muted hover:bg-bg-tertiary disabled:opacity-40"
-          title="Refresh"
+          title={t('common.refresh')}
+          aria-label={t('common.refresh')}
         >
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
         </button>
@@ -141,7 +144,7 @@ export default function GitHubPanel(): JSX.Element {
       <div className="min-h-0 flex-1 overflow-auto p-3 text-xs">
         {tab === 'status' ? (
           !cwd ? (
-            <p className="text-fg-muted">Open a project to see its git status.</p>
+            <p className="text-fg-muted">{t('github.panelOpenProject')}</p>
           ) : !status?.isRepo ? (
             <p className="text-fg-muted">
               {status?.error ?? 'This project is not a git repository yet.'}
@@ -244,7 +247,7 @@ export default function GitHubPanel(): JSX.Element {
               </select>
             ) : (
               <p className="flex items-center gap-1 text-fg-subtle">
-                <GitFork className="h-3 w-3" /> Connect GitHub in Settings to list your repositories.
+                <GitFork className="h-3 w-3" /> {t('github.panelConnect')}
               </p>
             )}
 

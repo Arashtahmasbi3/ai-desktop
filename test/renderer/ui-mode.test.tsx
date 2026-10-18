@@ -212,7 +212,7 @@ describe('checklist item 13 — the execution trace keeps the row and the verdic
   })
 })
 
-describe('checklist item 13 — the switch in the status bar', () => {
+describe('U3-1 — the switch is visible in the status bar', () => {
   it('1. turns simple into advanced and brings the advanced toggles back', () => {
     render(
       <>
@@ -223,21 +223,19 @@ describe('checklist item 13 — the switch in the status bar', () => {
     expect(treeToggle()).toBeNull()
     expect(terminalToggle()).toBeNull()
 
-    // The overflow menu opens on right-click, exactly as the bar documents.
-    fireEvent.contextMenu(screen.getByTestId('status-bar'))
-    const mode = screen.getByTestId('status-menu-ui-mode')
-    expect(mode.textContent).toContain(i18n.t('statusBar.uiModeSimple'))
-    expect(mode.getAttribute('aria-pressed')).toBe('false')
+    /*
+     * A segmented control in the bar itself, not a row in the right-click menu: the design guidelines say a
+     * control that changes what the interface offers must be visible.
+     */
+    expect(screen.getByTestId('status-ui-mode-simple').getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByTestId('status-ui-mode-advanced').getAttribute('aria-pressed')).toBe('false')
 
-    fireEvent.click(mode)
+    fireEvent.click(screen.getByTestId('status-ui-mode-advanced'))
 
     expect(useStore.getState().uiMode).toBe('advanced')
     expect(getUiMode()).toBe('advanced')
     expect(localStorage.getItem(MODE_KEY)).toBe(JSON.stringify('advanced'))
-    expect(screen.getByTestId('status-menu-ui-mode').textContent).toContain(
-      i18n.t('statusBar.uiModeAdvanced')
-    )
-    expect(screen.getByTestId('status-menu-ui-mode').getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByTestId('status-ui-mode-advanced').getAttribute('aria-pressed')).toBe('true')
     expect(treeToggle()).toBeTruthy()
     expect(terminalToggle()).toBeTruthy()
   })
@@ -252,8 +250,7 @@ describe('checklist item 13 — the switch in the status bar', () => {
     )
     expect(terminalToggle()).toBeTruthy()
 
-    fireEvent.contextMenu(screen.getByTestId('status-bar'))
-    fireEvent.click(screen.getByTestId('status-menu-ui-mode'))
+    fireEvent.click(screen.getByTestId('status-ui-mode-simple'))
 
     expect(useStore.getState().uiMode).toBe('simple')
     expect(getUiMode()).toBe('simple')
@@ -261,15 +258,30 @@ describe('checklist item 13 — the switch in the status bar', () => {
     expect(terminalToggle()).toBeNull()
   })
 
-  it('3. is labelled in Persian too', async () => {
+  it('3. no longer hides a second copy of the switch in the overflow menu', () => {
+    render(<StatusBar />)
+    fireEvent.contextMenu(screen.getByTestId('status-bar'))
+
+    // The menu still opens and still holds the other rows…
+    expect(screen.getByTestId('status-menu')).toBeTruthy()
+    expect(screen.getByTestId('status-menu-locale')).toBeTruthy()
+    // …but the mode lives in exactly one place now.
+    expect(screen.queryByTestId('status-menu-ui-mode')).toBeNull()
+  })
+
+  it('4. is labelled in Persian too', async () => {
     await i18n.changeLanguage('fa')
     try {
       render(<StatusBar />)
-      fireEvent.contextMenu(screen.getByTestId('status-bar'))
-
-      const mode = screen.getByTestId('status-menu-ui-mode')
-      expect(mode.textContent).toContain(i18n.t('statusBar.uiMode'))
-      expect(mode.textContent).toContain(i18n.t('statusBar.uiModeSimple'))
+      expect(screen.getByTestId('status-ui-mode').getAttribute('aria-label')).toBe(
+        i18n.t('statusBar.uiMode')
+      )
+      expect(screen.getByTestId('status-ui-mode-simple').textContent).toContain(
+        i18n.t('statusBar.uiModeSimple')
+      )
+      expect(screen.getByTestId('status-ui-mode-advanced').textContent).toContain(
+        i18n.t('statusBar.uiModeAdvanced')
+      )
     } finally {
       await i18n.changeLanguage('en')
     }

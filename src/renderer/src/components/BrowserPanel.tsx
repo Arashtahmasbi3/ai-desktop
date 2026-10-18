@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ArrowLeft, ArrowRight, Globe, Loader2, Lock, RotateCw } from 'lucide-react'
 import { normalizeUrl } from '@shared/url'
 import type { ElectronWebviewElement } from '../webview'
@@ -16,6 +17,7 @@ interface WebviewFailEvent extends Event {
 
 /** In-app browser: a hardened `<webview>` with a URL bar and history chips. */
 export default function BrowserPanel(): JSX.Element {
+  const { t } = useTranslation()
   const [src, setSrc] = useState<string | null>(null)
   const [input, setInput] = useState(HOME)
   const [loading, setLoading] = useState(false)
@@ -78,7 +80,8 @@ export default function BrowserPanel(): JSX.Element {
           type="button"
           onClick={() => webview()?.goBack()}
           disabled={!canBack}
-          title="Back"
+          title={t('browser.back')}
+          aria-label={t('browser.back')}
           className="rounded p-1 text-fg-muted hover:bg-bg-tertiary hover:text-fg disabled:opacity-30"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
@@ -87,7 +90,8 @@ export default function BrowserPanel(): JSX.Element {
           type="button"
           onClick={() => webview()?.goForward()}
           disabled={!canForward}
-          title="Forward"
+          title={t('browser.forward')}
+          aria-label={t('browser.forward')}
           className="rounded p-1 text-fg-muted hover:bg-bg-tertiary hover:text-fg disabled:opacity-30"
         >
           <ArrowRight className="h-3.5 w-3.5" />
@@ -96,7 +100,8 @@ export default function BrowserPanel(): JSX.Element {
           type="button"
           onClick={() => webview()?.reload()}
           disabled={!src}
-          title="Reload"
+          title={t('browser.reload')}
+          aria-label={t('browser.reload')}
           className="rounded p-1 text-fg-muted hover:bg-bg-tertiary hover:text-fg disabled:opacity-30"
         >
           {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCw className="h-3.5 w-3.5" />}
@@ -146,10 +151,8 @@ export default function BrowserPanel(): JSX.Element {
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4">
           <Globe className="h-9 w-9 text-accent" />
           <div className="text-center">
-            <p className="text-sm text-fg">In-app browser</p>
-            <p className="mt-1 text-xs text-fg-subtle">
-              Pages load in a sandboxed webview. Only http(s) is allowed.
-            </p>
+            <p className="text-sm text-fg">{t('browser.title')}</p>
+            <p className="mt-1 text-xs text-fg-subtle">{t('browser.hint')}</p>
           </div>
           <button
             type="button"

@@ -22,7 +22,8 @@
     "clear": "پاک‌کردن",
     "clearChatConfirm": "گفتگوی تازه شروع شود؟ پیام‌ها، گزارش‌ها و تغییرهای در انتظار پاک می‌شوند.",
     "clearTerminalConfirm": "تاریخچهٔ ترمینال پاک شود؟",
-    "duplicate": "تکثیر"
+    "duplicate": "تکثیر",
+    "refresh": "تازه‌سازی"
   },
   "titlebar": {
     "newChat": "چت جدید",
@@ -305,6 +306,20 @@
     "general": "عمومی",
     "providers": "سرویس‌دهنده‌ها",
     "customProviders": "سرویس‌دهنده‌های سفارشی",
+    "customProvidersTitle": "سرویس‌دهنده‌های سفارشی (سازگار با OpenAI)",
+    "noCustomProviders": "هنوز سرویس‌دهندهٔ سفارشی ثبت نشده است.",
+    "customProviderNamePlaceholder": "نام (مثلاً Together)",
+    "customProviderBaseUrlPlaceholder": "نشانی پایه (https://.../v1)",
+    "customProviderModelPlaceholder": "شناسهٔ مدل",
+    "customProviderApiKeyPlaceholder": "کلید API (برای نگه‌داشتن مقدار فعلی خالی بگذارید)",
+    "customProviderApiKey": "کلید API",
+    "customProviderHeadersPlaceholder": "هدرهای اضافی به شکل JSON (اختیاری، مثلاً {\"X-Title\":\"AI Desktop\"})",
+    "customProviderAdd": "افزودن سرویس‌دهنده",
+    "customProviderUpdate": "به‌روزرسانی",
+    "customProviderCancelEdit": "لغو ویرایش",
+    "customProviderTestOk": "OK ({{ms}} میلی‌ثانیه)",
+    "customProviderTestFailed": "ناموفق",
+    "customProviderHeadersError": "هدرها باید یک شیء JSON باشند",
     "github": "گیت‌هاب",
     "vps": "VPS",
     "projects": "پروژه‌ها",
@@ -616,7 +631,9 @@
     "signInAgain": "ورود دوباره",
     "disconnectTitle": "قطع اتصال فقط در AI Desktop انجام می‌شود. ورود gh CLI شما دست‌نخورده می‌ماند.",
     "disconnect": "قطع اتصال",
-    "accountUnknown": "نامشخص"
+    "accountUnknown": "نامشخص",
+    "panelOpenProject": "برای دیدن وضعیت گیت، یک پروژه باز کنید.",
+    "panelConnect": "برای دیدن مخزن‌ها، GitHub را در تنظیمات متصل کنید."
   },
   "toast": {
     "dismiss": "بستن",
@@ -682,7 +699,14 @@
     "testConnection": "تست اتصال",
     "testing": "در حال تست…",
     "testOpen": "پورت {{port}} باز است · {{ms}} میلی‌ثانیه",
-    "testFailed": "پورت {{port}}: {{reason}}"
+    "testFailed": "پورت {{port}}: {{reason}}",
+    "noServersHint": "هنوز سروری اضافه نشده است. برای اتصال یکی اضافه کنید.",
+    "selectServer": "برای اتصال، یک سرور انتخاب کنید.",
+    "unverifiedKey": "کلید میزبان تأیید نشده است. مطمئن شوید این اثر انگشت به سرور شما تعلق دارد:",
+    "trustConnect": "اعتماد و اتصال",
+    "noCommands": "هنوز فرمانی اجرا نشده است.",
+    "privateKeyPath": "مسیر کلید خصوصی",
+    "keyPassphraseOptional": "گذرواژهٔ کلید (اختیاری)"
   },
   "slash": {
     "new": "شروع چت جدید",
@@ -965,7 +989,9 @@
     "source": "منبع",
     "previewTitle": "پیش‌نمایش مارک‌داون",
     "sourceTitle": "نمایش منبع",
-    "unsaved": "تغییرهای ذخیره‌نشده — پیش‌نمایش تفاوت با فایل روی دیسک را نشان می‌دهد."
+    "unsaved": "تغییرهای ذخیره‌نشده — پیش‌نمایش تفاوت با فایل روی دیسک را نشان می‌دهد.",
+    "prevMatch": "تطابق قبلی",
+    "nextMatch": "تطابق بعدی"
   },
   "statusBar": {
     "ready": "آماده",
@@ -998,6 +1024,34 @@
     "upOneLevel": "یک سطح بالاتر",
     "filter": "فیلتر فایل‌ها…",
     "empty": "پوشهٔ خالی."
+  },
+  "browser": {
+    "title": "مرورگر درون‌برنامه‌ای",
+    "hint": "صفحه‌ها در یک webview سندباکس‌شده باز می‌شوند. فقط http(s) مجاز است.",
+    "back": "عقب",
+    "forward": "جلو",
+    "reload": "بارگذاری مجدد"
+  },
+  "diagnostics": {
+    "recommendations": "⚠️ پیشنهادها",
+    "allPresent": "همهٔ موارد ضروری موجود است.",
+    "needsRoot": "این نسخهٔ نصب به دسترسی root نیاز دارد. تأیید کنید که می‌خواهید این فرمان‌ها را با sudo اجرا کنید."
+  },
+  "gitSetup": {
+    "title": "گیت برای این پروژه راه‌اندازی شود؟",
+    "createGitignore": "ساخت .gitignore",
+    "initialCommit": "کامیت اولیه",
+    "pushRemote": "ارسال به ریموت"
+  },
+  "previewPane": {
+    "noPreview": "برای این نوع فایل پیش‌نمایش درون‌برنامه‌ای نیست. نشانی را در تب مرورگر باز کنید یا فایل را مستقیم ویرایش کنید."
+  },
+  "providerWarning": {
+    "noKey": "برای {{provider}} کلید API ثبت نشده است. برای شروع گفتگو یکی اضافه کنید.",
+    "openSettings": "باز کردن تنظیمات"
+  },
+  "tasks": {
+    "noLogs": "هنوز ورودی‌ای در گزارش نیست."
   },
   "tools": {
     "headlineRun": "یک دستور اجرا شد",
