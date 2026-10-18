@@ -16,7 +16,7 @@ import {
 } from '@core/tools/remote-fs-tools'
 import { shellQuote } from '@shared/shell-quote'
 import {
-  DEFAULT_TIMEOUT_MS,
+  REMOTE_COMMAND_TIMEOUT_MS,
   REMOTE_SHELL_TOOL,
   executeRemoteShell,
   type RemoteShellDeps
@@ -172,12 +172,12 @@ describe('D.1.4 Command timeout → the tool kills the command after 60s', () =>
       )
       const deps: RemoteShellDeps = { exec, connectedServers: () => ['srv-1'] }
       const pending = executeRemoteShell(deps, { server_id: 'srv-1', command: 'curl http://slow.example' })
-      await vi.advanceTimersByTimeAsync(DEFAULT_TIMEOUT_MS)
+      await vi.advanceTimersByTimeAsync(REMOTE_COMMAND_TIMEOUT_MS)
       const result = await pending
 
       expect(result).toMatchObject({ ok: false, timedOut: true })
       expect(result.content).toMatch(/timed out after 60000ms/)
-      expect(exec).toHaveBeenCalledWith('srv-1', 'curl http://slow.example', DEFAULT_TIMEOUT_MS)
+      expect(exec).toHaveBeenCalledWith('srv-1', 'curl http://slow.example', REMOTE_COMMAND_TIMEOUT_MS)
     } finally {
       vi.useRealTimers()
     }

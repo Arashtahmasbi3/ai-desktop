@@ -1,7 +1,9 @@
 import type { Plan, PlanDecision, PlanWarning } from '@shared/plan'
 import type { AgentEvent, PlanRequest } from '@shared/ui'
-
-export const DEFAULT_PLAN_TIMEOUT_MS = 5 * 60 * 1000
+// Defined once, in `core` (`task-planner.ts`), the layer both may import
+// (`shared ← core ← main`). The broker used to keep its own copy of the same
+// 5-minute number, which let the plan gate and the planner drift apart.
+import { DEFAULT_PLAN_TIMEOUT_MS } from '@core/agent/task-planner'
 
 export interface PlanBrokerOptions {
   emit: (event: AgentEvent) => void

@@ -4,6 +4,8 @@
  * reusable from both the main process and the renderer.
  */
 
+import { estimateTrimmedTokens } from './tokens'
+
 export const PROJECT_MEMORY_FILES = ['AI_CONTEXT.md', 'AGENTS.md'] as const
 export const MEMORY_CHAR_BUDGET = 12_000
 /** Conservative default context budget (~4 chars per token). */
@@ -64,11 +66,6 @@ export function renderProjectMemory(
   )
 }
 
-/** Rough token estimate (~4 chars/token) shared by the composer and warnings. */
-export function estimateTokens(text: string): number {
-  return Math.ceil(text.trim().length / 4)
-}
-
 /**
  * Total tokens for the conversation plus the pending draft, and a warning when
  * it crosses the budget. `ratio` is the fraction of the budget in use and
@@ -81,8 +78,8 @@ export function contextBudget(
   budget = DEFAULT_CONTEXT_TOKEN_BUDGET
 ): { tokens: number; ratio: number; nearLimit: boolean; overBudget: boolean } {
   const tokens =
-    messages.reduce((sum, message) => sum + estimateTokens(message.content), 0) +
-    (draft ? estimateTokens(draft) : 0)
+    messages.reduce((sum, message) => sum + estimateTrimmedTokens(message.content), 0) +
+    (draft ? estimateTrimmedTokens(draft) : 0)
   const ratio = budget > 0 ? tokens / budget : 0
   return { tokens, ratio, nearLimit: ratio >= CONTEXT_NEAR_LIMIT_RATIO, overBudget: tokens >= budget }
 }

@@ -54,7 +54,7 @@ export interface RemoteShellDeps {
  * but a build or a database migration legitimately takes minutes, so the budget
  * is chosen from the command shape rather than a single global value.
  */
-export const DEFAULT_TIMEOUT_MS = 60_000
+export const REMOTE_COMMAND_TIMEOUT_MS = 60_000
 export const BUILD_TIMEOUT_MS = 300_000
 export const MIGRATION_TIMEOUT_MS = 1_800_000
 
@@ -64,7 +64,7 @@ export function getCommandTimeout(command: string): number {
   if (/\b(rsync|pg_dump|pg_restore|docker save|docker load)\b/.test(command)) {
     return MIGRATION_TIMEOUT_MS
   }
-  return DEFAULT_TIMEOUT_MS
+  return REMOTE_COMMAND_TIMEOUT_MS
 }
 
 export interface RemoteShellResult {

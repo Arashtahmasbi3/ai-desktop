@@ -2,7 +2,7 @@
 import { describe, it, expect, afterEach, beforeAll } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import i18n from '../../src/renderer/src/i18n'
-import JobCard, { relativeTime } from '../../src/renderer/src/components/JobCard'
+import JobCard, { formatJobElapsed } from '../../src/renderer/src/components/JobCard'
 import type { Job } from '@shared/jobs'
 
 const baseJob: Job = {
@@ -45,11 +45,11 @@ describe('JobCard', () => {
     expect(screen.queryByRole('button', { name: /Kill/ })).toBeNull()
   })
 
-  it('formats relative times', () => {
+  it('formats elapsed times', () => {
     const now = 10_000_000
-    expect(relativeTime(now - 5_000, now)).toBe('5s')
-    expect(relativeTime(now - 120_000, now)).toBe('2m')
-    expect(relativeTime(now - 3 * 3_600_000, now)).toBe('3h')
-    expect(relativeTime(now + 5_000, now)).toBe('0s')
+    expect(formatJobElapsed(now - 5_000, now)).toBe('5s')
+    expect(formatJobElapsed(now - 120_000, now)).toBe('2m')
+    expect(formatJobElapsed(now - 3 * 3_600_000, now)).toBe('3h')
+    expect(formatJobElapsed(now + 5_000, now)).toBe('0s')
   })
 })

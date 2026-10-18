@@ -44,8 +44,15 @@ const NAV: Array<{ id: ViewId; labelKey: string; icon: typeof MessageSquare }> =
   { id: 'goals', labelKey: 'sidebar.navGoals', icon: Target }
 ]
 
-/** Short relative time such as "3m", "2h", "5d" for the chat rows. */
-export function relativeTime(at: number, now = Date.now()): string {
+/**
+ * Coarse age of a chat row: "now", "3m", "2h", "5d", then a locale date.
+ *
+ * Deliberately NOT the same rendering as a job card's elapsed time
+ * (`formatJobElapsed` in `JobCard.tsx`): a chat row says "now" for anything
+ * under a minute and stops counting days at 30, printing a date instead. The
+ * two formats differ, so they keep two names rather than one shared helper.
+ */
+export function formatChatAge(at: number, now = Date.now()): string {
   const seconds = Math.max(0, Math.round((now - at) / 1000))
   if (seconds < 60) return 'now'
   const minutes = Math.round(seconds / 60)
@@ -668,7 +675,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                 >
                   <span className="min-w-0 flex-1 truncate text-xs">{chat.title}</span>
                   <span data-testid="chat-row-time" className="shrink-0 text-3xs text-fg-muted">
-                    {relativeTime(chat.updatedAt)}
+                    {formatChatAge(chat.updatedAt)}
                   </span>
                 </button>
                 <button

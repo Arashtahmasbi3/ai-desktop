@@ -2,8 +2,8 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import type { VpsExecResult } from '@shared/vps'
 import {
   BUILD_TIMEOUT_MS,
-  DEFAULT_TIMEOUT_MS,
   MIGRATION_TIMEOUT_MS,
+  REMOTE_COMMAND_TIMEOUT_MS,
   executeRemoteShell,
   getCommandTimeout,
   type RemoteShellDeps
@@ -26,8 +26,8 @@ afterEach(() => {
 
 describe('getCommandTimeout (v2.3.2, A.4)', () => {
   it('2. gives ordinary commands the 60s default', () => {
-    expect(getCommandTimeout('sleep 120')).toBe(DEFAULT_TIMEOUT_MS)
-    expect(getCommandTimeout('ls -la /opt')).toBe(DEFAULT_TIMEOUT_MS)
+    expect(getCommandTimeout('sleep 120')).toBe(REMOTE_COMMAND_TIMEOUT_MS)
+    expect(getCommandTimeout('ls -la /opt')).toBe(REMOTE_COMMAND_TIMEOUT_MS)
   })
 
   it('3. gives npm install a 5 minute budget', () => {
@@ -48,7 +48,7 @@ describe('executeRemoteShell timeout enforcement', () => {
     const exec = vi.fn(async (_id: string, _cmd: string, _timeoutMs?: number) => okResult('done'))
     const result = await executeRemoteShell(deps(exec), { server_id: 'srv-1', command: 'ls' })
     expect(result).toMatchObject({ ok: true, content: 'done' })
-    expect(exec).toHaveBeenCalledWith('srv-1', 'ls', DEFAULT_TIMEOUT_MS)
+    expect(exec).toHaveBeenCalledWith('srv-1', 'ls', REMOTE_COMMAND_TIMEOUT_MS)
   })
 
   it('kills a hung command once its timeout elapses', async () => {
@@ -57,7 +57,7 @@ describe('executeRemoteShell timeout enforcement', () => {
       (_id: string, _cmd: string, _timeoutMs?: number) => new Promise<VpsExecResult>(() => undefined)
     )
     const pending = executeRemoteShell(deps(exec), { server_id: 'srv-1', command: 'sleep 120' })
-    await vi.advanceTimersByTimeAsync(DEFAULT_TIMEOUT_MS)
+    await vi.advanceTimersByTimeAsync(REMOTE_COMMAND_TIMEOUT_MS)
     const result = await pending
     expect(result).toMatchObject({ ok: false, timedOut: true })
     expect(result.content).toMatch(/timed out after 60000ms/)

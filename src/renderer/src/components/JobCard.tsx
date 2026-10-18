@@ -3,8 +3,16 @@ import { useTranslation } from 'react-i18next'
 import { CheckCircle2, ChevronDown, ChevronUp, Loader2, Skull, XCircle } from 'lucide-react'
 import type { Job } from '@shared/jobs'
 
-/** "2m ago" style relative time from an epoch-ms timestamp. */
-export function relativeTime(from: number, now: number): string {
+/**
+ * Elapsed time since a job started: "5s", "2m", "3h", "4d".
+ *
+ * Deliberately NOT the same rendering as the sidebar's chat age
+ * (`formatChatAge` in `Sidebar.tsx`): a job card counts seconds from the start
+ * and is prefixed by the translated "started … ago", so sub-minute precision is
+ * the point, while a chat row shows "now" and falls back to a date after 30
+ * days. Two formats, two names — do not collapse them.
+ */
+export function formatJobElapsed(from: number, now: number): string {
   const seconds = Math.max(0, Math.round((now - from) / 1000))
   if (seconds < 60) return `${seconds}s`
   const minutes = Math.round(seconds / 60)
@@ -49,7 +57,7 @@ export default function JobCard({
           {t('jobs.cardTitle', { id: job.id.slice(0, 8), status: job.status })}
         </span>
         <span className="ms-auto text-3xs text-fg-muted">
-          {t('jobs.startedAgo', { time: relativeTime(job.startedAt, at) })}
+          {t('jobs.startedAgo', { time: formatJobElapsed(job.startedAt, at) })}
         </span>
       </div>
       <div className="mt-1 truncate font-mono text-xs text-fg" title={job.command}>

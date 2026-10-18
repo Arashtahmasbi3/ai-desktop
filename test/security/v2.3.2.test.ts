@@ -17,7 +17,11 @@ import { SshManager } from '../../src/main/ssh/ssh-manager'
 import { VpsServerStore } from '../../src/main/ssh/server-store'
 import { AuditLog } from '@core/agent/audit-log'
 import { RateLimiter } from '@core/agent/rate-limiter'
-import { executeRemoteShell, getCommandTimeout, DEFAULT_TIMEOUT_MS } from '@core/tools/remote-shell-tool'
+import {
+  REMOTE_COMMAND_TIMEOUT_MS,
+  executeRemoteShell,
+  getCommandTimeout
+} from '@core/tools/remote-shell-tool'
 import type { VpsExecResult } from '@shared/vps'
 import { FakeBackend, KEY_FINGERPRINT, cipher } from '../helpers/fake-ssh'
 
@@ -146,8 +150,8 @@ describe('D.2.4 Policy mode change mid-session', () => {
 
 describe('D.2.5 Timeout bypass via background process', () => {
   it('still enforces the 60s budget for a backgrounded command', async () => {
-    expect(getCommandTimeout('sleep 120 &')).toBe(DEFAULT_TIMEOUT_MS)
-    expect(getCommandTimeout('sleep 120 & disown')).toBe(DEFAULT_TIMEOUT_MS)
+    expect(getCommandTimeout('sleep 120 &')).toBe(REMOTE_COMMAND_TIMEOUT_MS)
+    expect(getCommandTimeout('sleep 120 & disown')).toBe(REMOTE_COMMAND_TIMEOUT_MS)
 
     vi.useFakeTimers()
     const exec = vi.fn(
@@ -157,10 +161,10 @@ describe('D.2.5 Timeout bypass via background process', () => {
       { exec, connectedServers: () => ['srv-1'] },
       { server_id: 'srv-1', command: 'sleep 120 &' }
     )
-    await vi.advanceTimersByTimeAsync(DEFAULT_TIMEOUT_MS)
+    await vi.advanceTimersByTimeAsync(REMOTE_COMMAND_TIMEOUT_MS)
     const result = await pending
 
     expect(result).toMatchObject({ ok: false, timedOut: true })
-    expect(exec).toHaveBeenCalledWith('srv-1', 'sleep 120 &', DEFAULT_TIMEOUT_MS)
+    expect(exec).toHaveBeenCalledWith('srv-1', 'sleep 120 &', REMOTE_COMMAND_TIMEOUT_MS)
   })
 })

@@ -3,9 +3,9 @@ import {
   DEFAULT_CONTEXT_TOKEN_BUDGET,
   contextBudget,
   contextWarningVisible,
-  estimateTokens,
   renderProjectMemory
 } from '@shared/memory'
+import { estimateTrimmedTokens } from '@shared/tokens'
 
 describe('renderProjectMemory', () => {
   it('returns undefined when there is no usable memory', () => {
@@ -39,7 +39,7 @@ describe('renderProjectMemory', () => {
 describe('contextBudget', () => {
   it('sums message and draft tokens and flags over-budget', () => {
     const messages = [{ content: 'a'.repeat(40) }]
-    expect(estimateTokens('abcd')).toBe(1)
+    expect(estimateTrimmedTokens('abcd')).toBe(1)
     expect(contextBudget(messages).tokens).toBe(10)
     expect(contextBudget(messages).overBudget).toBe(false)
     expect(contextBudget(messages, '', 10).overBudget).toBe(true)

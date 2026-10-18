@@ -1,7 +1,14 @@
 import type { FetchLike, ProviderId } from '@shared/types'
 import { AbortError, LLMError, NetworkError, TimeoutError, mapHttpStatusError } from './errors'
 
-export const DEFAULT_TIMEOUT_MS = 60_000
+/**
+ * Default budget for one provider HTTP request (connect + headers + body).
+ *
+ * Named for the domain it times: this used to be a bare `DEFAULT_TIMEOUT_MS`,
+ * which was also the name of the unrelated remote-command budget in
+ * `@core/tools/remote-shell-tool` — same value, different clock.
+ */
+export const LLM_REQUEST_TIMEOUT_MS = 60_000
 export const DEFAULT_MAX_RETRIES = 2
 const MAX_BACKOFF_MS = 8_000
 

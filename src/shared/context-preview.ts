@@ -4,7 +4,8 @@
  * main process can build it from the same inputs.
  */
 
-import { isSecretPath as isSecretPathImpl } from './secret-paths'
+import { isSecretPath } from './secret-paths'
+import { estimateRawTokens } from './tokens'
 
 export interface ContextPreviewInput {
   provider?: string
@@ -48,19 +49,11 @@ export const EXCLUDED_ALWAYS = [
 
 
 /**
- * True when a path looks like it holds secret material and must not be sent.
- *
- * v2.6.2: delegates to `@shared/secret-paths`, the canonical Secret Path Guard,
- * so the preview can never disagree with what the sandbox/remote tools block.
+ * `isSecretPath` is re-exported, not re-implemented: `@shared/secret-paths` is
+ * the canonical Secret Path Guard (v2.6.2), so this preview can never disagree
+ * with what the sandbox and the remote tools block.
  */
-export function isSecretPath(path: string): boolean {
-  return isSecretPathImpl(path)
-}
-
-/** Rough token estimate: ~4 characters per token, rounded up. */
-export function estimateTokens(text: string): number {
-  return text ? Math.ceil(text.length / 4) : 0
-}
+export { isSecretPath }
 
 /** Build the transparency preview for the next send. */
 export function buildContextPreview(input: ContextPreviewInput): ContextPreview {
@@ -71,8 +64,8 @@ export function buildContextPreview(input: ContextPreviewInput): ContextPreview 
   const safeFiles = offeredFiles.filter((file) => !isSecretPath(file))
   const remotePaths = (input.remotePaths ?? []).filter((path) => !isSecretPath(path))
 
-  const systemTokens = estimateTokens(input.systemPrompt ?? '')
-  const historyTokens = estimateTokens(historyText)
+  const systemTokens = estimateRawTokens(input.systemPrompt ?? '')
+  const historyTokens = estimateRawTokens(historyText)
 
   const included: IncludedSection[] = []
   if (systemTokens > 0) included.push({ key: 'system', label: 'System prompt', tokens: systemTokens })
@@ -81,14 +74,14 @@ export function buildContextPreview(input: ContextPreviewInput): ContextPreview 
     included.push({
       key: 'files',
       label: `Files: ${safeFiles.join(', ')}`,
-      tokens: estimateTokens(safeFiles.join('\n'))
+      tokens: estimateRawTokens(safeFiles.join('\n'))
     })
   }
   if (remotePaths.length > 0) {
     included.push({
       key: 'remote',
       label: `Remote context: ${remotePaths.join(', ')}`,
-      tokens: estimateTokens(remotePaths.join('\n'))
+      tokens: estimateRawTokens(remotePaths.join('\n'))
     })
   }
 

@@ -2,16 +2,28 @@ import { describe, it, expect } from 'vitest'
 import {
   EXCLUDED_ALWAYS,
   buildContextPreview,
-  estimateTokens,
   formatContextPreview,
   isSecretPath
 } from '@shared/context-preview'
+import { estimateRawTokens, estimateTrimmedTokens } from '@shared/tokens'
 
-describe('estimateTokens', () => {
+describe('estimateRawTokens', () => {
   it('approximates four characters per token and floors at zero', () => {
-    expect(estimateTokens('')).toBe(0)
-    expect(estimateTokens('abcd')).toBe(1)
-    expect(estimateTokens('a'.repeat(9))).toBe(3)
+    expect(estimateRawTokens('')).toBe(0)
+    expect(estimateRawTokens('abcd')).toBe(1)
+    expect(estimateRawTokens('a'.repeat(9))).toBe(3)
+  })
+
+  it('counts whitespace the trimmed budget estimate ignores', () => {
+    // Two names, not one: the preview reports what is really sent, so padding
+    // is billed; the composer budget trims it. Merging them would move a number
+    // the user already sees in one of the two places.
+    expect(estimateRawTokens('   ')).toBe(1)
+    expect(estimateTrimmedTokens('   ')).toBe(0)
+    expect(estimateRawTokens('  abcd  ')).toBe(2)
+    expect(estimateTrimmedTokens('  abcd  ')).toBe(1)
+    // Identical for text that is already trimmed.
+    expect(estimateRawTokens('abcdefgh')).toBe(estimateTrimmedTokens('abcdefgh'))
   })
 })
 

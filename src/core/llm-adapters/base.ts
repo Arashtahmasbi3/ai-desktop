@@ -15,7 +15,7 @@ import type {
 import { ConfigError } from './errors'
 import {
   DEFAULT_MAX_RETRIES,
-  DEFAULT_TIMEOUT_MS,
+  LLM_REQUEST_TIMEOUT_MS,
   getGlobalFetch,
   httpJson,
   httpStream,
@@ -80,7 +80,7 @@ export abstract class BaseAdapter implements BaseLLMAdapter {
       model: config.model,
       baseUrl: trimTrailingSlash(config.baseUrl ?? this.defaultBaseUrl),
       headers: config.headers ?? {},
-      timeoutMs: config.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+      timeoutMs: config.timeoutMs ?? LLM_REQUEST_TIMEOUT_MS,
       maxRetries: config.maxRetries ?? DEFAULT_MAX_RETRIES,
       fetchImpl: config.fetchImpl ?? getGlobalFetch()
     }

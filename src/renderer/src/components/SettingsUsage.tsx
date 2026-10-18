@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { BarChart3, Download, Gauge, RotateCcw } from 'lucide-react'
-import { estimateTokens, contextBudget, DEFAULT_CONTEXT_TOKEN_BUDGET } from '@shared/memory'
+import { contextBudget, DEFAULT_CONTEXT_TOKEN_BUDGET } from '@shared/memory'
+import { estimateTrimmedTokens } from '@shared/tokens'
 import { useStore } from '../store'
 import {
   aggregateUsage,
@@ -94,7 +95,7 @@ export default function SettingsUsage(): JSX.Element {
   const pushToast = useStore((state) => state.pushToast)
 
   const stats = useMemo(() => {
-    const tokens = messages.reduce((sum, message) => sum + estimateTokens(message.content), 0)
+    const tokens = messages.reduce((sum, message) => sum + estimateTrimmedTokens(message.content), 0)
     const tools = logs.filter((entry) => entry.event === 'action.ok').length
     const errors = logs.filter(
       (entry) => entry.event === 'action.error' || entry.event === 'run.error'
