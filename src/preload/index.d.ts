@@ -14,6 +14,7 @@ import type { ApprovalMode, ApprovalHistoryEntry, ApprovalOutcome, ApprovedComma
 import type { PlanDecision } from '@shared/plan'
 import type { PreflightChoice } from '@shared/preflight'
 import type { ChatSaveInput, ChatSummary, StoredChat } from '@shared/chat'
+import type { McpServerInput, McpServerStatus, McpServerView } from '@shared/mcp'
 import type {
   AuditEntryView,
   HealthCheckConfig,
@@ -147,6 +148,17 @@ export interface Api {
     check(): Promise<UpdateCheckResult>
     download(): Promise<UpdateDownloadResult>
     install(): Promise<{ ok: boolean; error?: string }>
+  }
+  /**
+   * F0-2d: MCP servers. Always `McpServerView` on the way out — a server's environment (where a
+   * token lives) is written from here and never read back.
+   */
+  mcp: {
+    list(): Promise<McpServerView[]>
+    save(input: McpServerInput): Promise<McpServerView[]>
+    remove(id: string): Promise<McpServerView[]>
+    setEnabled(id: string, enabled: boolean): Promise<McpServerView[]>
+    status(): Promise<McpServerStatus[]>
   }
   github: {
     status(): Promise<GitHubAuthStatus>

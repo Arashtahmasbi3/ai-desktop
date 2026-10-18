@@ -9,6 +9,7 @@ import type { InvestigateScope, ResolvedProfile, SessionProfile } from '@shared/
 import type { PlanDecision } from '@shared/plan'
 import type { PreflightChoice } from '@shared/preflight'
 import type { ChatSaveInput, ChatSummary, StoredChat } from '@shared/chat'
+import type { McpServerInput, McpServerStatus, McpServerView } from '@shared/mcp'
 import type {
   AuditEntryView,
   HealthCheckConfig,
@@ -177,6 +178,20 @@ export const api = {
     check: (): Promise<unknown> => invoke('update:check'),
     download: (): Promise<unknown> => invoke('update:download'),
     install: (): Promise<unknown> => invoke('update:install')
+  },
+
+  /**
+   * F0-2d: MCP servers. Every mutation answers with the whole list, so the settings page renders
+   * one snapshot instead of guessing at the new state. Everything returned is a `McpServerView`:
+   * the `env` block a server config can carry stays in main, because that is where a token lives.
+   */
+  mcp: {
+    list: (): Promise<McpServerView[]> => invoke('mcp:list'),
+    save: (input: McpServerInput): Promise<McpServerView[]> => invoke('mcp:save', input),
+    remove: (id: string): Promise<McpServerView[]> => invoke('mcp:remove', id),
+    setEnabled: (id: string, enabled: boolean): Promise<McpServerView[]> =>
+      invoke('mcp:setEnabled', id, enabled),
+    status: (): Promise<McpServerStatus[]> => invoke('mcp:status')
   },
 
   github: {

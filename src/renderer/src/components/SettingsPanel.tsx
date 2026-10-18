@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   BarChart3,
+  Blocks,
   FolderPlus,
   GitFork,
   GitPullRequest,
@@ -34,6 +35,7 @@ import SettingsUsage from './SettingsUsage'
 import SettingsDeveloper from './SettingsDeveloper'
 import SettingsTools from './SettingsTools'
 import SettingsAudit from './SettingsAudit'
+import SettingsMcp from './SettingsMcp'
 import Modal from './ui/Modal'
 
 type TabId =
@@ -41,6 +43,7 @@ type TabId =
   | 'providers'
   | 'apikeys'
   | 'plugins'
+  | 'mcp'
   | 'browser'
   | 'github'
   | 'projects'
@@ -66,6 +69,9 @@ const NAV_GROUPS: Array<{ labelKey?: string; items: NavItem[] }> = [
     items: [
       { id: 'providers', labelKey: 'settings.providers', icon: Server },
       { id: 'plugins', labelKey: 'settings.plugins', icon: Plug },
+      // F0-2e: the servers the app may spawn. Its own tab, because it is a list to edit rather
+      // than a switch to flip.
+      { id: 'mcp', labelKey: 'settings.mcp', icon: Blocks },
       { id: 'apikeys', labelKey: 'settings.apiKeys', icon: KeyRound },
       { id: 'browser', labelKey: 'settings.browser', icon: Globe },
       { id: 'github', labelKey: 'settings.github', icon: GitPullRequest }
@@ -334,6 +340,8 @@ export default function SettingsPanel(): JSX.Element | null {
             {tab === 'connections' ? <SettingsConnections /> : null}
 
             {tab === 'plugins' ? <SettingsPlugins /> : null}
+
+            {tab === 'mcp' ? <SettingsMcp /> : null}
 
             {tab === 'browser' ? <SettingsBrowser /> : null}
 

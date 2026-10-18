@@ -32,6 +32,22 @@ export interface McpServerView {
   error?: string
 }
 
+/**
+ * What Settings sends to add or edit a server (F0-2d).
+ *
+ * The environment crosses the bridge in this direction only: it holds tokens, so it is written to
+ * main and never read back — `McpServerView` is what comes the other way.
+ */
+export interface McpServerInput {
+  /** Present to edit an existing server; absent to add one. */
+  id?: string
+  name: string
+  command: string
+  args?: string[]
+  env?: Record<string, string>
+  enabled?: boolean
+}
+
 /** A tool as the server describes it. */
 export interface McpToolInfo {
   serverId: string

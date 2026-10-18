@@ -26,7 +26,7 @@ import { RemoteFsToolExecutor } from '@core/tools/remote-fs-executor'
 import { MIGRATE_PROJECT_TOOL, type MigrateProjectDeps } from '@core/tools/migrate-project-tool'
 import { MigrateProjectToolExecutor } from '@core/tools/migrate-project-executor'
 import { CompositeToolExecutor, type ToolRoute } from '@core/tools/composite-executor'
-import { ToolsetBuilder } from '@core/tools/toolset'
+import { ToolsetBuilder, type ToolGroup } from '@core/tools/toolset'
 import { LIST_SERVERS_TOOL, ListServersToolExecutor, type ServerSummary } from '@core/tools/server-tools'
 import { wrapServerRefRoutes } from '@core/tools/server-ref-executor'
 import { DIAGNOSE_CRASH_TOOL } from '@core/tools/crash-diagnosis-tool'
@@ -50,6 +50,7 @@ import type { ApprovedPlan, Plan, PlanDecision, PlanScopeContext, PlanWarning } 
 import { PLAN_REAPPROVE_MESSAGE } from '@shared/plan'
 import type { ResolvedProfile } from '@shared/profile'
 import type { TraceDecision, TraceExplanation } from '@shared/trace'
+import type { McpServerConfig, McpServerStatus } from '@shared/mcp'
 import { TraceStore } from '@core/agent/trace-store'
 import { AuditTrail, auditFileFor, auditLineFromDecision, auditLineFromPreflightOverride, type AuditVerifyResult } from '@core/agent/audit-trail'
 import { resolveUserDataDir } from '@core/agent/persistence'
@@ -63,6 +64,10 @@ import { PlanTrustRegistry, PLAN_TRUST_METADATA_KEY } from '@core/agent/plan-tru
 import { resolveRunGoal, type RunGoalContext } from '@core/agent/goal-context'
 import type { GoalStore } from '@core/agent/goal-store'
 import { createApprovalGate, describeApprovalReason } from './approval-gate'
+import { registerMcpTools, type McpBridgeResult } from './mcp/bridge'
+import { connectMcpServer, type McpServerHandle } from './mcp/client'
+import type { McpServerStore } from './mcp/store'
+import { StdioTransport } from './mcp/transport'
 import type { ApprovalOutcome, ApprovalReason } from '@shared/approval'
 import type { ApprovedCommands } from '@core/agent/approved-commands'
 import type { Persistence } from '@core/agent/persistence'
@@ -144,6 +149,20 @@ interface RemoteRuntime {
 }
 
 /**
+ * F0-2c: an MCP group as runtime fields, for the one path through `buildRemoteRuntime` that
+ * returns before `planRemoteRuntime` is consulted (a remote project whose VPS is missing or
+ * offline). Those runs still get their MCP tools: an MCP server runs on this machine, so it has
+ * nothing to do with the project's host being down.
+ */
+function withMcpRuntime(group: ToolGroup | undefined): RemoteRuntime {
+  if (group === undefined) return {}
+  return {
+    extraTools: group.definitions,
+    ...(group.executor === undefined ? {} : { extraExecutor: group.executor })
+  }
+}
+
+/**
  * When the active project is remote but its VPS is missing or disconnected,
  * return a system hint telling the model to relay a clear message instead of
  * falling back to local file tools. Returns `undefined` for local projects or a
@@ -184,9 +203,24 @@ export function planRemoteRuntime(
   /** Absolute root of the active remote project; enables path containment (P0-2). */
   projectRoot?: string,
   /** Read-only widening while Diagnostic Mode is on (v2.5.3). */
-  diagnostic?: DiagnosticPolicy | null
+  diagnostic?: DiagnosticPolicy | null,
+  /**
+   * F0-2c: the MCP servers' tools, already connected by the caller. Registered first (below) so
+   * every early return in this function carries them — including a local run with no VPS, where
+   * they are the only extra tools the run has.
+   */
+  mcp?: ToolGroup
 ): RemoteRuntime {
-  if (!vps) return {}
+  /*
+   * F0-2c: the MCP group goes into the builder **before** anything else, and its executor is
+   * handed to every `build()` call in this function. Both halves matter: an early return that
+   * listed the definitions without the executor would offer the model a tool nothing can run, and
+   * `build()` deliberately does not compose one.
+   */
+  const tools = new ToolsetBuilder()
+  if (mcp) tools.add(mcp)
+  const mcpExecutor = mcp?.executor
+  if (!vps) return tools.build({ executor: mcpExecutor })
   const connected = vps.connectedServers()
 
   /*
@@ -195,8 +229,8 @@ export function planRemoteRuntime(
    * have?" is exactly the question the model must be able to answer before it can pick
    * one. It returns data only and can never select a server.
    */
-  const tools = new ToolsetBuilder()
-  if (typeof vps.listServers === 'function') {
+  const hasRoster = typeof vps.listServers === 'function'
+  if (hasRoster) {
     const listServers = (): Promise<ServerSummary[]> => vps.listServers!()
     tools.add({
       definitions: [LIST_SERVERS_TOOL],
@@ -218,10 +252,10 @@ export function planRemoteRuntime(
   })
   if (!resolution.ok) {
     return {
-      ...tools.build(),
+      ...tools.build({ executor: mcpExecutor }),
       systemHint:
         `${resolution.error} Do not assume or auto-select a server. ` +
-        (tools.toolCount > 0
+        (hasRoster
           ? 'Call "list_servers" to see every saved server (id, name, host, connected), then ' +
             'ask the user which one to use if it is still ambiguous. '
           : 'Ask the user to pick one ') +
@@ -230,18 +264,18 @@ export function planRemoteRuntime(
   }
 
   const target = resolution.vpsId
-  if (!target) return {}
+  if (!target) return tools.build({ executor: mcpExecutor })
 
   if (!connected.includes(target)) {
     if (wants) {
       return {
-        ...tools.build(),
+        ...tools.build({ executor: mcpExecutor }),
         systemHint:
           `The selected VPS "${target}" is not connected. Tell the user to add or connect it ` +
           'in Settings -> Connections, then retry.'
       }
     }
-    return tools.build()
+    return tools.build({ executor: mcpExecutor })
   }
   const shellTool: ToolDefinition = {
     ...REMOTE_SHELL_TOOL,
@@ -380,12 +414,27 @@ export function planRemoteRuntime(
    * roster so the model can retry instead of asking the user.
    */
   const routes: ToolRoute[] = tools.routes()
+  /*
+   * F0-2c: the MCP group is composed here like every other route, but it is deliberately **not**
+   * passed through `wrapServerRefRoutes`. That wrapper canonicalises `server_id` /
+   * `source_vps_id` / `target_vps_id` arguments to a saved VPS id, which is right for our own
+   * remote tools and wrong for a foreign one — a database MCP server's `server_id` is not a VPS in
+   * this app, so rewriting it would hand the tool arguments the user never wrote.
+   */
+  const foreignRoute = (route: ToolRoute): boolean =>
+    [...route.names].every((name) => name.startsWith('mcp__'))
   const routable =
     typeof vps.listServers === 'function'
-      ? wrapServerRefRoutes(routes, {
-          listServers: () => vps.listServers!(),
-          connectedServers: () => vps.connectedServers()
-        })
+      ? [
+          ...wrapServerRefRoutes(
+            routes.filter((route) => !foreignRoute(route)),
+            {
+              listServers: () => vps.listServers!(),
+              connectedServers: () => vps.connectedServers()
+            }
+          ),
+          ...routes.filter(foreignRoute)
+        ]
       : routes
   const executor: ToolExecutor =
     routable.length === 1 && routes.length === 1
@@ -506,6 +555,16 @@ export interface AgentServiceOptions {
    * the run is linked back to the goal.
    */
   goalStore?: GoalStore
+  /**
+   * F0-2c: the configured MCP servers. Absent, or an empty list, means the run touches no
+   * process at all — MCP is optional and most runs have no server configured.
+   */
+  mcpServers?: McpServerStore
+  /**
+   * F0-2c: how one MCP server is connected. Injected the same way the SSH host and the sandbox
+   * are, so a test never spawns a process; the default is the stdio transport the MCP spec defines.
+   */
+  mcpConnect?: (config: McpServerConfig) => Promise<McpServerHandle>
 }
 
 /** Which provider/model to put first for an agent run. */
@@ -576,6 +635,14 @@ export class AgentService {
   private readonly resolveVpsName?: (id: string) => Promise<string | undefined>
   private readonly sessionProfile?: { state(): Promise<ResolvedProfile> }
   private readonly goalStore?: GoalStore
+  /*
+   * F0-2c: MCP servers are optional, and a run must do nothing when there are none. `mcpStatus`
+   * is what the last run learned about each server, which is the only source `mcp:status` has:
+   * a status is an observation from a real connection, never a guess at one.
+   */
+  private readonly mcpServers?: McpServerStore
+  private readonly mcpConnect: (config: McpServerConfig) => Promise<McpServerHandle>
+  private mcpStatus: McpServerStatus[] = []
   private readonly controllers = new Set<AbortController>()
   private readonly changes = new Map<string, FileChangeView>()
   /**
@@ -629,6 +696,16 @@ export class AgentService {
     this.resolveVpsName = options.resolveVpsName
     this.sessionProfile = options.sessionProfile
     if (options.goalStore) this.goalStore = options.goalStore
+    if (options.mcpServers) this.mcpServers = options.mcpServers
+    this.mcpConnect =
+      options.mcpConnect ??
+      ((config) =>
+        connectMcpServer(
+          config,
+          new StdioTransport(config.command, config.args, {
+            ...(config.env === undefined ? {} : { env: config.env })
+          })
+        ))
   }
 
   isRunning(): boolean {
@@ -694,11 +771,49 @@ export class AgentService {
     return { refs, hint, ...(imageParts.length > 0 ? { imageParts } : {}) }
   }
 
+  /**
+   * Connect the configured MCP servers and hand back their tool group (F0-2c).
+   *
+   * `undefined` when nothing is configured — the common case, and the one that must not touch a
+   * process. A server that cannot start becomes a status entry rather than an exception
+   * (`registerMcpTools` guarantees that), so a missing or broken MCP server can never take the
+   * chat down: its tools are absent and the reason is visible in Settings → MCP.
+   */
+  private async openMcpTools(): Promise<
+    { bridge: McpBridgeResult; group: ToolGroup | undefined } | undefined
+  > {
+    const store = this.mcpServers
+    if (store === undefined) return undefined
+    let servers: McpServerConfig[]
+    try {
+      servers = await store.list()
+    } catch {
+      // An unreadable server list is "no servers", never a failed run.
+      return undefined
+    }
+    if (servers.length === 0) return undefined
+
+    const builder = new ToolsetBuilder()
+    const bridge = await registerMcpTools({ builder, servers, connect: this.mcpConnect })
+    this.mcpStatus = bridge.statuses
+    return { bridge, group: bridge.group }
+  }
+
+  /**
+   * What the last run observed about each MCP server (F0-2d, `mcp:status`). A status is an
+   * observation from a real connection, so before the first run it is empty rather than invented.
+   */
+  mcpStatuses(): McpServerStatus[] {
+    return [...this.mcpStatus]
+  }
+
   private async buildRemoteRuntime(
     task: string,
     vpsServerId?: string,
     enabledTools?: string[],
-    exposure?: ToolExposure
+    exposure?: ToolExposure,
+    /** F0-2c: the connected MCP servers' tools, registered into every path of this runtime. */
+    mcpGroup?: ToolGroup
   ): Promise<RemoteRuntime> {
     const settings = await this.persistence.load()
     const active = settings.projects.find((project) => project.id === settings.activeProjectId)
@@ -744,7 +859,7 @@ export class AgentService {
     if (hint) {
       // B-11: never swap or lose the chat-header host silently.
       const withWarning = [hint, runServer.warning].filter(Boolean).join(' ')
-      return { systemHint: withWarning, ...routing }
+      return { ...withMcpRuntime(mcpGroup), systemHint: withWarning, ...routing }
     }
 
     // Resolve the target explicitly: the user's chat-header choice wins, then the
@@ -762,7 +877,8 @@ export class AgentService {
       this.jobs,
       enabledTools,
       isRemote ? active?.path : undefined,
-      diagnostic
+      diagnostic,
+      mcpGroup
     )
     // B-11: the resolver's reconciliation (a stale chat-header VPS dropped in
     // favour of the project's server) must reach the agent prompt, not vanish.
@@ -948,6 +1064,31 @@ export class AgentService {
   }
 
   async run(request: AgentRunRequest, externalSignal?: AbortSignal): Promise<AgentRunResult> {
+    /*
+     * F0-2c: MCP servers are child processes, so whoever opened them must close them. The holder
+     * is how this wrapper can still reach them after a throw: the body below assigns it the
+     * moment the processes exist, and this `finally` closes them on every exit — a finished run,
+     * an aborted one, or a failure anywhere in between. `undefined` means the run opened no
+     * process, so a run with no MCP server configured touches nothing.
+     */
+    const mcpRuns: { current?: McpBridgeResult } = {}
+    try {
+      return await this.runBody(request, externalSignal, mcpRuns)
+    } finally {
+      await mcpRuns.current?.closeAll().catch(() => undefined)
+    }
+  }
+
+  /**
+   * The body of a run, split out of `run` for the one thing only a caller's `finally` can
+   * guarantee: that the MCP child processes are closed even when something throws between
+   * connecting them and the orchestrator's own teardown.
+   */
+  private async runBody(
+    request: AgentRunRequest,
+    externalSignal: AbortSignal | undefined,
+    mcpRuns: { current?: McpBridgeResult }
+  ): Promise<AgentRunResult> {
     const providers = await this.buildProviders({
       ...(request.provider ? { preferred: request.provider } : {}),
       ...(request.model ? { model: request.model } : {}),
@@ -963,11 +1104,19 @@ export class AgentService {
     const profileState = this.sessionProfile ? await this.sessionProfile.state() : undefined
     const exposure = profileState ? resolveToolExposure(profileState) : undefined
     const toolPolicy = exposure ? toolPolicyFor(exposure) : undefined
+    /*
+     * F0-2c: the MCP servers are connected **before** the runtime is built, so every path through
+     * `planRemoteRuntime` — a local run with no VPS, a missing or disconnected host, the plain
+     * local case — carries their tools, and the holder hands the handles to the caller's finally.
+     */
+    const mcp = await this.openMcpTools()
+    mcpRuns.current = mcp?.bridge
     const remote = await this.buildRemoteRuntime(
       request.task,
       request.vpsServerId,
       request.enabledTools,
-      exposure
+      exposure,
+      mcp?.group
     )
     const memory = await this.projectMemoryHint()
     /*

@@ -9,6 +9,7 @@ import { createNodeGitExec } from './github/git'
 import { ChildProcessRunner } from '@core/sandbox/command-runner'
 import { VpsServerStore } from './ssh/server-store'
 import { AuditLog } from '@core/agent/audit-log'
+import { McpServerStore } from './mcp/store'
 
 /** App data directory (e.g. `%APPDATA%\AI Desktop` on Windows). */
 export function appDataDir(appName = 'AI Desktop'): string {
@@ -71,4 +72,12 @@ export function createVpsServerStore(dir = appDataDir()): VpsServerStore {
 /** JSON trail of every SSH command (allowed, blocked or rate limited). */
 export function createAuditLog(dir = appDataDir()): AuditLog {
   return new AuditLog({ file: join(dir, 'ssh-audit.json') })
+}
+
+/**
+ * Configured MCP servers (F0-2d). One small JSON file, same as the other stores; the environment
+ * block it can hold never leaves main, so no cipher is needed for the file itself.
+ */
+export function createMcpServerStore(dir = appDataDir()): McpServerStore {
+  return new McpServerStore({ baseDir: dir })
 }

@@ -1,7 +1,7 @@
 import type { ToolDefinition } from '@shared/types'
 import type { AgentToolResult } from '@shared/agent'
 import type { ToolExecutor } from '@core/agent/tools'
-import type { ToolsetBuilder } from '@core/tools/toolset'
+import type { ToolsetBuilder, ToolGroup } from '@core/tools/toolset'
 import type { McpServerConfig, McpServerStatus, McpToolInfo } from '@shared/mcp'
 import { mcpResultText, mcpToolName, type McpServerHandle } from './client'
 
@@ -26,6 +26,13 @@ export interface McpBridgeOptions {
 export interface McpBridgeResult {
   statuses: McpServerStatus[]
   handles: McpServerHandle[]
+  /**
+   * The group these tools form, for a run's toolset. Returned as well as registered so a caller
+   * that handed over a throwaway builder (the agent service collects the group, then lets
+   * `ToolsetBuilder` own the real registration) does not have to rebuild it from names.
+   * `undefined` when no server published a tool.
+   */
+  group: ToolGroup | undefined
   closeAll(): Promise<void>
 }
 
@@ -107,13 +114,22 @@ export async function registerMcpTools(options: McpBridgeOptions): Promise<McpBr
     }
   }
 
-  if (allDefinitions.length > 0) {
-    options.builder.add({ definitions: allDefinitions, executor: new McpToolExecutor(routes) })
-  }
+  /*
+   * Every server's tools are one group with one executor: the route map is the dispatch table, so
+   * a second group would only duplicate it. The group is registered here *and* returned, because
+   * `ToolsetBuilder.build()` deliberately does not compose the executor — the caller needs both
+   * halves together, or the model would see a tool nothing can run.
+   */
+  const group: ToolGroup | undefined =
+    allDefinitions.length === 0
+      ? undefined
+      : { definitions: allDefinitions, executor: new McpToolExecutor(routes) }
+  if (group !== undefined) options.builder.add(group)
 
   return {
     statuses,
     handles,
+    group,
     async closeAll(): Promise<void> {
       await Promise.all(handles.map((handle) => handle.close().catch(() => undefined)))
     }

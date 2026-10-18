@@ -12,6 +12,7 @@ import type { GoalUpdate, NewGoalInput } from '@shared/goal'
 
 import type { AppServices } from './app-services'
 import { registerVpsIpc } from './vps-ipc'
+import { registerMcpIpc } from './mcp-ipc'
 import { runLocalCommand } from './local-shell'
 import { searchProject } from './project-search'
 import { canRememberTool, createRememberedApproval } from '@core/agent/remember-policy'
@@ -563,9 +564,12 @@ export function registerIpc(
   }
 
   const disposeVps = registerVpsIpc(services)
+  // F0-2d: MCP server settings (list/save/remove/toggle/status). Same registration shape as VPS.
+  const disposeMcp = registerMcpIpc(services)
 
   return () => {
     disposeVps()
+    disposeMcp()
     for (const [channel] of handlers) ipcMain.removeHandler(channel)
     for (const [channel] of windowChannels) ipcMain.removeHandler(channel)
   }

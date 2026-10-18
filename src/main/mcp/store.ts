@@ -1,6 +1,6 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { McpServerConfig, McpServerView } from '@shared/mcp'
+import type { McpServerConfig, McpServerInput, McpServerView } from '@shared/mcp'
 
 /**
  * The MCP server list, as one small JSON file (F0-2).
@@ -95,14 +95,7 @@ export class McpServerStore {
     }
   }
 
-  async save(input: {
-    id?: string
-    name: string
-    command: string
-    args?: string[]
-    env?: Record<string, string>
-    enabled?: boolean
-  }): Promise<McpServerConfig> {
+  async save(input: McpServerInput): Promise<McpServerConfig> {
     const servers = await this.list()
     const existing = input.id !== undefined ? servers.find((entry) => entry.id === input.id) : undefined
     const id = existing?.id ?? input.id ?? `mcp-${this.now().toString(36)}`

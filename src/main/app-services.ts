@@ -36,6 +36,7 @@ import {
   createAuditLog,
   createCustomProviderStore,
   createGitHubService,
+  createMcpServerStore,
   createOnboardingStore,
   createSessionStore,
   createSettingsStore,
@@ -49,6 +50,15 @@ import { SshManager } from './ssh/ssh-manager'
 import { Ssh2Backend } from './ssh/ssh2-backend'
 import type { VpsServerStore } from './ssh/server-store'
 import { JobManager } from '@core/agent/job-manager'
+import { toView } from './mcp/store'
+import type { McpServerStore } from './mcp/store'
+import type { McpServerHandle } from './mcp/client'
+import type {
+  McpServerConfig,
+  McpServerInput,
+  McpServerStatus,
+  McpServerView
+} from '@shared/mcp'
 import {
   createDiagnosticPolicy,
   diagnosticRemainingMs,
@@ -78,6 +88,13 @@ export interface AppServicesOptions {
   vpsServers?: VpsServerStore
   /** Optional injected job manager (tests). */
   jobs?: JobManager
+  /** Optional injected MCP server store (tests). */
+  mcpServers?: McpServerStore
+  /**
+   * Optional injected MCP connect factory (tests). The app default spawns the configured command
+   * over stdio; a test must never start a process for a tool it is only asserting the wiring of.
+   */
+  mcpConnect?: (config: McpServerConfig) => Promise<McpServerHandle>
 }
 
 /**
@@ -97,6 +114,11 @@ export class AppServices {
   readonly vpsServers: VpsServerStore
   readonly vps: SshManager
   readonly jobs: JobManager
+  /**
+   * F0-2d: the configured MCP servers. Owned here (not by the agent) because Settings writes to
+   * it between runs; the agent only reads it at the start of a run and never persists anything.
+   */
+  readonly mcpServers: McpServerStore
   readonly files = new FileService()
   /**
    * v2.9.0: desktop files/images the user attached, staged into the run workspace by
@@ -213,6 +235,7 @@ export class AppServices {
           void this.jobStore.save(jobs).catch(() => undefined)
         }
       })
+    this.mcpServers = options.mcpServers ?? createMcpServerStore(this.dir)
 
     this.approvals = new ApprovalBroker({
       emit: (event: AgentEvent) => this.emit('agent:event', event)
@@ -277,6 +300,10 @@ export class AppServices {
       goalStore: this.goals,
       getDiagnosticPolicy: () => this.getDiagnosticPolicy(),
       resolveVpsName: async (id) => (await this.vpsServers.list()).find((s) => s.id === id)?.name,
+      // F0-2c: the run reads the configured servers here and opens them itself; the connect
+      // factory is injectable so a test can drive a run without spawning a process.
+      mcpServers: this.mcpServers,
+      ...(options.mcpConnect ? { mcpConnect: options.mcpConnect } : {}),
       emit: (event: AgentEvent) => this.emit('agent:event', event)
     })
 
@@ -556,6 +583,60 @@ export class AppServices {
   async removeProviderKeyAt(provider: ProviderId, index: number): Promise<SettingsView> {
     await this.persistence.removeApiKeyAt(provider, index)
     return this.settingsView()
+  }
+
+  /**
+   * The configured MCP servers as Settings sees them (F0-2d): a launch line, the enabled flag and
+   * what the last run observed. Never `env` and never the raw command line — a token lives in the
+   * environment block, and the renderer has no business seeing it.
+   */
+  async mcpServerViews(): Promise<McpServerView[]> {
+    const servers = await this.mcpServers.list()
+    const observed = new Map(this.agent.mcpStatuses().map((status) => [status.serverId, status]))
+    return servers.map((server) => {
+      const view = toView(server)
+      const status = observed.get(server.id)
+      // `disconnected` adds nothing to a row that is already visibly not running.
+      if (status === undefined || status.state === 'disconnected') return view
+      return {
+        ...view,
+        ...(status.state === 'connected' ? { toolCount: status.toolCount } : {}),
+        ...(status.error === undefined ? {} : { error: status.error })
+      }
+    })
+  }
+
+  /**
+   * One status per configured server (F0-2d, `mcp:status`). A server no run has connected yet
+   * reads as `disconnected`, which is the truth: nothing has opened it.
+   */
+  async mcpStatuses(): Promise<McpServerStatus[]> {
+    const servers = await this.mcpServers.list()
+    const observed = new Map(this.agent.mcpStatuses().map((status) => [status.serverId, status]))
+    return servers.map(
+      (server) =>
+        observed.get(server.id) ?? {
+          serverId: server.id,
+          state: 'disconnected' as const,
+          toolCount: 0
+        }
+    )
+  }
+
+  /** Add or edit a server, and return the whole list: the renderer re-renders from one snapshot. */
+  async saveMcpServer(input: McpServerInput): Promise<McpServerView[]> {
+    await this.mcpServers.save(input)
+    return this.mcpServerViews()
+  }
+
+  async removeMcpServer(id: string): Promise<McpServerView[]> {
+    await this.mcpServers.remove(id)
+    return this.mcpServerViews()
+  }
+
+  async setMcpServerEnabled(id: string, enabled: boolean): Promise<McpServerView[]> {
+    await this.mcpServers.setEnabled(id, enabled)
+    return this.mcpServerViews()
   }
 
   static sessionDir(dir = appDataDir()): string {
