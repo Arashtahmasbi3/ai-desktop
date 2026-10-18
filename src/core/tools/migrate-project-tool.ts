@@ -2,7 +2,7 @@ import type { ToolDefinition } from '@shared/types'
 import type { VpsExecResult } from '@shared/vps'
 import { checkDenyList } from '@core/agent/deny-list'
 import type { AuditEntry } from '@core/agent/audit-log'
-import { shellQuote } from './remote-fs-tools'
+import { shellQuote } from '@shared/shell-quote'
 
 /** Tool the agent can call to copy a project from one VPS to another over SSH. */
 export const MIGRATE_PROJECT_TOOL: ToolDefinition = {

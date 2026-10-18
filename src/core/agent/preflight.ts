@@ -1,3 +1,4 @@
+import { shellQuote } from '@shared/shell-quote'
 /**
  * Preflight state checks before sensitive actions (v2.4, A.2).
  *
@@ -62,9 +63,6 @@ export interface PreflightExecResult {
 export type PreflightExec = (command: string) => Promise<PreflightExecResult>
 
 /** POSIX single-quote a value for safe embedding in a shell command. */
-function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`
-}
 
 /** Pure classification so the UI can decide what to show. */
 export function preflightWarnings(result: PreflightResult): PreflightCheck[] {

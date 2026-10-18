@@ -14,11 +14,9 @@ import { assertInstallAllowed, buildInstallCommands, getInstallRecipe } from '@c
 import { runRemoteCommands } from '@core/remote/run-commands'
 import { testServerConnection } from './server-connection-test'
 import type { AppServices } from './app-services'
+import { shellQuote } from '@shared/shell-quote'
 
 /** POSIX single-quote a value so it can be safely embedded in a shell command. */
-function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`
-}
 
 /** `find` a project folder by (partial) name under `/`, capped depth + results. */
 async function searchRemoteProject(

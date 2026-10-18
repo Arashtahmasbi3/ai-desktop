@@ -3,7 +3,8 @@ import type { CommandRunner } from './command-runner'
 import { ChildProcessRunner } from './command-runner'
 import type { SandboxCreateSpec, SandboxDriver, SandboxHandle } from './driver'
 import { ExecFailedError, ProviderUnavailableError } from './errors'
-import { normalizeSandboxPath, shellQuote, toContainerPath } from './paths'
+import { normalizeSandboxPath, toContainerPath } from './paths'
+import { shellQuote } from '@shared/shell-quote'
 
 export interface DockerSandboxOptions {
   /** Docker binary (for testing / non-standard installs). */

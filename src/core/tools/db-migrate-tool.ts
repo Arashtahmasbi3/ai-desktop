@@ -15,7 +15,7 @@ import type { VpsExecResult } from '@shared/vps'
 import type { ToolDefinition } from '@shared/types'
 import type { AgentAction, AgentToolResult } from '@shared/agent'
 import type { ToolExecutor, ToolExecOptions } from '@core/agent/tools'
-import { shellQuote } from './remote-fs-tools'
+import { shellQuote } from '@shared/shell-quote'
 
 export type DbType = 'postgres' | 'mysql' | 'mongodb' | 'sqlite'
 

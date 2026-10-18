@@ -5,7 +5,7 @@ import { RateLimiter } from '@core/agent/rate-limiter'
 import { evaluateHostPolicy } from '@core/remote/host-policy'
 import { parseBackupPath, restoreCommandFor } from '@core/remote/backup'
 import { runHealthCheck } from '@core/remote/health-check'
-import { shellQuote } from '@core/tools/remote-fs-tools'
+import { shellQuote } from '@shared/shell-quote'
 import { getCommandTimeout } from '@core/tools/remote-shell-tool'
 import type { ServerSummary } from '@core/tools/server-tools'
 import type {

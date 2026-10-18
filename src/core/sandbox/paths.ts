@@ -63,6 +63,3 @@ export function toContainerPath(relativePath: string, base = '/workspace'): stri
  * Quote a value for safe interpolation into a `/bin/sh` command line.
  * Wraps in single quotes and escapes embedded single quotes.
  */
-export function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, "'\\''")}'`
-}

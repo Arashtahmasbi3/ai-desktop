@@ -18,6 +18,7 @@ import type { ToolExecutor, ToolExecOptions } from '@core/agent/tools'
 import { checkDenyList } from '@core/agent/deny-list'
 import { findSecretPathsInCommand, inspectSecretPath } from '@shared/secret-paths'
 import { NAMED_DIAGNOSTIC_TOOL_NAMES } from '@shared/profile'
+import { shellQuote } from '@shared/shell-quote'
 
 /** Default and hard cap for "how many lines of logs". */
 export const DEFAULT_LOG_TAIL = 200
@@ -110,9 +111,6 @@ export const NAMED_DIAGNOSTIC_TOOLS: ToolDefinition[] = [
 export const NAMED_DIAGNOSTIC_TOOL_NAMES_SEEN = new Set(NAMED_DIAGNOSTIC_TOOLS.map((t) => t.name))
 
 /** Single-quote a value for POSIX shells (same escaping as the remote-fs tools). */
-export function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`
-}
 
 /** A conservative service/unit name: no whitespace, quotes or shell metacharacters. */
 const SERVICE_RE = /^[A-Za-z0-9@._:-]+$/

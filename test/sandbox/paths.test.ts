@@ -3,9 +3,10 @@ import {
   normalizeSandboxPath,
   resolveInsideWorkspace,
   resolveWorkspaceDir,
-  shellQuote,
+
   toContainerPath
 } from '@core/sandbox/paths'
+import { shellQuote } from '@shared/shell-quote'
 import { PathEscapeError } from '@core/sandbox/errors'
 
 describe('normalizeSandboxPath', () => {

@@ -11,6 +11,7 @@
  * Diagnostic Mode exposes it (the same read-only widening as v2.5.3).
  */
 import { isDiagnosticAllowed, type DiagnosticPolicy } from '@core/remote/diagnostic-policy'
+import { shellQuote } from '@shared/shell-quote'
 
 export type DiagnosisCategory = 'process' | 'logs' | 'resources' | 'network' | 'config'
 
@@ -54,9 +55,6 @@ const PROJECT_ROOT_TOKEN = '{{ROOT}}'
  * `/srv/my app` — or `/srv/it's` — break the probe command apart. Same rule as
  * `src/core/agent/preflight.ts`.
  */
-function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`
-}
 
 /** Resolve the project probes against the active project root. */
 export function buildCrashProbes(projectRoot?: string): DiagnosisProbe[] {

@@ -6,11 +6,9 @@ import { backupPathFor } from '@core/remote/backup'
 import { enforceProjectPath } from '@core/remote/path-guard'
 import { findSecretPathsInCommand, inspectSecretPath } from '@shared/secret-paths'
 import type { DiagnosticPolicy } from '@core/remote/diagnostic-policy'
+import { shellQuote } from '@shared/shell-quote'
 
 /** POSIX single-quote a value so it can be safely embedded in a shell command. */
-export function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`
-}
 
 /** Tools the agent can call to work on files of a connected VPS over SFTP/shell. */
 export const REMOTE_FS_TOOLS: ToolDefinition[] = [

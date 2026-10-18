@@ -14,6 +14,7 @@ import {
   type Job,
   type JobStatus
 } from '@shared/jobs'
+import { shellQuote } from '@shared/shell-quote'
 
 export interface JobExecResult {
   ok: boolean
@@ -40,9 +41,6 @@ export interface JobManagerOptions {
 export const JOB_PROBE_MARKER = '__AIDESK_JOB_EXIT__'
 
 /** POSIX single-quote a value for safe embedding in a shell command. */
-export function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`
-}
 
 /** `yes`/`no` probe for an executable on the remote host. */
 export function hasCommandProbe(binary: string): string {

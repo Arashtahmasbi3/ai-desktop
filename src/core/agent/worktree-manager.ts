@@ -7,7 +7,7 @@
  */
 
 import type { VpsExecResult } from '@shared/vps'
-import { shellQuote } from '../tools/remote-fs-tools'
+import { shellQuote } from '@shared/shell-quote'
 
 export interface WorktreeDeps {
   exec(serverId: string, command: string): Promise<VpsExecResult>

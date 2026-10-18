@@ -11,9 +11,10 @@ import { RemoteFsToolExecutor } from '@core/tools/remote-fs-executor'
 import {
   REMOTE_FS_TOOLS,
   executeRemoteFs,
-  shellQuote,
+
   type RemoteFsDeps
 } from '@core/tools/remote-fs-tools'
+import { shellQuote } from '@shared/shell-quote'
 import {
   DEFAULT_TIMEOUT_MS,
   REMOTE_SHELL_TOOL,

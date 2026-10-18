@@ -5,11 +5,12 @@ import {
   buildJobScript,
   hasCommandProbe,
   parseJobProbe,
-  shellQuote,
+
   tailLines,
   type JobExec,
   type JobExecResult
 } from '@core/agent/job-manager'
+import { shellQuote } from '@shared/shell-quote'
 import { shouldRunAsJob } from '@shared/jobs'
 import { executeRemoteShell } from '@core/tools/remote-shell-tool'
 import type { VpsExecResult } from '@shared/vps'

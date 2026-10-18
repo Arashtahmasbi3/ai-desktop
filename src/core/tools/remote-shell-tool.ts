@@ -2,7 +2,7 @@ import type { ToolDefinition } from '@shared/types'
 import type { VpsExecResult } from '@shared/vps'
 import { checkDenyList } from '@core/agent/deny-list'
 import { enforceCommandPaths } from '@core/remote/path-guard'
-import { shellQuote } from '@core/sandbox/paths'
+import { shellQuote } from '@shared/shell-quote'
 import { findSecretPathsInCommand } from '@shared/secret-paths'
 import type { DiagnosticPolicy } from '@core/remote/diagnostic-policy'
 
