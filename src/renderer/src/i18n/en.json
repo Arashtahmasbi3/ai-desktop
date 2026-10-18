@@ -203,6 +203,7 @@
     "approvalReasonWrite": "Write operation",
     "approvalReasonDangerous": "Dangerous command",
     "approvalReasonNetwork": "Network action — this command reaches another host.",
+    "approvalReasonMcp": "MCP server tool — this runs inside a server you connected, not inside the app.",
     "approvalReasonReadOnly": "Read-only operation",
     "approvalWriteWarning": "This is a write operation. It requires explicit approval.",
     "approvalTool": "Tool",

@@ -67,6 +67,11 @@ export type ApprovalReason =
    * nothing about pointing six ports at somebody else's machine.
    */
   | 'network_action'
+  /**
+   * v4.2: a tool published by an MCP server. It is a foreign process rather than one of our tools, so it is asked
+   * about in its own words and never silently approved in a mode chosen for the agent's own writes.
+   */
+  | 'mcp_tool'
 
 /** The user's answer to an approval prompt. */
 export interface ApprovalOutcome {

@@ -71,6 +71,8 @@ function reasonKey(reason: string): string {
       return 'chat.approvalReasonDangerous'
     case 'network_action':
       return 'chat.approvalReasonNetwork'
+    case 'mcp_tool':
+      return 'chat.approvalReasonMcp'
     case 'read_only_tool':
     case 'read_only_shell':
     case 'whitelisted_command':

@@ -99,6 +99,9 @@ export function shouldRequireApproval(action: {
 }): ApprovalRequirement {
   if (isDenyListedAction(action)) return { required: true, reason: 'dangerous' }
 
+  // v4.2: an MCP server's tool is a foreign process. Ask, in those words, before it runs.
+  if (action.name.startsWith('mcp__')) return { required: true, reason: 'mcp_tool' }
+
   if (action.name === 'remote_shell') {
     const command = action.arguments.command
     if (typeof command === 'string') {

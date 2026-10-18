@@ -63,6 +63,11 @@ export interface ClassifiableAction {
  */
 export function classifyAction(action: ClassifiableAction): ActionKind {
   if (SHELL_TOOLS.has(action.name)) return 'shell'
+  /*
+   * v4.2: an MCP tool belongs to a foreign process, so it is classified like shell: not directly classifiable,
+   * never remembered, and not silently approved outside full mode.
+   */
+  if (action.name.startsWith('mcp__')) return 'shell'
   if (READ_TOOLS.has(action.name)) return 'read'
   return 'write'
 }
