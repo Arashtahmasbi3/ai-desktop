@@ -44,7 +44,12 @@ export default function PlanCard(): JSX.Element | null {
       setEditing(false)
       setTrust(false)
     }
-    // Reset drafts whenever a new plan arrives.
+    /*
+     * C1-2: the dependency is `id` and nothing else, on purpose. `pending` is a store object whose identity
+     * changes on unrelated updates, so listing it would reset the drafts — discarding a half-finished edit — every
+     * time anything else in the app changed. The invariant is "a NEW plan resets the drafts; editing one does not",
+     * and `test/renderer/plan-card-drafts.test.tsx` pins both halves.
+     */
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 

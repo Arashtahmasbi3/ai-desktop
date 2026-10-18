@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   AlertTriangle,
@@ -140,7 +140,11 @@ export default function ApprovalDialog(): JSX.Element | null {
   const [learned, setLearned] = useState<ApprovedCommandView[]>([])
   const [showHistory, setShowHistory] = useState(false)
 
-  const refreshHistory = (): void => {
+  /*
+   * Stable on purpose: the effect below depends on it, and a plain function would either re-run the effect on every
+   * render (hammering the IPC) or capture a stale closure. It only calls setters, so it truly has no dependencies.
+   */
+  const refreshHistory = useCallback((): void => {
     void window.api.agent
       .approvalHistory()
       .then(setHistory)
@@ -149,7 +153,7 @@ export default function ApprovalDialog(): JSX.Element | null {
       .approvedCommands()
       .then(setLearned)
       .catch(() => setLearned([]))
-  }
+  }, [])
 
   useEffect(() => {
     setRememberCommand(false)
@@ -158,8 +162,7 @@ export default function ApprovalDialog(): JSX.Element | null {
     setShowDetails(false)
     if (!request) return
     refreshHistory()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [request])
+  }, [request, refreshHistory])
 
   if (!request) return null
 

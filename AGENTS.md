@@ -1150,3 +1150,33 @@ Branch `feature/v2.6.4-critical-fixes`.
 ### Sprint status
 - Fix A (`92205f0`), Fix B (`eddc2b0`), Fix C (`c152554`), Fix D (`e24fa95`), Fix E (`4eb963f`), Polish F (`65df132`) complete. Full suite: 221 files, 1724 passed | 1 skipped; builds green.
 - `[RELEASE]` **v2.6.4 released.** `feature/v2.6.4-critical-fixes` merged into `master` with a `--no-ff` merge commit (`8e12e9e`); no conflicts (master was a straight ancestor). Annotated tag `v2.6.4` created and pushed. Windows artifacts built from Linux via Wine (`npm run build:win`, exit 0) and hashed: `AI.Desktop.Setup.2.6.4.exe` (sha256 `f1bec3aaadc2bea37b4515effd58e33f74280ef8fdb205016ad89542fba14f6e`, 112,514,057 B), `AI.Desktop.2.6.4.Portable.exe` (sha256 `3e9351925b6a862d8c38f0b455a908cbf5d1c5b8af5857e6fb34dc30b617201a`, 112,231,216 B), `SHA256SUMS.txt` (189 B, dotted names so `sha256sum -c` works against the published files). Published as a public (non-prerelease, non-draft) GitHub Release: https://github.com/Arashtahmasbi3/ai-desktop/releases/tag/v2.6.4 — all three assets present. Binaries are unsigned (SmartScreen may warn — noted in the release). **[RELEASE] v2.6.4 — Multi-Project & Polish. 1724 tests pass | 1 skipped (Docker-conditional). Ready for user testing on Windows.**
+
+## Pattern: Design tokens and embedded surfaces
+
+Where our brutalist system stops (v4.2). Two rules, because the first one is a promise we would otherwise break
+without noticing.
+
+- **Our tokens own our shell.** Zero radius, 2px borders, one hard offset shadow with no blur, instant linear
+  motion, uppercase micro-labels and monospace data are the language of AI Desktop's own window, and
+  `test/renderer/brutal-tokens.test.ts` enforces it.
+- **A surface rendered inside someone else's product inherits THEIR tokens.** The official Claude MCP Apps
+  guidelines require host style variables for every structural element — backgrounds, text, borders, radii, weights
+  — and allow brand colour only for accents. A UI we hand to a host must look native there, not like our app
+  embedded in it. Concretely: 0.5px borders, 4–12px radii and soft shadows are CORRECT inside an MCP App and
+  forbidden inside our window. Both facts are true at once; only the boundary separates them.
+- **Consequences for the code:** any component that may be rendered in both places takes its structural values from
+  a prop or a CSS variable layer, never from our Tailwind tokens directly. The moment a shared component imports
+  `brutal-card`, it can no longer be embedded.
+- **Progressive disclosure is the host's pattern too.** Inline card (a summary, at most two actions, no menus) →
+  expanded → full screen (the composer stays visible). Our trace and file-change surfaces should follow the same
+  three levels rather than showing everything at once (U3-2 in the audit checklist).
+
+## Pattern: No interface for a capability that does not exist
+
+The Plugins page taught this (v4.0): seven switches persisted `plugins.enabled`, and nothing in the code read it,
+so every control reported a state change that never happened. The rule now:
+
+- a switch, chip or button must be backed by one call site that reads what it writes, or it must not ship;
+- an informational row must say where the setting actually lives, and its button must land on that tab;
+- a capability that is planned but absent is reported as absent (the Sources panel shows web search disabled rather
+  than pretending), never rendered as a control that silently does nothing.
