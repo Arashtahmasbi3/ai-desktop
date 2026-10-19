@@ -1,14 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  AlertTriangle,
-  ArrowDown,
-  Bot,
-  Eye,
-  Paperclip,
-  Send,
-  Square
-} from 'lucide-react'
+import { AlertTriangle, ArrowDown, Bot, Paperclip, Send, Square } from 'lucide-react'
 import { basename, useStore } from '../store'
 import { PROVIDERS } from '@shared/providers'
 import { buildContextPreview, type ContextPreview } from '@shared/context-preview'
@@ -30,6 +22,7 @@ import ApprovalDialog from './ApprovalDialog'
 import PreflightOverrideDialog from './PreflightOverrideDialog'
 import PlanCard from './PlanCard'
 import QuestionCard from './QuestionCard'
+import ToolGroupRow from './ToolGroupRow'
 import TaskTracker from './TaskTracker'
 import ExecutionBar from './ExecutionBar'
 import ProgressTimeline from './ProgressTimeline'
@@ -40,14 +33,14 @@ import GoalSummaryCard from './GoalSummaryCard'
 import LiveStatus from './LiveStatus'
 import JobsPanel from './JobsPanel'
 import MicButton from './MicButton'
-import { FullAccessBanner, FullAccessToggle } from './FullAccessToggle'
+import { FullAccessBanner } from './FullAccessToggle'
 import { filterSlashCommands, resolveSlashCommand } from '../lib/slash'
 import { decideSend, type PendingAttachment } from '../lib/context-gate'
 import { modelSupportsVision } from '@shared/attachments'
 import { attachmentPaths, dedupePaths, pasteIntent } from '../lib/attach-drop'
 import { workspaceStatus, shouldShowWorkspaceBanner } from '../lib/project-status'
 import { CHAT_MAX_WIDTH } from '../lib/layout'
-import { visibleChatMessages } from '../lib/tool-rows'
+import { groupToolRows, visibleChatMessages } from '../lib/tool-rows'
 import { toolLabel } from '../lib/tool-labels'
 import { contextBudget, contextWarningVisible } from '@shared/memory'
 
@@ -201,6 +194,14 @@ export default function ChatPanel(): JSX.Element {
     () => visibleChatMessages(messages, decisions, showRawToolRows),
     [messages, decisions, showRawToolRows]
   )
+  /*
+   * v4.3: consecutive calls to the same tool collapse into one row. The resolver stays here
+   * because the roster is store state; the row itself takes a display name, never an id.
+   */
+  const vpsServers = useStore((state) => state.vpsServers)
+  const toolRows = useMemo(() => groupToolRows(chatMessages), [chatMessages])
+  const serverNameFor = (serverId?: string): string | undefined =>
+    serverId ? vpsServers.find((server) => server.id === serverId)?.name : undefined
   const contextPercent = Math.min(100, Math.round(budget.ratio * 100))
 
   useEffect(() => {
@@ -453,11 +454,11 @@ export default function ChatPanel(): JSX.Element {
             <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
               {/* v4.0: the mark is a stamped plate and the title is a label — the empty state
                   states what this is instead of advertising it. */}
-              <div className="brutal-panel flex h-14 w-14 items-center justify-center shadow-shape-sm">
+              <div className="ui-panel flex h-14 w-14 items-center justify-center">
                 <Bot className="h-7 w-7 text-accent" />
               </div>
               <div>
-                <h1 className="brutal-label text-sm text-fg-strong">
+                <h1 className="ui-label text-sm text-fg-strong">
                   {t('chat.emptyTitleProject', { project: activeProject.name })}
                 </h1>
                 <p className="mt-1 max-w-md text-sm text-fg-muted">{t('chat.emptyBody')}</p>
@@ -468,7 +469,7 @@ export default function ChatPanel(): JSX.Element {
                     key={key}
                     type="button"
                     onClick={() => void send(t(key))}
-                    className="brutal-btn brutal-press py-2 text-start text-xs"
+                    className="ui-btn ui-press py-2 text-start text-xs"
                   >
                     {t(key)}
                   </button>
@@ -503,7 +504,21 @@ export default function ChatPanel(): JSX.Element {
             </div>
           )
         ) : (
-          chatMessages.map((message) => <MessageBubble key={message.id} message={message} />)
+          toolRows.map((row) =>
+            row.kind === 'group' ? (
+              <ToolGroupRow
+                key={row.key}
+                tool={row.tool}
+                messages={row.messages}
+                outcome={row.outcome}
+                durationMs={row.durationMs}
+                {...(row.serverId ? { serverId: row.serverId } : {})}
+                {...(row.serverId ? { serverName: serverNameFor(row.serverId) } : {})}
+              />
+            ) : (
+              <MessageBubble key={row.key} message={row.message} />
+            )
+          )
         )}
 
         <LiveStatus />
@@ -537,7 +552,7 @@ export default function ChatPanel(): JSX.Element {
           type="button"
           onClick={scrollToBottom}
           aria-label={t('chat.typing')}
-          className="absolute bottom-36 left-1/2 flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-shape-pill border border-border bg-bg-secondary text-fg shadow-shape transition-colors duration-fast ease-shape hover:bg-bg-tertiary"
+          className="absolute bottom-36 left-1/2 flex h-8 w-8 -translate-x-1/2 items-center justify-center rounded-shape-pill border border-border bg-bg-secondary text-fg transition-colors duration-fast ease-shape hover:bg-bg-tertiary"
         >
           <ArrowDown className="h-4 w-4" />
         </button>
@@ -556,7 +571,7 @@ export default function ChatPanel(): JSX.Element {
       ) : null}
 
       {warnings.length > 0 ? (
-        <div className="brutal-banner mx-3 mb-2 flex items-start gap-2 border-warning text-2xs text-warning">
+        <div className="ui-banner mx-3 mb-2 flex items-start gap-2 border-warning text-2xs text-warning">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <div className="flex flex-col gap-0.5">
             {warnings.map((warning, index) => (
@@ -614,6 +629,17 @@ export default function ChatPanel(): JSX.Element {
           </div>
         ) : null}
 
+        {contextWarningVisible(showContextWarning, budget.nearLimit) ? (
+          <div className="mb-1.5">
+            <ContextWarning
+              percent={contextPercent}
+              overBudget={budget.overBudget}
+              running={running}
+              onCompact={compactContext}
+            />
+          </div>
+        ) : null}
+
         {matches.length > 0 ? (
             <div className="mb-2 overflow-hidden rounded-lg border border-border bg-bg-secondary">
               {matches.map((command, index) => (
@@ -636,15 +662,10 @@ export default function ChatPanel(): JSX.Element {
             </div>
           ) : null}
 
-          {/* v3.0 clay: the composer is the app's primary touchable surface — the full
-              clay tier. The field is a recessed well inside the raised hero.
-              v3.1: this is also where a drop or a paste lands, so the handlers sit on
-              the hero rather than on the textarea — the whole composer is the target,
-              which is what a user aims at. */}
+          {/* v4.3: the composer is attach · input · model · send. A drop or a paste lands on
+              the whole surface, which is what a user aims at. */}
           <div
-            className={`brutal-panel p-2 transition-shadow duration-base ${
-              attachDragOver ? 'ring-2 ring-accent' : ''
-            }`}
+            className={`ui-panel p-2 ${attachDragOver ? 'border-accent' : ''}`}
             data-testid="composer-hero"
             onDragOver={(event) => {
               // preventDefault is what makes this element a valid drop target at all.
@@ -680,7 +701,7 @@ export default function ChatPanel(): JSX.Element {
               rows={1}
               dir={dir}
               placeholder={t('chat.placeholder')}
-              className="brutal-inset max-h-[200px] min-h-[2.25rem] flex-1 resize-none rounded-shape-sm px-2 py-2 text-sm text-fg-strong outline-none placeholder:text-fg-subtle"
+              className="ui-inset max-h-[200px] min-h-[2.25rem] flex-1 resize-none rounded-shape-sm px-2 py-2 text-sm text-fg-strong outline-none placeholder:text-fg-subtle"
             />
             <span className="shrink-0">
               <ModelSwitcher />
@@ -692,7 +713,7 @@ export default function ChatPanel(): JSX.Element {
                 onClick={abort}
                 title={`${t('chat.stop')} (Shift+Esc)`}
                 aria-label={`${t('chat.stop')} (Shift+Esc)`}
-                className="brutal-press flex h-8 w-8 items-center justify-center rounded-shape-pill bg-danger/20 text-danger hover:bg-danger/30"
+                className="ui-press flex h-8 w-8 items-center justify-center rounded-shape-pill bg-danger/20 text-danger hover:bg-danger/30"
               >
                 <Square className="h-4 w-4" />
               </button>
@@ -705,7 +726,7 @@ export default function ChatPanel(): JSX.Element {
                 aria-label={t('chat.send')}
                 className={`flex h-8 w-8 items-center justify-center rounded-shape-pill ${
                   input.trim() || attached.length > 0
-                    ? 'brutal-press bg-accent-solid text-accent-fg hover:bg-accent-solid-hover'
+                    ? 'ui-press bg-accent-solid text-accent-fg hover:bg-accent-solid-hover'
                     : 'bg-bg-tertiary text-fg-muted'
                 } disabled:cursor-not-allowed`}
               >
@@ -713,31 +734,6 @@ export default function ChatPanel(): JSX.Element {
               </button>
             )}
           </div>
-          <div className="mt-1.5 flex items-center justify-between px-1">
-            <div className="flex items-center gap-2">
-              <FullAccessToggle />
-              <button
-                type="button"
-                onClick={() => previewContext(input.trim(), false)}
-                title={t('chat.viewContext')}
-                className="flex items-center gap-1 rounded-shape-sm px-1.5 py-0.5 text-3xs text-fg-muted transition-colors duration-fast hover:bg-bg-tertiary hover:text-fg"
-              >
-                <Eye className="h-3 w-3" />
-                {t('chat.viewContext')}
-              </button>
-            </div>
-            {contextWarningVisible(showContextWarning, budget.nearLimit) ? (
-              <ContextWarning
-                percent={contextPercent}
-                overBudget={budget.overBudget}
-                running={running}
-                onCompact={compactContext}
-              />
-            ) : null}
-          </div>
-        </div>
-        <div className="mt-1.5 flex items-center justify-between px-1 text-3xs text-fg-subtle">
-          <span>Enter = {t('chat.send')} · Shift+Enter = ↵ · Ctrl+Enter = {t('chat.send')}</span>
         </div>
         </div>
       </div>

@@ -26,7 +26,7 @@ export default function PolicyWarningBanner({
   return (
     <div
       role="alert"
-      className="brutal-banner mt-3 border-warning text-warning"
+      className="ui-banner mt-3 border-warning text-warning"
     >
       <p className="flex items-start gap-2 text-[12px] font-medium">
         <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />

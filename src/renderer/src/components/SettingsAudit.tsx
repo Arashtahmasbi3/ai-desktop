@@ -44,19 +44,19 @@ export default function SettingsAudit(): JSX.Element {
 
   return (
     <section className="flex flex-col gap-3">
-      <h3 className="brutal-label flex items-center gap-2">
+      <h3 className="ui-label flex items-center gap-2">
         <ScrollText className="h-3.5 w-3.5" />
         {t('settings.audit')}
       </h3>
       <p className="text-2xs text-fg-muted">{t('settings.auditHint')}</p>
 
-      <div className="brutal-card p-3">
+      <div className="ui-card p-3">
         <div className="flex items-center gap-1.5 text-2xs text-fg-muted">
           <FileCheck2 className="h-3.5 w-3.5" />
           {t('settings.auditPath')}
         </div>
         {path ? (
-          <code className="brutal-data mt-1 block break-all text-2xs" dir="ltr">
+          <code className="ui-data mt-1 block break-all text-2xs" dir="ltr">
             {path}
           </code>
         ) : (
@@ -68,7 +68,7 @@ export default function SettingsAudit(): JSX.Element {
         type="button"
         onClick={() => void verify()}
         disabled={verifying || !path}
-        className="brutal-btn inline-flex w-fit items-center gap-1.5"
+        className="ui-btn inline-flex w-fit items-center gap-1.5"
       >
         <ShieldCheck className="h-3.5 w-3.5" />
         {verifying ? t('settings.auditVerifying') : t('settings.auditVerify')}
@@ -78,14 +78,14 @@ export default function SettingsAudit(): JSX.Element {
 
       {result ? (
         result.ok ? (
-          <p className="brutal-banner flex items-center gap-1.5 border-success text-2xs text-success">
+          <p className="ui-banner flex items-center gap-1.5 border-success text-2xs text-success">
             <ShieldCheck className="h-3.5 w-3.5" />
             {t('settings.auditOk', { count: result.lines })}
           </p>
         ) : (
-          <p className="brutal-banner flex items-center gap-1.5 border-danger text-2xs text-danger">
+          <p className="ui-banner flex items-center gap-1.5 border-danger text-2xs text-danger">
             <ShieldAlert className="h-3.5 w-3.5" />
-            <span className="brutal-data">
+            <span className="ui-data">
               {t('settings.auditBroken', {
                 line: (result.brokenAt ?? 0) + 1,
                 reason: result.reason ?? 'hash mismatch'

@@ -41,7 +41,7 @@ export default function ToastHost(): JSX.Element | null {
           <div
             key={toast.id}
             role="status"
-            className={`pointer-events-auto flex items-start gap-2 rounded-lg border px-3 py-2 text-xs shadow-lg backdrop-blur ${COLORS[toast.kind]}`}
+            className={`pointer-events-auto flex items-start gap-2 rounded-lg border px-3 py-2 text-xs backdrop-blur ${COLORS[toast.kind]}`}
           >
             <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span className="min-w-0 flex-1 break-words">{toast.message}</span>

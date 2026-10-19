@@ -167,7 +167,7 @@ export default function DecisionCard({ decision, compact, summary, onExplain }: 
       {open ? (
         <div data-testid="decision-body" className="space-y-2 border-t border-border px-2.5 py-2">
           <section>
-            <h4 className="text-3xs font-semibold uppercase tracking-wide text-fg-muted">
+            <h4 className="text-3xs font-semibold text-fg-muted">
               {t('trace.intent')}
             </h4>
             <MarkdownProse
@@ -188,7 +188,7 @@ export default function DecisionCard({ decision, compact, summary, onExplain }: 
           </section>
 
           <section>
-            <h4 className="text-3xs font-semibold uppercase tracking-wide text-fg-muted">
+            <h4 className="text-3xs font-semibold text-fg-muted">
               {t('trace.evidence')}
             </h4>
             {decision.evidence.length === 0 ? (
@@ -212,7 +212,7 @@ export default function DecisionCard({ decision, compact, summary, onExplain }: 
           </section>
 
           <section>
-            <h4 className="text-3xs font-semibold uppercase tracking-wide text-fg-muted">
+            <h4 className="text-3xs font-semibold text-fg-muted">
               {t('trace.decision')}
             </h4>
             <p className="mt-0.5 text-2xs leading-snug text-fg">{decision.decision}</p>
@@ -236,7 +236,7 @@ export default function DecisionCard({ decision, compact, summary, onExplain }: 
 
           {explanation ? (
             <div className="rounded border border-border/70 bg-bg-tertiary/40 p-2">
-              <p className="text-3xs font-semibold uppercase tracking-wide text-fg-muted">
+              <p className="text-3xs font-semibold text-fg-muted">
                 {t('trace.why')}
               </p>
               <ul className="mt-1 space-y-0.5">

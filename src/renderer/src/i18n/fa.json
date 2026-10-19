@@ -35,7 +35,8 @@
     "maximize": "بزرگ کردن",
     "restore": "بازگرداندن",
     "close": "بستن",
-    "commandPalette": "پالت دستورات"
+    "commandPalette": "پالت دستورات",
+    "menu": "ترجیحات"
   },
   "sidebar": {
     "newChat": "چت جدید",
@@ -71,7 +72,8 @@
     "policyMismatch": "سیاست پروژه با سیاست میزبان تفاوت دارد",
     "navGoals": "اهداف",
     "newChatInProject": "چت جدید در این پروژه",
-    "chatsInProject": "{{count}} چت"
+    "chatsInProject": "{{count}} چت",
+    "openProject": "باز کردن پروژه"
   },
   "chat": {
     "placeholder": "هر کاری انجام بده",
@@ -306,7 +308,15 @@
     "questionPaused": "هنوز پاسخی نرسیده؛ اجرا همین‌جا متوقف است و خودش ادامه نمی‌دهد.",
     "questionResume": "با بهترین فرض من ادامه بده",
     "toolBlocked": "مسدود",
-    "toolStderrWarnHint": "با کد ۰ تمام شد ولی در stderr نوشت — موفق با هشدار."
+    "toolStderrWarnHint": "با کد ۰ تمام شد ولی در stderr نوشت — موفق با هشدار.",
+    "toolGroupCommands_one": "{{count}} فرمان",
+    "toolGroupCommands_other": "{{count}} فرمان",
+    "toolGroup_one": "{{count}} فراخوانی",
+    "toolGroup_other": "{{count}} فراخوانی",
+    "toolGroupServer": "روی {{server}}",
+    "toolGroupAllOk": "همه موفق",
+    "toolGroupWarning": "با هشدار",
+    "toolGroupExpand": "نمایش {{count}} فراخوانی"
   },
   "vpsSelector": {
     "label": "VPS",
@@ -1088,7 +1098,8 @@
     "accessTitlePlan": "حالت برنامه روشن است: عامل فقط برنامه می‌نویسد و هیچ ابزاری اجرا نمی‌کند.",
     "accessTitleAsk": "پرسش: هر فراخوانی ابزار اول منتظر تأیید شما می‌ماند.",
     "accessTitleAutoWrite": "نوشتن خودکار: خواندن و جست‌وجو آزاد است؛ نوشتن و فرمان‌های شل اول می‌پرسند.",
-    "accessTitleFull": "دسترسی کامل: تا وقتی خاموشش نکنید هیچ ابزاری نمی‌پرسد."
+    "accessTitleFull": "دسترسی کامل: تا وقتی خاموشش نکنید هیچ ابزاری نمی‌پرسد.",
+    "sessionTokens": "{{tokens}} توکن"
   },
   "fileExplorer": {
     "noProjects": "هیچ پروژه‌ای اضافه نشده. از Settings یک پوشهٔ پروژه اضافه کنید یا یک پوشه را روی پنجره رها کنید.",
@@ -1265,5 +1276,9 @@
     "recommendThisComputer": "انتقال را از این کامپیوتر انجام بده: این مسیر باز است و لازم نیست چیزی از سمت ارائه‌دهنده باز شود.",
     "recommendFromSource": "انتقال را از سروری اجرا کن که به مقصد می‌رسد؛ این کامپیوتر نمی‌تواند.",
     "recommendProvider": "از ارائه‌دهنده بخواه TCP {{port}} را باز کند: خود مقصد در حال گوش دادن است."
+  },
+  "questionSheet": {
+    "title": "عامل سؤالی دارد",
+    "skip": "رد کردن"
   }
 }

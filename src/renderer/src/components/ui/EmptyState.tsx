@@ -73,12 +73,12 @@ export default function EmptyState({
       data-testid={testId ?? EMPTY_STATE_TEST_ID}
       data-tone={tone}
       role={tone === 'error' ? 'alert' : undefined}
-      className={`brutal-card flex flex-col items-start gap-2 p-4 text-start${
+      className={`ui-card flex flex-col items-start gap-2 p-4 text-start${
         tone === 'error' ? ' border-danger' : ''
       }${className ? ` ${className}` : ''}`}
     >
       {mark ? <div aria-hidden="true">{mark}</div> : null}
-      <p className="brutal-label text-fg">{title}</p>
+      <p className="ui-label text-fg">{title}</p>
       {body ? <p className="max-w-prose text-xs leading-relaxed text-fg-muted">{body}</p> : null}
       {actions.length > 0 ? (
         <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -92,7 +92,7 @@ export default function EmptyState({
                * A toast-triggering action is never "primary" and a navigation is never "danger":
                * the filled surface is reserved for the one thing that moves the user forward.
                */
-              className={action === primary ? 'brutal-btn brutal-primary' : 'brutal-btn'}
+              className={action === primary ? 'ui-btn ui-primary' : 'ui-btn'}
             >
               {action.label}
             </button>
@@ -101,10 +101,10 @@ export default function EmptyState({
       ) : null}
       {detail ? (
         <details className="mt-1 w-full">
-          <summary className="brutal-label cursor-pointer text-fg-subtle">{detail.label}</summary>
+          <summary className="ui-label cursor-pointer text-fg-subtle">{detail.label}</summary>
           <pre
             dir="ltr"
-            className="brutal-inset mt-1 max-h-32 overflow-auto whitespace-pre-wrap px-2 py-1 text-3xs text-fg-muted"
+            className="ui-inset mt-1 max-h-32 overflow-auto whitespace-pre-wrap px-2 py-1 text-3xs text-fg-muted"
           >
             {detail.text}
           </pre>

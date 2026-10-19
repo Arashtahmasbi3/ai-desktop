@@ -52,7 +52,7 @@ export default function SourcesList(): JSX.Element {
   return (
     <div className="flex flex-col gap-3 text-xs">
       <section data-testid="chat-memory">
-        <p className="mb-1 flex items-center gap-1.5 text-3xs font-semibold uppercase tracking-wide text-fg-subtle">
+        <p className="mb-1 flex items-center gap-1.5 text-3xs font-semibold text-fg-subtle">
           <Brain className="h-3 w-3" />
           {t('workspace.memoryTitle')}
         </p>
@@ -101,7 +101,7 @@ export default function SourcesList(): JSX.Element {
       </section>
 
       <section>
-        <p className="mb-1 text-3xs font-semibold uppercase tracking-wide text-fg-subtle">
+        <p className="mb-1 text-3xs font-semibold text-fg-subtle">
           {t('workspace.filesRead')}
         </p>
         {filesRead.length === 0 ? (
@@ -123,7 +123,7 @@ export default function SourcesList(): JSX.Element {
       </section>
 
       <section>
-        <p className="mb-1 text-3xs font-semibold uppercase tracking-wide text-fg-subtle">
+        <p className="mb-1 text-3xs font-semibold text-fg-subtle">
           {t('workspace.context')}
         </p>
         <ul className="space-y-0.5">
@@ -140,7 +140,7 @@ export default function SourcesList(): JSX.Element {
 
       {preview.blockedFiles.length > 0 ? (
         <section>
-          <p className="mb-1 text-3xs font-semibold uppercase tracking-wide text-warning">
+          <p className="mb-1 text-3xs font-semibold text-warning">
             {t('workspace.withheld')}
           </p>
           <ul className="space-y-0.5">
@@ -154,7 +154,7 @@ export default function SourcesList(): JSX.Element {
       ) : null}
 
       <section>
-        <p className="mb-1 text-3xs font-semibold uppercase tracking-wide text-fg-subtle">
+        <p className="mb-1 text-3xs font-semibold text-fg-subtle">
           {t('workspace.excluded')}
         </p>
         <ul className="space-y-0.5 text-fg-subtle">

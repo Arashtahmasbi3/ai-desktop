@@ -118,7 +118,7 @@ export default function InlineTrace(): JSX.Element | null {
       // inside an RTL chat. `auto` resolves per element, and the commands/tool
       // chips below keep their own explicit LTR direction.
       dir="auto"
-      className="brutal-card mx-4 flex flex-col gap-1 p-2"
+      className="ui-card mx-4 flex flex-col gap-1 p-2"
     >
       <button
         type="button"
@@ -128,7 +128,7 @@ export default function InlineTrace(): JSX.Element | null {
         className="flex items-center gap-2 px-0.5 text-left"
       >
         <Activity className="h-3.5 w-3.5 shrink-0 text-accent" />
-        <span className="text-3xs font-semibold uppercase tracking-wide text-fg-muted">
+        <span className="text-3xs font-semibold text-fg-muted">
           {t('trace.inlineTitle')}
         </span>
         <span

@@ -35,7 +35,8 @@
     "maximize": "Maximize",
     "restore": "Restore",
     "close": "Close",
-    "commandPalette": "Command palette"
+    "commandPalette": "Command palette",
+    "menu": "Preferences"
   },
   "sidebar": {
     "newChat": "New chat",
@@ -71,7 +72,8 @@
     "policyMismatch": "Project policy differs from the host policy",
     "navGoals": "Goals",
     "newChatInProject": "New chat in this project",
-    "chatsInProject": "{{count}} chats"
+    "chatsInProject": "{{count}} chats",
+    "openProject": "Open project"
   },
   "chat": {
     "placeholder": "Do anything",
@@ -306,7 +308,15 @@
     "questionPaused": "No answer yet, so the run is paused here. It will not continue on its own.",
     "questionResume": "Resume with my best assumption",
     "toolBlocked": "blocked",
-    "toolStderrWarnHint": "Exited 0 but wrote to stderr — succeeded with warnings."
+    "toolStderrWarnHint": "Exited 0 but wrote to stderr — succeeded with warnings.",
+    "toolGroupCommands_one": "{{count}} command",
+    "toolGroupCommands_other": "{{count}} commands",
+    "toolGroup_one": "{{count}} call",
+    "toolGroup_other": "{{count}} calls",
+    "toolGroupServer": "on {{server}}",
+    "toolGroupAllOk": "all ok",
+    "toolGroupWarning": "with warnings",
+    "toolGroupExpand": "Show the {{count}} calls"
   },
   "vpsSelector": {
     "label": "VPS",
@@ -1088,7 +1098,8 @@
     "accessTitlePlan": "Plan mode is on: the agent drafts a plan and runs no tools.",
     "accessTitleAsk": "Ask: every tool call waits for your approval first.",
     "accessTitleAutoWrite": "Auto-write: reads and searches run freely; writes and shell commands ask first.",
-    "accessTitleFull": "Full access: every tool runs without asking until you turn it off."
+    "accessTitleFull": "Full access: every tool runs without asking until you turn it off.",
+    "sessionTokens": "{{tokens}} tokens"
   },
   "fileExplorer": {
     "noProjects": "No project added yet. Add a project folder from Settings, or drop a folder onto the window.",
@@ -1265,5 +1276,9 @@
     "recommendThisComputer": "Transfer through this computer: this path is open, so nothing has to be opened on the provider's side.",
     "recommendFromSource": "Run the transfer from the server that can reach it: this computer cannot.",
     "recommendProvider": "Ask the provider to open TCP {{port}}: the target itself is listening."
+  },
+  "questionSheet": {
+    "title": "The agent has a question",
+    "skip": "Skip"
   }
 }

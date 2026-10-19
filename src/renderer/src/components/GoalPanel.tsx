@@ -70,12 +70,12 @@ function GoalCard({ goal }: { goal: Goal }): JSX.Element {
           <div className="flex items-center gap-2">
             <span className="truncate text-sm text-fg-strong">{goal.title}</span>
             <span
-              className={`shrink-0 rounded px-1.5 py-0.5 text-3xs uppercase ${STATUS_CLASS[goal.status]}`}
+              className={`shrink-0 rounded px-1.5 py-0.5 text-3xs ${STATUS_CLASS[goal.status]}`}
             >
               {t(STATUS_LABEL[goal.status])}
             </span>
             {isActive ? (
-              <span className="shrink-0 rounded bg-accent-solid/15 px-1.5 py-0.5 text-3xs uppercase text-accent">
+              <span className="shrink-0 rounded bg-accent-solid/15 px-1.5 py-0.5 text-3xs text-accent">
                 {t('goals.pinned')}
               </span>
             ) : null}

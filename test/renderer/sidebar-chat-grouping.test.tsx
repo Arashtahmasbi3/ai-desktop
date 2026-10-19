@@ -96,29 +96,37 @@ beforeEach(() => {
 })
 
 describe('v2.8.0 — chat history grouped under its project', () => {
-  it('renders a group per project that has chats, each with its own chats', () => {
+  it('renders ONE tree: each project appears once, with its own chats nested under it', () => {
     render(<Sidebar />)
 
-    // The name appears twice by design: once in the projects list, once as the
-    // history group's header.
-    expect(screen.getAllByText('alpha-project').length).toBeGreaterThan(1)
-    expect(screen.getAllByText('beta-project').length).toBeGreaterThan(1)
+    /*
+     * v4.3 merged PROJECTS and RECENTS into a single tree. Before that, every project name
+     * appeared twice — once as a project row and once as the history group's heading — which is
+     * exactly the duplication the report asked to have removed.
+     */
+    expect(screen.getAllByText('alpha-project')).toHaveLength(1)
+    expect(screen.getAllByText('beta-project')).toHaveLength(1)
 
-    // Each group is rendered (its "+" is unique to it)…
+    // Each project node still offers its own "new chat"…
     expect(screen.getByTestId('project-new-chat-p1')).toBeTruthy()
     expect(screen.getByTestId('project-new-chat-p2')).toBeTruthy()
-    // …and every chat is listed exactly once.
+    // …every chat is listed exactly once, under its own project…
     expect(screen.getAllByText('Alpha chat')).toHaveLength(1)
     expect(screen.getAllByText('Beta chat')).toHaveLength(1)
+    expect(screen.getByTestId('chat-row-c1')).toBeTruthy()
+    expect(screen.getByTestId('chat-row-c2')).toBeTruthy()
   })
 
-  it('shows no group for a project with no chats', () => {
+  it('leaves a project with no chats empty, without inventing a row for it', () => {
     useStore.setState({ chats: [chat('c1', 'Alpha chat', 'p1')] })
     render(<Sidebar />)
 
-    // beta has no chats, so it has no history group and no "+" in that section.
-    expect(screen.queryByTestId('project-new-chat-p2')).toBeNull()
-    expect(screen.getByTestId('project-new-chat-p1')).toBeTruthy()
+    // beta is still a project node (a project without chats is a project), but it has no chats
+    // nested under it — and the only chat row on screen belongs to alpha.
+    expect(screen.getByTestId('project-node-p2')).toBeTruthy()
+    expect(screen.getByTestId('chat-row-c1')).toBeTruthy()
+    expect(screen.queryByTestId('chat-row-c2')).toBeNull()
+    expect(screen.getAllByTestId('chat-row-c1')).toHaveLength(1)
   })
 
   it('puts a chat with no project binding in the trailing "No project" bucket', () => {

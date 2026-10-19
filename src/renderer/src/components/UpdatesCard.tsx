@@ -67,17 +67,17 @@ export default function UpdatesCard(): JSX.Element {
   }
 
   return (
-    <div className="brutal-card flex flex-col gap-3 p-3">
+    <div className="ui-card flex flex-col gap-3 p-3">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <RefreshCw className={phase === 'checking' ? 'h-3.5 w-3.5 animate-spin text-accent' : 'h-3.5 w-3.5 text-accent'} />
-          <span className="brutal-label text-fg">{t('settings.updates')}</span>
+          <span className="ui-label text-fg">{t('settings.updates')}</span>
         </div>
         <button
           type="button"
           onClick={() => void check()}
           disabled={phase === 'checking' || phase === 'downloading'}
-          className="brutal-btn"
+          className="ui-btn"
         >
           {phase === 'checking' ? t('settings.updateChecking') : t('settings.updateCheck')}
         </button>
@@ -85,7 +85,7 @@ export default function UpdatesCard(): JSX.Element {
 
       <p className="text-3xs text-fg-subtle">{t('settings.updatesHint')}</p>
 
-      <div className="brutal-inset flex flex-col gap-2 p-2.5 text-2xs">
+      <div className="ui-inset flex flex-col gap-2 p-2.5 text-2xs">
         <div className="flex items-center gap-2">
           {phase === 'current' ? (
             <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-success" />
@@ -98,7 +98,7 @@ export default function UpdatesCard(): JSX.Element {
             {result ? describeCheck(result) : t('settings.updateNeverChecked')}
           </span>
           {result ? (
-            <span className="brutal-data ml-auto shrink-0 text-3xs text-fg-subtle">
+            <span className="ui-data ml-auto shrink-0 text-3xs text-fg-subtle">
               {t('settings.updateCurrent')}: {result.current}
             </span>
           ) : null}
@@ -121,7 +121,7 @@ export default function UpdatesCard(): JSX.Element {
           <button
             type="button"
             onClick={() => void download()}
-            className="brutal-btn brutal-press brutal-primary mt-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-2xs"
+            className="ui-btn ui-press ui-primary mt-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-2xs"
           >
             <DownloadCloud className="h-3.5 w-3.5" />
             {t('settings.updateDownload', { size: formatUpdateSize(result.manifest.size) })}
@@ -140,7 +140,7 @@ export default function UpdatesCard(): JSX.Element {
             <button
               type="button"
               onClick={() => void install()}
-              className="brutal-btn brutal-press brutal-primary mt-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-2xs"
+              className="ui-btn ui-press ui-primary mt-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-2xs"
             >
               <Rocket className="h-3.5 w-3.5" />
               {t('settings.updateInstall')}

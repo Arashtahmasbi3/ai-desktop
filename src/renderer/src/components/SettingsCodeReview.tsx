@@ -52,7 +52,7 @@ export default function SettingsCodeReview(): JSX.Element {
 
   return (
     <section className="flex flex-col gap-3">
-      <h3 className="brutal-label flex items-center gap-2">
+      <h3 className="ui-label flex items-center gap-2">
         <GitFork className="h-3.5 w-3.5" />
         {t('settings.codeReview')}
       </h3>
@@ -67,7 +67,7 @@ export default function SettingsCodeReview(): JSX.Element {
         <p className="text-2xs text-fg-subtle">{t('settings.codeReviewNoAuth')}</p>
       ) : (
         <>
-          <label className="brutal-inset brutal-focus flex items-center gap-2 px-2 py-1.5">
+          <label className="ui-inset ui-focus flex items-center gap-2 px-2 py-1.5">
             <Search className="h-3.5 w-3.5 text-fg-muted" />
             <input
               value={query}
@@ -86,9 +86,9 @@ export default function SettingsCodeReview(): JSX.Element {
                 return (
                   <li
                     key={repo.fullName}
-                    className="brutal-card flex items-center justify-between gap-3 px-3 py-2"
+                    className="ui-card flex items-center justify-between gap-3 px-3 py-2"
                   >
-                    <span className="brutal-data min-w-0 truncate text-xs" dir="ltr">
+                    <span className="ui-data min-w-0 truncate text-xs" dir="ltr">
                       {repo.fullName}
                     </span>
                     <label className="flex shrink-0 cursor-pointer items-center gap-2 text-2xs text-fg-muted">

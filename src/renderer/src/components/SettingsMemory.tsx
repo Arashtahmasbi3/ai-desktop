@@ -146,19 +146,19 @@ export default function SettingsMemory(): JSX.Element {
 
   return (
     <section className="flex flex-col gap-3">
-      <h3 className="brutal-label flex items-center gap-2">
+      <h3 className="ui-label flex items-center gap-2">
         <MemoryStick className="h-3.5 w-3.5" />
         {t('settings.memory')}
       </h3>
       <p className="text-2xs text-fg-muted">{t('settings.memoryHint')}</p>
 
-      <div className="brutal-panel p-3">
+      <div className="ui-panel p-3">
         <div className="flex items-center justify-between text-xs text-fg">
           <span className="flex items-center gap-1.5">
             <Cpu className="h-3.5 w-3.5" />
             {t('settings.contextUsage')}
           </span>
-          <span className={`brutal-data ${overBudget ? 'text-warning' : 'text-fg-muted'}`}>
+          <span className={`ui-data ${overBudget ? 'text-warning' : 'text-fg-muted'}`}>
             {tokens.toLocaleString()} / {DEFAULT_CONTEXT_TOKEN_BUDGET.toLocaleString()}
           </span>
         </div>
@@ -174,13 +174,13 @@ export default function SettingsMemory(): JSX.Element {
       </div>
 
       {/* The fact ledger: everything the app believes about this project, including the past. */}
-      <div className="brutal-panel flex flex-col gap-2 p-3">
+      <div className="ui-panel flex flex-col gap-2 p-3">
         <div className="flex items-center justify-between gap-2">
           <span className="flex items-center gap-1.5 text-xs font-semibold text-fg">
             <Brain className="h-3.5 w-3.5 text-accent" />
             {t('settings.factsTitle')}
           </span>
-          <span className="brutal-data shrink-0 text-3xs text-fg-subtle">
+          <span className="ui-data shrink-0 text-3xs text-fg-subtle">
             {t('settings.factsCount', { live: live.length, superseded: past })}
           </span>
         </div>
@@ -198,7 +198,7 @@ export default function SettingsMemory(): JSX.Element {
             type="button"
             onClick={() => void learn()}
             disabled={!activeChatId || learning}
-            className="brutal-btn brutal-primary flex items-center gap-1.5 px-2.5 py-1 text-2xs"
+            className="ui-btn ui-primary flex items-center gap-1.5 px-2.5 py-1 text-2xs"
           >
             <Sparkles className="h-3.5 w-3.5" />
             {learning ? t('settings.factsLearning') : t('settings.factsLearn')}
@@ -210,8 +210,8 @@ export default function SettingsMemory(): JSX.Element {
             <button
               type="button"
               onClick={() => void forgetAll()}
-              className={`brutal-btn ml-auto flex items-center gap-1.5 px-2.5 py-1 text-2xs ${
-                confirmingClear ? 'brutal-danger text-danger' : 'hover:text-danger'
+              className={`ui-btn ml-auto flex items-center gap-1.5 px-2.5 py-1 text-2xs ${
+                confirmingClear ? 'ui-danger text-danger' : 'hover:text-danger'
               }`}
             >
               <Eraser className="h-3.5 w-3.5" />
@@ -254,12 +254,12 @@ export default function SettingsMemory(): JSX.Element {
                     >
                       {fact.text}
                     </div>
-                    <div className="brutal-data mt-0.5 flex flex-wrap items-center gap-1.5 text-3xs text-fg-subtle">
+                    <div className="ui-data mt-0.5 flex flex-wrap items-center gap-1.5 text-3xs text-fg-subtle">
                       <span>
                         {t('settings.factsObserved', { date: factDate(fact.validAt) })}
                       </span>
                       {isLive ? null : (
-                        <span className="brutal-chip">
+                        <span className="ui-chip">
                           {status === 'expired'
                             ? t('settings.factsExpired')
                             : t('settings.factsSuperseded')}
@@ -277,7 +277,7 @@ export default function SettingsMemory(): JSX.Element {
                     onClick={() => void forget(fact.id)}
                     aria-label={t('settings.factsForgetOne')}
                     title={t('settings.factsForgetOne')}
-                    className="brutal-btn shrink-0 p-1 text-fg-subtle hover:text-danger"
+                    className="ui-btn shrink-0 p-1 text-fg-subtle hover:text-danger"
                   >
                     <Trash2 className="h-3 w-3" />
                   </button>

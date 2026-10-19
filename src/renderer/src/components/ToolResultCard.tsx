@@ -152,7 +152,7 @@ export default function ToolResultCard(props: ToolCallView): JSX.Element {
 
   return (
     <div
-      className={`brutal-card flex max-w-[min(52rem,88%)] flex-col overflow-hidden ${
+      className={`ui-card flex max-w-[min(52rem,88%)] flex-col overflow-hidden ${
         succeeded ? '' : outcome === 'blocked' ? 'border border-warning/40' : 'border border-danger/40'
       }`}
       dir="ltr"
@@ -268,7 +268,7 @@ export default function ToolResultCard(props: ToolCallView): JSX.Element {
         >
           {error ? (
             <div>
-              <p className="mb-0.5 text-3xs uppercase tracking-wide text-danger">
+              <p className="mb-0.5 text-3xs text-danger">
                 {t('chat.toolCause')}
               </p>
               <pre className="whitespace-pre-wrap break-words font-mono text-2xs text-danger">
@@ -301,7 +301,7 @@ export default function ToolResultCard(props: ToolCallView): JSX.Element {
 
           {raw ? (
             <div>
-              <p className="mb-0.5 text-3xs uppercase tracking-wide text-fg-muted">
+              <p className="mb-0.5 text-3xs text-fg-muted">
                 {t('chat.toolRawCommand')}
               </p>
               <pre
@@ -349,7 +349,7 @@ export default function ToolResultCard(props: ToolCallView): JSX.Element {
           {stdout ? (
             <div>
               <div className="mb-0.5 flex items-center justify-between gap-2">
-                <p className="text-3xs uppercase tracking-wide text-fg-muted">
+                <p className="text-3xs text-fg-muted">
                   {t('chat.toolStdout')}
                 </p>
                 {longOutput ? (
@@ -372,7 +372,7 @@ export default function ToolResultCard(props: ToolCallView): JSX.Element {
 
           {stderr ? (
             <div>
-              <p className="mb-0.5 text-3xs uppercase tracking-wide text-warning">
+              <p className="mb-0.5 text-3xs text-warning">
                 {t('chat.toolStderr')}
               </p>
               <pre className="max-h-40 overflow-auto rounded bg-bg-primary px-2 py-1.5 font-mono text-2xs whitespace-pre-wrap text-warning/90">

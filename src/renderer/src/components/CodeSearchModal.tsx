@@ -45,7 +45,7 @@ export default function CodeSearchModal(): JSX.Element | null {
       onClick={() => setSearchOpen(false)}
     >
       <div
-        className="flex max-h-[70vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-border bg-bg-secondary shadow-2xl"
+        className="flex max-h-[70vh] w-full max-w-2xl flex-col overflow-hidden rounded-shape border border-border bg-bg-secondary"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center gap-2 border-b border-border px-3 py-2">

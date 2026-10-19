@@ -64,12 +64,12 @@ export default function ProgressTimeline({ embedded }: ProgressTimelineProps = {
       data-testid="progress-timeline"
       className={
         embedded
-          ? 'flex max-h-72 w-full shrink-0 flex-col overflow-hidden rounded-xl border border-border bg-bg-secondary'
+          ? 'flex max-h-72 w-full shrink-0 flex-col overflow-hidden rounded-shape border border-border bg-bg-secondary'
           : 'flex h-full w-64 shrink-0 flex-col border-l border-border bg-bg-secondary'
       }
     >
       <div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-1.5">
-        <span className="text-3xs font-semibold uppercase tracking-wide text-fg-muted">
+        <span className="text-3xs font-semibold text-fg-muted">
           {t('timeline.title')}
         </span>
         {running ? <Loader2 className="h-3 w-3 animate-spin text-accent" /> : null}

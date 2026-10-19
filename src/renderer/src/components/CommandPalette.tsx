@@ -118,7 +118,7 @@ export default function CommandPalette(): JSX.Element | null {
       <div
         role="dialog"
         aria-label={t('palette.title')}
-        className="w-[min(34rem,90vw)] overflow-hidden rounded-xl border border-border bg-bg-secondary shadow-2xl"
+        className="w-[min(34rem,90vw)] overflow-hidden rounded-shape border border-border bg-bg-secondary"
       >
         <input
           ref={inputRef}

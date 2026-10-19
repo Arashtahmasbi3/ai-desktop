@@ -13,7 +13,7 @@
   "test/renderer/sidebar-chat-grouping.test.tsx": 6,
   "test/renderer/settings-audit.test.tsx": 5,
   "test/renderer/settings-projects.test.tsx": 5,
-  "test/renderer/sidebar-navigation.test.tsx": 5,
+  "test/renderer/sidebar-navigation.test.tsx": 4,
   "test/renderer/plan-dialog.test.tsx": 4,
   "test/renderer/settings-mcp.test.tsx": 4,
   "test/renderer/ui-hardening.test.tsx": 4,

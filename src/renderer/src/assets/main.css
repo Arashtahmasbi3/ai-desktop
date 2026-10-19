@@ -4,7 +4,7 @@
 
 /*
  * ---------------------------------------------------------------------------
- * Theme palettes (v2.7.0)
+ * Theme palettes (v2.7.0, geometry v4.3)
  * ---------------------------------------------------------------------------
  * Light is the default ("day") theme; `.dark` on <html> switches to the dark
  * palette the app shipped with. Values are space-separated RGB triplets so
@@ -23,8 +23,9 @@
     --bg-tertiary: 237 235 231;
     --bg-elevated: 255 255 254;
     /*
-     * Border hierarchy (v4.0). The previous values sat at roughly 1.1:1 against the page, so 180
-     * borders rendered as nothing. These are the two tiers: a visible separator, and ink.
+     * Border hierarchy. One hairline for structure, one stronger line for a surface that
+     * must read as a container. Both are visible against the page (the pre-3.0 values sat at
+     * roughly 1.1:1 and rendered as nothing).
      */
     --border: 176 169 159;
     --border-strong: 66 62 58;
@@ -58,34 +59,38 @@
     --scrollbar-thumb-hover: 180 175 168;
 
     /*
-     * Brutalist geometry (v4.0). Two steps only: a square edge, and a hairline micro-round for
-     * inputs and tiny chips where a true 0 reads as a rendering mistake. "Pill" survives solely
-     * for status dots, which are circles by definition rather than by style choice.
+     * Linux-desktop geometry (v4.3). Three radius steps, all small: a hairline round for
+     * inputs and chips, the 6px system step for cards and menus, and one step up for a
+     * dialog. "Pill" survives solely for status dots and the composer's round buttons,
+     * which are circles by definition rather than by style choice.
      */
-    --shape-r-sm: 2px;
-    --shape-r: 0px;
-    --shape-r-lg: 0px;
+    --shape-r-sm: 4px;
+    --shape-r: 6px;
+    --shape-r-lg: 8px;
     --shape-pill: 999px;
-    /** The one border width that means "this is a surface". */
-    --shape-border: 2px;
+    /** The one border width that means "this is a surface". A hairline, by contract. */
+    --shape-border: 1px;
     /*
-     * Hard offset shadows: zero blur, so they read as ink rather than as a light source. This is
-     * what replaces clay's blurred double shadow — the same signal (this floats) with none of the
-     * softness that made every surface compete for attention.
+     * No depth. A desktop application separates regions with a 1px line and a flat
+     * background step, not with an offset or a blurred shadow — this token exists so a
+     * component that asks for one gets nothing rather than inventing its own.
      */
-    --shape-shadow: 4px 4px 0 0 rgb(var(--fg-strong));
-    --shape-shadow-sm: 2px 2px 0 0 rgb(var(--fg-strong));
-    --shape-shadow-accent: 4px 4px 0 0 rgb(var(--accent));
-    --shape-shadow-outline: 0 0 0 var(--shape-border) rgb(var(--fg-strong));
+    --shape-shadow: none;
+    --shape-shadow-sm: none;
+    --shape-shadow-accent: none;
 
     /*
-     * Motion: instant. Brutalism does not ease — a state change is a state change. Non-zero so
-     * transitionend listeners still fire, which the reduced-motion block already depends on.
+     * Motion: instant, or one short step. Nothing eases for longer than 120ms — a control
+     * that moves for a quarter of a second reads as an animation, not as a response. Non-zero
+     * so transitionend listeners still fire, which the reduced-motion block depends on.
      */
     --motion-fast: 60ms;
     --motion-base: 90ms;
     --motion-slow: 120ms;
-    --ease-shape: linear;
+    --ease-shape: ease-out;
+
+    /** The dense list row: one height for every row in the tree, the menus and the status line. */
+    --row-h: 28px;
 
     /* A real scale, so overlays stop guessing with arbitrary z-[N] values. */
     --z-base: 0;
@@ -106,7 +111,6 @@
     --bg-secondary: 27 25 23;
     --bg-tertiary: 37 34 32;
     --bg-elevated: 31 29 27;
-    /* Border hierarchy (v4.0) — the dark theme's edges were as invisible as the light one's. */
     --border: 92 87 80;
     --border-strong: 176 169 159;
 
@@ -136,16 +140,6 @@
     --focus-ring: 167 139 250;
     --scrollbar-thumb: 55 52 49;
     --scrollbar-thumb-hover: 72 68 64;
-
-    /*
-     * A shadow cannot be dark-on-dark, so the dark theme draws its offset from the foreground ramp
-     * instead: the same hard ink edge, in the one direction that is visible on this background.
-     * Still zero blur, still no light source — it stays an edge, not a glow.
-     */
-    --shape-shadow: 4px 4px 0 0 rgb(var(--border-strong));
-    --shape-shadow-sm: 2px 2px 0 0 rgb(var(--border-strong));
-    --shape-shadow-accent: 4px 4px 0 0 rgb(var(--accent-solid));
-    --shape-shadow-outline: 0 0 0 var(--shape-border) rgb(var(--border-strong));
   }
 
   html,
@@ -154,10 +148,16 @@
     height: 100%;
   }
 
+  /*
+   * The desktop's own font. A GTK/Qt application inherits the system UI face; it does not
+   * ship a branded one — so the stack starts at `system-ui` and only falls through to the
+   * bundled Persian face for glyphs the system font does not carry.
+   */
   body {
     @apply bg-bg-primary text-fg antialiased;
     margin: 0;
-    font-family: 'Inter', 'Vazirmatn', ui-sans-serif, system-ui, sans-serif;
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', 'Helvetica Neue',
+      Arial, 'Vazirmatn', sans-serif;
     overflow: hidden;
   }
 
@@ -381,82 +381,83 @@
 }
 
 /*
- * Brutalist surfaces (v4.0). These classes are the whole vocabulary; components pick a tier
- * instead of inventing their own borders, shadows and padding.
+ * The surface vocabulary (v4.3 — a desktop vocabulary). These classes are the whole set;
+ * a component picks a tier instead of inventing its own border, radius and padding.
  *
- *   brutal-panel — a bordered surface that sits ON the page (a modal, the composer, a card)
- *   brutal-inset — a bordered well that sits IN a surface (a text field, a code block, search)
- *   brutal-press — the interaction signature: the surface moves INTO its own shadow when pressed
- *   brutal-label — the uppercase micro-label that names a region without spending colour on it
- *   brutal-data  — monospace tabular figures: any number, id, path, token count or price
- *   brutal-primary / brutal-danger / brutal-focus — the three semantic states worth a class
+ *   ui-panel — a bordered surface that sits ON the page (a modal, the composer, a card)
+ *   ui-card  — a quieter container: a 1px line and the page's own background
+ *   ui-inset — a recessed well that sits IN a surface (a text field, a code block, search)
+ *   ui-row   — the dense list row: one 28px height, used by the tree, the menus and the status line
+ *   ui-press — the interaction signature: the row takes the hover/active background, nothing moves
+ *   ui-label — a quiet region label. Sentence case, normal tracking — never a micro-caps stamp
+ *   ui-data  — monospace tabular figures: any number, id, path, token count or price
+ *   ui-primary / ui-danger / ui-focus — the three semantic states worth a class
  *
- * Two rules that keep this from becoming pastiche, because brutalism applied to everything IS the
- * "cluttered and over-saturated" complaint it is meant to answer:
+ * Three rules keep this from drifting back into decoration, which is the complaint the previous
+ * vocabulary answered with its opposite:
  *
- *   1. **Depth is for things you can touch.** A surface gets its offset shadow only when it is
- *      interactive. Static containers get a border and no shadow, so the eye can tell what responds.
- *   2. **Never two shouting elements.** A heavy-bordered surface does not also take the accent fill,
- *      and the security dialogs keep the border with **no** offset shadow — a decision about a
- *      destructive command should not look playful.
+ *   1. **A line, not a box.** Structure is a 1px hairline; a second border weight does not exist.
+ *   2. **No depth.** Nothing casts a shadow, and nothing translates when pressed. State is a
+ *      background step and a border colour.
+ *   3. **One accent.** `accent` marks the primary action and the selected row. Everything else
+ *      is the neutral ramp; a state colour appears as a dot or a 1px marker, not as a wash.
  */
 @layer components {
-  .brutal-panel {
-    @apply rounded-shape border-2 border-fg-strong bg-bg-elevated;
+  .ui-panel {
+    @apply rounded-shape border border-border-strong bg-bg-elevated;
+  }
+
+  .ui-card {
+    @apply rounded-shape border border-border bg-bg-elevated;
+  }
+
+  .ui-inset {
+    @apply rounded-shape-sm border border-border bg-bg-tertiary;
+  }
+
+  .ui-press {
+    @apply transition-colors duration-fast ease-shape;
+  }
+
+  .ui-press:hover {
+    @apply bg-bg-tertiary;
+  }
+
+  .ui-press:active {
+    @apply bg-bg-tertiary;
+    /* Nothing moves. A desktop control changes colour; it does not slide into a shadow. */
+    transform: none;
+  }
+
+  /** The dense row height, in one place. Plain CSS so the value is a token, not a utility guess. */
+  .ui-row {
+    display: flex;
+    align-items: center;
+    height: var(--row-h);
+    min-height: var(--row-h);
   }
 
   /**
-   * Secondary containers: visible structure, no shadow. A card you cannot click should not float —
-   * that was the single biggest contributor to "everything competes for attention".
+   * A notice bar. A desktop notice is a hairline box with one short rail in its state
+   * colour, so the colour carries the meaning and the surface stays quiet.
    */
-  .brutal-card {
-    @apply rounded-shape border-2 border-border-strong bg-bg-elevated;
+  .ui-banner {
+    @apply rounded-shape border border-l-[3px] bg-bg-elevated px-3 py-2;
   }
 
-  .brutal-inset {
-    @apply rounded-shape-sm border border-border-strong bg-bg-tertiary;
+  /** A bordered button: the default interactive surface. */
+  .ui-btn {
+    @apply ui-focus rounded-shape border border-border-strong bg-bg-elevated px-3 py-1 text-xs font-medium text-fg transition-colors duration-fast ease-shape hover:bg-bg-tertiary disabled:opacity-50;
   }
 
-  .brutal-press {
-    @apply transition-[box-shadow,transform] duration-fast ease-shape;
+  /** A chip: a read-out, not a button. Sentence case, one line. */
+  .ui-chip {
+    @apply inline-flex items-center gap-1 rounded-shape-sm border border-border bg-bg-secondary px-1.5 py-0.5 text-3xs font-medium text-fg-muted;
   }
 
-  .brutal-press:hover {
-    @apply shadow-shape;
-  }
-
-  .brutal-press:active {
-    @apply shadow-none;
-    /* Moves into where its shadow was: the press reads as the surface going down, not fading. */
-    transform: translate(2px, 2px);
-  }
-
-  /**
-   * A notice bar. Brutalism does not whisper in a soft tinted rounded box: the notice gets a solid
-   * edge in its own state colour plus a hard rail on the leading side, so it reads as a stamped
-   * label rather than as decoration — and it stays legible in both themes because the state colour
-   * is carried by a border, not only by a background wash.
-   */
-  .brutal-banner {
-    @apply rounded-shape border-2 border-l-8 bg-bg-elevated px-3 py-2;
-  }
-
-  /** A square, bordered button: the default interactive surface of the new language. */
-  .brutal-btn {
-    @apply brutal-focus rounded-shape border-2 border-border-strong bg-bg-elevated px-3 py-1.5 text-xs font-semibold text-fg transition-[box-shadow,transform] duration-fast ease-shape hover:border-fg-strong hover:shadow-shape-sm active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:opacity-50;
-  }
-
-  /**
-   * A chip: a state read-out ("Safe mode", "Idle", "3 files"). Square, hairline-round, and its
-   * label is uppercased so a row of chips reads as a legend instead of as buttons.
-   */
-  .brutal-chip {
-    @apply inline-flex items-center gap-1 rounded-shape-sm border border-border-strong bg-bg-secondary px-1.5 py-0.5 text-3xs font-semibold uppercase tracking-label text-fg-muted;
-  }
-
-  /** A tab or segmented control: same geometry, flatter, with the selected one filled in. */
-  .brutal-tab {
-    @apply rounded-shape border-2 border-transparent px-2.5 py-1 text-2xs font-bold uppercase tracking-label text-fg-muted transition-colors duration-fast hover:text-fg;
+  /** A tab or segmented control: flat, with the selected one taking a background step. */
+  .ui-tab {
+    @apply rounded-shape-sm border border-transparent px-2.5 py-1 text-2xs font-medium text-fg-muted transition-colors duration-fast hover:text-fg;
   }
 
   /*
@@ -464,44 +465,44 @@
    * in this codebase uses aria-pressed, the tab strip uses aria-selected, and list rows use
    * data-selected — supporting only one of them is how the panel tabs ended up unstyled.
    */
-  .brutal-tab[aria-selected='true'],
-  .brutal-tab[aria-pressed='true'],
-  .brutal-tab[data-selected='true'] {
-    @apply border-fg-strong bg-bg-tertiary text-fg-strong;
+  .ui-tab[aria-selected='true'],
+  .ui-tab[aria-pressed='true'],
+  .ui-tab[data-selected='true'] {
+    @apply border-border bg-bg-tertiary text-fg-strong;
   }
 
-  .brutal-label {
-    @apply text-2xs font-bold uppercase tracking-label text-fg-muted;
+  .ui-label {
+    @apply text-2xs font-medium text-fg-muted;
   }
 
-  .brutal-data {
+  .ui-data {
     @apply font-mono tabular-nums text-fg;
   }
 
   /** The single most important control on a surface (send, save, apply). */
-  .brutal-primary {
-    @apply rounded-shape border-2 border-fg-strong bg-accent-solid text-accent-fg shadow-shape-sm;
+  .ui-primary {
+    @apply rounded-shape border border-accent-solid bg-accent-solid text-accent-fg;
   }
 
   /** Destructive or irreversible. Border and colour, never a soft tint alone. */
-  .brutal-danger {
-    @apply rounded-shape border-2 border-danger bg-danger/10 text-danger;
+  .ui-danger {
+    @apply rounded-shape border border-danger bg-danger/10 text-danger;
   }
 
   /**
    * Keyboard focus must be unmissable: a 2px accent outline offset from the edge, so it survives
-   * on top of the hard border instead of hiding inside it.
+   * on top of the hairline instead of hiding inside it.
    */
-  .brutal-focus {
-    @apply outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent;
+  .ui-focus {
+    @apply outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent;
   }
 }
 
-/* A hard-edged scrollbar, because a soft rounded thumb on a square surface is the tell. */
+/* A hairline scrollbar: a soft rounded thumb on a flat surface is the tell of a web app. */
 @layer utilities {
-  .brutal-scroll {
+  .ui-scroll {
     scrollbar-width: thin;
-    scrollbar-color: rgb(var(--border-strong)) transparent;
+    scrollbar-color: rgb(var(--border)) transparent;
   }
 }
 

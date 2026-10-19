@@ -62,7 +62,7 @@ export default function GitSetupDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-      <div className="flex max-h-[calc(100vh-2rem)] w-[min(32rem,92vw)] flex-col overflow-hidden rounded-lg border border-border bg-bg-secondary shadow-xl">
+      <div className="flex max-h-[calc(100vh-2rem)] w-[min(32rem,92vw)] flex-col overflow-hidden rounded-lg border border-border bg-bg-secondary">
         <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-2.5">
           <div className="flex items-center gap-2 text-sm text-fg">
             <GitBranch className="h-4 w-4 text-accent" />

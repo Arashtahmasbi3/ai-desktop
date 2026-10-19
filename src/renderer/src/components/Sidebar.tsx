@@ -6,7 +6,6 @@ import {
   ChevronRight,
   Copy,
   Download,
-  FolderOpen,
   FolderTree,
   GitFork,
   Globe,
@@ -15,17 +14,14 @@ import {
   MessageSquare,
   MoreHorizontal,
   Pin,
-  Plug,
   Plus,
   Search,
   Server,
   Settings2,
   Target,
-  Trash2,
-  User
+  Trash2
 } from 'lucide-react'
 import type { ChatSummary } from '@shared/chat'
-import { groupChatsByProject } from '@shared/chat'
 import type { HostPolicy } from '@shared/vps'
 import type { ProjectRecord } from '@shared/ui'
 import { basename, useStore, type ViewId } from '../store'
@@ -95,7 +91,7 @@ export interface SidebarProps {
 }
 
 /**
- * The navigation entries the user has not switched off. Brutalism is not the point here — honesty
+ * The navigation entries the user has not switched off. Style is not the point here — honesty
  * is: Settings → Surfaces offers a Browser switch, and a switch that does not remove the thing it
  * names is exactly the kind of lie this release set out to remove from the app.
  */
@@ -103,6 +99,28 @@ function visibleNav(): typeof NAV {
   return NAV.filter((item) => item.id !== 'browser' || isCapabilityEnabled('browser'))
 }
 
+/** Unassigned chats: a chat with no project is still a chat, and it needs somewhere to live. */
+const UNASSIGNED = '__unassigned'
+
+/**
+ * The sidebar (v4.3) — **one** tree.
+ *
+ * The previous build had two lists that described the same data: `PROJECTS` (a row per project)
+ * and `RECENTS` (the same projects again as headers, with their chats under them), so every project
+ * name appeared twice and every chat sat in a section whose heading repeated a row above it. On top
+ * of that the bottom of the sidebar offered `Workspace / Surfaces / User`, which the report
+ * correctly identified as three more names for "the sidebar" and "settings".
+ *
+ * It is now a single tree and a single header:
+ *
+ *   header    New chat · notifications · pin, then the search box, then one compact view switcher
+ *   tree      project node (collapsible) → its chats, nested and indented
+ *             …then a trailing "No project" node for chats with no project binding
+ *
+ * The "one row per project" detail survives as `project-chat-count`, `project-new-chat-<id>` and
+ * the per-project connection test, because those are actions on the project rather than a second
+ * copy of it.
+ */
 export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
   const { t } = useTranslation()
   const collapsed = useStore((state) => state.sidebarCollapsed) || Boolean(rail)
@@ -134,8 +152,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
   const [query, setQuery] = useState('')
   const [chatMenuFor, setChatMenuFor] = useState<string | null>(null)
   const [projectMenuFor, setProjectMenuFor] = useState<string | null>(null)
-  const [workspaceOpen, setWorkspaceOpen] = useState(false)
-  const [projectsOpen, setProjectsOpen] = useState(true)
+  const [collapsedProjects, setCollapsedProjects] = useState<string[]>([])
   const [searchingId, setSearchingId] = useState<string | null>(null)
   const servers = useStore((state) => state.vpsServers)
   // v2.8.0: the connected *set*, so more than one project can show a live dot.
@@ -166,24 +183,24 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  const filtered = useMemo(
-    () => chats.filter((chat) => chat.title.toLowerCase().includes(query.trim().toLowerCase())),
-    [chats, query]
-  )
   const projects = settings?.projects ?? []
-  const activeProject = projects.find((project) => project.id === settings?.activeProjectId)
-  // v2.8.0: the history is grouped under its project again (see the Recents block).
-  const chatGroups = useMemo(
-    () =>
-      groupChatsByProject(
-        filtered,
-        projects.map((project) => project.id)
-      ),
-    [filtered, projects]
+  const normalized = query.trim().toLowerCase()
+  const filtered = useMemo(
+    () => chats.filter((chat) => chat.title.toLowerCase().includes(normalized)),
+    [chats, normalized]
   )
-  const projectNameFor = (projectId: string): string | undefined =>
-    projects.find((project) => project.id === projectId)?.name
-  const serverName = (serverId?: string): string | undefined =>
+  /** Chats nested under each project node; a matching project keeps all of its chats. */
+  const chatsFor = useMemo(() => {
+    const index = new Map<string, ChatSummary[]>()
+    for (const chat of filtered) {
+      const key = chat.workspaceId ?? UNASSIGNED
+      const bucket = index.get(key)
+      if (bucket) bucket.push(chat)
+      else index.set(key, [chat])
+    }
+    return index
+  }, [filtered])
+  const serverNameFor = (serverId?: string): string | undefined =>
     servers.find((server) => server.id === serverId)?.name
 
   const projectState = (project: ProjectRecord): DotState => {
@@ -213,9 +230,13 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
     return t('sidebar.connDisconnected')
   }
 
-  /** Chats saved under a project's workspace, shown as a per-project counter. */
-  const chatCountFor = (projectId: string): number =>
-    chats.filter((chat) => chat.workspaceId === projectId).length
+  const toggleProject = (projectId: string): void => {
+    setCollapsedProjects((current) =>
+      current.includes(projectId)
+        ? current.filter((id) => id !== projectId)
+        : [...current, projectId]
+    )
+  }
 
   const onRename = (chat: ChatSummary): void => {
     setChatMenuFor(null)
@@ -267,11 +288,100 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
 
   const VISIBLE_NAV = visibleNav()
 
+  /** One chat row: title, age, and one overflow trigger. */
+  const chatRow = (chat: ChatSummary): JSX.Element => (
+    <div
+      key={chat.id}
+      data-testid={`chat-row-${chat.id}`}
+      className="group relative flex items-center ps-6"
+    >
+      <button
+        type="button"
+        onClick={() => void loadSession(chat.id)}
+        className={`ui-row flex min-w-0 flex-1 items-center gap-2 rounded-shape-sm px-2 text-left text-xs transition-colors duration-fast ${
+          activeChatId === chat.id
+            ? 'bg-accent-solid/15 text-fg-strong'
+            : 'text-fg hover:bg-bg-tertiary'
+        }`}
+      >
+        <span className="min-w-0 flex-1 truncate">{chat.title}</span>
+        <span data-testid="chat-row-time" className="shrink-0 text-3xs text-fg-subtle">
+          {formatChatAge(chat.updatedAt)}
+        </span>
+      </button>
+      <button
+        type="button"
+        aria-label={t('common.more')}
+        data-testid={`chat-row-more-${chat.id}`}
+        onClick={() => setChatMenuFor(chatMenuFor === chat.id ? null : chat.id)}
+        className="hidden h-7 w-7 shrink-0 items-center justify-center rounded-shape-sm text-fg-muted hover:bg-bg-tertiary hover:text-fg focus-visible:flex group-hover:flex group-focus-within:flex"
+      >
+        <MoreHorizontal className="h-3.5 w-3.5" />
+      </button>
+
+      {chatMenuFor === chat.id ? (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setChatMenuFor(null)}
+            aria-hidden="true"
+          />
+          <div
+            role="menu"
+            className="absolute end-1 top-7 z-50 w-36 overflow-hidden rounded-shape border border-border bg-bg-elevated py-1 text-xs"
+          >
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => onRename(chat)}
+              className="ui-row ui-press w-full px-3 text-left text-fg"
+            >
+              {t('common.rename')}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setChatMenuFor(null)
+                void duplicateChat(chat.id)
+              }}
+              className="ui-row ui-press w-full gap-1.5 px-3 text-left text-fg"
+            >
+              <Copy className="h-3 w-3" />
+              {t('common.duplicate')}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setChatMenuFor(null)
+                exportChat(chat)
+              }}
+              className="ui-row ui-press w-full gap-1.5 px-3 text-left text-fg"
+            >
+              <Download className="h-3 w-3" />
+              {t('common.export')}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => onDelete(chat)}
+              className="ui-row ui-press w-full gap-1.5 px-3 text-left text-danger"
+            >
+              <Trash2 className="h-3 w-3" />
+              {t('common.delete')}
+            </button>
+          </div>
+        </>
+      ) : null}
+    </div>
+  )
+
   if (collapsed) {
     return (
       <nav
         aria-label={t('sidebar.chats')}
-        className="flex w-14 shrink-0 flex-col items-center gap-1 border-r border-border bg-bg-secondary py-2 transition-all duration-200"
+        className="flex w-14 shrink-0 flex-col items-center gap-1 border-e border-border bg-bg-secondary py-2 transition-all duration-200"
       >
         {VISIBLE_NAV.map((item) => {
           const Icon = item.icon
@@ -283,9 +393,9 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
               title={t(item.labelKey)}
               aria-label={t(item.labelKey)}
               onClick={() => setView(item.id)}
-              className={`relative flex h-9 w-9 items-center justify-center rounded-lg transition ${
+              className={`relative flex h-9 w-9 items-center justify-center rounded-shape-sm transition-colors duration-fast ${
                 active
-                  ? 'bg-accent-solid/20 text-accent'
+                  ? 'bg-accent-solid/15 text-accent'
                   : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
               }`}
             >
@@ -293,12 +403,12 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
               {item.id === 'tasks' && runningJobs > 0 ? (
                 <span
                   data-testid="sidebar-jobs-badge-collapsed"
-                  className="absolute -right-1 -top-1 min-w-[14px] rounded-full bg-accent-solid px-1 text-center text-4xs font-semibold leading-3.5 text-bg-primary"
+                  className="absolute -end-1 -top-1 min-w-[14px] rounded-full bg-accent-solid px-1 text-center text-4xs font-semibold leading-3.5 text-accent-fg"
                 >
                   {runningJobs}
                 </span>
               ) : item.id === 'tasks' && (worker?.active ?? 0) > 0 ? (
-                <span className="absolute right-1 top-1 h-1.5 w-1.5 animate-pulse rounded-full bg-info" />
+                <span className="absolute end-1 top-1 h-1.5 w-1.5 animate-pulse rounded-full bg-info" />
               ) : null}
             </button>
           )
@@ -310,7 +420,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
           aria-label={t('sidebar.pin')}
           aria-pressed={sidebarPinned}
           onClick={() => setSidebarPinned(!sidebarPinned)}
-          className={`mt-auto flex h-9 w-9 items-center justify-center rounded-lg ${
+          className={`mt-auto flex h-9 w-9 items-center justify-center rounded-shape-sm ${
             sidebarPinned
               ? 'bg-accent-solid/15 text-accent'
               : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
@@ -323,7 +433,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
           title={t('common.settings')}
           aria-label={t('common.settings')}
           onClick={openSettings}
-          className="flex h-9 w-9 items-center justify-center rounded-lg text-fg-muted hover:bg-bg-tertiary hover:text-fg"
+          className="flex h-9 w-9 items-center justify-center rounded-shape-sm text-fg-muted hover:bg-bg-tertiary hover:text-fg"
         >
           <Settings2 className="h-4 w-4" />
         </button>
@@ -334,63 +444,27 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
   return (
     <nav
       aria-label={t('sidebar.chats')}
-      className="flex w-64 shrink-0 flex-col border-r border-border bg-bg-secondary transition-all duration-200"
+      className="flex w-64 shrink-0 flex-col border-e border-border bg-bg-secondary transition-all duration-200"
     >
-      <div className="flex shrink-0 flex-col gap-2 p-2">
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setWorkspaceOpen((open) => !open)}
-            className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-bg-tertiary"
-          >
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-accent-solid/15 text-accent">
-              <FolderTree className="h-3.5 w-3.5" />
-            </span>
-            <span className="min-w-0 flex-1 truncate text-xs font-medium text-fg">
-              {activeProject?.name ?? 'AI Desktop'}
-            </span>
-            <GitStatusPill />
-            <ChevronDown className="h-3.5 w-3.5 shrink-0 text-fg-muted" />
-          </button>
-          {workspaceOpen ? (
-            <>
-              <div
-                className="fixed inset-0 z-40"
-                onClick={() => setWorkspaceOpen(false)}
-                aria-hidden="true"
-              />
-              <div className="absolute left-1 right-1 top-10 z-50 overflow-hidden rounded-shape border-2 border-border-strong bg-bg-secondary py-1 text-xs shadow-shape">
-                {projects.map((project) => (
-                  <button
-                    key={project.id}
-                    type="button"
-                    onClick={() => {
-                      setWorkspaceOpen(false)
-                      void openProject(project.id)
-                    }}
-                    className="block w-full truncate px-3 py-1.5 text-left text-fg hover:bg-bg-tertiary"
-                  >
-                    {project.name}
-                  </button>
-                ))}
-              </div>
-            </>
-          ) : null}
-        </div>
-
+      {/* Sticky header: the actions and the search, never scrolled away with the tree. */}
+      <div className="flex shrink-0 flex-col gap-1.5 border-b border-border p-2">
         <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={() => newSession()}
-            className="brutal-card brutal-press flex flex-1 items-center justify-center gap-1.5 px-2 py-1.5 text-xs font-medium text-fg"
+            className="ui-btn ui-press flex h-7 flex-1 items-center justify-center gap-1.5 text-xs"
           >
             <Plus className="h-3.5 w-3.5" />
             {t('sidebar.newChat')}
           </button>
           <button
             type="button"
-            title={runningJobs > 0 ? t('jobs.badgeTitle', { count: runningJobs }) : t('sidebar.navTasks')}
-            aria-label={runningJobs > 0 ? t('jobs.badgeTitle', { count: runningJobs }) : t('sidebar.navTasks')}
+            title={
+              runningJobs > 0 ? t('jobs.badgeTitle', { count: runningJobs }) : t('sidebar.navTasks')
+            }
+            aria-label={
+              runningJobs > 0 ? t('jobs.badgeTitle', { count: runningJobs }) : t('sidebar.navTasks')
+            }
             data-testid="sidebar-jobs-button"
             onClick={() => {
               if (runningJobs > 0) {
@@ -400,18 +474,18 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                 setView('tasks')
               }
             }}
-            className="relative flex h-7 w-7 items-center justify-center rounded-lg text-fg-muted hover:bg-bg-tertiary hover:text-fg"
+            className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-shape-sm text-fg-muted hover:bg-bg-tertiary hover:text-fg"
           >
             <Bell className="h-3.5 w-3.5" />
             {runningJobs > 0 ? (
               <span
                 data-testid="sidebar-jobs-badge"
-                className="absolute -right-1 -top-1 min-w-[14px] rounded-full bg-accent-solid px-1 text-center text-4xs font-semibold leading-3.5 text-bg-primary"
+                className="absolute -end-1 -top-1 min-w-[14px] rounded-full bg-accent-solid px-1 text-center text-4xs font-semibold leading-3.5 text-accent-fg"
               >
                 {runningJobs}
               </span>
             ) : (worker?.active ?? 0) > 0 ? (
-              <span className="absolute right-1 top-1 h-1.5 w-1.5 animate-pulse rounded-full bg-info" />
+              <span className="absolute end-1 top-1 h-1.5 w-1.5 animate-pulse rounded-full bg-info" />
             ) : null}
           </button>
           <button
@@ -421,7 +495,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
             aria-label={sidebarPinned ? t('sidebar.unpin') : t('sidebar.pin')}
             aria-pressed={sidebarPinned}
             onClick={() => setSidebarPinned(!sidebarPinned)}
-            className={`flex h-7 w-7 items-center justify-center rounded-lg ${
+            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-shape-sm ${
               sidebarPinned
                 ? 'bg-accent-solid/15 text-accent'
                 : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
@@ -431,120 +505,120 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
           </button>
         </div>
 
-        <label className="flex items-center gap-1.5 rounded-lg border border-border bg-bg-primary px-2 py-1.5 focus-within:border-accent/50">
-          <Search className="h-3.5 w-3.5 text-fg-muted" />
+        <label className="flex h-7 items-center gap-1.5 rounded-shape-sm border border-border bg-bg-primary px-2 focus-within:border-accent">
+          <Search className="h-3.5 w-3.5 shrink-0 text-fg-muted" />
           <input
             ref={searchRef}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={t('common.search')}
             aria-label={t('common.search')}
-            className="w-full bg-transparent text-xs text-fg outline-none placeholder:text-fg-muted"
+            className="w-full bg-transparent text-xs text-fg outline-none placeholder:text-fg-subtle"
           />
-          <kbd className="shrink-0 rounded border border-border px-1 text-4xs text-fg-muted">
-            Ctrl ⇧ K
-          </kbd>
+          <kbd className="shrink-0 text-4xs text-fg-subtle">Ctrl Shift K</kbd>
         </label>
+
+        {/*
+          One compact view switcher. The bottom-of-sidebar Workspace / Surfaces / User entries were
+          three names for two destinations already present elsewhere (the right rail, the title
+          bar's settings button, this sidebar), so they are gone — but the views themselves still
+          need one visible control, and this row is that control, in the same order the rail uses.
+        */}
+        <div role="group" aria-label={t('sidebar.navChat')} className="flex items-center gap-0.5">
+          {VISIBLE_NAV.map((item) => {
+            const Icon = item.icon
+            const active = view === item.id
+            return (
+              <button
+                key={item.id}
+                type="button"
+                data-testid={`sidebar-view-${item.id}`}
+                title={t(item.labelKey)}
+                aria-label={t(item.labelKey)}
+                aria-pressed={active}
+                onClick={() => setView(item.id)}
+                className={`flex h-7 flex-1 items-center justify-center rounded-shape-sm transition-colors duration-fast ${
+                  active
+                    ? 'bg-accent-solid/15 text-accent'
+                    : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+              </button>
+            )
+          })}
+        </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-2">
-        <section className="mb-2">
-          <button
-            type="button"
-            onClick={() => setProjectsOpen((open) => !open)}
-            aria-expanded={projectsOpen}
-            className="flex w-full items-center gap-1 px-2 py-1 text-3xs font-semibold uppercase tracking-wide text-fg-muted hover:text-fg"
-          >
-            {projectsOpen ? (
-              <ChevronDown className="h-3 w-3 shrink-0" />
-            ) : (
-              <ChevronRight className="h-3 w-3 shrink-0" />
-            )}
-            {t('sidebar.projects')}
-          </button>
-          {projectsOpen && projects.length === 0 ? (
-            <p className="px-2 py-1 text-2xs text-fg-muted">{t('settings.noProjects')}</p>
-          ) : projectsOpen ? (
-            projects.map((project) => {
-              const state = projectState(project)
-              const server = serverName(project.vpsId)
-              const chatCount = chatCountFor(project.id)
-              return (
-                <div key={project.id} className="group relative mb-1">
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => void openProject(project.id)}
-                      className={`brutal-card brutal-press flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left ${
-                        project.id === settings?.activeProjectId
-                          ? 'bg-accent-solid/15 text-fg-strong'
-                          : 'text-fg'
-                      }`}
+      {/* The tree: one node per project, its chats nested under it. */}
+      <div className="min-h-0 flex-1 overflow-y-auto py-1">
+        {projects.length === 0 ? (
+          <p className="px-3 py-2 text-2xs text-fg-subtle">{t('settings.noProjects')}</p>
+        ) : (
+          projects.map((project) => {
+            const state = projectState(project)
+            const chatCount = chatsFor.get(project.id)?.length ?? 0
+            const open = !collapsedProjects.includes(project.id)
+            const nested = chatsFor.get(project.id) ?? []
+            return (
+              <div key={project.id} data-testid={`project-node-${project.id}`}>
+                <div className="group relative flex items-center gap-1 px-1">
+                  <button
+                    type="button"
+                    data-testid={`project-toggle-${project.id}`}
+                    onClick={() => toggleProject(project.id)}
+                    aria-expanded={open}
+                    aria-label={project.name}
+                    title={project.name}
+                    className={`ui-row ui-press min-w-0 flex-1 gap-1.5 rounded-shape-sm px-1 text-left ${
+                      project.id === settings?.activeProjectId
+                        ? 'bg-accent-solid/15 text-fg-strong'
+                        : 'text-fg'
+                    }`}
+                  >
+                    {open ? (
+                      <ChevronDown className="h-3 w-3 shrink-0 text-fg-subtle" />
+                    ) : (
+                      <ChevronRight className="h-3 w-3 shrink-0 text-fg-subtle" />
+                    )}
+                    <ProjectBadges
+                      project={project}
+                      connectionDotClass={dotClass(state)}
+                      connectionTitle={connectionTitleFor(state)}
+                      serverName={serverNameFor(project.vpsId)}
+                      policyMismatch={hasPolicyMismatch(project.policy, hostPolicyFor(project.vpsId))}
+                    />
+                  </button>
+                  {project.id === settings?.activeProjectId ? <GitStatusPill /> : null}
+                  {chatCount > 0 ? (
+                    <span
+                      data-testid="project-chat-count"
+                      title={t('sidebar.chatCount', { count: chatCount })}
+                      className="shrink-0 text-3xs text-fg-subtle group-hover:hidden group-focus-within:hidden"
                     >
-                      <span className="min-w-0 flex-1">
-                        <ProjectBadges
-                          project={project}
-                          connectionDotClass={dotClass(state)}
-                          connectionTitle={connectionTitleFor(state)}
-                          serverName={server}
-                          policyMismatch={hasPolicyMismatch(
-                            project.policy,
-                            hostPolicyFor(project.vpsId)
-                          )}
-                        />
-                        {project.type === 'remote' && !project.vpsId ? (
-                          <span className="block truncate text-3xs text-warning/90">
-                            {`⚠ ${t('sidebar.remoteNoVps')}`}
-                          </span>
-                        ) : state === 'missing' ? (
-                          <span className="block truncate text-3xs text-warning/90">
-                            {project.osMismatch ? t('sidebar.osMismatch') : t('sidebar.missingPath')}
-                          </span>
-                        ) : (
-                          <span
-                            className="block truncate text-3xs text-fg-muted"
-                            dir="ltr"
-                          >
-                            {basename(project.path)}
-                          </span>
-                        )}
-                      </span>
-                    </button>
-                    {chatCount > 0 ? (
-                      <span
-                        data-testid="project-chat-count"
-                        title={t('sidebar.chatCount', { count: chatCount })}
-                        className="shrink-0 rounded bg-bg-primary px-1.5 py-0.5 text-3xs text-fg-muted group-hover:hidden group-focus-within:hidden"
-                      >
-                        {chatCount}
-                      </span>
-                    ) : null}
-                    <button
-                      type="button"
-                      aria-label={t('common.more')}
-                      onClick={() =>
-                        setProjectMenuFor(projectMenuFor === project.id ? null : project.id)
-                      }
-                      className="hidden shrink-0 rounded p-1 text-fg-muted hover:bg-bg-primary hover:text-fg focus-visible:block group-hover:block group-focus-within:block"
-                    >
-                      <MoreHorizontal className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-
-                  {/*
-                    B2-2: this is the sidebar's server state — a remote project whose host is not
-                    connected. The app already knew how to answer "can this computer reach it?";
-                    the answer used to live on the Servers page, which a user staring at this row
-                    has no reason to open. No server selected means no control, not a dead one.
-                  */}
-                  {state === 'disconnected' && project.vpsId ? (
-                    <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1 px-2">
-                      <ConnectionTestButton
-                        serverId={project.vpsId}
-                        testId={`project-connection-test-${project.id}`}
-                      />
-                    </div>
+                      {chatCount}
+                    </span>
                   ) : null}
+                  <button
+                    type="button"
+                    data-testid={`project-new-chat-${project.id}`}
+                    onClick={() => void startChatInProject(project.id)}
+                    title={t('sidebar.newChatInProject')}
+                    aria-label={t('sidebar.newChatInProject')}
+                    className="hidden h-6 w-6 shrink-0 items-center justify-center rounded-shape-sm text-fg-muted hover:bg-bg-tertiary hover:text-fg focus-visible:flex group-hover:flex group-focus-within:flex"
+                  >
+                    <Plus className="h-3 w-3" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={t('common.more')}
+                    onClick={() =>
+                      setProjectMenuFor(projectMenuFor === project.id ? null : project.id)
+                    }
+                    className="hidden h-6 w-6 shrink-0 items-center justify-center rounded-shape-sm text-fg-muted hover:bg-bg-tertiary hover:text-fg focus-visible:flex group-hover:flex group-focus-within:flex"
+                  >
+                    <MoreHorizontal className="h-3.5 w-3.5" />
+                  </button>
 
                   {projectMenuFor === project.id ? (
                     <>
@@ -555,8 +629,20 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                       />
                       <div
                         role="menu"
-                        className="absolute right-1 top-8 z-50 w-40 overflow-hidden rounded-shape border-2 border-border-strong bg-bg-secondary py-1 text-xs shadow-shape"
+                        className="absolute end-1 top-7 z-50 w-44 overflow-hidden rounded-shape border border-border bg-bg-elevated py-1 text-xs"
                       >
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setProjectMenuFor(null)
+                            void openProject(project.id)
+                          }}
+                          className="ui-row ui-press w-full gap-1.5 px-3 text-left text-fg"
+                        >
+                          <FolderTree className="h-3 w-3" />
+                          {t('sidebar.openProject', { defaultValue: 'Open project' })}
+                        </button>
                         <button
                           type="button"
                           role="menuitem"
@@ -564,7 +650,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                             setProjectMenuFor(null)
                             void locate(project.id)
                           }}
-                          className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-fg hover:bg-bg-tertiary"
+                          className="ui-row ui-press w-full gap-1.5 px-3 text-left text-fg"
                         >
                           <MapPin className="h-3 w-3" />
                           {t('sidebar.locate')}
@@ -575,7 +661,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                             role="menuitem"
                             disabled={searchingId === project.id}
                             onClick={() => void searchOnVps(project)}
-                            className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-fg hover:bg-bg-tertiary disabled:opacity-40"
+                            className="ui-row ui-press w-full gap-1.5 px-3 text-left text-fg disabled:opacity-40"
                           >
                             <Server className="h-3 w-3" />
                             {t('sidebar.searchOnVps')}
@@ -590,7 +676,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                               void removeProject(project.id)
                             }
                           }}
-                          className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-danger hover:bg-bg-tertiary"
+                          className="ui-row ui-press w-full gap-1.5 px-3 text-left text-danger"
                         >
                           <Trash2 className="h-3 w-3" />
                           {t('common.remove')}
@@ -598,211 +684,80 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                       </div>
                     </>
                   ) : null}
-
-                  {vpsSearch?.id === project.id ? (
-                    <div className="ml-2 mt-0.5 rounded-lg border border-border bg-bg-primary p-1">
-                      <p className="px-1 py-0.5 text-3xs text-fg-muted">
-                        {t('vps.found', { count: vpsSearch.paths.length })}
-                      </p>
-                      {vpsSearch.paths.map((remotePath) => (
-                        <button
-                          key={remotePath}
-                          type="button"
-                          dir="ltr"
-                          onClick={() => void addFoundRemote(project.name, remotePath)}
-                          className="block w-full truncate rounded px-1.5 py-1 text-left text-2xs text-fg hover:bg-bg-tertiary"
-                        >
-                          {remotePath}
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
                 </div>
-              )
-            })
-          ) : null}
-        </section>
 
-        <section>
-          <h3 className="px-2 py-1 text-3xs font-semibold uppercase tracking-wide text-fg-muted">
-            {t('sidebar.recents')}
-          </h3>
-          {chats.length === 0 ? (
-            <p className="px-2 py-3 text-2xs leading-relaxed text-fg-muted">
-              {t('sidebar.emptyChats')}
-            </p>
-          ) : filtered.length === 0 ? (
-            <p className="px-2 py-3 text-2xs text-fg-muted">{t('palette.noResults')}</p>
-          ) : (
-            /*
-             * v2.8.0: group the history under its project again.
-             *
-             * `groupChatsByProject` was written for this in v2.2 and then orphaned by
-             * the v2.3 sidebar redesign, which made Recents one flat, project-blind
-             * list — so chats bound to a project looked like a single pile. Reported:
-             * "after creating a project I should be able to create chats under each
-             * project, with tidy, organised grouping."
-             */
-            chatGroups.map((group) => (
-              <div key={group.projectId ?? '__unassigned'}>
-                <p className="mt-2 flex items-center gap-1 px-2 py-1 text-3xs font-semibold uppercase tracking-wide text-fg-muted">
-                  <FolderOpen className="h-3 w-3 shrink-0" />
-                  <span className="truncate">
-                    {group.projectId
-                      ? (projectNameFor(group.projectId) ?? t('sidebar.noProject'))
-                      : t('sidebar.noProject')}
-                  </span>
-                  <span
-                    data-testid="chat-group-count"
-                    className="ms-auto shrink-0 text-3xs uppercase tracking-wide text-fg-subtle"
-                  >
-                    {group.chats.length}
-                  </span>
-                  {group.projectId ? (
-                    <button
-                      type="button"
-                      data-testid={`project-new-chat-${group.projectId}`}
-                      onClick={() => void startChatInProject(group.projectId!)}
-                      title={t('sidebar.newChatInProject')}
-                      aria-label={t('sidebar.newChatInProject')}
-                      className="shrink-0 rounded p-0.5 text-fg-muted hover:bg-bg-tertiary hover:text-fg"
-                    >
-                      <Plus className="h-3 w-3" />
-                    </button>
-                  ) : null}
-                </p>
-                {group.chats.map((chat) => (
-              <div key={chat.id} data-testid={`chat-row-${chat.id}`} className="group relative flex items-center">
                 {/*
-                 * v4.1 item 14: a row is a title, when it was last touched, and one
-                 * overflow trigger. The conversation glyph that read as a checkbox is
-                 * gone, and the trigger is a real <button> beside the title button
-                 * (not a role="button" span inside it) so the row keeps one action and
-                 * the keyboard can reach the menu.
-                 */}
-                <button
-                  type="button"
-                  onClick={() => void loadSession(chat.id)}
-                  className={`flex min-w-0 flex-1 items-center gap-2 rounded-shape-sm px-2 py-1.5 text-left transition ${
-                    activeChatId === chat.id
-                      ? 'bg-accent-solid/15 text-fg-strong'
-                      : 'text-fg hover:bg-bg-tertiary'
-                  }`}
-                >
-                  <span className="min-w-0 flex-1 truncate text-xs">{chat.title}</span>
-                  <span data-testid="chat-row-time" className="shrink-0 text-3xs text-fg-muted">
-                    {formatChatAge(chat.updatedAt)}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  aria-label={t('common.more')}
-                  data-testid={`chat-row-more-${chat.id}`}
-                  onClick={() => setChatMenuFor(chatMenuFor === chat.id ? null : chat.id)}
-                  className="hidden shrink-0 items-center justify-center rounded-shape-sm p-1 text-fg-muted hover:bg-bg-tertiary hover:text-fg focus-visible:block group-hover:block group-focus-within:block"
-                >
-                  <MoreHorizontal className="h-3.5 w-3.5" />
-                </button>
-
-                {chatMenuFor === chat.id ? (
-                  <>
-                    <div
-                      className="fixed inset-0 z-40"
-                      onClick={() => setChatMenuFor(null)}
-                      aria-hidden="true"
+                  B2-2: a remote project whose host is not connected is where the connection test
+                  is felt. No server selected means no control at all, not a dead one.
+                */}
+                {state === 'disconnected' && project.vpsId ? (
+                  <div className="flex min-w-0 flex-wrap items-center gap-1 ps-6">
+                    <ConnectionTestButton
+                      serverId={project.vpsId}
+                      testId={`project-connection-test-${project.id}`}
                     />
-                    <div
-                      role="menu"
-                      className="absolute right-1 top-7 z-50 w-32 overflow-hidden rounded-shape border-2 border-border-strong bg-bg-secondary py-1 text-xs shadow-shape"
-                    >
+                  </div>
+                ) : null}
+
+                {project.type === 'remote' && !project.vpsId ? (
+                  <p className="ps-6 pe-2 text-3xs text-warning">
+                    {t('sidebar.remoteNoVps')}
+                  </p>
+                ) : state === 'missing' ? (
+                  <p className="ps-6 pe-2 text-3xs text-warning">
+                    <span>
+                      {project.osMismatch ? t('sidebar.osMismatch') : t('sidebar.missingPath')}
+                    </span>
+                    {' · '}
+                    <span dir="ltr">{basename(project.path)}</span>
+                  </p>
+                ) : null}
+
+                {vpsSearch?.id === project.id ? (
+                  <div className="ms-6 me-2 rounded-shape-sm border border-border bg-bg-primary p-1">
+                    <p className="px-1 py-0.5 text-3xs text-fg-muted">
+                      {t('vps.found', { count: vpsSearch.paths.length })}
+                    </p>
+                    {vpsSearch.paths.map((remotePath) => (
                       <button
+                        key={remotePath}
                         type="button"
-                        role="menuitem"
-                        onClick={() => onRename(chat)}
-                        className="block w-full px-3 py-1.5 text-left text-fg hover:bg-bg-tertiary"
+                        dir="ltr"
+                        onClick={() => void addFoundRemote(project.name, remotePath)}
+                        className="block w-full truncate rounded-shape-sm px-1.5 py-1 text-left text-2xs text-fg hover:bg-bg-tertiary"
                       >
-                        {t('common.rename')}
+                        {remotePath}
                       </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          setChatMenuFor(null)
-                          void duplicateChat(chat.id)
-                        }}
-                        className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-fg hover:bg-bg-tertiary"
-                      >
-                        <Copy className="h-3 w-3" />
-                        {t('common.duplicate')}
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          setChatMenuFor(null)
-                          exportChat(chat)
-                        }}
-                        className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-fg hover:bg-bg-tertiary"
-                      >
-                        <Download className="h-3 w-3" />
-                        {t('common.export')}
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => onDelete(chat)}
-                        className="flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-danger hover:bg-bg-tertiary"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                        {t('common.delete')}
-                      </button>
-                    </div>
-                  </>
+                    ))}
+                  </div>
+                ) : null}
+
+                {open && nested.length > 0 ? (
+                  <div className="flex flex-col">{nested.map((chat) => chatRow(chat))}</div>
+                ) : null}
+
+                {open && nested.length === 0 && normalized === '' ? (
+                  <p className="ps-6 pe-2 text-3xs text-fg-subtle">{t('sidebar.emptyChats')}</p>
                 ) : null}
               </div>
-                ))}
-              </div>
-            ))
-          )}
-        </section>
-      </div>
+            )
+          })
+        )}
 
-      <div className="shrink-0 border-t border-border p-2">
-        <div className="mb-1 flex items-center gap-0.5">
-          <button
-            type="button"
-            onClick={() => setView('files')}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-2xs text-fg-muted hover:bg-bg-tertiary hover:text-fg"
-          >
-            <FolderTree className="h-3 w-3" />
-            {t('sidebar.navWorkspace')}
-          </button>
-          <button
-            type="button"
-            onClick={openSettings}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-2xs text-fg-muted hover:bg-bg-tertiary hover:text-fg"
-          >
-            <Plug className="h-3 w-3" />
-            {/* Was a hard-coded "Plugins": untranslated, and it kept the old name after the section
-                became Surfaces. */}
-            {t('settings.plugins')}
-          </button>
-          <button
-            type="button"
-            title={`${t('common.settings')} (Ctrl+,)`}
-            aria-label={t('common.settings')}
-            onClick={openSettings}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-fg-muted hover:bg-bg-tertiary hover:text-fg"
-          >
-            <Settings2 className="h-3.5 w-3.5" />
-          </button>
-        </div>
-        <div className="flex items-center gap-2 px-1">
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-bg-tertiary text-fg">
-            <User className="h-3 w-3" />
-          </span>
-          <span className="text-xs text-fg-muted">{t('sidebar.user')}</span>
-        </div>
+        {/* Chats with no project binding: still a node, so nothing is ever unreachable. */}
+        {(chatsFor.get(UNASSIGNED)?.length ?? 0) > 0 ? (
+          <div data-testid="project-node-unassigned" className="mt-1">
+            <p className="ui-row gap-1.5 px-2 text-3xs text-fg-muted">
+              <FolderTree className="h-3 w-3 shrink-0" aria-hidden="true" />
+              <span className="min-w-0 flex-1 truncate">{t('sidebar.noProject')}</span>
+            </p>
+            {(chatsFor.get(UNASSIGNED) ?? []).map((chat) => chatRow(chat))}
+          </div>
+        ) : null}
+
+        {normalized !== '' && filtered.length === 0 ? (
+          <p className="px-3 py-2 text-2xs text-fg-subtle">{t('palette.noResults')}</p>
+        ) : null}
       </div>
     </nav>
   )

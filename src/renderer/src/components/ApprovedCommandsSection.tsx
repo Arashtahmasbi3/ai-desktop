@@ -21,7 +21,7 @@ export default function ApprovedCommandsSection(): JSX.Element {
   }, [])
 
   return (
-    <div className="brutal-card flex flex-col gap-2 p-3">
+    <div className="ui-card flex flex-col gap-2 p-3">
       <div>
         <p className="flex items-center gap-1.5 text-xs font-medium text-fg">
           <ShieldCheck className="h-3.5 w-3.5 text-success" />
@@ -38,9 +38,9 @@ export default function ApprovedCommandsSection(): JSX.Element {
           {items.map((item) => (
             <li
               key={item.id}
-              className="brutal-inset flex items-center justify-between gap-2 px-2 py-1 text-2xs text-fg"
+              className="ui-inset flex items-center justify-between gap-2 px-2 py-1 text-2xs text-fg"
             >
-              <span className="brutal-data truncate" dir="ltr">
+              <span className="ui-data truncate" dir="ltr">
                 {item.label}
               </span>
               <button
@@ -48,7 +48,7 @@ export default function ApprovedCommandsSection(): JSX.Element {
                 onClick={() => {
                   void window.api.agent.revokeApprovedCommand(item.id).then(refresh)
                 }}
-                className="brutal-btn shrink-0 px-1.5 py-0.5 text-2xs"
+                className="ui-btn shrink-0 px-1.5 py-0.5 text-2xs"
               >
                 {t('settings.revoke')}
               </button>

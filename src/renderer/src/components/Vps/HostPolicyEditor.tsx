@@ -97,7 +97,7 @@ export default function HostPolicyEditor({ server }: { server: VpsServerView }):
         {server.name}
       </p>
       <div className="grid grid-cols-2 gap-2">
-        <label className="flex flex-col gap-1 text-3xs uppercase tracking-wide text-fg-muted">
+        <label className="flex flex-col gap-1 text-3xs text-fg-muted">
           {t('settings.hostPolicyMode')}
           <select value={mode} onChange={(event) => changeMode(event.target.value as HostPolicyMode)} className={field}>
             {MODES.map((value) => (
@@ -107,7 +107,7 @@ export default function HostPolicyEditor({ server }: { server: VpsServerView }):
             ))}
           </select>
         </label>
-        <label className="flex flex-col gap-1 text-3xs uppercase tracking-wide text-fg-muted">
+        <label className="flex flex-col gap-1 text-3xs text-fg-muted">
           {t('settings.hostPolicyApproval')}
           <select
             value={approval}

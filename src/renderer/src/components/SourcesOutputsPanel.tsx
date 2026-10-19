@@ -104,7 +104,7 @@ export default function SourcesOutputsPanel({
         className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-3 text-xs text-fg"
       >
         <section>
-          <p className="mb-1 flex items-center gap-1.5 text-3xs font-semibold uppercase tracking-wide text-fg-subtle">
+          <p className="mb-1 flex items-center gap-1.5 text-3xs font-semibold text-fg-subtle">
             <FileOutput className="h-3 w-3" />
             {t('runPanel.outputs')}
           </p>
@@ -125,7 +125,7 @@ export default function SourcesOutputsPanel({
                  * "chosen" by structure instead of by a colour wash nobody can distinguish from a
                  * hover.
                  */
-                className="brutal-tab text-3xs"
+                className="ui-tab text-3xs"
               >
                 {t(KIND_KEY[option])}
               </button>
@@ -146,13 +146,13 @@ export default function SourcesOutputsPanel({
               aria-label={t('runPanel.targetLabel')}
               data-testid="run-output-target"
               dir="ltr"
-              className="brutal-inset min-w-0 flex-1 rounded-shape-sm px-2 py-1 text-3xs text-fg-strong outline-none placeholder:text-fg-subtle"
+              className="ui-inset min-w-0 flex-1 rounded-shape-sm px-2 py-1 text-3xs text-fg-strong outline-none placeholder:text-fg-subtle"
             />
             <button
               type="button"
               onClick={submitOutput}
               data-testid="run-output-add"
-              className="brutal-press flex shrink-0 items-center gap-1 rounded-shape-sm bg-accent-solid px-2 py-1 text-3xs text-accent-fg hover:bg-accent-solid-hover"
+              className="ui-press flex shrink-0 items-center gap-1 rounded-shape-sm bg-accent-solid px-2 py-1 text-3xs text-accent-fg hover:bg-accent-solid-hover"
             >
               <Plus className="h-3 w-3" />
               {t('runPanel.add')}
@@ -188,7 +188,7 @@ export default function SourcesOutputsPanel({
         </section>
 
         <section>
-          <p className="mb-1 flex items-center gap-1.5 text-3xs font-semibold uppercase tracking-wide text-fg-subtle">
+          <p className="mb-1 flex items-center gap-1.5 text-3xs font-semibold text-fg-subtle">
             <FileSearch className="h-3 w-3" />
             {t('runPanel.sources')}
           </p>

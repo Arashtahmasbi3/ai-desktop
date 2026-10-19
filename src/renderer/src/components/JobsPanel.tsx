@@ -35,7 +35,7 @@ export default function JobsPanel(): JSX.Element | null {
       className="flex flex-col gap-2 border-b border-border bg-bg-secondary/60 px-3 py-2"
     >
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-2xs font-medium uppercase tracking-wide text-fg-muted">
+        <div className="flex items-center gap-1.5 text-2xs font-medium text-fg-muted">
           {jobs.length > 0 ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
           {t('jobs.panelTitle', { count: jobs.length })}
         </div>

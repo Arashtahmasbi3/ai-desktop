@@ -25,7 +25,7 @@ export default function ProviderWarning(): JSX.Element | null {
   const label = PROVIDERS[selection.provider]?.label ?? selection.provider
 
   return (
-    <div className="brutal-banner mx-3 mb-2 flex items-center gap-2 border-warning text-2xs text-warning">
+    <div className="ui-banner mx-3 mb-2 flex items-center gap-2 border-warning text-2xs text-warning">
       <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
       <span className="flex-1">{t('providerWarning.noKey', { provider: label })}</span>
       <button

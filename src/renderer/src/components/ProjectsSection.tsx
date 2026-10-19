@@ -69,7 +69,7 @@ export default function ProjectsSection(): JSX.Element {
 
   return (
     <section>
-      <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
+      <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold text-fg-muted">
         <FolderPlus className="h-3.5 w-3.5" />
         {t('settings.projects')}
       </h3>
@@ -164,7 +164,7 @@ export default function ProjectsSection(): JSX.Element {
       {projects.length === 0 ? (
         <p className="text-xs text-fg-subtle">{t('settings.noProjects')}</p>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-border">
+        <div className="overflow-hidden rounded-shape border border-border">
           {projects.map((project) => (
             <ProjectCard key={project.id} project={project} />
           ))}

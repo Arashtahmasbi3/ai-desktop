@@ -85,7 +85,7 @@ export default function DiagnosticsPanel({ serverId, serverName, onClose }: Prop
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="flex max-h-[80vh] w-[36rem] flex-col overflow-hidden rounded-lg border border-border bg-bg-secondary shadow-xl">
+      <div className="flex max-h-[80vh] w-[36rem] flex-col overflow-hidden rounded-lg border border-border bg-bg-secondary">
         <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-2.5">
           <div className="flex items-center gap-2 text-sm text-fg">
             <Server className="h-4 w-4 text-accent" />

@@ -86,17 +86,17 @@ export default function CodeBlock({ code, language }: CodeBlockProps): JSX.Eleme
     <div
       tabIndex={0}
       onKeyDown={onKeyDown}
-      className="my-2 overflow-hidden rounded-shape border-2 border-border-strong bg-bg-primary"
+      className="my-2 overflow-hidden rounded-shape border border-border-strong bg-bg-primary"
     >
-      {/* v4.0: the header is a stated bar — an ink rule and an uppercase mono language — not a strip. */}
+      {/* v4.0: the header is a stated bar — an ink rule and an mono language — not a strip. */}
       <div className="flex items-center gap-2 border-b-2 border-border-strong px-2 py-1 text-fg-muted">
         <Terminal className="h-3 w-3" />
-        <span className="brutal-label">{LANGUAGE_LABEL[normalized] ?? language ?? 'text'}</span>
+        <span className="ui-label">{LANGUAGE_LABEL[normalized] ?? language ?? 'text'}</span>
         <span className="flex-1" />
         <button
           type="button"
           onClick={() => void copy()}
-          className="flex items-center gap-1 rounded-shape-sm border border-border px-1.5 py-0.5 font-semibold uppercase tracking-label hover:border-fg-strong hover:text-fg"
+          className="flex items-center gap-1 rounded-shape-sm border border-border px-1.5 py-0.5 font-semibold hover:border-fg-strong hover:text-fg"
         >
           {copied ? <Check className="h-3 w-3 text-success" /> : <Copy className="h-3 w-3" />}
           {copied ? t('chat.copied') : t('chat.copy')}

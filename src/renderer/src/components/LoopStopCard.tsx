@@ -61,7 +61,7 @@ export default function LoopStopCard({ stop, onContinue, onCorrect, onStop }: Pr
     <div
       data-testid="loop-stop-card"
       data-kind={model.kind}
-      className="mx-4 rounded-shape border-2 border-warning bg-warning/10 p-3 text-start"
+      className="mx-4 rounded-shape border border-warning bg-warning/10 p-3 text-start"
     >
       <div className="flex items-start gap-2">
         {isQuestion ? (
@@ -70,7 +70,7 @@ export default function LoopStopCard({ stop, onContinue, onCorrect, onStop }: Pr
           <AlertOctagon className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
         )}
         <div className="min-w-0 flex-1">
-          <p className="brutal-label text-warning">{t(model.titleKey)}</p>
+          <p className="ui-label text-warning">{t(model.titleKey)}</p>
 
           {isQuestion ? (
             <div data-testid="loop-stop-question" className="mt-1">
@@ -98,7 +98,7 @@ export default function LoopStopCard({ stop, onContinue, onCorrect, onStop }: Pr
           {/* The verdict: what happened, the evidence, and one next step (v4.1). */}
           {model.verdict ? (
             <div data-testid="loop-stop-verdict" className="mt-2 border-t-2 border-warning/40 pt-2">
-              <p className="brutal-label">{t('chat.verdictTitle')}</p>
+              <p className="ui-label">{t('chat.verdictTitle')}</p>
               <p
                 data-testid="loop-stop-verdict-cause"
                 dir="auto"
@@ -122,7 +122,7 @@ export default function LoopStopCard({ stop, onContinue, onCorrect, onStop }: Pr
               ) : null}
               {model.verdict.actionKey ? (
                 <>
-                  <p className="brutal-label mt-2">{t('chat.verdictNext')}</p>
+                  <p className="ui-label mt-2">{t('chat.verdictNext')}</p>
                   <p
                     data-testid="loop-stop-verdict-next"
                     dir="auto"
@@ -144,7 +144,7 @@ export default function LoopStopCard({ stop, onContinue, onCorrect, onStop }: Pr
                   <button
                     type="button"
                     onClick={() => void copyCommand(model.verdict?.actionCommand ?? '')}
-                    className="brutal-btn shrink-0 px-1.5 py-1 text-3xs"
+                    className="ui-btn shrink-0 px-1.5 py-1 text-3xs"
                     aria-label={t('chat.copy')}
                   >
                     {copied === model.verdict.actionCommand ? (
@@ -159,7 +159,7 @@ export default function LoopStopCard({ stop, onContinue, onCorrect, onStop }: Pr
               {/* v4.1 (item 18): the second route, when the direct one is blocked. */}
               {model.verdict.alternate ? (
                 <div data-testid="loop-stop-alternate" className="mt-2">
-                  <p className="brutal-label">{t('chat.verdictAltTitle')}</p>
+                  <p className="ui-label">{t('chat.verdictAltTitle')}</p>
                   <p dir="auto" className="mt-0.5 text-2xs leading-relaxed text-fg">
                     {t(model.verdict.alternate.textKey, model.verdict.alternate.detail ?? {})}
                   </p>
@@ -173,7 +173,7 @@ export default function LoopStopCard({ stop, onContinue, onCorrect, onStop }: Pr
                     <button
                       type="button"
                       onClick={() => void copyCommand(model.verdict?.alternate?.command ?? '')}
-                      className="brutal-btn shrink-0 px-1.5 py-1 text-3xs"
+                      className="ui-btn shrink-0 px-1.5 py-1 text-3xs"
                       aria-label={t('chat.copy')}
                     >
                       {copied === model.verdict.alternate.command ? (
@@ -198,7 +198,7 @@ export default function LoopStopCard({ stop, onContinue, onCorrect, onStop }: Pr
               <button
                 type="button"
                 onClick={onStop}
-                className="brutal-btn flex items-center gap-1 whitespace-nowrap px-2.5 py-1 text-2xs"
+                className="ui-btn flex items-center gap-1 whitespace-nowrap px-2.5 py-1 text-2xs"
               >
                 <XOctagon className="h-3 w-3" />
                 {t('chat.loopStopStop')}
@@ -209,7 +209,7 @@ export default function LoopStopCard({ stop, onContinue, onCorrect, onStop }: Pr
                   type="button"
                   onClick={onContinue}
                   disabled={!model.allowContinue}
-                  className={`brutal-primary flex items-center gap-1 whitespace-nowrap px-2.5 py-1 text-2xs font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${emphasisClass('continue')}`}
+                  className={`ui-primary flex items-center gap-1 whitespace-nowrap px-2.5 py-1 text-2xs font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${emphasisClass('continue')}`}
                 >
                   <RotateCcw className="h-3 w-3" />
                   {t('chat.loopStopContinue')}
@@ -217,7 +217,7 @@ export default function LoopStopCard({ stop, onContinue, onCorrect, onStop }: Pr
                 <button
                   type="button"
                   onClick={onCorrect}
-                  className={`brutal-btn flex items-center gap-1 whitespace-nowrap px-2.5 py-1 text-2xs ${emphasisClass('correct')}`}
+                  className={`ui-btn flex items-center gap-1 whitespace-nowrap px-2.5 py-1 text-2xs ${emphasisClass('correct')}`}
                 >
                   <CornerDownRight className="h-3 w-3" />
                   {t('chat.loopStopCorrect')}
@@ -225,7 +225,7 @@ export default function LoopStopCard({ stop, onContinue, onCorrect, onStop }: Pr
                 <button
                   type="button"
                   onClick={onStop}
-                  className={`brutal-btn flex items-center gap-1 whitespace-nowrap px-2.5 py-1 text-2xs ${emphasisClass('stop')}`}
+                  className={`ui-btn flex items-center gap-1 whitespace-nowrap px-2.5 py-1 text-2xs ${emphasisClass('stop')}`}
                 >
                   <XOctagon className="h-3 w-3" />
                   {t('chat.loopStopStop')}
@@ -236,9 +236,9 @@ export default function LoopStopCard({ stop, onContinue, onCorrect, onStop }: Pr
 
           {model.lastAction && !isQuestion ? (
             <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-3xs text-fg-muted">
-              <span className="brutal-label">{t('chat.loopStopStuckOn')}</span>
+              <span className="ui-label">{t('chat.loopStopStuckOn')}</span>
               {model.onRemote ? (
-                <span className="brutal-chip flex items-center gap-1 px-1 py-0.5">
+                <span className="ui-chip flex items-center gap-1 px-1 py-0.5">
                   <Server className="h-3 w-3" />
                   {t('chat.loopStopRemote')}
                   {model.serverId ? <span className="font-mono">{model.serverId}</span> : null}
@@ -262,7 +262,7 @@ export default function LoopStopCard({ stop, onContinue, onCorrect, onStop }: Pr
                 type="button"
                 onClick={() => setShowRecent((value) => !value)}
                 aria-expanded={showRecent}
-                className="flex items-center gap-1 text-3xs uppercase tracking-label text-fg-muted hover:text-fg"
+                className="flex items-center gap-1 text-3xs text-fg-muted hover:text-fg"
               >
                 {showRecent ? (
                   <ChevronDown className="h-3 w-3" />

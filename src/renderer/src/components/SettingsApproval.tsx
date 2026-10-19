@@ -6,7 +6,7 @@ import ApprovedCommandsSection from './ApprovedCommandsSection'
 /**
  * One option in a segmented control. The native radio stays (so the accessible name is the label
  * text and the arrow keys still work), and the visible surface is the label itself, filled by
- * `.brutal-tab` through `data-selected`.
+ * `.ui-tab` through `data-selected`.
  */
 function Choice({
   name,
@@ -24,7 +24,7 @@ function Choice({
   return (
     <label
       data-selected={checked}
-      className="brutal-tab flex w-full cursor-pointer items-center gap-2 border-border-strong px-2.5 py-1.5 text-left"
+      className="ui-tab flex w-full cursor-pointer items-center gap-2 border-border-strong px-2.5 py-1.5 text-left"
     >
       <input
         type="radio"
@@ -49,17 +49,17 @@ export default function SettingsApproval(): JSX.Element {
 
   return (
     <section className="flex flex-col gap-3">
-      <h3 className="brutal-label flex items-center gap-2">
+      <h3 className="ui-label flex items-center gap-2">
         <ShieldCheck className="h-3.5 w-3.5" />
         {t('settings.approvalMode')}
       </h3>
 
-      <div className="brutal-card flex flex-col gap-2 p-3">
+      <div className="ui-card flex flex-col gap-2 p-3">
         <div>
           <p className="text-xs font-medium text-fg">{t('settings.approvalMode')}</p>
           <p className="mt-0.5 text-2xs text-fg-muted">{t('settings.approvalHint')}</p>
         </div>
-        <div role="radiogroup" aria-label={t('settings.approvalMode')} className="brutal-inset flex flex-col">
+        <div role="radiogroup" aria-label={t('settings.approvalMode')} className="ui-inset flex flex-col">
           {(
             [
               ['ask', 'settings.approvalAsk'],
@@ -93,12 +93,12 @@ export default function SettingsApproval(): JSX.Element {
         it answers a different question ("which decisions should I be able to review?") and it can
         ask even when the approval mode above would have proceeded.
       */}
-      <div className="brutal-card flex flex-col gap-2 p-3">
+      <div className="ui-card flex flex-col gap-2 p-3">
         <div>
           <p className="text-xs font-medium text-fg">{t('settings.checkpointTitle')}</p>
           <p className="mt-0.5 text-2xs text-fg-muted">{t('settings.checkpointHint')}</p>
         </div>
-        <div role="radiogroup" aria-label={t('settings.checkpointTitle')} className="brutal-inset flex flex-col">
+        <div role="radiogroup" aria-label={t('settings.checkpointTitle')} className="ui-inset flex flex-col">
           {(
             [
               ['off', 'settings.checkpointOff'],

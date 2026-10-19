@@ -115,6 +115,18 @@ export function costOf(record: UsageRecord): number | null {
   return (record.inputTokens / 1_000_000) * rates.input + (record.outputTokens / 1_000_000) * rates.output
 }
 
+/**
+ * A token count with its grouping separator: 12400 -> "12,400".
+ *
+ * The status line shows this number continuously, so it gets one rule rather than each read-out
+ * calling `toLocaleString` with its own idea of a locale. Persian uses Persian digits, which is
+ * what a Persian reader expects from a desktop application.
+ */
+export function formatTokens(tokens: number, locale: string = 'en'): string {
+  const safe = Number.isFinite(tokens) ? Math.max(0, Math.round(tokens)) : 0
+  return safe.toLocaleString(locale === 'fa' ? 'fa-IR' : 'en-US')
+}
+
 /** Human-readable cost, or the explicit "cost unknown" label. */
 export function formatCost(cost: number | null): string {
   if (cost === null) return 'Cost unknown'

@@ -1,63 +1,17 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AlertTriangle, ShieldCheck, Zap } from 'lucide-react'
+import { AlertTriangle } from 'lucide-react'
 import { useStore } from '../store'
-import { APPROVAL_MODES, isFullAccess, type ApprovalMode } from '@shared/approval'
+import { isFullAccess } from '@shared/approval'
 import { formatCountdown } from '../lib/countdown'
 
-const MODE_LABEL: Record<ApprovalMode, string> = {
-  ask: 'chat.fullAccessAsk',
-  'auto-write': 'chat.fullAccessAuto',
-  full: 'chat.fullAccessFull'
-}
-
-/** Compact mode picker shown under the composer (v2.3, B.2). */
-export function FullAccessToggle(): JSX.Element {
-  const { t } = useTranslation()
-  const mode = useStore((state) => state.settings?.approvalMode ?? 'ask')
-  const setApprovalMode = useStore((state) => state.setApprovalMode)
-  const [open, setOpen] = useState(false)
-  const full = isFullAccess(mode)
-
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        title={t('chat.fullAccess')}
-        className={`flex items-center gap-1 rounded px-1.5 py-0.5 transition ${
-          full
-            ? 'bg-danger/20 text-danger'
-            : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
-        }`}
-      >
-        {full ? <Zap className="h-3 w-3" /> : <ShieldCheck className="h-3 w-3" />}
-        {full ? t('chat.fullAccessStatus') : t(MODE_LABEL[mode])}
-      </button>
-      {open ? (
-        <div className="absolute bottom-full left-0 z-40 mb-1 w-52 rounded-lg border border-border bg-bg-secondary p-1 shadow-xl">
-          {APPROVAL_MODES.map((value) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => {
-                void setApprovalMode(value)
-                setOpen(false)
-              }}
-              className={`block w-full rounded px-2 py-1.5 text-left text-2xs transition ${
-                value === mode
-                  ? 'bg-accent-solid/15 text-accent'
-                  : 'text-fg hover:bg-bg-tertiary'
-              }`}
-            >
-              {t(MODE_LABEL[value])}
-            </button>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  )
-}
+/*
+ * v4.3: the compact approval-mode picker that used to sit under the composer is **gone**, not
+ * moved: a mode is not a send action, and a second copy of it beside Send is what made the mode
+ * read differently in two places. The mode is chosen in the title bar's ⋯ menu and reads back
+ * on the one status line. This module now exports the full-access *banner* only, because a run
+ * that is allowed to do anything deserves to say so prominently while it happens.
+ */
 
 /** Red-ish banner shown while full access is active. */
 export function FullAccessBanner(): JSX.Element | null {

@@ -154,7 +154,7 @@ export default function VpsPanel(): JSX.Element {
     <div className="flex h-full min-h-0 flex-1">
       <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-bg-secondary">
         <div className="flex items-center justify-between border-b border-border px-3 py-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-fg-muted">VPS</span>
+          <span className="text-xs font-semibold text-fg-muted">VPS</span>
           <div className="flex items-center gap-1">
             <button
               onClick={() => void refresh()}
@@ -277,7 +277,7 @@ export default function VpsPanel(): JSX.Element {
                 <button
                   onClick={() => void testConnection(server.id)}
                   disabled={tests[server.id] === 'running'}
-                  className="brutal-btn shrink-0 px-1.5 py-0.5 text-3xs disabled:opacity-50"
+                  className="ui-btn shrink-0 px-1.5 py-0.5 text-3xs disabled:opacity-50"
                   title={t('vps.testConnection')}
                   aria-label={t('vps.testConnection')}
                   data-testid={`connection-test-button-${server.id}`}

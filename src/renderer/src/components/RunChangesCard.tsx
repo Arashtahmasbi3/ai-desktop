@@ -28,7 +28,7 @@ export default function RunChangesCard(): JSX.Element | null {
     <section
       data-testid="run-changes"
       dir="auto"
-      className="brutal-card mx-4 mb-2 flex flex-col overflow-hidden"
+      className="ui-card mx-4 mb-2 flex flex-col overflow-hidden"
     >
       <header className="flex items-center gap-2 px-2.5 py-1.5">
         <FileEdit className="h-3.5 w-3.5 shrink-0 text-accent" />

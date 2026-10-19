@@ -27,7 +27,7 @@ export default function DiffViewer({ before, after, language }: DiffViewerProps)
 
   return (
     <div className="min-h-0 flex-1 overflow-auto font-mono text-xs" dir="ltr">
-      <div className="flex border-b border-border bg-bg-secondary text-3xs uppercase tracking-wide text-fg-muted">
+      <div className="flex border-b border-border bg-bg-secondary text-3xs text-fg-muted">
         <div className="flex flex-1 gap-2 px-2 py-1">
           <span className="w-8 text-right">old</span>
           <span>before</span>

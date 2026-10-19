@@ -78,7 +78,7 @@ export default function MessageBubble({ message }: { message: ChatMessage }): JS
           isUser ? 'items-end' : 'items-start'
         }`}
       >
-        <span className="brutal-label mb-0.5 px-1">
+        <span className="ui-label mb-0.5 px-1">
           {t(ROLE_LABEL[message.role])}
         </span>
         {/* v4.0: a message is a bordered block, not a pillow. The speaker is told apart by the
@@ -88,7 +88,7 @@ export default function MessageBubble({ message }: { message: ChatMessage }): JS
         <div
           dir="auto"
           data-testid={`message-${message.role}`}
-          className={`chat-markdown w-full rounded-shape border-2 px-3 py-2 text-sm leading-relaxed ${
+          className={`chat-markdown w-full rounded-shape border px-3 py-2 text-sm leading-relaxed ${
             isUser
               ? 'border-accent bg-accent-solid/10 text-fg-strong'
               : message.role === 'system'

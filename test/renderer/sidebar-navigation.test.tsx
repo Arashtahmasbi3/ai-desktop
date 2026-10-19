@@ -103,17 +103,24 @@ describe('v2.6.0 B.2 - sidebar navigation', () => {
     expect(screen.getByTitle('1 chats')).toBeTruthy()
   })
 
-  it('3. the project group collapses and expands', () => {
+  it('3. a project node collapses and expands its own chats', () => {
     render(<Sidebar />)
-    const header = screen.getByText('Projects')
+    // Two projects, so two chat-counter badges on the two project nodes.
     expect(screen.getAllByTestId('project-chat-count')).toHaveLength(2)
+    expect(screen.getByTestId('chat-row-c1')).toBeTruthy()
 
-    fireEvent.click(header)
-    expect(screen.queryAllByTestId('project-chat-count')).toHaveLength(0)
-    expect(header.closest('button')!.getAttribute('aria-expanded')).toBe('false')
+    const toggle = screen.getByTestId('project-toggle-p1')
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
 
-    fireEvent.click(header)
-    expect(screen.getAllByTestId('project-chat-count')).toHaveLength(2)
+    fireEvent.click(toggle)
+    // Collapsing hides that project's chats only; the node (and its count) stays.
+    expect(screen.queryByTestId('chat-row-c1')).toBeNull()
+    expect(screen.getByTestId('chat-row-c3')).toBeTruthy()
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+
+    fireEvent.click(toggle)
+    expect(screen.getByTestId('chat-row-c1')).toBeTruthy()
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
   })
 
   it('4. the connection dot is labelled for the project state', () => {

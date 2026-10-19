@@ -2,35 +2,48 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Activity,
-  HardDrive,
-  Lock,
-  LockOpen,
+  ChevronRight,
   PanelLeft,
-  Server,
   ShieldAlert,
   Terminal,
-  Trash2,
-  Wifi,
-  Zap
+  Trash2
 } from 'lucide-react'
 import { useStore } from '../store'
 import { isCapabilityEnabled } from '../lib/capabilities'
-import { useConnectionStatus, CONNECTION_TONE_CLASS } from '../lib/connection-status'
+import { useConnectionStatus, type ConnectionTone } from '../lib/connection-status'
 import { vpsServerName } from '../lib/vps-state'
-import { nextApprovalMode } from '@shared/approval'
 import { formatCountdown } from '../lib/countdown'
 import VpsSelector from './VpsSelector'
-import GitStatusPill from './GitStatusPill'
 import PlanTrustChip from './PlanTrustChip'
+import ConnectionTestButton from './ConnectionTest'
 
 /**
- * v2.6.1 (B.3): the execution contract, always visible above the chat.
+ * The workspace line (v4.3).
  *
- * Two lines: line 1 is *where* the agent works (project / server / path), line 2
- * is *how* it is allowed to work (git, connection, approval mode) plus the run
- * controls. A user should never have to open a dialog to know whether the agent
- * will ask before acting.
+ * This used to be a **two-line** bar under the title bar, and it was the clearest example of the
+ * duplication the user kept reporting: line 1 named the project, the server and the path, line 2
+ * repeated the connection and the approval mode, and the footer then printed the approval mode and
+ * the connection again. Three surfaces, one fact each.
+ *
+ * It is now **one** line that answers exactly one question — *where is this run working?* — as a
+ * breadcrumb (`project › path`) followed by the connection truth, stated once:
+ * `● spmotor (91.107.174.210)`. The approval mode left this bar entirely (it is a preference, and
+ * it now lives in the title bar's menu and reads back in the status line), and so did the git
+ * banner (the sidebar's project header already carries it).
+ *
+ * The controls that remain are the ones that act on the workspace rather than on the message:
+ * the server picker, the connection test when there is something to diagnose, plan mode, the run
+ * timeline, and the terminal and file tree in advanced mode. Nothing here is a send action.
  */
+
+/** The connection state as a dot: colour is a status signal, never a surface fill. */
+const DOT_TONE: Record<ConnectionTone, string> = {
+  ok: 'bg-success',
+  warn: 'bg-warning',
+  bad: 'bg-danger',
+  muted: 'bg-fg-subtle'
+}
+
 function DiagnosticBadge(): JSX.Element | null {
   const { t } = useTranslation()
   const diagnostic = useStore((state) => state.diagnostic)
@@ -44,7 +57,7 @@ function DiagnosticBadge(): JSX.Element | null {
       title={`${t('settings.diagnosticOn')}${
         minutes > 0 ? ` · ${t('settings.diagnosticRemaining', { minutes })}` : ''
       }`}
-      className="brutal-chip border-warning text-warning"
+      className="ui-chip border-warning text-warning"
     >
       <Activity className="h-3 w-3" />
       {t('settings.diagnosticTitle')}
@@ -52,7 +65,7 @@ function DiagnosticBadge(): JSX.Element | null {
   )
 }
 
-/** Ticks once a second while a deadline is set, so the badge stays live. */
+/** Ticks once a second while a deadline is set, so a countdown stays live. */
 function useCountdown(target: number | null): number {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -62,12 +75,6 @@ function useCountdown(target: number | null): number {
   }, [target])
   return target ? Math.max(0, target - now) : 0
 }
-
-const APPROVAL_TONE = {
-  ask: 'border-info/40 bg-info/10 text-info',
-  'auto-write': 'border-border bg-bg-tertiary text-fg',
-  full: 'border-warning/50 bg-warning/15 text-warning'
-} as const
 
 export default function ExecutionBar({
   timelineOpen,
@@ -85,12 +92,11 @@ export default function ExecutionBar({
   const setPlanMode = useStore((state) => state.setPlanMode)
   const terminalOpen = useStore((state) => state.terminalOpen)
   const toggleTerminal = useStore((state) => state.toggleTerminal)
-  // Checklist item 13: the terminal and the file tree are advanced panes. In simple mode
-  // their toggles are not offered at all, so the header stays about the run itself.
-  const advanced = useStore((state) => state.uiMode === 'advanced')
   const newSession = useStore((state) => state.newSession)
+  // Checklist item 13: the terminal and the file tree are advanced panes. In simple mode
+  // their toggles are not offered at all.
+  const advanced = useStore((state) => state.uiMode === 'advanced')
   const approvalMode = useStore((state) => state.settings?.approvalMode ?? 'ask')
-  const setApprovalMode = useStore((state) => state.setApprovalMode)
   const fullAccessExpiresAt = useStore((state) => state.fullAccessExpiresAt)
   const connection = useConnectionStatus()
 
@@ -100,162 +106,167 @@ export default function ExecutionBar({
 
   const full = approvalMode === 'full'
   const remaining = useCountdown(full ? fullAccessExpiresAt : null)
-  const modeLabel = full
-    ? t('execution.modeFull')
-    : approvalMode === 'auto-write'
-      ? t('execution.modeAuto')
-      : t('execution.modeAsk')
-  const ModeIcon = full ? LockOpen : approvalMode === 'auto-write' ? Zap : Lock
 
   const projectName = activeProject?.name ?? t('sidebar.noProject')
+  const path = activeProject?.path ?? '—'
+  const server = activeProject
+    ? vpsServers.find((candidate) => candidate.id === activeProject.vpsId)
+    : undefined
   const serverName =
     activeProject?.type === 'remote'
-      ? (vpsServerName(vpsServers, activeProject.vpsId) ?? activeProject.vpsId ?? t('sidebar.remote'))
+      ? (server?.name ?? vpsServerName(vpsServers, activeProject.vpsId) ?? t('sidebar.remote'))
       : t('sidebar.local')
-  const path = activeProject?.path ?? '—'
-
-  const ConnectionIcon =
-    connection.kind === 'local' ? HardDrive : connection.kind === 'connected' ? Wifi : Server
 
   const iconButton = (active: boolean): string =>
-    `flex h-5 w-5 shrink-0 items-center justify-center rounded transition ${
-      active ? 'bg-accent-solid/20 text-accent' : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
+    `flex h-7 w-7 shrink-0 items-center justify-center rounded-shape-sm transition-colors duration-fast ${
+      active ? 'bg-accent-solid/15 text-accent' : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
     }`
 
   return (
     <header
       data-testid="execution-bar"
-      className="flex shrink-0 flex-col gap-1 border-b border-border bg-bg-secondary/40 px-3 py-1.5 text-2xs"
+      className="ui-row shrink-0 gap-2 border-b border-border bg-bg-secondary px-3 text-2xs"
     >
-      {/* Line 1 — identity: project / server / path */}
-      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-        {/* v4.0: the toggle goes with the surface it opens (Settings → Surfaces). */}
-        {advanced && isCapabilityEnabled('filesystem') ? (
-          <button
-            type="button"
-            onClick={toggleChatTree}
-            title={t('chat.toggleTree')}
-            aria-label={t('chat.toggleTree')}
-            className={iconButton(chatTreeOpen)}
-          >
-            <PanelLeft className="h-3.5 w-3.5" />
-          </button>
-        ) : null}
-        <span
-          data-testid="exec-project"
-          className="max-w-[10rem] truncate font-medium text-fg"
-          title={projectName}
+      {advanced && isCapabilityEnabled('filesystem') ? (
+        <button
+          type="button"
+          onClick={toggleChatTree}
+          title={t('chat.toggleTree')}
+          aria-label={t('chat.toggleTree')}
+          aria-pressed={chatTreeOpen}
+          className={iconButton(chatTreeOpen)}
         >
-          {projectName}
-        </span>
-        <span className="shrink-0 text-fg-subtle">/</span>
-        <span data-testid="exec-server" className="max-w-[9rem] truncate text-fg-muted" title={serverName}>
-          {serverName}
-        </span>
-        <span className="shrink-0 text-fg-subtle">/</span>
-        <span
-          data-testid="exec-path"
-          dir="ltr"
-          className="min-w-0 flex-1 truncate font-mono text-3xs text-fg-muted"
-          title={path}
-        >
-          {path}
-        </span>
-        <span className="ml-auto flex shrink-0 items-center gap-1">
-          <DiagnosticBadge />
-          <PlanTrustChip />
-          <VpsSelector />
-          <button
-            type="button"
-            onClick={() => {
-              // U-4: `newSession` wipes messages, logs, decisions and pending diffs.
-              if (window.confirm(t('common.clearChatConfirm'))) newSession()
-            }}
-            title={t('chat.clear')}
-            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-fg-muted hover:bg-bg-tertiary hover:text-fg"
-          >
-            <Trash2 className="h-3 w-3" />
-            <span className="hidden sm:inline">{t('chat.clear')}</span>
-          </button>
-        </span>
-      </div>
+          <PanelLeft className="h-3.5 w-3.5" />
+        </button>
+      ) : null}
 
-      {/* Line 2 — contract: git · connection · approval mode, then controls */}
-      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="flex min-w-0 items-center gap-2">
-          <GitStatusPill />
-          <span className="text-fg-subtle">·</span>
+      {/* The breadcrumb: where this run lives. Project, then its folder — nothing repeated. */}
+      <span
+        data-testid="exec-project"
+        className="max-w-[12rem] shrink-0 truncate text-xs font-medium text-fg-strong"
+        title={projectName}
+      >
+        {projectName}
+      </span>
+      <ChevronRight className="h-3 w-3 shrink-0 text-fg-subtle" aria-hidden="true" />
+      <span
+        data-testid="exec-path"
+        dir="ltr"
+        className="min-w-0 flex-1 truncate font-mono text-3xs text-fg-muted"
+        title={path}
+      >
+        {path}
+      </span>
+
+      <span className="ml-auto flex shrink-0 items-center gap-1.5">
+        <DiagnosticBadge />
+        <PlanTrustChip />
+
+        {/*
+          The connection truth, once. A dot carries the state; the label names the machine and its
+          address, so "connected" can never be shown about a server the reader cannot identify.
+          `data-connection` keeps the machine-readable state for the connection test's own tests.
+        */}
+        <span
+          data-testid="status-item-workspace"
+          data-connection={connection.kind}
+          className="flex min-w-0 items-center gap-1.5"
+          title={`${t('connection.title')}: ${t(connection.labelKey)}${
+            connection.detail ? ` · ${connection.detail}` : ''
+          }`}
+        >
           <span
-            data-testid="exec-connection"
-            data-connection={connection.kind}
-            className={`flex min-w-0 items-center gap-1 ${CONNECTION_TONE_CLASS[connection.tone]}`}
-            title={`${t('connection.title')}: ${t(connection.labelKey)}${
-              connection.detail ? ` · ${connection.detail}` : ''
-            }`}
-          >
-            <ConnectionIcon className="h-3 w-3 shrink-0" />
-            <span className="truncate">{t(connection.labelKey)}</span>
+            data-testid="connection-dot"
+            aria-hidden="true"
+            className={`h-1.5 w-1.5 shrink-0 rounded-full ${DOT_TONE[connection.tone]}`}
+          />
+          <span data-testid="exec-server" className="max-w-[11rem] truncate text-fg">
+            {serverName}
           </span>
-          <span className="text-fg-subtle">·</span>
-          <button
-            type="button"
-            data-testid="exec-approval"
-            onClick={() => void setApprovalMode(nextApprovalMode(approvalMode))}
-            title={t('settings.approvalMode')}
-            /*
-         * v4.0: a chip, not a lozenge. The tone still comes from the approval mode, so the colour
-         * keeps meaning what it meant; only the geometry changed.
-         */
-        /*
-         * `shrink-0` is not decoration: in a narrow window this chip must keep its full width
-         * instead of collapsing, which `execution-bar.test.tsx` pins as a real requirement.
-         */
-        className={`brutal-chip shrink-0 ${APPROVAL_TONE[approvalMode]}`}
-          >
-            <ModeIcon className="h-3 w-3" />
-            <span className="whitespace-nowrap">{modeLabel}</span>
-            {full && remaining > 0 ? (
-              <span data-testid="exec-approval-timer" className="font-mono tabular-nums">
-                {formatCountdown(remaining)}
-              </span>
-            ) : null}
-          </button>
-        </span>
-
-        <span className="ml-auto flex shrink-0 items-center gap-1">
-          <button
-            type="button"
-            onClick={() => setPlanMode(!planMode)}
-            title={t('chat.planModeHint')}
-            className={`flex items-center gap-1 rounded px-1.5 py-0.5 transition ${
-              planMode ? 'bg-accent-solid/20 text-accent' : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
-            }`}
-          >
-            <ShieldAlert className="h-3 w-3" />
-            {planMode ? t('chat.planMode') : t('chat.codeMode')}
-          </button>
-          <button
-            type="button"
-            onClick={onToggleTimeline}
-            title={t('timeline.title')}
-            aria-label={t('timeline.title')}
-            className={iconButton(timelineOpen)}
-          >
-            <Activity className="h-3.5 w-3.5" />
-          </button>
-          {advanced && isCapabilityEnabled('terminal') ? (
-            <button
-              type="button"
-              onClick={toggleTerminal}
-              title={t('chat.terminalTitle')}
-              aria-label={t('chat.terminalTitle')}
-              className={iconButton(terminalOpen)}
+          {activeProject?.type === 'remote' && server?.host ? (
+            <span className="max-w-[11rem] truncate font-mono text-3xs text-fg-subtle" dir="ltr">
+              ({server.host})
+            </span>
+          ) : null}
+          {full && remaining > 0 ? (
+            <span
+              data-testid="exec-approval-timer"
+              className="font-mono text-3xs text-danger tabular-nums"
             >
-              <Terminal className="h-3.5 w-3.5" />
-            </button>
+              {formatCountdown(remaining)}
+            </span>
           ) : null}
         </span>
-      </div>
+
+        {/*
+          B2-2: the connection test sits where a connection problem is felt. Absent when there is
+          nothing wrong — never a disabled button.
+        */}
+        {connection.serverId &&
+        (connection.kind === 'error' || connection.kind === 'disconnected') ? (
+          <ConnectionTestButton
+            serverId={connection.serverId}
+            compact
+            testId="status-connection-test"
+          />
+        ) : null}
+
+        <VpsSelector />
+
+        <button
+          type="button"
+          onClick={() => setPlanMode(!planMode)}
+          title={t('chat.planModeHint')}
+          aria-pressed={planMode}
+          data-testid="exec-plan-mode"
+          className={`flex h-7 shrink-0 items-center gap-1 rounded-shape-sm px-1.5 transition-colors duration-fast ${
+            planMode
+              ? 'bg-accent-solid/15 text-accent'
+              : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
+          }`}
+        >
+          <ShieldAlert className="h-3 w-3" />
+          {planMode ? t('chat.planMode') : t('chat.codeMode')}
+        </button>
+
+        <button
+          type="button"
+          onClick={onToggleTimeline}
+          title={t('timeline.title')}
+          aria-label={t('timeline.title')}
+          aria-pressed={timelineOpen}
+          className={iconButton(timelineOpen)}
+        >
+          <Activity className="h-3.5 w-3.5" />
+        </button>
+
+        {advanced && isCapabilityEnabled('terminal') ? (
+          <button
+            type="button"
+            onClick={toggleTerminal}
+            title={t('chat.terminalTitle')}
+            aria-label={t('chat.terminalTitle')}
+            aria-pressed={terminalOpen}
+            className={iconButton(terminalOpen)}
+          >
+            <Terminal className="h-3.5 w-3.5" />
+          </button>
+        ) : null}
+
+        <button
+          type="button"
+          data-testid="exec-clear"
+          onClick={() => {
+            // U-4: `newSession` wipes messages, logs, decisions and pending diffs.
+            if (window.confirm(t('common.clearChatConfirm'))) newSession()
+          }}
+          title={t('chat.clear')}
+          aria-label={t('chat.clear')}
+          className={iconButton(false)}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      </span>
     </header>
   )
 }

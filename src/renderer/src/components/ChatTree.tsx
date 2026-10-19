@@ -30,7 +30,7 @@ export default function ChatTree({ mode, onClose }: ChatTreeProps): JSX.Element 
         className={
           mode === 'static'
             ? 'hidden w-64 shrink-0 border-r border-border md:flex'
-            : 'absolute inset-y-0 left-0 z-40 flex w-64 max-w-[90vw] flex-col border-r border-border bg-bg-secondary shadow-2xl'
+            : 'absolute inset-y-0 left-0 z-40 flex w-64 max-w-[90vw] flex-col border-r border-border bg-bg-secondary'
         }
       >
         <FileExplorer onClose={mode === 'overlay' ? onClose : undefined} />

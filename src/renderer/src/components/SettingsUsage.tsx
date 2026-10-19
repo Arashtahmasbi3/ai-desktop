@@ -35,7 +35,7 @@ import EmptyState from './ui/EmptyState'
  * with the table in `lib/usage.ts` that the spend cap itself uses. No estimate is invented here —
  * where a figure does not exist, the panel says so (see the cap-events card).
  *
- * Deliberately brutalist: bars are a div with a width, data is monospace (`brutal-data`), there
+ * Deliberately plain: bars are a div with a width, data is monospace (`ui-data`), there
  * is no chart library and no soft gradient.
  */
 
@@ -75,24 +75,24 @@ function TotalsRow({
   t: Translator
 }): JSX.Element {
   return (
-    <div className="brutal-inset px-3 py-2">
+    <div className="ui-inset px-3 py-2">
       <div className="mb-1 flex items-center justify-between">
         <span className="text-2xs font-semibold text-fg">{label}</span>
-        <span className="brutal-data text-xs">
+        <span className="ui-data text-xs">
           {totals.cost === null ? t('settings.usageUnknownCost') : formatCost(totals.cost)}
         </span>
       </div>
       <div className="grid grid-cols-3 gap-2 text-2xs text-fg-muted">
         <span>
           {t('settings.usageInput')}:{' '}
-          <span className="brutal-data">{totals.inputTokens.toLocaleString()}</span>
+          <span className="ui-data">{totals.inputTokens.toLocaleString()}</span>
         </span>
         <span>
           {t('settings.usageOutput')}:{' '}
-          <span className="brutal-data">{totals.outputTokens.toLocaleString()}</span>
+          <span className="ui-data">{totals.outputTokens.toLocaleString()}</span>
         </span>
         <span>
-          {t('settings.usageCalls')}: <span className="brutal-data">{totals.calls.toLocaleString()}</span>
+          {t('settings.usageCalls')}: <span className="ui-data">{totals.calls.toLocaleString()}</span>
         </span>
       </div>
       {totals.costUnknown ? (
@@ -123,24 +123,24 @@ function BreakdownList({
   if (rows.length === 0) return null
   return (
     <div data-testid={testId}>
-      <p className="brutal-label text-fg">{title}</p>
+      <p className="ui-label text-fg">{title}</p>
       <p className="mb-1 text-3xs text-fg-subtle">{hint}</p>
       <ul className="flex flex-col gap-1">
         {rows.map((row) => (
           <li
             key={row.key}
-            className="brutal-inset flex items-center gap-2 px-2.5 py-1.5 text-2xs"
+            className="ui-inset flex items-center gap-2 px-2.5 py-1.5 text-2xs"
             data-testid={`${testId}-row`}
             data-key={row.key}
           >
-            <span className="brutal-data min-w-0 flex-1 truncate text-fg">{row.key}</span>
-            <span className="brutal-data shrink-0 text-fg-muted">
+            <span className="ui-data min-w-0 flex-1 truncate text-fg">{row.key}</span>
+            <span className="ui-data shrink-0 text-fg-muted">
               {row.inputTokens.toLocaleString()} / {row.outputTokens.toLocaleString()}
             </span>
-            <span className="brutal-data w-16 shrink-0 text-end text-fg-muted">
+            <span className="ui-data w-16 shrink-0 text-end text-fg-muted">
               {row.calls.toLocaleString()} {t('settings.usageCalls')}
             </span>
-            <span className="brutal-data w-20 shrink-0 text-end text-fg">
+            <span className="ui-data w-20 shrink-0 text-end text-fg">
               {row.cost === null ? t('usage.unpriced') : formatCost(row.cost)}
             </span>
           </li>
@@ -169,18 +169,18 @@ function DayRow({
       data-testid={`usage-day-${day.day}`}
       data-calls={day.calls}
     >
-      <span className="brutal-data w-20 shrink-0 text-fg-muted">{day.day}</span>
+      <span className="ui-data w-20 shrink-0 text-fg-muted">{day.day}</span>
       <span className="min-w-0 flex-1">
         <Bar percent={percent} testId={`usage-day-bar-${day.day}`} />
       </span>
-      <span className="brutal-data w-20 shrink-0 text-end text-fg">
+      <span className="ui-data w-20 shrink-0 text-end text-fg">
         {day.calls === 0
           ? '—'
           : day.cost === null
             ? t('usage.unpriced')
             : formatCost(day.cost)}
       </span>
-      <span className="brutal-data w-16 shrink-0 text-end text-fg-muted">
+      <span className="ui-data w-16 shrink-0 text-end text-fg-muted">
         {tokens.toLocaleString()}
       </span>
       <span className="w-16 shrink-0 text-end text-3xs text-fg-subtle">
@@ -270,14 +270,14 @@ export default function SettingsUsage(): JSX.Element {
   return (
     <section className="flex flex-col gap-3">
       {/* 1. Today against the cap — the number that can stop a send. */}
-      <div className="brutal-card p-3" data-testid="usage-today">
+      <div className="ui-card p-3" data-testid="usage-today">
         <div className="flex items-center justify-between gap-2">
           <span className="flex items-center gap-1.5 text-xs font-semibold text-fg">
             <Gauge className="h-3.5 w-3.5 text-accent" />
             {t('usage.todayTitle')}
           </span>
           <span
-            className={`brutal-chip ${
+            className={`ui-chip ${
               budgetNow.level === 'over'
                 ? 'border-danger text-danger'
                 : budgetNow.level === 'warn'
@@ -292,7 +292,7 @@ export default function SettingsUsage(): JSX.Element {
           </span>
         </div>
 
-        <p className="brutal-data mt-2 text-base" data-testid="budget-today">
+        <p className="ui-data mt-2 text-base" data-testid="budget-today">
           {formatCost(budgetNow.spentToday)}
           {budgetNow.cap > 0 ? (
             <span className="text-fg-muted"> / {formatCost(budgetNow.cap)}</span>
@@ -306,7 +306,7 @@ export default function SettingsUsage(): JSX.Element {
               tone={budgetNow.level === 'over' ? 'over' : budgetNow.level === 'warn' ? 'warn' : 'ok'}
               testId="usage-cap-bar"
             />
-            <p className="brutal-data mt-1 text-2xs text-fg-muted" data-testid="usage-cap-fraction">
+            <p className="ui-data mt-1 text-2xs text-fg-muted" data-testid="usage-cap-fraction">
               {t('usage.capFraction', { percent: Math.round(budgetNow.fraction * 100) })}
             </p>
           </>
@@ -334,7 +334,7 @@ export default function SettingsUsage(): JSX.Element {
             value={budget.dailyCap || ''}
             placeholder="0"
             onChange={(event) => updateBudget({ dailyCap: Number(event.target.value) })}
-            className="brutal-inset brutal-focus brutal-data w-20 px-2 py-1 text-right text-2xs"
+            className="ui-inset ui-focus ui-data w-20 px-2 py-1 text-right text-2xs"
           />
         </label>
 
@@ -361,7 +361,7 @@ export default function SettingsUsage(): JSX.Element {
         <>
           {/* 2. The last 14 days, as a bar list. */}
           <div data-testid="usage-days">
-            <p className="brutal-label text-fg">{t('usage.daysTitle')}</p>
+            <p className="ui-label text-fg">{t('usage.daysTitle')}</p>
             <p className="mb-1 text-3xs text-fg-subtle">{t('usage.daysHint')}</p>
             <ol className="flex flex-col gap-1">
               {days.map((day) => (
@@ -387,17 +387,17 @@ export default function SettingsUsage(): JSX.Element {
           />
 
           {/* 4. Cap events — and the honest gap. */}
-          <div className="brutal-card p-3" data-testid="usage-cap-events">
+          <div className="ui-card p-3" data-testid="usage-cap-events">
             <div className="flex items-center justify-between gap-2">
-              <span className="brutal-label text-fg">{t('usage.capEventsTitle')}</span>
-              <span className="brutal-data text-2xs text-warning" data-testid="usage-cap-events-value">
+              <span className="ui-label text-fg">{t('usage.capEventsTitle')}</span>
+              <span className="ui-data text-2xs text-warning" data-testid="usage-cap-events-value">
                 {t('usage.capEventsUnknown')}
               </span>
             </div>
             <p className="mt-1 text-2xs leading-relaxed text-fg-muted" data-testid="usage-cap-events-body">
               {t('usage.capEventsBody')}
             </p>
-            <p className="brutal-data mt-2 text-2xs text-fg-muted">
+            <p className="ui-data mt-2 text-2xs text-fg-muted">
               {t('usage.capEventsLevel')}:{' '}
               <span data-testid="usage-cap-level">{levelLabel(budgetNow.level, t)}</span>
             </p>
@@ -411,24 +411,24 @@ export default function SettingsUsage(): JSX.Element {
         </>
       )}
 
-      <h3 className="brutal-label flex items-center gap-2">
+      <h3 className="ui-label flex items-center gap-2">
         <BarChart3 className="h-3.5 w-3.5" />
         {t('settings.usage')}
       </h3>
       <p className="text-2xs text-fg-muted">{t('settings.usageHint')}</p>
       <dl className="flex flex-col gap-2">
         {rows.map(([label, value]) => (
-          <div key={label} className="brutal-card flex items-center justify-between px-3 py-2">
+          <div key={label} className="ui-card flex items-center justify-between px-3 py-2">
             <dt className="text-xs text-fg-muted">{label}</dt>
-            <dd className="brutal-data text-xs">{value}</dd>
+            <dd className="ui-data text-xs">{value}</dd>
           </div>
         ))}
       </dl>
 
-      <div data-testid="usage-context-window" className="brutal-inset px-3 py-2">
+      <div data-testid="usage-context-window" className="ui-inset px-3 py-2">
         <div className="flex items-center justify-between text-xs text-fg">
           <span>{t('settings.contextUsage')}</span>
-          <span className={`brutal-data ${context.overBudget ? 'text-warning' : 'text-fg-muted'}`}>
+          <span className={`ui-data ${context.overBudget ? 'text-warning' : 'text-fg-muted'}`}>
             {context.tokens.toLocaleString()} / {DEFAULT_CONTEXT_TOKEN_BUDGET.toLocaleString()} ·{' '}
             {contextPercent}%
           </span>
@@ -450,7 +450,7 @@ export default function SettingsUsage(): JSX.Element {
             onClick={exportCsv}
             disabled={usageRecords.length === 0}
             title={t('settings.usageExport')}
-            className="brutal-btn flex items-center gap-1"
+            className="ui-btn flex items-center gap-1"
           >
             <Download className="h-3 w-3" />
             {t('settings.usageExport')}
@@ -460,7 +460,7 @@ export default function SettingsUsage(): JSX.Element {
             onClick={resetUsage}
             disabled={usageRecords.length === 0}
             title={t('settings.usageReset')}
-            className="brutal-btn flex items-center gap-1"
+            className="ui-btn flex items-center gap-1"
           >
             <RotateCcw className="h-3 w-3" />
             {t('settings.usageReset')}

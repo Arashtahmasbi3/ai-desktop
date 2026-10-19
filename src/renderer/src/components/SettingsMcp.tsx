@@ -92,7 +92,7 @@ export default function SettingsMcp(): JSX.Element {
 
   return (
     <section className="flex flex-col gap-3" data-testid="settings-mcp">
-      <h3 className="brutal-label flex items-center gap-2">
+      <h3 className="ui-label flex items-center gap-2">
         <Blocks className="h-3.5 w-3.5" />
         {t('settings.mcp')}
       </h3>
@@ -103,7 +103,7 @@ export default function SettingsMcp(): JSX.Element {
           event.preventDefault()
           add()
         }}
-        className="brutal-card flex flex-col gap-2 p-3"
+        className="ui-card flex flex-col gap-2 p-3"
         data-testid="mcp-add-form"
       >
         <div className="grid grid-cols-2 gap-2">
@@ -113,7 +113,7 @@ export default function SettingsMcp(): JSX.Element {
             placeholder={t('settings.mcpNamePlaceholder')}
             aria-label={t('settings.mcpName')}
             name="mcp-name"
-            className="brutal-inset brutal-focus px-2 py-1 text-xs text-fg"
+            className="ui-inset ui-focus px-2 py-1 text-xs text-fg"
           />
           <input
             value={command}
@@ -122,7 +122,7 @@ export default function SettingsMcp(): JSX.Element {
             aria-label={t('settings.mcpCommand')}
             name="mcp-command"
             dir="ltr"
-            className="brutal-inset brutal-focus brutal-data px-2 py-1 text-xs"
+            className="ui-inset ui-focus ui-data px-2 py-1 text-xs"
           />
         </div>
         <input
@@ -132,7 +132,7 @@ export default function SettingsMcp(): JSX.Element {
           aria-label={t('settings.mcpArgs')}
           name="mcp-args"
           dir="ltr"
-          className="brutal-inset brutal-focus brutal-data px-2 py-1 text-xs"
+          className="ui-inset ui-focus ui-data px-2 py-1 text-xs"
         />
         <p className="text-3xs text-fg-subtle">{t('settings.mcpArgsHint')}</p>
         <textarea
@@ -143,7 +143,7 @@ export default function SettingsMcp(): JSX.Element {
           name="mcp-env"
           rows={2}
           dir="ltr"
-          className="brutal-inset brutal-focus brutal-data px-2 py-1 text-xs"
+          className="ui-inset ui-focus ui-data px-2 py-1 text-xs"
         />
         {formError !== null ? (
           <p className="text-2xs text-danger" data-testid="mcp-form-error">
@@ -154,7 +154,7 @@ export default function SettingsMcp(): JSX.Element {
           <button
             type="submit"
             disabled={busy}
-            className="brutal-btn brutal-primary flex items-center gap-1"
+            className="ui-btn ui-primary flex items-center gap-1"
           >
             <Plus className="h-3.5 w-3.5" />
             {t('settings.mcpAdd')}
@@ -185,18 +185,18 @@ export default function SettingsMcp(): JSX.Element {
                 key={server.id}
                 data-testid="mcp-server-row"
                 data-server-id={server.id}
-                className="brutal-card flex flex-col gap-1.5 p-3"
+                className="ui-card flex flex-col gap-1.5 p-3"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="truncate text-sm text-fg">{server.name}</p>
                     {/* The launch line is data, so it reads left-to-right even in an RTL locale. */}
-                    <p className="brutal-data mt-0.5 truncate text-2xs text-fg-muted" dir="ltr">
+                    <p className="ui-data mt-0.5 truncate text-2xs text-fg-muted" dir="ltr">
                       {server.launch}
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
-                    <span className="brutal-chip" data-testid="mcp-server-enabled">
+                    <span className="ui-chip" data-testid="mcp-server-enabled">
                       {t(server.enabled ? 'settings.mcpEnabled' : 'settings.mcpDisabled')}
                     </span>
                     <button
@@ -208,7 +208,7 @@ export default function SettingsMcp(): JSX.Element {
                       aria-label={`${
                         server.enabled ? t('settings.mcpDisable') : t('settings.mcpEnable')
                       } ${server.name}`}
-                      className="brutal-btn px-2 py-1 text-2xs"
+                      className="ui-btn px-2 py-1 text-2xs"
                     >
                       {server.enabled ? t('settings.mcpDisable') : t('settings.mcpEnable')}
                     </button>
@@ -218,14 +218,14 @@ export default function SettingsMcp(): JSX.Element {
                       onClick={() => void apply(() => window.api.mcp.remove(server.id))}
                       title={t('settings.mcpRemove')}
                       aria-label={`${t('settings.mcpRemove')} ${server.name}`}
-                      className="brutal-btn p-1 text-fg-muted"
+                      className="ui-btn p-1 text-fg-muted"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </div>
                 <p className="flex flex-wrap items-center gap-2 text-2xs text-fg-muted">
-                  <span className="brutal-chip" data-testid="mcp-server-state" data-state={state}>
+                  <span className="ui-chip" data-testid="mcp-server-state" data-state={state}>
                     {t(`settings.mcpState_${state}`)}
                   </span>
                   {server.error === undefined && toolCount !== undefined ? (
@@ -246,10 +246,10 @@ export default function SettingsMcp(): JSX.Element {
       )}
 
       <div
-        className="rounded-shape border-2 border-border-strong bg-bg-secondary p-3"
+        className="rounded-shape border border-border-strong bg-bg-secondary p-3"
         data-testid="mcp-last-status"
       >
-        <h4 className="brutal-label">{t('settings.mcpStatusTitle')}</h4>
+        <h4 className="ui-label">{t('settings.mcpStatusTitle')}</h4>
         {statuses.length === 0 ? (
           <p className="mt-1 text-2xs text-fg-subtle">{t('settings.mcpStatusEmpty')}</p>
         ) : (
@@ -264,10 +264,10 @@ export default function SettingsMcp(): JSX.Element {
                   {servers.find((server) => server.id === status.serverId)?.name ?? status.serverId}
                 </span>
                 <span className="flex shrink-0 items-center gap-2">
-                  <span className="brutal-chip" data-state={status.state}>
+                  <span className="ui-chip" data-state={status.state}>
                     {t(`settings.mcpState_${status.state}`)}
                   </span>
-                  <span className="brutal-data text-fg-muted" dir="ltr">
+                  <span className="ui-data text-fg-muted" dir="ltr">
                     {status.toolCount}
                   </span>
                   {status.error !== undefined ? (

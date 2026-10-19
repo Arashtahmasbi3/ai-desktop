@@ -40,7 +40,7 @@ describe('EmptyState: say what is missing, offer at most two actions (U3-6)', ()
     // A control that cannot work is a button that lies about a capability: none is rendered.
     expect(screen.queryAllByRole('button')).toHaveLength(0)
     // ... and the block is a real container of the design language (square, 2px border).
-    expect(block.className).toContain('brutal-card')
+    expect(block.className).toContain('ui-card')
   })
 
   it('2. offers at most two actions and marks only the primary one', () => {
@@ -66,8 +66,8 @@ describe('EmptyState: say what is missing, offer at most two actions (U3-6)', ()
     expect(secondary).not.toHaveBeenCalled()
 
     // The filled surface is the way forward; the alternative stays a plain bordered button.
-    expect(screen.getByTestId('primary').className).toContain('brutal-primary')
-    expect(screen.getByTestId('secondary').className).not.toContain('brutal-primary')
+    expect(screen.getByTestId('primary').className).toContain('ui-primary')
+    expect(screen.getByTestId('secondary').className).not.toContain('ui-primary')
   })
 
   it('3. one action is enough — the second slot is optional', () => {

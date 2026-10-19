@@ -396,7 +396,7 @@ export default function App(): JSX.Element {
 
       {dragging ? (
         <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center bg-accent-solid/10 backdrop-blur-sm">
-          <div className="flex items-center gap-2 rounded-xl border border-accent/50 bg-bg-secondary px-4 py-3 text-sm text-fg">
+          <div className="flex items-center gap-2 rounded-shape border border-accent/50 bg-bg-secondary px-4 py-3 text-sm text-fg">
             <UploadCloud className="h-4 w-4 text-accent" />
             {t('titlebar.openFolder')}
           </div>

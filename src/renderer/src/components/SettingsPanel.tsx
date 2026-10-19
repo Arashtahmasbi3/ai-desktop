@@ -152,13 +152,13 @@ export default function SettingsPanel(): JSX.Element | null {
     >
       <div className="flex h-[min(85vh,44rem)] max-h-full flex-col overflow-hidden">
         <div className="flex h-11 shrink-0 items-center justify-between border-b-2 border-fg-strong px-4">
-          <h2 className="brutal-label text-fg-strong">{t('settings.title')}</h2>
+          <h2 className="ui-label text-fg-strong">{t('settings.title')}</h2>
           <button
             type="button"
             onClick={close}
             title={`${t('common.close')} (Esc)`}
             aria-label={t('common.close')}
-            className="brutal-btn brutal-focus p-1"
+            className="ui-btn ui-focus p-1"
           >
             <X className="h-4 w-4" />
           </button>
@@ -172,7 +172,7 @@ export default function SettingsPanel(): JSX.Element | null {
             {NAV_GROUPS.map((group, groupIndex) => (
               <div key={group.labelKey ?? `group-${groupIndex}`} className="flex flex-col gap-0.5">
                 {group.labelKey ? (
-                  <span className="brutal-label px-2.5 pb-0.5 pt-2">
+                  <span className="ui-label px-2.5 pb-0.5 pt-2">
                     {t(group.labelKey)}
                   </span>
                 ) : null}
@@ -184,7 +184,7 @@ export default function SettingsPanel(): JSX.Element | null {
                       type="button"
                       onClick={() => setTab(item.id)}
                       data-selected={tab === item.id}
-                      className="brutal-tab flex items-center gap-2 px-2.5 py-1.5 text-left"
+                      className="ui-tab flex items-center gap-2 px-2.5 py-1.5 text-left"
                     >
                       <Icon className="h-3.5 w-3.5" />
                       {t(item.labelKey)}
@@ -203,11 +203,11 @@ export default function SettingsPanel(): JSX.Element | null {
                   hint, so "which theme am I on?" is never a guess. It sits above the
                   language because it is the setting a new user reaches for first.
                 */}
-                <h3 className="brutal-label flex items-center gap-2">
+                <h3 className="ui-label flex items-center gap-2">
                   <Palette className="h-3.5 w-3.5" />
                   {t('settings.theme')}
                 </h3>
-                <div className="brutal-card p-3">
+                <div className="ui-card p-3">
                   <p className="text-xs text-fg-muted">{t('settings.themeHint')}</p>
                   <div
                     role="radiogroup"
@@ -225,7 +225,7 @@ export default function SettingsPanel(): JSX.Element | null {
                           data-selected={active}
                           data-testid={`settings-theme-${option}`}
                           onClick={() => setTheme(option)}
-                          className="brutal-tab flex items-center justify-center gap-2 px-2 py-2"
+                          className="ui-tab flex items-center justify-center gap-2 px-2 py-2"
                         >
                           <ThemeIcon preference={option} className="h-3.5 w-3.5" />
                           {t(themeLabelKey(option))}
@@ -235,11 +235,11 @@ export default function SettingsPanel(): JSX.Element | null {
                   </div>
                 </div>
 
-                <h3 className="brutal-label flex items-center gap-2">
+                <h3 className="ui-label flex items-center gap-2">
                   <Languages className="h-3.5 w-3.5" />
                   {t('common.language')}
                 </h3>
-                <div className="brutal-card p-3">
+                <div className="ui-card p-3">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-sm text-fg">{t('settings.languageHint')}</p>
@@ -250,7 +250,7 @@ export default function SettingsPanel(): JSX.Element | null {
                         setLocale(event.target.value === 'fa' ? 'fa' : 'en')
                       }
                       aria-label={t('common.language')}
-                      className="brutal-inset brutal-focus px-2 py-1 text-xs text-fg"
+                      className="ui-inset ui-focus px-2 py-1 text-xs text-fg"
                     >
                       {SUPPORTED_LOCALES.map((option) => (
                         <option key={option} value={option}>
@@ -320,7 +320,7 @@ export default function SettingsPanel(): JSX.Element | null {
                         )
                       }
                       aria-label={t('settings.chatOnProjectSwitch')}
-                      className="brutal-inset brutal-focus shrink-0 px-2 py-1 text-xs text-fg"
+                      className="ui-inset ui-focus shrink-0 px-2 py-1 text-xs text-fg"
                     >
                       <option value="ask">{t('projectSwitch.ask')}</option>
                       <option value="link">{t('projectSwitch.link')}</option>

@@ -39,7 +39,7 @@ export default function TemplateMenu({ currentInput, onPick }: TemplateMenuProps
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="brutal-btn flex items-center gap-1.5"
+        className="ui-btn flex items-center gap-1.5"
       >
         <LayoutTemplate className="h-3.5 w-3.5 text-accent" />
         {t('chat.templates')}
@@ -47,7 +47,7 @@ export default function TemplateMenu({ currentInput, onPick }: TemplateMenuProps
       {open ? (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} aria-hidden="true" />
-          <div className="absolute left-1/2 top-10 z-50 w-64 -translate-x-1/2 overflow-hidden rounded-lg border border-border bg-bg-secondary py-1 text-start text-xs shadow-2xl">
+          <div className="absolute left-1/2 top-10 z-50 w-64 -translate-x-1/2 overflow-hidden rounded-lg border border-border bg-bg-secondary py-1 text-start text-xs">
             {BUILTIN_TEMPLATES.map((template) => (
               <button
                 key={template.id}

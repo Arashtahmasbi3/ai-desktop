@@ -21,7 +21,7 @@ export default function SettingsTools(): JSX.Element {
 
   return (
     <section className="flex flex-col gap-3">
-      <h3 className="brutal-label flex items-center gap-2">
+      <h3 className="ui-label flex items-center gap-2">
         <Wrench className="h-3.5 w-3.5" />
         {t('settings.tools')}
       </h3>
@@ -32,7 +32,7 @@ export default function SettingsTools(): JSX.Element {
           return (
             <li
               key={group.id}
-              className="brutal-card px-3 py-2"
+              className="ui-card px-3 py-2"
             >
               <label className="flex cursor-pointer items-start gap-3">
                 <input
@@ -43,7 +43,7 @@ export default function SettingsTools(): JSX.Element {
                   aria-label={group.label}
                 />
                 <span className="flex flex-col">
-                  <span className="brutal-data text-xs text-accent">{group.label}</span>
+                  <span className="ui-data text-xs text-accent">{group.label}</span>
                   <span className="text-2xs text-fg-muted">{group.description}</span>
                 </span>
               </label>

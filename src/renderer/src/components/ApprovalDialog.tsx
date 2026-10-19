@@ -317,7 +317,7 @@ export default function ApprovalDialog(): JSX.Element | null {
           />
         ) : null}
 
-        <p className="mt-3 text-3xs uppercase tracking-wide text-fg-subtle">
+        <p className="mt-3 text-3xs text-fg-subtle">
           {t('chat.approvalCommand')}
         </p>
 
@@ -420,7 +420,7 @@ export default function ApprovalDialog(): JSX.Element | null {
 
         {showHistory ? (
           <div className="mx-4 mb-3 max-h-48 overflow-auto rounded-lg border border-border bg-bg-primary p-2">
-            <p className="mb-1 text-3xs font-medium uppercase tracking-wide text-fg-subtle">
+            <p className="mb-1 text-3xs font-medium text-fg-subtle">
               {t('chat.approvalHistory')}
             </p>
             {history.length === 0 ? (
@@ -442,7 +442,7 @@ export default function ApprovalDialog(): JSX.Element | null {
                 ))}
               </ul>
             )}
-            <p className="mb-1 text-3xs font-medium uppercase tracking-wide text-fg-subtle">
+            <p className="mb-1 text-3xs font-medium text-fg-subtle">
               {t('settings.approvedCommands')}
             </p>
             {learned.length === 0 ? (

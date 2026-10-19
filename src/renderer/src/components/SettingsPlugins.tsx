@@ -75,7 +75,7 @@ export default function SettingsPlugins(): JSX.Element {
 
   return (
     <section className="flex flex-col gap-3" data-testid="settings-plugins">
-      <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
+      <h3 className="flex items-center gap-2 text-xs font-semibold text-fg-muted">
         <Plug className="h-3.5 w-3.5" />
         {t('settings.plugins')}
       </h3>
@@ -91,14 +91,14 @@ export default function SettingsPlugins(): JSX.Element {
             role="tab"
             aria-selected={tab === item.id}
             onClick={() => setTab(item.id)}
-            className="brutal-tab"
+            className="ui-tab"
           >
             {t(item.labelKey)}
           </button>
         ))}
       </div>
 
-      <label className="brutal-inset brutal-focus flex items-center gap-2 px-2 py-1.5">
+      <label className="ui-inset ui-focus flex items-center gap-2 px-2 py-1.5">
         <Search className="h-3.5 w-3.5 text-fg-muted" />
         <input
           value={query}
@@ -160,7 +160,7 @@ function CapabilityRow({
     <div
       data-testid="capability-row"
       data-capability={capability.id}
-      className="brutal-card flex items-center justify-between gap-3 p-3"
+      className="ui-card flex items-center justify-between gap-3 p-3"
     >
       <div className="min-w-0">
         <p className="text-sm text-fg">{label}</p>
@@ -173,7 +173,7 @@ function CapabilityRow({
         aria-label={label}
         title={entry.description}
         onClick={() => onToggle(capability.id)}
-        className={`brutal-focus relative h-5 w-9 shrink-0 rounded-shape-sm border-2 transition-colors duration-fast ${
+        className={`ui-focus relative h-5 w-9 shrink-0 rounded-shape-sm border transition-colors duration-fast ${
           enabled ? 'border-fg-strong bg-accent-solid' : 'border-border-strong bg-bg-tertiary'
         }`}
       >
@@ -203,7 +203,7 @@ function InfoRow({
     <div
       data-testid="catalog-row"
       data-optional="false"
-      className="brutal-card flex items-center justify-between gap-3 p-3"
+      className="ui-card flex items-center justify-between gap-3 p-3"
     >
       <div className="min-w-0">
         <p className="text-sm text-fg">{entry.name}</p>
@@ -217,7 +217,7 @@ function InfoRow({
       <button
         type="button"
         onClick={onOpenSettings}
-        className="brutal-btn brutal-press flex shrink-0 items-center gap-1.5"
+        className="ui-btn ui-press flex shrink-0 items-center gap-1.5"
       >
         {t('settings.pluginsConfigure')}
         <ArrowUpRight className="h-3 w-3" />

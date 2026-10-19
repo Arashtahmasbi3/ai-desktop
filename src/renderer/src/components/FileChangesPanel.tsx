@@ -137,7 +137,7 @@ export default function FileChangesPanel({ changes }: FileChangesPanelProps): JS
     <div className="mb-2 flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2 px-1">
         {/* U3-2 level 1: the headline and the totals, one line. */}
-        <p className="flex min-w-0 items-center gap-1.5 text-3xs uppercase tracking-wide text-fg-muted">
+        <p className="flex min-w-0 items-center gap-1.5 text-3xs text-fg-muted">
           <Layers className="h-3 w-3 shrink-0" />
           <span className="truncate">{t('chat.changesTitle')}</span>
           <span className="shrink-0 text-fg-subtle">({changes.length})</span>

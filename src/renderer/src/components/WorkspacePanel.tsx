@@ -59,7 +59,7 @@ export default function WorkspacePanel({ overlay }: WorkspacePanelProps = {}): J
             title={label}
             aria-label={label}
             aria-pressed={tab === id}
-            className="brutal-focus flex h-8 w-8 items-center justify-center rounded-shape-sm text-fg-muted hover:bg-bg-tertiary hover:text-fg"
+            className="ui-focus flex h-8 w-8 items-center justify-center rounded-shape-sm text-fg-muted hover:bg-bg-tertiary hover:text-fg"
           >
             <Icon className="h-3.5 w-3.5" />
           </button>
@@ -70,7 +70,7 @@ export default function WorkspacePanel({ overlay }: WorkspacePanelProps = {}): J
           onClick={toggle}
           title={t('workspace.open')}
           aria-label={t('workspace.open')}
-          className="brutal-focus mt-auto flex h-8 w-8 items-center justify-center rounded-shape-sm text-fg-muted hover:bg-bg-tertiary hover:text-fg"
+          className="ui-focus mt-auto flex h-8 w-8 items-center justify-center rounded-shape-sm text-fg-muted hover:bg-bg-tertiary hover:text-fg"
         >
           <PanelRightOpen className="h-3.5 w-3.5" />
         </button>
@@ -85,8 +85,8 @@ export default function WorkspacePanel({ overlay }: WorkspacePanelProps = {}): J
         // U-7: logical properties, so the panel pins to the *end* edge and its
         // divider sits on the start side in RTL as well as LTR.
         overlay
-          ? 'absolute inset-y-0 end-0 z-40 flex w-[22rem] max-w-[90vw] shrink-0 flex-col border-s border-border bg-bg-secondary shadow-2xl'
-          : 'absolute inset-y-0 end-0 z-40 flex w-[22rem] max-w-[90vw] shrink-0 flex-col border-s border-border bg-bg-secondary shadow-2xl xl:static xl:z-auto xl:shadow-none'
+          ? 'absolute inset-y-0 end-0 z-40 flex w-[22rem] max-w-[90vw] shrink-0 flex-col border-s border-border bg-bg-secondary'
+          : 'absolute inset-y-0 end-0 z-40 flex w-[22rem] max-w-[90vw] shrink-0 flex-col border-s border-border bg-bg-secondary xl:static xl:z-auto xl:shadow-none'
       }
     >
       <header className="flex h-10 shrink-0 items-center gap-1 border-b border-border px-2">
@@ -96,7 +96,7 @@ export default function WorkspacePanel({ overlay }: WorkspacePanelProps = {}): J
             type="button"
             onClick={() => setTab(id)}
             aria-pressed={tab === id}
-            className="brutal-tab flex items-center gap-1.5 text-2xs"
+            className="ui-tab flex items-center gap-1.5 text-2xs"
           >
             <Icon className="h-3.5 w-3.5" />
             {label}
@@ -126,7 +126,7 @@ export default function WorkspacePanel({ overlay }: WorkspacePanelProps = {}): J
               type="button"
               data-testid="rail-declare-sources"
               onClick={() => setSourcesPanelOpen(true)}
-              className="brutal-btn brutal-press mb-3 flex w-full items-center justify-center gap-1.5 text-3xs"
+              className="ui-btn ui-press mb-3 flex w-full items-center justify-center gap-1.5 text-3xs"
             >
               <SlidersHorizontal className="h-3.5 w-3.5" />
               {t('runPanel.title')}

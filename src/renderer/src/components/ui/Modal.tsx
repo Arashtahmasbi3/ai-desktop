@@ -151,7 +151,7 @@ export default function Modal({
         aria-label={ariaLabel}
         tabIndex={-1}
         style={{ maxWidth, maxHeight }}
-        className={`brutal-panel flex w-full flex-col overflow-hidden border border-border outline-none ${className}`}
+        className={`ui-panel flex w-full flex-col overflow-hidden border border-border outline-none ${className}`}
       >
         {children}
       </div>

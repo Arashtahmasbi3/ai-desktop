@@ -9,7 +9,7 @@ import type { ChatMessage } from '../../src/renderer/src/store'
  * The message bubble (v4.0).
  *
  * There was no test for this component, and the transcript is the most-used surface in the app — so
- * the brutalist pass skipped it entirely (it used no clay classes, so nothing renamed it) and the
+ * the v4.0 restyle skipped it entirely (it used no renamed classes, so nothing touched it) and the
  * gap only appeared when the rendered page was read.
  *
  * The first case exists because of a specific bug I introduced while fixing that: a JSX comment in
@@ -60,10 +60,10 @@ describe('MessageBubble (v4.0)', () => {
     unmount()
 
     for (const className of [assistantClass, userClass]) {
-      // Square geometry and a 2px border: the language the rest of the app now speaks.
+      // The 6px radius step and a 1px hairline: the language the rest of the app speaks.
       expect(className).toContain('rounded-shape')
-      expect(className).toContain('border-2')
-      expect(className).not.toContain('rounded-xl')
+      expect(className.split(/\s+/)).toContain('border')
+      expect(className).not.toContain('border-2')
     }
     // And the two are distinguishable without relying on the fill colour.
     expect(userClass).toContain('border-accent')

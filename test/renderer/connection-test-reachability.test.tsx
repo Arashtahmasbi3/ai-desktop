@@ -5,7 +5,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 import i18n from '../../src/renderer/src/i18n'
 import Sidebar from '../../src/renderer/src/components/Sidebar'
-import StatusBar from '../../src/renderer/src/components/StatusBar'
+import ExecutionBar from '../../src/renderer/src/components/ExecutionBar'
 import ErrorBanner from '../../src/renderer/src/components/ErrorBanner'
 import { useStore } from '../../src/renderer/src/store'
 import {
@@ -21,7 +21,7 @@ import type { ProjectRecord, SettingsView, WorkerStatus } from '@shared/ui'
  *
  * v4.1 added a real TCP probe (`vps:testConnection`) and one button for it on the Servers page.
  * That answers "is the host reachable?", but only for a user who knows the page exists: every
- * surface that *reports* a failure — the sidebar's project row, the status bar's connection item,
+ * surface that *reports* a failure — the sidebar's project row, the workspace line's item,
  * and the strip after a failed run — offered no way to ask. These cases pin the reachability, and
  * they pin the two rules that keep it honest:
  *
@@ -366,11 +366,11 @@ describe('the sidebar row for a disconnected server', () => {
   })
 })
 
-describe('the status bar item that reports the remote connection', () => {
+describe('the workspace line that reports the remote connection', () => {
   it('offers the test when the server is disconnected', async () => {
     stubApi({ testConnection: async () => TIMED_OUT })
     useStore.setState({ settings: settings([remoteProject]), vpsServers: [SERVER] })
-    render(<StatusBar />)
+    render(<ExecutionBar timelineOpen={false} onToggleTimeline={() => undefined} />)
 
     const item = screen.getByTestId('status-item-workspace')
     expect(item.getAttribute('data-connection')).toBe('disconnected')
@@ -392,7 +392,7 @@ describe('the status bar item that reports the remote connection', () => {
       vpsServers: [SERVER],
       vpsStatus: { status: 'error', serverId: 'srv-1', error: 'Connection failed' }
     })
-    render(<StatusBar />)
+    render(<ExecutionBar timelineOpen={false} onToggleTimeline={() => undefined} />)
 
     expect(screen.getByTestId('status-item-workspace').getAttribute('data-connection')).toBe('error')
     expect(screen.getByTestId('status-connection-test-button')).toBeTruthy()
@@ -405,7 +405,7 @@ describe('the status bar item that reports the remote connection', () => {
       vpsServers: [SERVER],
       vpsConnected: ['srv-1']
     })
-    render(<StatusBar />)
+    render(<ExecutionBar timelineOpen={false} onToggleTimeline={() => undefined} />)
 
     expect(screen.getByTestId('status-item-workspace').getAttribute('data-connection')).toBe('connected')
     expect(screen.queryByTestId('status-connection-test-button')).toBeNull()
@@ -414,7 +414,7 @@ describe('the status bar item that reports the remote connection', () => {
 
     const local: ProjectRecord = { ...remoteProject, type: 'local', exists: true, vpsId: undefined }
     useStore.setState({ settings: settings([local]), vpsConnected: [] })
-    render(<StatusBar />)
+    render(<ExecutionBar timelineOpen={false} onToggleTimeline={() => undefined} />)
 
     expect(screen.getByTestId('status-item-workspace').getAttribute('data-connection')).toBe('local')
     expect(screen.queryByTestId('status-connection-test-button')).toBeNull()

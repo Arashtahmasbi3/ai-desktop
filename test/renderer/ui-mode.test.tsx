@@ -5,6 +5,7 @@ import i18n from '../../src/renderer/src/i18n'
 import ExecutionBar from '../../src/renderer/src/components/ExecutionBar'
 import InlineTrace from '../../src/renderer/src/components/InlineTrace'
 import StatusBar from '../../src/renderer/src/components/StatusBar'
+import Titlebar from '../../src/renderer/src/components/Titlebar'
 import { DEFAULT_UI_MODE, getUiMode, setUiMode } from '../../src/renderer/src/lib/ui-mode'
 import { useStore } from '../../src/renderer/src/store'
 import type { SettingsView } from '@shared/ui'
@@ -24,8 +25,9 @@ import type { TraceDecision } from '../../src/shared/trace'
  *  2. **"Not offered" means not open either.** A pane that is open when the mode turns simple is
  *     closed (and its persisted flag cleared), and the store refuses to reopen it — so the
  *     keyboard shortcuts and the Settings → Connections button cannot route around the mode.
- *  3. **Advanced is one visible control away.** The status bar's overflow menu switches modes and
- *     the terminal/file-tree toggles come back; the trace's reasoning row returns too.
+ *  3. **Advanced is one visible control away.** The switch is a preference, so in v4.3 it moved
+ *     from the status bar into the title bar's `⋯` menu — and the terminal/file-tree toggles come
+ *     back with it, as does the trace's reasoning row.
  */
 
 beforeAll(async () => {
@@ -85,7 +87,8 @@ const executionBar = (): JSX.Element => (
 beforeEach(() => {
   localStorage.clear()
   // A stubbed bridge is a boundary, not a mock of the code under test: `VpsSelector` refreshes the
-  // server list on mount and none of these cases is about VPS state.
+  // server list on mount and none of these cases is about VPS state; the title bar asks the window
+  // whether it is maximized.
   ;(window as unknown as { api: unknown }).api = {
     vps: {
       list: () => Promise.resolve([]),
@@ -94,7 +97,15 @@ beforeEach(() => {
       gitStatusParsed: () =>
         Promise.resolve({ branch: 'main', changes: 0, ahead: 0, behind: 0, clean: true })
     },
-    agent: { abort: () => Promise.resolve() }
+    agent: { abort: () => Promise.resolve() },
+    window: {
+      isMaximized: () => Promise.resolve(false),
+      minimize: () => Promise.resolve(),
+      toggleMaximize: () => Promise.resolve(false),
+      close: () => Promise.resolve()
+    },
+    events: { on: () => () => undefined },
+    dialog: { pickDirectory: () => Promise.resolve(null) }
   }
   useStore.setState({
     settings,
@@ -212,11 +223,11 @@ describe('checklist item 13 — the execution trace keeps the row and the verdic
   })
 })
 
-describe('U3-1 — the switch is visible in the status bar', () => {
+describe('v4.3 — the interface switch lives in the title-bar menu', () => {
   it('1. turns simple into advanced and brings the advanced toggles back', () => {
     render(
       <>
-        <StatusBar />
+        <Titlebar />
         {executionBar()}
       </>
     )
@@ -224,18 +235,20 @@ describe('U3-1 — the switch is visible in the status bar', () => {
     expect(terminalToggle()).toBeNull()
 
     /*
-     * A segmented control in the bar itself, not a row in the right-click menu: the design guidelines say a
-     * control that changes what the interface offers must be visible.
+     * The switch is a *preference*: the report asked for it to leave the status bar, so it now sits
+     * in the title bar's overflow menu, one visible control away from the first screen.
      */
-    expect(screen.getByTestId('status-ui-mode-simple').getAttribute('aria-pressed')).toBe('true')
-    expect(screen.getByTestId('status-ui-mode-advanced').getAttribute('aria-pressed')).toBe('false')
+    fireEvent.click(screen.getByTestId('titlebar-menu-button'))
+    expect(screen.getByTestId('titlebar-ui-mode-simple').getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByTestId('titlebar-ui-mode-advanced').getAttribute('aria-pressed')).toBe(
+      'false'
+    )
 
-    fireEvent.click(screen.getByTestId('status-ui-mode-advanced'))
+    fireEvent.click(screen.getByTestId('titlebar-ui-mode-advanced'))
 
     expect(useStore.getState().uiMode).toBe('advanced')
     expect(getUiMode()).toBe('advanced')
     expect(localStorage.getItem(MODE_KEY)).toBe(JSON.stringify('advanced'))
-    expect(screen.getByTestId('status-ui-mode-advanced').getAttribute('aria-pressed')).toBe('true')
     expect(treeToggle()).toBeTruthy()
     expect(terminalToggle()).toBeTruthy()
   })
@@ -244,13 +257,17 @@ describe('U3-1 — the switch is visible in the status bar', () => {
     act(() => useStore.getState().setUiMode('advanced'))
     render(
       <>
-        <StatusBar />
+        <Titlebar />
         {executionBar()}
       </>
     )
     expect(terminalToggle()).toBeTruthy()
 
-    fireEvent.click(screen.getByTestId('status-ui-mode-simple'))
+    fireEvent.click(screen.getByTestId('titlebar-menu-button'))
+    expect(screen.getByTestId('titlebar-ui-mode-advanced').getAttribute('aria-pressed')).toBe(
+      'true'
+    )
+    fireEvent.click(screen.getByTestId('titlebar-ui-mode-simple'))
 
     expect(useStore.getState().uiMode).toBe('simple')
     expect(getUiMode()).toBe('simple')
@@ -258,28 +275,37 @@ describe('U3-1 — the switch is visible in the status bar', () => {
     expect(terminalToggle()).toBeNull()
   })
 
-  it('3. no longer hides a second copy of the switch in the overflow menu', () => {
-    render(<StatusBar />)
-    fireEvent.contextMenu(screen.getByTestId('status-bar'))
+  it('3. is gone from the status line, which keeps no menu of its own', () => {
+    render(
+      <>
+        <StatusBar />
+        <Titlebar />
+      </>
+    )
 
-    // The menu still opens and still holds the other rows…
-    expect(screen.getByTestId('status-menu')).toBeTruthy()
-    expect(screen.getByTestId('status-menu-locale')).toBeTruthy()
-    // …but the mode lives in exactly one place now.
-    expect(screen.queryByTestId('status-menu-ui-mode')).toBeNull()
+    // The bar is one line: no mode switch and no overflow menu hidden behind a right-click.
+    expect(screen.queryByTestId('status-ui-mode')).toBeNull()
+    fireEvent.contextMenu(screen.getByTestId('status-bar'))
+    expect(screen.queryByTestId('status-menu')).toBeNull()
+
+    // …and the mode exists exactly once, in the title bar's menu.
+    fireEvent.click(screen.getByTestId('titlebar-menu-button'))
+    expect(screen.getAllByTestId('titlebar-ui-mode-simple')).toHaveLength(1)
+    expect(screen.getAllByTestId('titlebar-ui-mode-advanced')).toHaveLength(1)
   })
 
   it('4. is labelled in Persian too', async () => {
     await i18n.changeLanguage('fa')
     try {
-      render(<StatusBar />)
-      expect(screen.getByTestId('status-ui-mode').getAttribute('aria-label')).toBe(
+      render(<Titlebar />)
+      fireEvent.click(screen.getByTestId('titlebar-menu-button'))
+      expect(screen.getByTestId('titlebar-ui-mode').getAttribute('aria-label')).toBe(
         i18n.t('statusBar.uiMode')
       )
-      expect(screen.getByTestId('status-ui-mode-simple').textContent).toContain(
+      expect(screen.getByTestId('titlebar-ui-mode-simple').textContent).toContain(
         i18n.t('statusBar.uiModeSimple')
       )
-      expect(screen.getByTestId('status-ui-mode-advanced').textContent).toContain(
+      expect(screen.getByTestId('titlebar-ui-mode-advanced').textContent).toContain(
         i18n.t('statusBar.uiModeAdvanced')
       )
     } finally {

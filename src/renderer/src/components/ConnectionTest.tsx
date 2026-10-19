@@ -111,7 +111,7 @@ export default function ConnectionTestButton({
         disabled={running}
         aria-busy={running}
         title={t('connect.testRunFrom')}
-        className="brutal-press flex shrink-0 items-center gap-1 rounded-shape-sm border border-border bg-bg-primary px-1.5 py-0.5 text-3xs text-fg hover:bg-bg-tertiary disabled:opacity-50"
+        className="ui-press flex shrink-0 items-center gap-1 rounded-shape-sm border border-border bg-bg-primary px-1.5 py-0.5 text-3xs text-fg hover:bg-bg-tertiary disabled:opacity-50"
       >
         <Activity className={`h-3 w-3 shrink-0 ${running ? 'animate-pulse' : ''}`} />
         {compact ? t('connect.testShort') : t('vps.testConnection')}

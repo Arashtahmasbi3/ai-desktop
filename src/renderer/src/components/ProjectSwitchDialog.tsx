@@ -39,7 +39,7 @@ export default function ProjectSwitchDialog(): JSX.Element | null {
       aria-modal="true"
       data-testid="project-switch-dialog"
     >
-      <div className="w-full max-w-md rounded-xl border border-border bg-bg-secondary p-4 shadow-2xl">
+      <div className="w-full max-w-md rounded-shape border border-border bg-bg-secondary p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 className="text-sm font-semibold text-fg-strong">{t('projectSwitch.title')}</h2>

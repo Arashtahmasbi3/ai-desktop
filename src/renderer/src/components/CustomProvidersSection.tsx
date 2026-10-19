@@ -90,12 +90,12 @@ export default function CustomProvidersSection(): JSX.Element {
 
   return (
     <section className="mt-6">
-      <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-fg-muted">
+      <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold text-fg-muted">
         <Plug className="h-3.5 w-3.5" />
         {t('settings.customProvidersTitle')}
       </h3>
 
-      <div className="rounded-xl border border-border bg-bg-primary p-3">
+      <div className="rounded-shape border border-border bg-bg-primary p-3">
         <div className="flex flex-wrap items-center gap-2">
           <input
             value={label}
@@ -191,7 +191,7 @@ export default function CustomProvidersSection(): JSX.Element {
       {customProviders.length === 0 ? (
         <p className="mt-2 text-xs text-fg-subtle">{t('settings.noCustomProviders')}</p>
       ) : (
-        <div className="mt-2 overflow-hidden rounded-xl border border-border">
+        <div className="mt-2 overflow-hidden rounded-shape border border-border">
           {customProviders.map((provider) => (
             <div
               key={provider.id}

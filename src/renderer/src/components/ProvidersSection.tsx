@@ -141,7 +141,7 @@ export default function ProvidersSection(): JSX.Element {
 
   return (
     <section>
-      <h3 className="brutal-label mb-2 flex items-center gap-2">
+      <h3 className="ui-label mb-2 flex items-center gap-2">
         <KeyRound className="h-3.5 w-3.5" />
         {t('settings.apiKeys')}
       </h3>
@@ -166,24 +166,24 @@ export default function ProvidersSection(): JSX.Element {
             <div
               key={provider}
               data-provider={provider}
-              className="brutal-card p-3"
+              className="ui-card p-3"
             >
               <div className="mb-2 flex items-center justify-between">
                 <span className="flex items-center gap-2 text-sm font-medium text-fg">
                   {descriptor.label}
                   {/* Only worth saying when there is more than one: one key is the ordinary case. */}
                   {typeof keyCount === 'number' && keyCount > 1 ? (
-                    <span className="brutal-chip text-xs">
+                    <span className="ui-chip text-xs">
                       {t('settings.keysPoolSize', { count: keyCount })}
                     </span>
                   ) : null}
                   {view?.hasApiKey ? (
-                    <span className="brutal-chip border-success text-success">
+                    <span className="ui-chip border-success text-success">
                       <Check className="h-3 w-3" />
                       {t('settings.keySaved')}
                     </span>
                   ) : (
-                    <span className="brutal-chip">
+                    <span className="ui-chip">
                       {t('settings.noKey')}
                     </span>
                   )}
@@ -193,7 +193,7 @@ export default function ProvidersSection(): JSX.Element {
                   onClick={() => void setActiveProvider(provider)}
                   disabled={active}
                   data-selected={active}
-                  className="brutal-tab border-border-strong px-2 py-0.5"
+                  className="ui-tab border-border-strong px-2 py-0.5"
                 >
                   {active ? t('common.active') : t('common.setActive')}
                 </button>
@@ -212,13 +212,13 @@ export default function ProvidersSection(): JSX.Element {
                   placeholder={t('settings.apiKeyPlaceholder')}
                   dir="ltr"
                   autoComplete="off"
-                  className="brutal-inset brutal-focus brutal-data flex-1 px-2 py-1 text-xs"
+                  className="ui-inset ui-focus ui-data flex-1 px-2 py-1 text-xs"
                 />
                 <button
                   type="button"
                   onClick={() => void saveKey(provider)}
                   disabled={!keys[provider]?.trim() || savingKey === provider}
-                  className="brutal-btn brutal-primary"
+                  className="ui-btn ui-primary"
                 >
                   {t('common.save')}
                 </button>
@@ -228,7 +228,7 @@ export default function ProvidersSection(): JSX.Element {
                     onClick={() => void removeApiKey(provider)}
                     title={t('common.remove')}
                     aria-label={t('common.remove')}
-                    className="brutal-btn p-1 text-fg-muted hover:text-danger"
+                    className="ui-btn p-1 text-fg-muted hover:text-danger"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -250,13 +250,13 @@ export default function ProvidersSection(): JSX.Element {
                   aria-label={t('settings.keysAddPlaceholder')}
                   dir="ltr"
                   autoComplete="off"
-                  className="brutal-inset brutal-focus brutal-data flex-1 px-2 py-1 text-xs"
+                  className="ui-inset ui-focus ui-data flex-1 px-2 py-1 text-xs"
                 />
                 <button
                   type="button"
                   onClick={() => void addKey(provider)}
                   disabled={!pendingKeys[provider]?.trim() || addingKey !== null}
-                  className="brutal-btn"
+                  className="ui-btn"
                 >
                   {t('settings.keysAdd')}
                 </button>
@@ -269,7 +269,7 @@ export default function ProvidersSection(): JSX.Element {
               {pool.length > 0 ? (
                 <div className="mt-2">
                   {pool.length > 1 ? (
-                    <p className="brutal-label mb-1 flex items-center gap-1">
+                    <p className="ui-label mb-1 flex items-center gap-1">
                       <Clock className="h-3 w-3" />
                       {t('settings.keysPoolTitle')}
                     </p>
@@ -284,13 +284,13 @@ export default function ProvidersSection(): JSX.Element {
                           data-testid={`key-row-${provider}`}
                           data-key-id={key.id}
                           data-key-state={key.state}
-                          className="brutal-inset flex items-center gap-2 px-2 py-1 text-2xs"
+                          className="ui-inset flex items-center gap-2 px-2 py-1 text-2xs"
                         >
-                          <span className="brutal-data text-fg-subtle">
+                          <span className="ui-data text-fg-subtle">
                             {t('settings.keysKeyLabel', { id: key.id })}
                           </span>
                           {key.state === 'cooling' ? (
-                            <span className="brutal-data border border-warning/50 bg-warning/15 px-1.5 py-0.5 text-warning">
+                            <span className="ui-data border border-warning/50 bg-warning/15 px-1.5 py-0.5 text-warning">
                               {minutes === null
                                 ? t('settings.keysCooling')
                                 : t('settings.keysCoolingFor', { minutes })}
@@ -299,7 +299,7 @@ export default function ProvidersSection(): JSX.Element {
                             <span className="text-fg-muted">{t('settings.keysReady')}</span>
                           )}
                           {key.failures > 0 ? (
-                            <span className="brutal-data text-fg-subtle">
+                            <span className="ui-data text-fg-subtle">
                               {t('settings.keysFailures', { count: key.failures })}
                             </span>
                           ) : null}
@@ -309,7 +309,7 @@ export default function ProvidersSection(): JSX.Element {
                             disabled={busyKey !== null}
                             aria-label={t('settings.keysRemoveOne', { id: key.id })}
                             title={t('settings.keysRemoveOne', { id: key.id })}
-                            className="brutal-btn ml-auto shrink-0 p-1 text-fg-subtle hover:text-danger"
+                            className="ui-btn ml-auto shrink-0 p-1 text-fg-subtle hover:text-danger"
                           >
                             <Trash2 className="h-3 w-3" />
                           </button>
@@ -327,11 +327,11 @@ export default function ProvidersSection(): JSX.Element {
               ) : null}
 
               <div className="mt-2 flex items-center gap-2">
-                <label className="brutal-label">{t('settings.model')}</label>
+                <label className="ui-label">{t('settings.model')}</label>
                 <select
                   value={model}
                   onChange={(event) => void setModel(provider, event.target.value)}
-                  className="brutal-inset brutal-focus brutal-data flex-1 px-2 py-1 text-xs"
+                  className="ui-inset ui-focus ui-data flex-1 px-2 py-1 text-xs"
                 >
                   {descriptor.models.map((option) => (
                     <option key={option.id} value={option.id}>
