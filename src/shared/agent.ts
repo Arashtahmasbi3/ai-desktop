@@ -169,6 +169,16 @@ export interface LoopStopInfo {
   /** v4.1: set when the agent was waiting on a question, so the card asks instead of calling it a loop. */
   pendingQuestion?: string
   /**
+   * X5: the run stopped because its last steps re-ran probes it had already answered, not because
+   * anything failed. The two fields below turn that into something the card can show: what it was
+   * doing, and what it has already ruled out.
+   */
+  noNewInformation?: boolean
+  /** X5: the probe(s) of the final step — what the run was doing when it stopped. */
+  activity?: string
+  /** X5: probes whose answers the run already had, one line each (`remote_shell:ip -6 addr`). */
+  ruledOut?: string[]
+  /**
    * B2-1: the same conclusion as translatable keys, produced by the pattern table in
    * `core/agent/verdict.ts`. Added alongside `message` rather than instead of it: `message` is this
    * run's English sentence and existing callers/tests read it, while `verdict` is what a renderer in

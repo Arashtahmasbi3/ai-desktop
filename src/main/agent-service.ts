@@ -20,6 +20,7 @@ import type { RemoteWorkspaceInfo } from '@shared/workspace-info'
 import { AgentOrchestrator, type FileChange, type ProviderEntry } from '@core/agent-orchestrator'
 import type { ApprovedCommands } from '@core/agent/approved-commands'
 import type { AuditVerifyResult } from '@core/agent/audit-trail'
+import type { DiagnosisLedger } from '@core/agent/diagnosis-ledger'
 import { resolveRunGoal, type RunGoalContext } from '@core/agent/goal-context'
 import type { GoalStore } from '@core/agent/goal-store'
 import type { Persistence } from '@core/agent/persistence'
@@ -198,6 +199,12 @@ export interface AgentServiceOptions {
    * are, so a test never spawns a process; the default is the stdio transport the MCP spec defines.
    */
   mcpConnect?: (config: McpServerConfig) => Promise<McpServerHandle>
+  /**
+   * X6: the per-project diagnosis ledger. When present, a run is told what this project already
+   * established in the last 24 hours, it refuses to silently re-run an answered probe, and a
+   * durable verdict is written back for the next session. Absent means the run has no memory.
+   */
+  diagnoses?: DiagnosisLedger
 }
 
 /**
@@ -225,6 +232,8 @@ export class AgentService {
   private readonly resolveVpsName?: (id: string) => Promise<string | undefined>
   private readonly sessionProfile?: { state(): Promise<ResolvedProfile> }
   private readonly goalStore?: GoalStore
+  /** X6: what this project already proved, so a later session does not start from zero. */
+  private readonly diagnoses?: DiagnosisLedger
   private readonly controllers = new Set<AbortController>()
   /**
    * Trusted plans, keyed by session (v2.6.1 Fix 3). A trusted plan survives the
@@ -265,6 +274,7 @@ export class AgentService {
     this.resolveVpsName = options.resolveVpsName
     this.sessionProfile = options.sessionProfile
     if (options.goalStore) this.goalStore = options.goalStore
+    if (options.diagnoses) this.diagnoses = options.diagnoses
 
     this.providers = new ProviderFactory({
       persistence: options.persistence,
@@ -528,6 +538,11 @@ export class AgentService {
       sessionMetadata: () => this.planTrust.metadataFor(sessionKey),
       ...remote,
       ...(effectiveSystemHint ? { systemHint: effectiveSystemHint } : {}),
+      // X6: the run's diagnosis memory, scoped to the active project. No project, no ledger — a
+      // diagnosis that could cross projects would be worse than having none.
+      ...(this.diagnoses && activeProject
+        ? { diagnosis: { ledger: this.diagnoses, projectId: activeProject.id } }
+        : {}),
       ...(planMode ? { planMode: true } : {}),
       // v2.6.2 T3.1: stamp the served goal onto every emitted trace decision.
       ...(goalContext.goal ? { goalId: goalContext.goal.id } : {}),

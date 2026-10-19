@@ -158,12 +158,25 @@ interface Sample {
   text: string
   reason?: LoopStopInfo['reason']
   failures?: number
+  /** X5: the stop was produced by the drift guard, not by anything the output said. */
+  noNewInformation?: boolean
   causeKey: string
   nextStepKey: string
   params?: Record<string, string>
 }
 
 const SAMPLES: Sample[] = [
+  {
+    // X5: the drift guard's stop. The evidence it carries is real (the port was dropped and
+    // sshd was listening), yet the run stopped because it re-ran the probe, not because of what
+    // the probe said — so this row outranks the rows that explain the output itself.
+    id: 'repeated-evidence',
+    label: 'two steps that re-ran probes whose answers were already known',
+    text: UPSTREAM,
+    noNewInformation: true,
+    causeKey: 'verdict.causeRepeatedEvidence',
+    nextStepKey: 'verdict.nextRepeatedEvidence'
+  },
   {
     id: 'upstream-blocked',
     label: 'a ping that answered, a dropped port and sshd listening on the target',
@@ -296,6 +309,7 @@ function evidenceFor(sample: Sample): VerdictEvidence {
   return {
     text: sample.text,
     ...(sample.reason ? { reason: sample.reason } : {}),
+    ...(sample.noNewInformation ? { noNewInformation: true } : {}),
     failures: sample.failures ?? 1,
     steps: 4
   }
@@ -598,6 +612,10 @@ describe('the queued advice says the right thing for each class', () => {
   // batch can be merged and reviewed without dragging the other along.
   const EN_SNIPPET_2 = '../i18n/verdict2-en.json'
   const FA_SNIPPET_2 = '../i18n/verdict2-fa.json'
+  // The third merge batch: X5's drift-guard row, staged the same way so it can be merged and
+  // reviewed on its own.
+  const EN_SNIPPET_3 = '../i18n/drift-en.json'
+  const FA_SNIPPET_3 = '../i18n/drift-fa.json'
   const EN_LOCALE_FILE = 'src/renderer/src/i18n/en.json'
   const FA_LOCALE_FILE = 'src/renderer/src/i18n/fa.json'
 
@@ -623,8 +641,8 @@ describe('the queued advice says the right thing for each class', () => {
   function translate(locale: 'en' | 'fa', key: string): string | undefined {
     const sources: string[] =
       locale === 'en'
-        ? [EN_LOCALE_FILE, EN_SNIPPET, EN_SNIPPET_2]
-        : [FA_LOCALE_FILE, FA_SNIPPET, FA_SNIPPET_2]
+        ? [EN_LOCALE_FILE, EN_SNIPPET, EN_SNIPPET_2, EN_SNIPPET_3]
+        : [FA_LOCALE_FILE, FA_SNIPPET, FA_SNIPPET_2, FA_SNIPPET_3]
     for (const source of sources) {
       if (!existsSync(join(process.cwd(), source))) continue
       let node: unknown = readJson(source)
@@ -657,7 +675,8 @@ describe('the queued advice says the right thing for each class', () => {
   it('keeps the two merge snippets in step while they still exist', () => {
     for (const [enRelative, faRelative] of [
       [EN_SNIPPET, FA_SNIPPET],
-      [EN_SNIPPET_2, FA_SNIPPET_2]
+      [EN_SNIPPET_2, FA_SNIPPET_2],
+      [EN_SNIPPET_3, FA_SNIPPET_3]
     ] as const) {
       const en = join(process.cwd(), enRelative)
       const fa = join(process.cwd(), faRelative)

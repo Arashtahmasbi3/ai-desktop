@@ -19,6 +19,7 @@ import type { ApprovalMode } from '@shared/approval'
 import type { PreflightChoice } from '@shared/preflight'
 import type { CompressOptions } from './context-compressor'
 import type { ContextSummarizer } from './context-manager'
+import type { DiagnosisScope } from './diagnosis-ledger'
 import type { SessionStore } from './session-store'
 import type { ToolExecutor } from './tools'
 import type { Plan, PlanDecision, PlanWarning } from './plan-mode'
@@ -178,11 +179,20 @@ export interface AgentOrchestratorOptions {
    */
   diagnosticMode?: () => boolean
   /**
-   * v2.5.3 Smarter Prompt: the active project, its path, the VPS and the
+   * v2.9.0: the active project, its path, the VPS and the
    * environment, baked into the system prompt so simple "where am I?" questions
    * are answered from context instead of tool calls.
    */
   remoteContext?: RemotePromptContext
+  /**
+   * X6: the project's diagnosis ledger.
+   *
+   * When present the run is told what this project already established within the last 24 hours,
+   * it refuses to silently re-run a probe that is already answered (once per run, so a deliberate
+   * retest is still possible), and a durable verdict at the end is written back to the ledger for
+   * the next session.
+   */
+  diagnosis?: DiagnosisScope
   now?: () => number
   runIdFactory?: () => string
 }

@@ -26,6 +26,7 @@ import {
   type PlanWarning
 } from './plan-mode'
 import { isProductive, reflect } from './step-metrics'
+import { informationOfStep, type StepInformation } from './step-information'
 import { verifySuccess, type ToolCallRecord } from './success-verifier'
 import { failedToolResult, formatObservation } from './tool-results'
 
@@ -202,6 +203,8 @@ export interface StepSummary {
   failures: number
   /** The model narration, clipped, used to spot repeated reasoning. */
   reasoningSignature?: string
+  /** X5: what the step learned, so the loop guard can tell activity from information. */
+  information: StepInformation
 }
 
 export interface StepSummaryInput {
@@ -243,6 +246,7 @@ export function summarizeStep(input: StepSummaryInput): StepSummary {
     productive,
     newAction,
     failures,
+    information: informationOfStep(input.actions, input.observations),
     ...(reasoningSignature ? { reasoningSignature } : {})
   }
 }
@@ -263,6 +267,8 @@ export interface LoopVerdictInput {
   failures: number
   newAction: boolean
   reasoningSignature?: string
+  /** X5: what the step learned, so a repeated probe cannot pass for progress. */
+  information: StepInformation
 }
 
 export interface LoopVerdict {
@@ -270,6 +276,8 @@ export interface LoopVerdict {
   stopReason?: LoopStopReason
   shouldAskUser: boolean
   noProgressSteps: number
+  /** X5: set when the stop was drift — what the run was doing and what it ruled out. */
+  noInformation?: { activity: string; ruledOut: string[] }
 }
 
 /**
@@ -288,6 +296,7 @@ export function applyLoopVerdict(
     productive: input.productive,
     failures: input.failures,
     newAction: input.newAction,
+    information: input.information,
     ...(input.reasoningSignature ? { reasoningSignature: input.reasoningSignature } : {}),
     ...(input.observations.some((result) => result.code === 'redirect') ? { redirected: true } : {})
   })
@@ -306,8 +315,18 @@ export function applyLoopVerdict(
   const noProgressSteps = input.loopDetector.noProgressSteps
   if (loop.stop) {
     const reason = loop.stopReason ?? 'repeated_action'
-    deps.log('warn', 'loop.stop', deps.runId, { step: deps.step, reason })
-    return { stop: true, stopReason: reason, shouldAskUser: false, noProgressSteps }
+    deps.log('warn', 'loop.stop', deps.runId, {
+      step: deps.step,
+      reason,
+      ...(loop.noInformation ? { noNewInformation: true } : {})
+    })
+    return {
+      stop: true,
+      stopReason: reason,
+      shouldAskUser: false,
+      noProgressSteps,
+      ...(loop.noInformation ? { noInformation: loop.noInformation } : {})
+    }
   }
   if (loop.shouldAskUser) {
     deps.log('warn', 'loop.needs_input', deps.runId, {

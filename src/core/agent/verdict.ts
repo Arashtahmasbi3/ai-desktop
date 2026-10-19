@@ -36,6 +36,12 @@ export interface VerdictEvidence {
   failures?: number
   /** How many steps ran before the stop. */
   steps?: number
+  /**
+   * X5: true when the loop detector stopped the run because two steps in a row re-ran probes whose
+   * answers it already had. This is the run's own reason for stopping, not a reading of the
+   * evidence, which is why {@link VERDICT_PATTERNS} answers it from a field rather than from text.
+   */
+  noNewInformation?: boolean
 }
 
 /** The extra wording a pattern gets when the output itself names the thing to fix. */
@@ -171,6 +177,7 @@ function hostProvenUp(text: string): boolean {
  *
  * | weight | tier                       | why it wins over what is below it                          |
  * | ------ | -------------------------- | ---------------------------------------------------------- |
+ * | 96     | the run learned nothing    | it is the loop's own reason for stopping, so it outranks the evidence it stopped on: "the port is filtered" is one of the things it already ruled out |
  * | 95     | a credential was refused   | the output names the identity; nothing else can be the cause |
  * | 92     | a privilege was refused    | the command was right, this identity may not run it        |
  * | 90     | storage or toolchain       | the machine said exactly what is missing                   |
@@ -190,6 +197,20 @@ function hostProvenUp(text: string): boolean {
  * them: exactly one of the two can match any given pile, so their weights are documentation.
  */
 export const VERDICT_PATTERNS: readonly VerdictPattern[] = [
+  /*
+   * X5: the drift guard's own verdict. A run whose last two steps re-ran probes it had already
+   * answered was not stuck on a failure — it was stuck on asking the same question. That is the
+   * reason the run stopped, so it outranks the evidence those probes produced (which is exactly
+   * what the previous steps already ruled out). It matches on a field, never on text, so it can
+   * only answer a stop the loop detector produced.
+   */
+  {
+    id: 'repeated-evidence',
+    weight: 96,
+    causeKey: 'verdict.causeRepeatedEvidence',
+    nextStepKey: 'verdict.nextRepeatedEvidence',
+    matches: (evidence) => evidence.noNewInformation === true
+  },
   {
     id: 'auth-ssh-key',
     weight: 95,
@@ -446,6 +467,39 @@ export function diagnose(evidence: VerdictEvidence): StopVerdictKeys {
   }
 }
 
+/**
+ * A line that reports some port's state, whichever word it uses for it: a scan's `22/tcp open`, an
+ * `ss` listing's `LISTEN … :22`, an SSH `connect to host … port 22: Connection refused`. Used only
+ * to name the ports a piece of output is about, so a *new* port is distinguishable from a repeat.
+ */
+const PORT_STATE = /open|succeeded|listen|filtered|timed out|refused/i
+
+/**
+ * What one pile of output means, in this table's own vocabulary (X5).
+ *
+ * The loop detector needs to answer "did this step learn anything the run did not already know?"
+ * and the honest answer is not "was there output" — `ip -6 addr` prints plenty and settles nothing.
+ * So a step's output is reduced to the signals the verdict table itself reads: the cause it names
+ * (with the tool or credential it named), and every port whose state it reports. Two steps that
+ * produce the same signals taught the run the same thing, whatever bytes they printed.
+ */
+export function evidenceSignature(text: string): string[] {
+  const clean = plain(text)
+  if (clean.trim() === '') return []
+  const signals = new Set<string>()
+  const verdict = diagnose({ text: clean, failures: 1 })
+  if (verdict.patternId !== undefined) {
+    const named = verdict.params ? Object.values(verdict.params)[0] : undefined
+    signals.add(named ? `cause:${verdict.patternId}:${named}` : `cause:${verdict.patternId}`)
+  }
+  for (const line of clean.split('\n')) {
+    if (!PORT_STATE.test(line)) continue
+    const port = portOf(line)
+    if (port !== undefined) signals.add(`port:${port}`)
+  }
+  return [...signals]
+}
+
 /** Flatten a stopped run into the evidence the table reads. */
 export function evidenceFromStop(stop: LoopStopInfo): VerdictEvidence {
   const failures = stop.recentFailures ?? []
@@ -455,7 +509,8 @@ export function evidenceFromStop(stop: LoopStopInfo): VerdictEvidence {
       .join('\n'),
     reason: stop.reason,
     failures: failures.length,
-    steps: stop.steps ?? 0
+    steps: stop.steps ?? 0,
+    ...(stop.noNewInformation ? { noNewInformation: true } : {})
   }
 }
 

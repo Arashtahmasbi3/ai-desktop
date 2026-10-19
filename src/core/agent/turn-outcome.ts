@@ -47,8 +47,44 @@ export function turnIsOverdue(
   return { overdue: current - lastProgressAt >= turnTimeoutMs, idle: true }
 }
 
+/** Extra wording a stop can carry beyond its reason (X5). */
+export interface StopExtras {
+  /**
+   * True when the loop detector stopped the run because two steps in a row added no information.
+   * The stop then says what it was doing and what it had already ruled out — the two things the
+   * user asked for four times while the app repeated the same probes.
+   */
+  noNewInformation?: boolean
+  /** The probe(s) of the final step. */
+  activity?: string
+  /** Probes whose answers the run already had. */
+  ruledOut?: string[]
+}
+
+/**
+ * What a drift stop says: the activity, the evidence already settled, and the fact that the run
+ * stopped for lack of new information rather than because something failed.
+ */
+function noInformationMessage(extras: StopExtras): string {
+  const doing = extras.activity ?? 'the same probes'
+  const ruledOut = extras.ruledOut ?? []
+  const settled =
+    ruledOut.length > 0
+      ? ` Already established and ruled out: ${ruledOut.join('; ')}.`
+      : ''
+  return (
+    'It stopped before finishing: its last two steps re-ran probes whose answers it already had, ' +
+    `so it learned nothing new. It was doing: ${doing}.${settled} ` +
+    'The reason and the next step are in the card below.'
+  )
+}
+
 /** Build the user-facing stop summary, including the most recent actions. */
-export function buildStopInfo(reason: LoopStopInfo['reason'], steps: AgentStep[]): LoopStopInfo {
+export function buildStopInfo(
+  reason: LoopStopInfo['reason'],
+  steps: AgentStep[],
+  extras: StopExtras = {}
+): LoopStopInfo {
   const last = steps[steps.length - 1]
   const recentActions =
     last?.actions.map((action) => {
@@ -90,12 +126,18 @@ export function buildStopInfo(reason: LoopStopInfo['reason'], steps: AgentStep[]
 
   const stop: LoopStopInfo = {
     reason,
-    message:
-      'It stopped before finishing: ' + label[reason] + '. The reason and the next step are in the card below.',
+    message: extras.noNewInformation
+      ? noInformationMessage(extras)
+      : 'It stopped before finishing: ' +
+        label[reason] +
+        '. The reason and the next step are in the card below.',
     recentActions,
     recentFailures,
     steps: steps.length,
-    ...(pendingQuestion ? { pendingQuestion } : {})
+    ...(pendingQuestion ? { pendingQuestion } : {}),
+    ...(extras.noNewInformation ? { noNewInformation: true } : {}),
+    ...(extras.activity ? { activity: extras.activity } : {}),
+    ...(extras.ruledOut && extras.ruledOut.length > 0 ? { ruledOut: extras.ruledOut } : {})
   }
   /*
    * B2-1: the same observations, named by the pattern table instead of by a sentence. `message`

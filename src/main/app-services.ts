@@ -11,6 +11,7 @@ import type { SessionStore } from '@core/agent/session-store'
 import { ApprovedCommands } from '@core/agent/approved-commands'
 import { sweepStaleTempFilesInDir } from '@core/atomic-write'
 import { RunStore } from '@core/agent/run-store'
+import { DiagnosisLedger } from '@core/agent/diagnosis-ledger'
 import { GoalStore } from '@core/agent/goal-store'
 import { classifyLocalProject } from '@shared/paths'
 import { SandboxManagerImpl } from '@core/sandbox/manager'
@@ -148,6 +149,14 @@ export class AppServices {
   readonly facts = new FactStore({ dir: join(appDataDir(), 'facts') })
 
   /**
+   * X6: the per-project diagnosis ledger. One JSON file per project under `<userData>/diagnosis`;
+   * a run is told what this project already established in the last 24 hours and refuses to
+   * silently re-run an answered probe, and a durable verdict is written back so the next session
+   * does not repeat the same three tests from scratch.
+   */
+  readonly diagnoses = new DiagnosisLedger({ dir: appDataDir() })
+
+  /**
    * v3.1: the append-only decision log. One JSONL per project, written only when the user turns
    * checkpoints on; nothing reads or grows it otherwise.
    */
@@ -283,6 +292,7 @@ export class AppServices {
     })
     this.agent = new AgentService({
       facts: this.facts,
+      diagnoses: this.diagnoses,
       checkpoints: this.checkpoints,
       sandbox: this.sandbox,
       persistence: this.persistence,

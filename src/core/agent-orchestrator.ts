@@ -38,6 +38,11 @@ import type { ToolCallRecord } from './agent/success-verifier'
 import { ASK_USER_TOOL, type AgentQuestion, type AskUserAnswer } from './agent/question'
 import { answerAskUser, applyLoopGuard } from './agent/action-guards'
 import { buildTraceDecision } from './agent/trace-decision'
+import {
+  alreadyEstablishedMessage,
+  type DiagnosisFact,
+  type DiagnosisScope
+} from './agent/diagnosis-ledger'
 import { createAdapterSummarizer } from './agent/transcript'
 export { createAdapterSummarizer }
 import { buildRemoteGuidance, buildRunSystemPrompt, buildSystemPrompt } from './agent/system-prompt'
@@ -45,7 +50,7 @@ export { buildRemoteGuidance, buildSystemPrompt }
 export type { RemotePromptContext, SystemPromptOptions } from './agent/system-prompt'
 import type { RemotePromptContext } from './agent/system-prompt'
 import { addUsage, defaultContextTokens } from './agent/step-metrics'
-import { formatObservation, settlePendingToolCalls } from './agent/tool-results'
+import { formatObservation, answeredToolResult, settlePendingToolCalls } from './agent/tool-results'
 import { buildStopInfo, finishRun, turnIsOverdue, turnTimeoutWarning } from './agent/turn-outcome'
 import { callLlm, type LlmCallDeps } from './agent/llm-call'
 export type { LlmCallOutcome } from './agent/llm-call'
@@ -136,6 +141,8 @@ export class AgentOrchestrator {
   private readonly enforceSuccessVerification: boolean
   private readonly diagnosticMode?: () => boolean
   private readonly remoteContext?: RemotePromptContext
+  /** X6: the project's diagnosis ledger, when the caller has one. */
+  private readonly diagnosis?: DiagnosisScope
   private readonly now: () => number
   private readonly runIdFactory: () => string
   private runCounter = 0
@@ -189,6 +196,7 @@ export class AgentOrchestrator {
     this.enforceSuccessVerification = options.enforceSuccessVerification ?? false
     this.diagnosticMode = options.diagnosticMode
     this.remoteContext = options.remoteContext
+    this.diagnosis = options.diagnosis
     this.now = options.now ?? (() => Date.now())
     this.runCounter = 0
     this.runIdFactory = options.runIdFactory ?? (() => `run-${++this.runCounter}`)
@@ -272,17 +280,24 @@ export class AgentOrchestrator {
       findAlternative: (toolName, args, error) => findAlternatives(toolName, args, error)
     })
     const observedSignatures = new Set<string>()
+    // X6: diagnoses already offered to the model in this run, so a deliberate retest is not wedged.
+    const skippedDiagnoses = new Set<string>()
     // The last plan shown to the user, so a repeated plan can be flagged (A.5).
     let lastPlan: Plan | undefined
     // `remote_shell` present ⇒ the run targets a VPS, so add the discovery /
     // loop / diagnostic guidance (v2.5.3, Fix 3).
     const remoteWork = this.extraToolNames.has('remote_shell')
+    // X6: what this project already established within the last 24 hours, with the time of each
+    // probe. Read once, before the prompt is built, so the run starts from what is known instead of
+    // discovering it again — the same three tests used to be run from scratch in four sessions.
+    const diagnosisHint = this.diagnosis ? await this.diagnosisHint() : ''
+    const systemHint = [this.systemHint, diagnosisHint].filter((part) => Boolean(part)).join('\n\n')
     const context = new ContextManager({
       systemPrompt: buildRunSystemPrompt({
         provider,
         tools,
         planMode: this.planMode,
-        ...(this.systemHint !== undefined ? { systemHint: this.systemHint } : {}),
+        ...(systemHint !== '' ? { systemHint } : {}),
         planGateEnabled: Boolean(this.planGate && this.planApproval && this.planApproval !== 'full'),
         remoteWork,
         diagnosticEnabled: Boolean(this.diagnosticMode?.()),
@@ -504,6 +519,28 @@ export class AgentOrchestrator {
             continue
           }
 
+          // X6: this project already established the answer to this exact probe. The call is
+          // intercepted once per run — the model gets the answer and its timestamp instead of
+          // silently repeating work — and a second explicit attempt runs for real, so a deliberate
+          // retest can never be wedged shut.
+          const established = await this.establishedDiagnosis(action)
+          if (established && !skippedDiagnoses.has(established.key)) {
+            skippedDiagnoses.add(established.key)
+            const answered = answeredToolResult(action, alreadyEstablishedMessage(established))
+            observations.push(answered)
+            context.appendToolResult({
+              toolCallId: action.id,
+              name: action.name,
+              content: formatObservation(answered)
+            })
+            this.log('info', 'diagnosis.already_established', runId, {
+              step: index,
+              key: established.key,
+              at: established.at
+            })
+            continue
+          }
+
           // Fuzzy loop guard: catch the same tool name repeated even when its
           // arguments change every call (e.g. remote_shell with new commands).
           const guard = loopDetector.beforeToolCall(action.name, action.arguments)
@@ -665,12 +702,19 @@ export class AgentOrchestrator {
             productive: summary.productive,
             failures: summary.failures,
             newAction: summary.newAction,
+            information: summary.information,
             ...(summary.reasoningSignature ? { reasoningSignature: summary.reasoningSignature } : {})
           },
           warnings
         )
         if (loop.stop) {
-          stopInfo = buildStopInfo(loop.stopReason ?? 'repeated_action', steps)
+          // X5: a drift stop carries what the run was doing and what it had already ruled out, so
+          // the verdict can name the drift instead of reporting whatever the latest probe said.
+          stopInfo = buildStopInfo(
+            loop.stopReason ?? 'repeated_action',
+            steps,
+            loop.noInformation ? { noNewInformation: true, ...loop.noInformation } : {}
+          )
           status = 'needs_input'
           message = stopInfo.message
           finalAnswer = null
@@ -719,6 +763,10 @@ export class AgentOrchestrator {
       this.log('warn', 'loop.max_steps', runId, { steps: steps.length, maxSteps: this.maxSteps })
     }
 
+    // X6: a durable verdict (a dropped port, a full disk, a missing tool) is written back to the
+    // project's ledger, so the next session starts where this one finished instead of at zero.
+    if (stopInfo) await this.recordDiagnosis(runId, stopInfo)
+
     const result = finishRun(
       { log: this.log, now: this.now },
       runId,
@@ -746,6 +794,48 @@ export class AgentOrchestrator {
       options.resumeSessionId
     )
     return result
+  }
+
+  /**
+   * X6: what this project already established, as a hint for the prompt.
+   *
+   * Best-effort: memory is an optimisation, so a ledger that cannot be read must leave the run
+   * exactly as it would have been without one.
+   */
+  private async diagnosisHint(): Promise<string> {
+    if (!this.diagnosis) return ''
+    try {
+      return await this.diagnosis.ledger.hint(this.diagnosis.projectId)
+    } catch {
+      return ''
+    }
+  }
+
+  /** X6: the established fact that pre-empts this call, or `undefined` when there is none. */
+  private async establishedDiagnosis(action: AgentAction): Promise<DiagnosisFact | undefined> {
+    if (!this.diagnosis) return undefined
+    if (action.name === 'ask_user') return undefined
+    try {
+      return await this.diagnosis.ledger.knownProbe(
+        this.diagnosis.projectId,
+        action.name,
+        action.arguments
+      )
+    } catch {
+      return undefined
+    }
+  }
+
+  /** X6: write the durable fact a stopped run established back to the project's ledger. */
+  private async recordDiagnosis(runId: string, stop: LoopStopInfo): Promise<void> {
+    if (!this.diagnosis) return
+    try {
+      const fact = await this.diagnosis.ledger.recordStop(this.diagnosis.projectId, stop)
+      if (!fact) return
+      this.log('info', 'diagnosis.recorded', runId, { key: fact.key, cause: fact.cause })
+    } catch {
+      // Losing a memory must never fail a run.
+    }
   }
 
   /** Compose sandbox tools with any extra (e.g. remote) tool runtime. */

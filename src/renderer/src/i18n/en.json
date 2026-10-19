@@ -1211,7 +1211,9 @@
     "causeUpstreamBlocked": "The host is up and that port is still dropped from another machine: nothing on the host itself can be the cause, because the block is above it — a security group or an upstream ACL at the hosting provider.",
     "nextUpstreamBlocked": "Open inbound TCP 22 for the source address in the hosting provider's firewall panel (the provider the server's PTR names; the host's own ufw and iptables were clean, so the rule has to go there). Or transfer the project through this computer instead — pull it from the source and push it on to the target — because the route from here may not be blocked even when the other one is.",
     "causeBlockedLocally": "The TCP connect to that port was dropped, and nothing in the evidence proves the host itself is up: reachability is unknown, so this is not yet evidence about anyone above it.",
-    "nextBlockedLocally": "Prove the host is up first — open a console session on it, or ping it from this machine — and only then retest that port from the same machine. A filtered result against a host nobody checked the state of says nothing about who blocks it."
+    "nextBlockedLocally": "Prove the host is up first — open a console session on it, or ping it from this machine — and only then retest that port from the same machine. A filtered result against a host nobody checked the state of says nothing about who blocks it.",
+    "causeRepeatedEvidence": "The last two steps re-ran probes whose answers were already known: the output did not change, so nothing new was learned and the run was circling the same question instead of the problem.",
+    "nextRepeatedEvidence": "Say in one sentence what is already established and what it rules out, then change the question — a different target, a different measurement, or the route through this computer — rather than re-running the same probe."
   },
   "connect": {
     "testShort": "Test",

@@ -6,6 +6,7 @@ import type {
 import { DEFAULT_LOOP_POLICY } from '@shared/agent'
 import { stableStringify } from './tools'
 import type { StrategyAlternative } from './strategies'
+import type { StepInformation } from './step-information'
 
 /** What one completed step tells the detector. */
 export interface LoopObservation {
@@ -25,6 +26,12 @@ export interface LoopObservation {
    * failure-streak stop before the model can act on the suggestion.
    */
   redirected?: boolean
+  /**
+   * X5: what the step learned, when its actions were read-only probes. Present, a probing step is
+   * judged by whether it added a lesson or changed a probe's answer — running a command and getting
+   * output is activity, and progress is new information about the task.
+   */
+  information?: StepInformation
 }
 
 export interface LoopCheckResult {
@@ -37,6 +44,12 @@ export interface LoopCheckResult {
   stop: boolean
   /** Why the run stopped, when {@link stop} is true. */
   stopReason?: LoopStopReason
+  /**
+   * X5: present when the run stopped because two steps in a row added no information. Says what it
+   * was doing and what it had already ruled out, so the stop can explain itself instead of leaving
+   * the user with "it got stuck".
+   */
+  noInformation?: { activity: string; ruledOut: string[] }
 }
 
 /** One executed tool call, kept so a STOP can show a short recent history. */
@@ -97,6 +110,18 @@ const GUARD_WINDOW_SIZE = 15
 const PROGRESS_TIMEOUT_MS = 120_000
 /** A.3: consecutive failures of one tool before it is taken out of rotation. */
 const BLOCKED_TOOL_THRESHOLD = 2
+/**
+ * X5: consecutive steps without new information before the run stops.
+ *
+ * Two, not five: the old policy waited five steps and called it "no progress", which a run that
+ * keeps *doing* things can never satisfy — every step was `productive`, so the counter never moved
+ * and the guard never fired. The session log in this item spent 69.3s on two probes that answered
+ * nothing and kept going. A step that adds no information is evidence the run has lost its thread,
+ * and one step can still be an unlucky guess; two in a row is a drift.
+ */
+const NO_INFORMATION_STOP = 2
+/** How many already-answered probes a stop reports. */
+const RULED_OUT_LIMIT = 8
 
 /**
  * Tools whose identity is the command they run. Two `run_command` calls are only
@@ -239,6 +264,14 @@ export class LoopDetector {
   private stopReason: LoopStopReason | undefined
   private stopped = false
   private readonly policy: LoopDetectionPolicy
+  // --- X5: information, not activity -----------------------------------------
+  /** Every lesson the run has been taught, so the same one twice cannot pass for progress. */
+  private readonly seenLessons = new Set<string>()
+  /** Probes the run has run, and every answer each has given (a change is information). */
+  private readonly seenProbeDigests = new Map<string, Set<string>>()
+  private noInformationStreak = 0
+  /** True once the run recorded a failure: until then it is exploring, not drifting (X5). */
+  private sawFailure = false
 
   // --- Per-tool-call state (beforeToolCall / afterToolCall) -----------------
   private readonly now: () => number
@@ -277,6 +310,11 @@ export class LoopDetector {
 
   get noProgressSteps(): number {
     return this.consecutiveNoProgress
+  }
+
+  /** X5: consecutive steps that added no new information (the drift guard's counter). */
+  get noInformationSteps(): number {
+    return this.noInformationStreak
   }
 
   get windowSize(): number {
@@ -397,6 +435,11 @@ export class LoopDetector {
     this.lastReasoning = null
     this.stopReason = undefined
     this.stopped = false
+    // X5: a fresh start is a fresh run of evidence; the answers it already has are gone with it.
+    this.seenLessons.clear()
+    this.seenProbeDigests.clear()
+    this.noInformationStreak = 0
+    this.sawFailure = false
     // Per-tool-call
     this.recentCallKeys.length = 0
     this.warnedCallKeys.clear()
@@ -722,6 +765,46 @@ export class LoopDetector {
       }
     }
 
+    // --- X5: information, not activity ----------------------------------------
+    //
+    // `productive` answers "did a new action succeed", which a run that keeps doing *something* can
+    // satisfy forever — that is why the 27.8s `ip -6 addr` and the 41.5s project-wide `grep` were
+    // both progress and no guard fired. This counter answers the question the user was asking: did
+    // the run learn anything it did not already know?
+    //
+    // It is a *separate* counter on purpose. The two contracts that already exist — warn on >2 of
+    // one signature, stop on the 5th, and stop after 3 consecutive failing steps — are decided
+    // above, unchanged; this rule only decides whether a step made of read-only probes counts as
+    // progress. Two such steps in a row that taught nothing is drift, and it stops there rather
+    // than waiting for five — but only once the run has a failure to explain. A run with no failure
+    // evidence is exploring, not drifting, and the older no-progress ask remains its backstop.
+    let noInformation: LoopCheckResult['noInformation']
+    if ((observation.failures ?? 0) > 0) this.sawFailure = true
+    if (observation.redirected) {
+      this.noInformationStreak = 0
+    } else {
+      const learned = this.informationGained(observation)
+      if (learned === undefined) {
+        // A step that is not a read-only probe (a write, a file read, a plan decision): the
+        // existing rules own it, and this guard does not count it either way.
+      } else if (learned) {
+        this.noInformationStreak = 0
+      } else {
+        this.noInformationStreak += 1
+      }
+      if (this.sawFailure && this.noInformationStreak >= NO_INFORMATION_STOP) {
+        stopReason ??= 'no_progress'
+        noInformation = this.driftSummary(observation.information)
+        warnings.push({
+          kind: 'no_progress',
+          count: this.noInformationStreak,
+          message:
+            `${this.noInformationStreak} consecutive steps added no new information ` +
+            `(doing: ${noInformation.activity})`
+        })
+      }
+    }
+
     // --- Reasoning loop -------------------------------------------------------
     const newAction = observation.newAction ?? observation.productive
     if (observation.reasoningSignature && !newAction) {
@@ -765,7 +848,56 @@ export class LoopDetector {
       ...(warnings.length > 0 ? { hint: buildHint(warnings) } : {}),
       shouldAskUser,
       stop: this.stopped,
-      ...(this.stopReason ? { stopReason: this.stopReason } : {})
+      ...(this.stopReason ? { stopReason: this.stopReason } : {}),
+      ...(noInformation ? { noInformation } : {})
+    }
+  }
+
+  /**
+   * Did this probing step teach the run anything? (X5)
+   *
+   * `true` — it added a lesson the run had not been taught, or a probe answered differently than it
+   * did before. `false` — it repeated what the run already knew. `undefined` — the step is not made
+   * purely of read-only probes (or the caller did not describe what it learned), so this guard does
+   * not judge it and the existing progress rules keep deciding.
+   *
+   * Lessons and probe answers are learnt from *every* step, because a step that is not purely a
+   * probe can still settle a question, and a later probe repeating it must not look new.
+   */
+  private informationGained(observation: LoopObservation): boolean | undefined {
+    const information = observation.information
+    if (!information) return undefined
+
+    let fresh = false
+    for (const lesson of information.lessons) {
+      if (this.seenLessons.has(lesson)) continue
+      this.seenLessons.add(lesson)
+      fresh = true
+    }
+    for (const probe of information.probes) {
+      const answers = this.seenProbeDigests.get(probe.signature)
+      if (!answers) {
+        this.seenProbeDigests.set(probe.signature, new Set([probe.digest]))
+        continue
+      }
+      // The same command answering differently is the one way a repeat can teach something.
+      if (!answers.has(probe.digest)) {
+        answers.add(probe.digest)
+        fresh = true
+      }
+    }
+
+    // Work that is not a read-only probe is measured by the old rules, not by this one.
+    return information.probeOnly ? fresh : undefined
+  }
+
+  /** What the run was doing and what it has already ruled out, for a drift stop (X5). */
+  private driftSummary(information?: StepInformation): { activity: string; ruledOut: string[] } {
+    const doing = information?.probes.map((probe) => probe.signature) ?? []
+    const ruledOut = [...this.seenProbeDigests.keys()]
+    return {
+      activity: doing.length > 0 ? doing.join(', ') : 'the same action',
+      ruledOut: ruledOut.slice(Math.max(0, ruledOut.length - RULED_OUT_LIMIT))
     }
   }
 }
