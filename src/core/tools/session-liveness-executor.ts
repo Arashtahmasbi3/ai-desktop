@@ -2,6 +2,7 @@ import type { AgentAction, AgentToolResult } from '@shared/agent'
 import type { ToolExecutor, ToolExecOptions } from '@core/agent/tools'
 import { matchesSessionDropped } from '@core/agent/verdict'
 import type { VpsReconnectOutcome } from '@shared/vps'
+import { serverNameFor, type ServerNameLookup } from './server-names'
 
 /**
  * R1: one bounded reconnect when a tool finds its SSH session gone.
@@ -23,6 +24,8 @@ export interface SessionLivenessDeps {
   isConnected(serverId: string): boolean
   /** The run's pinned server, used when the action's arguments name none. */
   fallbackServerId?: string
+  /** R6: the saved name for an id, so the note names the server instead of printing a UUID. */
+  serverName?: ServerNameLookup
 }
 
 /**
@@ -107,9 +110,12 @@ export class SessionLivenessExecutor implements ToolExecutor {
 
     const outcome = await this.deps.reconnect(serverId, `${action.name}: ${firstLine(text)}`)
     const why = outcome.state.error ?? outcome.state.status
+    // R6: name the machine. The id stays in the audit log and on the tool result.
+    const name = await serverNameFor(this.deps.serverName, serverId)
+    const session = name === undefined ? 'the SSH session' : `the SSH session to server ${name}`
     const note = outcome.ok
-      ? `Liveness: the SSH session to server ${serverId} was gone; one reconnect attempt succeeded. Call the tool again on the live session.`
-      : `Liveness: the SSH session to server ${serverId} is gone; one reconnect attempt failed (${why}).`
+      ? `Liveness: ${session} was gone; one reconnect attempt succeeded. Call the tool again on the live session.`
+      : `Liveness: ${session} is gone; one reconnect attempt failed (${why}).`
     return withNote(result, note)
   }
 }

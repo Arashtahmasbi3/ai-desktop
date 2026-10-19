@@ -19,6 +19,12 @@ import { checkDenyList } from '@core/agent/deny-list'
 import { findSecretPathsInCommand, inspectSecretPath } from '@shared/secret-paths'
 import { NAMED_DIAGNOSTIC_TOOL_NAMES } from '@shared/profile'
 import { shellQuote } from '@shared/shell-quote'
+import {
+  connectedServerNames,
+  notConnectedMessage,
+  serverLabel,
+  type ServerNameLookup
+} from './server-names'
 
 /** Default and hard cap for "how many lines of logs". */
 export const DEFAULT_LOG_TAIL = 200
@@ -238,6 +244,8 @@ export interface DiagnosticsToolDeps {
   connectedServers(): string[]
   /** Absolute project root, used as the default target for get_disk_usage. */
   projectRoot?: string
+  /** R6: the saved name for an id, so a refusal names the server instead of printing a UUID. */
+  serverName?: ServerNameLookup
 }
 
 function formatResult(result: VpsExecResult): string {
@@ -302,19 +310,30 @@ export class DiagnosticsToolExecutor implements ToolExecutor {
      * reasonably concluded the two were the same machine. Refusing is the honest answer —
      * the caller asked about a host this tool deliberately will not touch.
      */
+    /*
+     * R6: the refusal used to print both ids — `... chat header (34c80099-...), not
+     * e000539d-...` — in a sentence the user reads. The ids stay in the result's `serverId`
+     * and in the audit log; the sentence uses the names the user gave the machines.
+     */
     if (
       this.pinnedServerId &&
       typeof requested === 'string' &&
       requested.length > 0 &&
       requested !== this.pinnedServerId
     ) {
+      const pinned = await serverLabel(
+        this.deps.serverName,
+        this.pinnedServerId,
+        'the current selection'
+      )
+      const other = await serverLabel(this.deps.serverName, requested, 'a different saved server')
       return {
         ...base,
         ok: false,
         output: '',
         error:
           `Diagnostics always run against the server selected in the chat header (` +
-          `${this.pinnedServerId}), not ${requested}. Select ${requested} there to inspect ` +
+          `${pinned}), not ${other}. Select ${other} in the chat header to inspect ` +
           'that host, or use a server-parameterised tool such as remote_shell.',
         serverId: this.pinnedServerId,
         code: 'invalid_arguments',
@@ -328,7 +347,10 @@ export class DiagnosticsToolExecutor implements ToolExecutor {
         ...base,
         ok: false,
         output: '',
-        error: `server_id is required. Connected: ${this.deps.connectedServers().join(', ') || 'none'}`,
+        error: `server_id is required. Connected: ${await connectedServerNames(
+          this.deps.serverName,
+          this.deps.connectedServers()
+        )}`,
         code: 'invalid_arguments',
         durationMs: Date.now() - startedAt
       }
@@ -338,7 +360,7 @@ export class DiagnosticsToolExecutor implements ToolExecutor {
         ...base,
         ok: false,
         output: '',
-        error: `Server ${serverId} is not connected.`,
+        error: await notConnectedMessage(this.deps.serverName, serverId),
         serverId,
         code: 'remote_error',
         durationMs: Date.now() - startedAt

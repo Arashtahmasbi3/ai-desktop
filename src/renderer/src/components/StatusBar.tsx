@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useStore } from '../store'
 import { budgetState, readBudget } from '../lib/budget'
 import { deriveRunAccess, type RunAccessMode } from '../lib/run-access'
-import { aggregateUsage, formatCost, formatTokens } from '../lib/usage'
+import { aggregateUsage, formatCost, formatSpend, formatTokens } from '../lib/usage'
 
 /** Tone per access mode: full access is the one that must stand out. */
 const ACCESS_TONE: Record<RunAccessMode, string> = {
@@ -33,7 +33,7 @@ function Dot({ ok }: { ok: boolean | null }): JSX.Element {
  *   state   can I send?             ("Agent: ready" / "not running" / unknown)
  *   mode    what may the run do?    scope + mode, derived from the store (`deriveRunAccess`)
  *   spend   session tokens          the tokens this session has actually used
- *   cost    session spend           the priced total, or the honest "cost unknown"
+ *   cost    session spend           the priced total, or a stated lower bound when a model is unpriced
  *
  * Everything else moved to where it belongs: the model to the composer (which already picks it),
  * the approval mode to the title bar's menu (it is a preference), the connection to the workspace
@@ -93,6 +93,20 @@ export default function StatusBar(): JSX.Element {
   const tokens = session.total.inputTokens + session.total.outputTokens
   const locale = i18n.language === 'fa' ? 'fa' : 'en'
   const budget = budgetState(usageRecords, readBudget(), Date.now())
+  /*
+   * R6: "Cost unknown" was not honest enough. A model with no published price does not make the
+   * spend unknowable — it makes the figure we *can* prove a lower bound, which is exactly what
+   * the spend cap already says. The styled keys live in `_research/i18n/r6-*.json`; the
+   * `defaultValue` keeps the sentence honest until they are merged, and `formatSpend` is the one
+   * place the wording (and the arithmetic) lives.
+   */
+  const unpriced = session.total.cost === null || session.total.costUnknown
+  const spendText = unpriced
+    ? t(session.total.cost === null ? 'statusBar.spendUnpriced' : 'statusBar.spendLowerBound', {
+        cost: session.total.cost === null ? '' : formatCost(session.total.cost),
+        defaultValue: formatSpend(session.total.cost, true)
+      })
+    : formatSpend(session.total.cost, false)
 
   // v2.7.0: `worker` is null until the background worker reports in. Defaulting to
   // "online" made the bar claim "Agent: running" before anything had reported — three
@@ -175,7 +189,7 @@ export default function StatusBar(): JSX.Element {
         }`}
         title={budget.cap > 0 ? budget.label : t('settings.usageHint')}
       >
-        {formatCost(session.total.cost)}
+        {spendText}
       </span>
 
       {!ready ? (

@@ -5,6 +5,7 @@ import { enforceCommandPaths } from '@core/remote/path-guard'
 import { shellQuote } from '@shared/shell-quote'
 import { findSecretPathsInCommand } from '@shared/secret-paths'
 import type { DiagnosticPolicy } from '@core/remote/diagnostic-policy'
+import { connectedServerNames, notConnectedMessage, type ServerNameLookup } from './server-names'
 
 /** Tool the agent can call to run a command on a connected VPS. */
 export const REMOTE_SHELL_TOOL: ToolDefinition = {
@@ -47,6 +48,8 @@ export interface RemoteShellDeps {
    * `null`/absent keeps the default confinement.
    */
   diagnostic?: DiagnosticPolicy | null
+  /** R6: the saved name for an id, so a refusal names the server instead of printing a UUID. */
+  serverName?: ServerNameLookup
 }
 
 /**
@@ -117,12 +120,15 @@ export async function executeRemoteShell(
   if (!serverId) {
     return {
       ok: false,
-      content: `server_id is required. Connected: ${connected.join(', ') || 'none'}`,
+      content: `server_id is required. Connected: ${await connectedServerNames(
+        deps.serverName,
+        connected
+      )}`,
       ...target
     }
   }
   if (!connected.includes(serverId)) {
-    return { ok: false, content: `Server ${serverId} is not connected.`, ...target }
+    return { ok: false, content: await notConnectedMessage(deps.serverName, serverId), ...target }
   }
   /*
    * Path containment is a FILE-TOOL boundary, and this is not one (X8).

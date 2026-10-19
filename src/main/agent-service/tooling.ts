@@ -193,6 +193,18 @@ export class ToolingAssembler {
     })
     const serverId = runServer.serverId
     const connected = runServer.connected
+    /*
+     * R6: a routing refusal is a sentence the user reads, so it names the machine. The roster is
+     * available here and nowhere below (the routing callback is pure), so the name is resolved once
+     * and carried on the context; an unknown name degrades to "the selected VPS", never to a UUID.
+     */
+    const routingServerName =
+      serverId && this.vps && typeof this.vps.listServers === 'function'
+        ? await this.vps
+            .listServers()
+            .then((servers) => servers.find((server) => server.id === serverId)?.name)
+            .catch(() => undefined)
+        : undefined
     // Read the diagnostic policy once per run so a toggle mid-run does not change
     // the containment rules under the agent's feet (v2.5.3). T2.4 unions it with
     // the environment's Investigate read roots: a dev box may be read anywhere,
@@ -210,6 +222,7 @@ export class ToolingAssembler {
             routeToolCall(toolName, args, {
               workspaceType: 'remote',
               ...(serverId ? { serverId } : {}),
+              ...(routingServerName ? { serverName: routingServerName } : {}),
               ...(active?.path ? { remotePath: active.path } : {}),
               connected,
               ...(diagnostic ? { diagnostic } : {})

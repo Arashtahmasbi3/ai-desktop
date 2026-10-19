@@ -3,6 +3,7 @@ import type { VpsExecResult } from '@shared/vps'
 import { checkDenyList } from '@core/agent/deny-list'
 import type { AuditEntry } from '@core/agent/audit-log'
 import { shellQuote } from '@shared/shell-quote'
+import { connectedServerNames, notConnectedMessage, serverLabel, type ServerNameLookup } from './server-names'
 
 /** Tool the agent can call to copy a project from one VPS to another over SSH. */
 export const MIGRATE_PROJECT_TOOL: ToolDefinition = {
@@ -71,6 +72,8 @@ export interface MigrateProjectDeps {
   exec(serverId: string, command: string): Promise<VpsExecResult>
   /** Records the migration in the SSH audit log (best-effort). */
   audit?(entry: Omit<AuditEntry, 'at'>): Promise<void>
+  /** R6: the saved name for an id, so a refusal names the server instead of printing a UUID. */
+  serverName?: ServerNameLookup
 }
 
 export interface MigrateProjectResult {
@@ -329,12 +332,14 @@ export async function executeMigrateProject(
   const rawHost = String(args.target_host ?? '').trim()
   const connected = deps.connectedServers()
 
-  if (!sourceId) return fail(`source_vps_id is required. Connected: ${connected.join(', ') || 'none'}`)
+  if (!sourceId) return fail(`source_vps_id is required. Connected: ${await connectedServerNames(deps.serverName, connected)}`)
   if (!targetId && !rawHost) {
     return fail('A target is required: pass target_vps_id for a saved server, or target_host.')
   }
   if (!connected.includes(sourceId)) {
-    return fail(`Source server ${sourceId} is not connected. Connect it first.`)
+    return fail(
+      `${await notConnectedMessage(deps.serverName, sourceId, 'The source server')} Connect it first.`
+    )
   }
 
   const sourceCheck = checkMigrationPath(args.source_path)
@@ -351,9 +356,12 @@ export async function executeMigrateProject(
   const target = targetId
     ? await deps.resolveServer(targetId)
     : resolveRawTarget(rawHost, args, sourceId, await deps.resolveServer(sourceId))
-  if (!target) return fail(`Unknown target server ${targetId || rawHost}.`)
+  const targetLabel = targetId
+    ? await serverLabel(deps.serverName, targetId, 'the requested target server')
+    : rawHost
+  if (!target) return fail(`Unknown target server ${targetLabel}.`)
   if (!USERNAME_RE.test(target.username)) {
-    return fail(`Target server ${targetId || rawHost} has an unsafe username.`)
+    return fail(`Target server ${targetLabel} has an unsafe username.`)
   }
 
   const command = buildRsyncCommand(sourcePath, target, targetPath)

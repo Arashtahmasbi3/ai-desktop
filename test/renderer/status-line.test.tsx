@@ -123,7 +123,7 @@ describe('v4.3 — the status line', () => {
 
     // The model moved to the composer, which already picks it.
     expect(screen.queryByTestId('status-item-model')).toBeNull()
-    // The interface switch moved to the title bar's menu.
+    // The interface switch lives on the title bar as a visible control (R6), not here.
     expect(screen.queryByTestId('status-ui-mode')).toBeNull()
     expect(screen.queryByTestId('status-more-hint')).toBeNull()
     // The connection moved to the workspace line, where it is stated once.
@@ -143,5 +143,59 @@ describe('v4.3 — the status line', () => {
     render(<StatusBar />)
 
     expect(screen.getByTestId('status-item-agent').getAttribute('data-state')).toBe('unknown')
+  })
+
+  /*
+   * R6b: `Cost unknown` was not honest enough. A model with no published price does not make the
+   * spend unknowable — it makes the part we can prove a lower bound, which is what the spend cap
+   * already says. The spend item must say so and must not print the bare word "unknown".
+   */
+  it('7. an unpriced model renders a lower bound, never "Cost unknown"', () => {
+    const now = Date.now()
+    useStore.setState({
+      usageRecords: [
+        {
+          provider: 'deepseek',
+          model: 'mystery-model-9',
+          inputTokens: 1_000,
+          outputTokens: 500,
+          timestamp: now
+        }
+      ]
+    })
+    render(<StatusBar />)
+
+    const spend = screen.getByTestId('status-spend')
+    expect(spend.textContent ?? '').toMatch(/unpriced/i)
+    expect(spend.textContent ?? '').toMatch(/lower bound/i)
+    expect(spend.textContent ?? '').not.toMatch(/unknown/i)
+  })
+
+  it('8. a partly priced session shows the number but states it is a lower bound', () => {
+    const now = Date.now()
+    useStore.setState({
+      usageRecords: [
+        {
+          provider: 'deepseek',
+          model: 'deepseek-flash',
+          inputTokens: 10_000,
+          outputTokens: 2_400,
+          timestamp: now
+        },
+        {
+          provider: 'deepseek',
+          model: 'mystery-model-9',
+          inputTokens: 1_000,
+          outputTokens: 0,
+          timestamp: now
+        }
+      ]
+    })
+    render(<StatusBar />)
+
+    const text = screen.getByTestId('status-spend').textContent ?? ''
+    expect(text).toMatch(/^at least \$/)
+    expect(text).toMatch(/lower bound/i)
+    expect(text).not.toMatch(/unknown/i)
   })
 })

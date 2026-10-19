@@ -1103,7 +1103,9 @@
     "accessTitleAsk": "Ask: every tool call waits for your approval first.",
     "accessTitleAutoWrite": "Auto-write: reads and searches run freely; writes and shell commands ask first.",
     "accessTitleFull": "Full access: every tool runs without asking until you turn it off.",
-    "sessionTokens": "{{tokens}} tokens"
+    "sessionTokens": "{{tokens}} tokens",
+    "spendUnpriced": "unpriced model — the spend is a lower bound",
+    "spendLowerBound": "at least {{cost}} — an unpriced model makes this a lower bound"
   },
   "fileExplorer": {
     "noProjects": "No project added yet. Add a project folder from Settings, or drop a folder onto the window.",

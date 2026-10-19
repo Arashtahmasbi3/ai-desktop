@@ -7,6 +7,7 @@ import { enforceProjectPath } from '@core/remote/path-guard'
 import { findSecretPathsInCommand, inspectSecretPath } from '@shared/secret-paths'
 import type { DiagnosticPolicy } from '@core/remote/diagnostic-policy'
 import { shellQuote } from '@shared/shell-quote'
+import { connectedServerNames, notConnectedMessage, type ServerNameLookup } from './server-names'
 
 /** POSIX single-quote a value so it can be safely embedded in a shell command. */
 
@@ -101,6 +102,8 @@ export interface RemoteFsDeps {
   projectRoot?: string
   /** Read-only widening while Diagnostic Mode is on (v2.5.3). */
   diagnostic?: DiagnosticPolicy | null
+  /** R6: the saved name for an id, so a refusal names the server instead of printing a UUID. */
+  serverName?: ServerNameLookup
 }
 
 export interface RemoteFsResult {
@@ -196,9 +199,16 @@ export async function executeRemoteFs(
   const serverId = String(args.server_id ?? '').trim()
   const connected = deps.connectedServers()
   if (!serverId) {
-    return fail(`server_id is required. Connected: ${connected.join(', ') || 'none'}`)
+    return fail(
+      `server_id is required. Connected: ${await connectedServerNames(
+        deps.serverName,
+        connected
+      )}`
+    )
   }
-  if (!connected.includes(serverId)) return fail(`Server ${serverId} is not connected.`)
+  if (!connected.includes(serverId)) {
+    return fail(await notConnectedMessage(deps.serverName, serverId))
+  }
 
   try {
     switch (toolName) {

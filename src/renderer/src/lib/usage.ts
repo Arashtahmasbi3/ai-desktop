@@ -30,8 +30,8 @@ export const MAX_USAGE_RECORDS = 5000
 /**
  * Published per-model prices (USD / 1M tokens). Lookup is case-insensitive and
  * falls back to a substring match, so `deepseek-chat` also matches
- * `deepseek-chat-v3`. Models that are absent are "cost unknown" rather than
- * silently priced at zero.
+ * `deepseek-chat-v3`. Models that are absent are unpriced — the total is reported as a
+ * lower bound rather than silently priced at zero.
  */
 export const PROVIDER_COSTS: Record<string, CostRates> = {
   'deepseek-flash': { input: 0.14, output: 0.28 },
@@ -127,12 +127,33 @@ export function formatTokens(tokens: number, locale: string = 'en'): string {
   return safe.toLocaleString(locale === 'fa' ? 'fa-IR' : 'en-US')
 }
 
-/** Human-readable cost, or the explicit "cost unknown" label. */
+/**
+ * Human-readable cost.
+ *
+ * R6: an unpriced model must not read as the bare "Cost unknown". The spend cap already says the
+ * honest thing — "a lower bound" — so the same idea is used everywhere a cost is shown: the number
+ * is not missing, it is the part we can prove. `formatSpend` adds the same sentence when the total
+ * is a *partial* one (some calls priced, some not).
+ */
+export const UNPRICED_SPEND = 'unpriced model — the spend is a lower bound'
+
 export function formatCost(cost: number | null): string {
-  if (cost === null) return 'Cost unknown'
+  if (cost === null) return UNPRICED_SPEND
   if (cost === 0) return '$0.00'
   if (cost < 0.01) return `$${cost.toFixed(4)}`
   return `$${cost.toFixed(2)}`
+}
+
+/**
+ * The status line's spend read-out: never "unknown", and never a silent under-count.
+ *
+ * `unpriced` is `UsageTotals.costUnknown` — at least one call in the window had no published
+ * price. A total that is a lower bound has to say so, or the user will read `$0.12` as the bill.
+ */
+export function formatSpend(cost: number | null, unpriced: boolean): string {
+  if (cost === null) return UNPRICED_SPEND
+  if (!unpriced) return formatCost(cost)
+  return `at least ${formatCost(cost)} — an unpriced model makes this a lower bound`
 }
 
 function addRecord(totals: UsageTotals, record: UsageRecord): UsageTotals {

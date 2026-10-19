@@ -4,6 +4,11 @@ import type { AgentAction, AgentToolResult } from '@shared/agent'
 import type { ToolExecutor, ToolExecOptions } from '@core/agent/tools'
 import type { DiagnosticPolicy } from '@core/remote/diagnostic-policy'
 import { formatDiagnosis, runCrashDiagnosis } from '@core/agent/crash-diagnosis'
+import {
+  connectedServerNames,
+  notConnectedMessage,
+  type ServerNameLookup
+} from './server-names'
 
 /** Tool the agent calls to run the structured crash-diagnosis probes (v2.5.6). */
 export const DIAGNOSE_CRASH_TOOL: ToolDefinition = {
@@ -26,6 +31,8 @@ export interface CrashDiagnosisToolDeps {
   projectRoot?: string
   /** Read-only widening while Diagnostic Mode is on (v2.5.3). */
   diagnostic?: DiagnosticPolicy | null
+  /** R6: the saved name for an id, so a refusal names the server instead of printing a UUID. */
+  serverName?: ServerNameLookup
 }
 
 /**
@@ -68,7 +75,10 @@ export class CrashDiagnosisToolExecutor implements ToolExecutor {
         ...base,
         ok: false,
         output: '',
-        error: `server_id is required. Connected: ${this.deps.connectedServers().join(', ') || 'none'}`,
+        error: `server_id is required. Connected: ${await connectedServerNames(
+          this.deps.serverName,
+          this.deps.connectedServers()
+        )}`,
         code: 'invalid_arguments'
       }
     }
@@ -77,7 +87,7 @@ export class CrashDiagnosisToolExecutor implements ToolExecutor {
         ...base,
         ok: false,
         output: '',
-        error: `Server ${serverId} is not connected.`,
+        error: await notConnectedMessage(this.deps.serverName, serverId),
         serverId,
         code: 'remote_error'
       }

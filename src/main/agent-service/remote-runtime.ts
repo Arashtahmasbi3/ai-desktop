@@ -248,6 +248,23 @@ export function planRemoteRuntime(
    * one. It returns data only and can never select a server.
    */
   const hasRoster = typeof vps.listServers === 'function'
+  /*
+   * R6: every refusal that mentions a server is a sentence the user reads, so it names the
+   * machine instead of printing its UUID. The roster is already read for `list_servers`, so
+   * one lookup serves every executor below; a host without a roster keeps the neutral
+   * phrasing (`server-names.ts`).
+   */
+  const serverName =
+    typeof vps.listServers === 'function'
+      ? async (serverId: string): Promise<string | undefined> => {
+          try {
+            const servers = await vps.listServers!()
+            return servers.find((server) => server.id === serverId)?.name
+          } catch {
+            return undefined
+          }
+        }
+      : undefined
   if (hasRoster) {
     const listServers = (): Promise<ServerSummary[]> => vps.listServers!()
     /*
@@ -331,7 +348,8 @@ export function planRemoteRuntime(
       connectedServers: () => vps.connectedServers(),
       ...(jobs ? { jobs } : {}),
       ...(projectRoot ? { projectRoot } : {}),
-      ...(diagnostic ? { diagnostic } : {})
+      ...(diagnostic ? { diagnostic } : {}),
+      ...(serverName ? { serverName } : {})
     },
     target
   )
@@ -355,7 +373,8 @@ export function planRemoteRuntime(
       listFiles: (serverId, path) => vps.listFiles!(serverId, path),
       exec: (serverId, command) => vps.exec(serverId, command),
       ...(projectRoot ? { projectRoot } : {}),
-      ...(diagnostic ? { diagnostic } : {})
+      ...(diagnostic ? { diagnostic } : {}),
+      ...(serverName ? { serverName } : {})
     }
     if (typeof vps.recordAudit === 'function') {
       fsDeps.audit = (entry) => vps.recordAudit!(entry).then(() => undefined)
@@ -377,7 +396,8 @@ export function planRemoteRuntime(
       connectedServers: () => vps.connectedServers(),
       exec: (serverId, command) => vps.exec(serverId, command),
       ...(projectRoot ? { projectRoot } : {}),
-      ...(diagnostic ? { diagnostic } : {})
+      ...(diagnostic ? { diagnostic } : {}),
+      ...(serverName ? { serverName } : {})
     },
     target
   )
@@ -398,7 +418,8 @@ export function planRemoteRuntime(
     {
       connectedServers: () => vps.connectedServers(),
       exec: (serverId, command) => vps.exec(serverId, command),
-      ...(projectRoot ? { projectRoot } : {})
+      ...(projectRoot ? { projectRoot } : {}),
+      ...(serverName ? { serverName } : {})
     },
     target
   )
@@ -416,7 +437,8 @@ export function planRemoteRuntime(
     const migrateDeps: MigrateProjectDeps = {
       connectedServers: () => vps.connectedServers(),
       resolveServer: (id) => vps.resolveServer!(id),
-      exec: (serverId, command) => vps.exec(serverId, command)
+      exec: (serverId, command) => vps.exec(serverId, command),
+      ...(serverName ? { serverName } : {})
     }
     if (typeof vps.recordAudit === 'function') {
       migrateDeps.audit = (entry) => vps.recordAudit!(entry).then(() => undefined)
@@ -482,7 +504,8 @@ export function planRemoteRuntime(
           executor: new SessionLivenessExecutor(route.executor, {
             reconnect,
             isConnected: (serverId) => vps.connectedServers().includes(serverId),
-            ...(target ? { fallbackServerId: target } : {})
+            ...(target ? { fallbackServerId: target } : {}),
+            ...(serverName ? { serverName } : {})
           })
         }))
   const ownedRoutes = withLiveness(routes.filter((route) => !foreignRoute(route)))

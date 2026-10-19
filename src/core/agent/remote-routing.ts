@@ -31,6 +31,12 @@ export interface RoutingContext {
   workspaceType?: 'local' | 'remote'
   /** VPS the remote project lives on (`project.vpsId`). */
   serverId?: string
+  /**
+   * R6: the saved name for `serverId`, when the caller knows it. A routing refusal is a sentence
+   * the user reads, so it names the machine instead of quoting its UUID; without a name it says
+   * "the selected VPS" rather than falling back to the id.
+   */
+  serverName?: string
   /** Absolute project root on the VPS (`project.path`). */
   remotePath?: string
   /** Whether that server is currently connected. */
@@ -82,7 +88,10 @@ export function routeToolCall(
     return {
       kind: 'error',
       message:
-        `VPS "${context.serverId}" is not connected, so "${toolName}" cannot run remotely. ` +
+        (context.serverName
+          ? `VPS "${context.serverName}"`
+          : 'The selected VPS') +
+        ` is not connected, so "${toolName}" cannot run remotely. ` +
         'Connect the VPS in Settings -> Connections, then retry.'
     }
   }

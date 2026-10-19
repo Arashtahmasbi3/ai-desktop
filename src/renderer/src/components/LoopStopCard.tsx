@@ -16,7 +16,8 @@ import {
 } from 'lucide-react'
 import type { LoopStopInfo } from '@shared/agent'
 import { buildLoopStopModel, type LoopStopAction } from '../lib/loop-stop'
-import { summarizeCommand, truncateMiddle } from '../lib/tool-labels'
+import { summarizeCommand, truncateMiddle, withoutServerId } from '../lib/tool-labels'
+import { useStore } from '../store'
 
 interface Props {
   stop: LoopStopInfo
@@ -41,6 +42,17 @@ interface Props {
 export default function LoopStopCard({ stop, onContinue, onCorrect, onStop }: Props): JSX.Element {
   const { t } = useTranslation()
   const model = buildLoopStopModel(stop)
+  /*
+   * R6: the card names the machine. It used to print `model.serverId` — a raw UUID — beside the
+   * word "Remote". The roster is the same one the header reads, so the card cannot disagree with
+   * the server the run was on; an id the roster no longer knows is simply not printed, because a
+   * UUID is not a name.
+   */
+  const vpsServers = useStore((state) => state.vpsServers)
+  const serverName = model.serverId
+    ? vpsServers.find((server) => server.id === model.serverId)?.name
+    : undefined
+  const actionText = withoutServerId(model.lastCommand ?? model.lastAction ?? '')
   const [showRecent, setShowRecent] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
   const emphasisClass = (action: LoopStopAction): string =>
@@ -241,7 +253,7 @@ export default function LoopStopCard({ stop, onContinue, onCorrect, onStop }: Pr
                 <span className="ui-chip flex items-center gap-1 px-1 py-0.5">
                   <Server className="h-3 w-3" />
                   {t('chat.loopStopRemote')}
-                  {model.serverId ? <span className="font-mono">{model.serverId}</span> : null}
+                  {serverName ? <span className="font-mono">{serverName}</span> : null}
                 </span>
               ) : (
                 <Terminal className="h-3 w-3" />
@@ -249,9 +261,9 @@ export default function LoopStopCard({ stop, onContinue, onCorrect, onStop }: Pr
               <code
                 className="min-w-0 flex-1 truncate font-mono"
                 dir="ltr"
-                title={model.lastCommand ?? model.lastAction}
+                title={actionText}
               >
-                {summarizeCommand(model.lastCommand ?? model.lastAction ?? '')}
+                {summarizeCommand(actionText)}
               </code>
             </div>
           ) : null}

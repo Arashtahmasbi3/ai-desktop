@@ -4,12 +4,12 @@
  *
  * Before this, the window had a title bar, a two-line execution bar under it, and a status bar at
  * the bottom, and the same five facts were spread across all three. The title bar is now the only
- * place a *window-level* control lives: the app name, the project picker, the Ctrl+K palette, and
- * one `⋯` menu that holds the preferences the redesign removed from the surfaces (the approval
- * mode, the Simple/Advanced switch, language, online state).
+ * place a *window-level* control lives: the app name, the project picker, the Ctrl+K palette, the
+ * visible Simple/Advanced switch (R6) and one `⋯` menu that holds the preferences the redesign
+ * removed from the surfaces (the approval mode, language, online state).
  */
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import i18n from '../../src/renderer/src/i18n'
 import Titlebar from '../../src/renderer/src/components/Titlebar'
 import { useStore } from '../../src/renderer/src/store'
@@ -109,6 +109,8 @@ describe('v4.3 — the title bar', () => {
 
   it('4. the menu holds the preferences and not send actions', () => {
     render(<Titlebar />)
+    // R6: the interface switch is visible on the bar, so it is NOT one of the menu's items.
+    expect(screen.getByTestId('titlebar-ui-mode')).toBeTruthy()
     fireEvent.click(screen.getByTestId('titlebar-menu-button'))
 
     const menu = screen.getByTestId('titlebar-menu')
@@ -116,9 +118,8 @@ describe('v4.3 — the title bar', () => {
     expect(screen.getByTestId('titlebar-approval-ask')).toBeTruthy()
     expect(screen.getByTestId('titlebar-approval-auto-write')).toBeTruthy()
     expect(screen.getByTestId('titlebar-approval-full')).toBeTruthy()
-    // The interface switch: removed from the status bar.
-    expect(screen.getByTestId('titlebar-ui-mode-simple')).toBeTruthy()
-    expect(screen.getByTestId('titlebar-ui-mode-advanced')).toBeTruthy()
+    // The interface switch is not duplicated here — a second copy is what U3-1 forbade.
+    expect(within(menu).queryByTestId('titlebar-ui-mode-simple')).toBeNull()
     // Language and online state moved here when the status bar lost its menu.
     expect(screen.getByTestId('titlebar-menu-locale')).toBeTruthy()
     expect(screen.getByTestId('titlebar-menu-online')).toBeTruthy()

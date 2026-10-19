@@ -28,7 +28,7 @@ export interface WorkspaceStatus {
   /** i18n key for the action button; `null` means "no action". */
   actionKey: string | null
   action: WorkspaceAction
-  /** Remote path, exposed as the `{{path}}` i18n parameter for `remote-ok`. */
+  /** Remote path, exposed as the `{{path}}` i18n parameter when a banner needs it. */
   path?: string
 }
 
@@ -92,14 +92,16 @@ export function workspaceStatus(input: WorkspaceStatusInput): WorkspaceStatus {
         action: 'reconnect'
       }
     }
-    return {
-      kind: 'remote-ok',
-      tone: 'ok',
-      messageKey: 'chat.remoteConnected',
-      actionKey: null,
-      action: 'none',
-      path: project.path
-    }
+    /*
+     * R6: a connected remote project shows **no** banner.
+     *
+     * `Remote: /opt/sepehr-motor (connected)` repeated the breadcrumb's path and the execution
+     * bar's connection fact — and it said "(connected)" for a session that could be dead, which is
+     * a Stage-4 claim that never landed (the liveness fact has since moved to the bar). The states
+     * below still render because each carries one fact the bar does not: no VPS chosen, no path,
+     * a dead session, a missing local folder, no project at all.
+     */
+    return { kind: 'remote-ok', tone: 'ok', messageKey: null, actionKey: null, action: 'none' }
   }
 
   if (project.exists === false) {

@@ -79,7 +79,7 @@ function TotalsRow({
       <div className="mb-1 flex items-center justify-between">
         <span className="text-2xs font-semibold text-fg">{label}</span>
         <span className="ui-data text-xs">
-          {totals.cost === null ? t('settings.usageUnknownCost') : formatCost(totals.cost)}
+          {totals.cost === null ? t('usage.unpriced') : formatCost(totals.cost)}
         </span>
       </div>
       <div className="grid grid-cols-3 gap-2 text-2xs text-fg-muted">
@@ -96,7 +96,7 @@ function TotalsRow({
         </span>
       </div>
       {totals.costUnknown ? (
-        <p className="mt-1 text-3xs text-warning">{t('settings.usageUnknownCost')}</p>
+        <p className="mt-1 text-3xs text-warning">{t('settings.budgetUnpriced')}</p>
       ) : null}
     </div>
   )

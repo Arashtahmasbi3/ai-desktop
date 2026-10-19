@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import i18n from '../../src/renderer/src/i18n'
 import ExecutionBar from '../../src/renderer/src/components/ExecutionBar'
 import InlineTrace from '../../src/renderer/src/components/InlineTrace'
@@ -25,9 +25,9 @@ import type { TraceDecision } from '../../src/shared/trace'
  *  2. **"Not offered" means not open either.** A pane that is open when the mode turns simple is
  *     closed (and its persisted flag cleared), and the store refuses to reopen it — so the
  *     keyboard shortcuts and the Settings → Connections button cannot route around the mode.
- *  3. **Advanced is one visible control away.** The switch is a preference, so in v4.3 it moved
- *     from the status bar into the title bar's `⋯` menu — and the terminal/file-tree toggles come
- *     back with it, as does the trace's reasoning row.
+ *  3. **Advanced is one visible control away.** The switch is a labelled two-option control on the
+ *     title bar itself (R6 restored it from the `⋯` menu, which is what U3-1 exists to prevent),
+ *     and the terminal/file-tree toggles come back with it, as does the trace's reasoning row.
  */
 
 beforeAll(async () => {
@@ -223,8 +223,8 @@ describe('checklist item 13 — the execution trace keeps the row and the verdic
   })
 })
 
-describe('v4.3 — the interface switch lives in the title-bar menu', () => {
-  it('1. turns simple into advanced and brings the advanced toggles back', () => {
+describe('R6 / U3-1 — the interface switch is a visible control on the title bar', () => {
+  it('1. shows both options without opening a menu, then switches to advanced', () => {
     render(
       <>
         <Titlebar />
@@ -235,10 +235,18 @@ describe('v4.3 — the interface switch lives in the title-bar menu', () => {
     expect(terminalToggle()).toBeNull()
 
     /*
-     * The switch is a *preference*: the report asked for it to leave the status bar, so it now sits
-     * in the title bar's overflow menu, one visible control away from the first screen.
+     * U3-1: "prefer visible controls over menus". Hiding the switch in the `⋯` menu is exactly
+     * the regression it exists to prevent, so the control is on the bar and needs no click to be
+     * seen. Both options are labelled and the current one is `aria-pressed`.
      */
-    fireEvent.click(screen.getByTestId('titlebar-menu-button'))
+    const group = screen.getByTestId('titlebar-ui-mode')
+    expect(group.getAttribute('aria-label')).toBe(i18n.t('statusBar.uiMode'))
+    expect(screen.getByTestId('titlebar-ui-mode-simple').textContent).toBe(
+      i18n.t('statusBar.uiModeSimple')
+    )
+    expect(screen.getByTestId('titlebar-ui-mode-advanced').textContent).toBe(
+      i18n.t('statusBar.uiModeAdvanced')
+    )
     expect(screen.getByTestId('titlebar-ui-mode-simple').getAttribute('aria-pressed')).toBe('true')
     expect(screen.getByTestId('titlebar-ui-mode-advanced').getAttribute('aria-pressed')).toBe(
       'false'
@@ -249,6 +257,9 @@ describe('v4.3 — the interface switch lives in the title-bar menu', () => {
     expect(useStore.getState().uiMode).toBe('advanced')
     expect(getUiMode()).toBe('advanced')
     expect(localStorage.getItem(MODE_KEY)).toBe(JSON.stringify('advanced'))
+    expect(screen.getByTestId('titlebar-ui-mode-advanced').getAttribute('aria-pressed')).toBe(
+      'true'
+    )
     expect(treeToggle()).toBeTruthy()
     expect(terminalToggle()).toBeTruthy()
   })
@@ -263,7 +274,6 @@ describe('v4.3 — the interface switch lives in the title-bar menu', () => {
     )
     expect(terminalToggle()).toBeTruthy()
 
-    fireEvent.click(screen.getByTestId('titlebar-menu-button'))
     expect(screen.getByTestId('titlebar-ui-mode-advanced').getAttribute('aria-pressed')).toBe(
       'true'
     )
@@ -275,7 +285,7 @@ describe('v4.3 — the interface switch lives in the title-bar menu', () => {
     expect(terminalToggle()).toBeNull()
   })
 
-  it('3. is gone from the status line, which keeps no menu of its own', () => {
+  it('3. the status line keeps no switch and no menu, and the control exists exactly once', () => {
     render(
       <>
         <StatusBar />
@@ -288,17 +298,20 @@ describe('v4.3 — the interface switch lives in the title-bar menu', () => {
     fireEvent.contextMenu(screen.getByTestId('status-bar'))
     expect(screen.queryByTestId('status-menu')).toBeNull()
 
-    // …and the mode exists exactly once, in the title bar's menu.
+    // …and there is one copy of the mode switch, on the title bar — not a second one in the menu.
+    expect(screen.getAllByTestId('titlebar-ui-mode-simple')).toHaveLength(1)
     fireEvent.click(screen.getByTestId('titlebar-menu-button'))
     expect(screen.getAllByTestId('titlebar-ui-mode-simple')).toHaveLength(1)
     expect(screen.getAllByTestId('titlebar-ui-mode-advanced')).toHaveLength(1)
+    expect(
+      within(screen.getByTestId('titlebar-menu')).queryByTestId('titlebar-ui-mode-simple')
+    ).toBeNull()
   })
 
   it('4. is labelled in Persian too', async () => {
     await i18n.changeLanguage('fa')
     try {
       render(<Titlebar />)
-      fireEvent.click(screen.getByTestId('titlebar-menu-button'))
       expect(screen.getByTestId('titlebar-ui-mode').getAttribute('aria-label')).toBe(
         i18n.t('statusBar.uiMode')
       )

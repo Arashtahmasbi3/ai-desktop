@@ -108,6 +108,15 @@ describe('routeToolCall', () => {
     )
     expect(disconnected).toMatchObject({ kind: 'error' })
     if (disconnected.kind === 'error') expect(disconnected.message).toContain('not connected')
+    // R6: the refusal is a sentence — it names the machine, or says "the selected VPS", never the id.
+    expect(disconnected.kind === 'error' && disconnected.message).not.toContain('srv-1')
+    const named = routeToolCall(
+      'read_file',
+      { path: 'a' },
+      { ...REMOTE, connected: false, serverName: 'spmotor' }
+    )
+    expect(named.kind === 'error' && named.message).toContain('"spmotor"')
+    expect(named.kind === 'error' && named.message).not.toContain('srv-1')
   })
 
   it('covers every routable local tool in the mapping table', () => {

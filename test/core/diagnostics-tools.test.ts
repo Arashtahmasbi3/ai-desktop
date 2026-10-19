@@ -138,9 +138,20 @@ describe('buildDiagnosticCommand validation', () => {
 })
 
 describe('DiagnosticsToolExecutor', () => {
+  /*
+   * R6: ids are UUIDs in the app, and they were printed inside sentences a user reads. The exact
+   * two ids from the reported stop card are used here, so the regression is pinned against the
+   * real shape of the leak rather than an `srv-1` stand-in.
+   */
+  const PINNED = '34c80099-2868-40a1-bef4-9b23d865db0b'
+  const OTHER = 'e000539d-4199-46eb-a350-9406a210b514'
+  const NAMES: Record<string, string> = { [PINNED]: 'spmotor', [OTHER]: 'backup-host' }
+  const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
+
   const deps = (calls: string[]) => ({
     connectedServers: () => ['vps-1'],
-    exec: execFor(calls)
+    exec: execFor(calls),
+    serverName: async (serverId: string): Promise<string | undefined> => NAMES[serverId]
   })
 
   it('runs the built command on the pinned server and returns its output', async () => {
@@ -170,19 +181,56 @@ describe('DiagnosticsToolExecutor', () => {
    */
   it('refuses a model-supplied server_id that differs from the pinned server', async () => {
     const calls: string[] = []
-    const executor = new DiagnosticsToolExecutor(deps(calls), 'vps-1')
+    const executor = new DiagnosticsToolExecutor(deps(calls), PINNED)
     const result = await executor.execute(
-      action('get_system_health', { server_id: 'other-host' })
+      action('get_system_health', { server_id: OTHER })
     )
 
     expect(result.ok).toBe(false)
     expect(result.code).toBe('invalid_arguments')
-    // The message must name both hosts and say what to do, or the model just retries.
-    expect(result.error).toContain('vps-1')
-    expect(result.error).toContain('other-host')
+    // R6: the sentence names both machines — the reported card printed two UUIDs instead.
+    expect(result.error).toContain('spmotor')
+    expect(result.error).toContain('backup-host')
+    expect(result.error).not.toMatch(UUID_RE)
     expect(result.error).toContain('chat header')
+    // The id itself is still on the result, for the audit log and the expanded card body.
+    expect(result.serverId).toBe(PINNED)
     // And it must not have touched either machine.
     expect(calls).toHaveLength(0)
+  })
+
+  it('never prints a UUID when a server has no name in the roster (R6)', async () => {
+    const calls: string[] = []
+    const executor = new DiagnosticsToolExecutor(
+      { connectedServers: () => [], exec: execFor(calls) },
+      PINNED
+    )
+    const result = await executor.execute(action('get_system_health', {}))
+
+    expect(result.ok).toBe(false)
+    expect(result.code).toBe('remote_error')
+    expect(result.error).not.toMatch(UUID_RE)
+    expect(result.error).toMatch(/not connected/i)
+    // The id is still on the result, for the audit log and the expanded card body.
+    expect(result.serverId).toBe(PINNED)
+    expect(calls).toHaveLength(0)
+  })
+
+  it('lists connected servers by name, never by id (R6)', async () => {
+    const calls: string[] = []
+    const executor = new DiagnosticsToolExecutor(
+      {
+        connectedServers: () => [PINNED, OTHER],
+        exec: execFor(calls),
+        serverName: async (serverId: string): Promise<string | undefined> => NAMES[serverId]
+      },
+      undefined
+    )
+    const result = await executor.execute(action('get_system_health', {}))
+
+    expect(result.code).toBe('invalid_arguments')
+    expect(result.error).toContain('spmotor, backup-host')
+    expect(result.error).not.toMatch(UUID_RE)
   })
 
   it('still honours the requested server when none is pinned', async () => {

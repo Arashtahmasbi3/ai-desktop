@@ -5,6 +5,7 @@ import {
   appendUsage,
   costOf,
   formatCost,
+  formatSpend,
   loadUsage,
   parseUsage,
   rateFor,
@@ -100,11 +101,18 @@ describe('Task 1.2 - token usage', () => {
     expect(aggregateUsage([]).total.calls).toBe(0)
   })
 
-  it('5. an unknown provider/model reports "Cost unknown"', () => {
+  it('5. an unpriced model reports a lower bound, never a bare "unknown"', () => {
     const unknown = record({ model: 'mystery-model-9' })
     expect(rateFor('mystery-model-9')).toBeNull()
     expect(costOf(unknown)).toBeNull()
-    expect(formatCost(null)).toBe('Cost unknown')
+    // R6: the old label was `Cost unknown`, which said nothing a user could act on.
+    expect(formatCost(null)).not.toBe('Cost unknown')
+    expect(formatCost(null)).not.toMatch(/^unknown$/i)
+    expect(formatCost(null)).toMatch(/unpriced/i)
+    expect(formatCost(null)).toMatch(/lower bound/i)
+    expect(formatSpend(null, true)).toMatch(/lower bound/i)
+    expect(formatSpend(0.12, true)).toMatch(/^at least \$0\.12/)
+    expect(formatSpend(0.12, false)).toBe('$0.12')
 
     const summary = aggregateUsage([unknown])
     expect(summary.total.costUnknown).toBe(true)

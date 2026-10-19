@@ -56,8 +56,12 @@ const APPROVAL_LABEL: Record<ApprovalMode, string> = {
  *
  * The `⋯` menu is where the *preferences* the user asked to have removed from the surfaces now
  * live: the approval mode (it was a chip in the transcript header and again beside the composer),
- * the Simple/Advanced interface mode (it was a switch in the status bar), language, online state
- * and the shortcut list. A mode is not a send action, so it does not sit next to Send.
+ * language, online state and the shortcut list. A mode is not a send action, so it does not sit
+ * next to Send.
+ *
+ * R6: the Simple/Advanced switch is **not** in that menu. It is a visible segmented control on
+ * the bar itself, because hiding it is the regression U3-1 exists to prevent ("prefer visible
+ * controls over menus") — and there is exactly one copy of it.
  */
 export default function Titlebar(): JSX.Element {
   const { t } = useTranslation()
@@ -231,6 +235,38 @@ export default function Titlebar(): JSX.Element {
       </button>
 
       {/*
+        R6 / U3-1: the Simple/Advanced switch is a **visible** segmented control again.
+        Moving it into the `⋯` menu is exactly what U3-1 existed to undo ("prefer visible
+        controls over menus"), and the menu copy is gone rather than duplicated: a second
+        copy is the mistake U3-1 named. Two labelled options, `aria-pressed` on each, and
+        the current one is the filled one.
+      */}
+      <div
+        role="group"
+        aria-label={t('statusBar.uiMode')}
+        data-testid="titlebar-ui-mode"
+        className="no-drag flex h-7 shrink-0 items-center rounded-shape-sm border border-border p-0.5"
+      >
+        {(['simple', 'advanced'] as const).map((mode) => (
+          <button
+            key={mode}
+            type="button"
+            aria-pressed={uiMode === mode}
+            data-testid={`titlebar-ui-mode-${mode}`}
+            title={t('statusBar.uiModeHint')}
+            onClick={() => setUiMode(mode)}
+            className={`flex h-6 items-center px-1.5 text-2xs transition-colors duration-fast ${
+              uiMode === mode
+                ? 'bg-accent-solid/15 font-semibold text-accent'
+                : 'text-fg-muted hover:text-fg'
+            }`}
+          >
+            {t(uiModeLabelKey(mode))}
+          </button>
+        ))}
+      </div>
+
+      {/*
         v2.7.0: an explicit, labelled theme menu rather than an icon that cycles —
         "which theme am I on?" should never be a guess.
       */}
@@ -344,36 +380,6 @@ export default function Titlebar(): JSX.Element {
                   </button>
                 )
               })}
-
-              <p className="mt-1 border-t border-border px-3 pb-1 pt-2 text-3xs text-fg-muted">
-                {t('statusBar.uiMode')}
-              </p>
-              <div
-                role="group"
-                aria-label={t('statusBar.uiMode')}
-                data-testid="titlebar-ui-mode"
-              >
-              {(['simple', 'advanced'] as const).map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  aria-pressed={uiMode === mode}
-                  data-testid={`titlebar-ui-mode-${mode}`}
-                  onClick={() => {
-                    setUiMode(mode)
-                    setMenuOpen(false)
-                  }}
-                  className="ui-row ui-press w-full gap-2 px-3 text-left"
-                >
-                  <Check
-                    className={`h-3.5 w-3.5 shrink-0 ${
-                      uiMode === mode ? 'text-accent' : 'invisible'
-                    }`}
-                  />
-                  <span className="text-fg">{t(uiModeLabelKey(mode))}</span>
-                </button>
-              ))}
-              </div>
 
               <div className="mt-1 border-t border-border pt-1">
                 <button

@@ -39,15 +39,17 @@ describe('workspaceStatus (A.2 table)', () => {
     })
   })
 
-  it('remote project with a connected VPS shows the connected info', () => {
+  it('remote project with a connected VPS shows no banner at all (R6)', () => {
+    // The old `Remote: /opt/app (connected)` banner repeated the breadcrumb and the bar, and it
+    // claimed a live session. A connected remote project is the normal case, not a message.
     const status = workspaceStatus({ project: remote(), vpsConnected: true })
     expect(status).toMatchObject({
       kind: 'remote-ok',
       tone: 'ok',
-      messageKey: 'chat.remoteConnected',
-      path: '/opt/app'
+      messageKey: null,
+      action: 'none'
     })
-    expect(shouldShowWorkspaceBanner(status)).toBe(true)
+    expect(shouldShowWorkspaceBanner(status)).toBe(false)
   })
 
   it('remote project never reports a missing path while the VPS is connected', () => {

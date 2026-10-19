@@ -9,13 +9,18 @@ import type { ProjectRecord, SettingsView } from '@shared/ui'
 import type { VpsConnectionState, VpsServerView } from '@shared/vps'
 
 /**
- * R1 - the header dot, the `Remote: ...` banner and the tree dot read ONE per-server fact.
+ * R1 - the header dot and the tree dot read ONE per-server fact.
  *
  * The screenshots showed the banner saying `Remote: /opt/... (connected)` while every remote tool
  * failed with `Not connected` in 0.01 s. The surfaces were reading different things: the banner and
  * the tree read the connected set (refreshed a round-trip later), the header read the singular
  * `vpsStatus` slot (whichever server changed last). These cases keep that connected set stale on
  * purpose and change only the liveness fact, so a surface reading anything else cannot pass.
+ *
+ * R6 removed the `Remote: … (connected)` banner itself (it duplicated the breadcrumb and the bar,
+ * and it was the claim that lied). The connected fact is now asserted on the execution bar's
+ * connection item; the disconnected banner and its Reconnect action stay, because that one carries
+ * a fact the bar does not.
  */
 beforeAll(async () => {
   await i18n.changeLanguage('en')
@@ -95,10 +100,11 @@ const bannerConnected = (): HTMLElement | null =>
 const bannerDisconnected = (): HTMLElement | null =>
   screen.queryByText(i18n.t('chat.remoteDisconnected'))
 
-describe('R1 - the banner text follows the per-server fact in both directions', () => {
+describe('R1 - the connection truth follows the per-server fact in both directions', () => {
   it('shows connected, flips on a liveness disconnect in the same tick, and flips back', () => {
     render(<ChatPanel />)
-    expect(bannerConnected()).toBeTruthy()
+    // R6: no `Remote: … (connected)` banner at all; the bar carries the fact.
+    expect(bannerConnected()).toBeNull()
     const bar = screen.getByTestId('status-item-workspace')
     expect(bar.getAttribute('data-connection')).toBe('connected')
 
@@ -121,7 +127,7 @@ describe('R1 - the banner text follows the per-server fact in both directions', 
         .applyVpsLiveness({ serverId: 'srv-a', state: { status: 'connected' }, at: 2 })
     })
 
-    expect(bannerConnected()).toBeTruthy()
+    expect(bannerConnected()).toBeNull()
     expect(bannerDisconnected()).toBeNull()
     expect(bar.getAttribute('data-connection')).toBe('connected')
   })
@@ -133,7 +139,8 @@ describe('R1 - the banner text follows the per-server fact in both directions', 
         .getState()
         .applyVpsLiveness({ serverId: 'srv-b', state: { status: 'disconnected' }, at: 1 })
     })
-    expect(bannerConnected()).toBeTruthy()
+    expect(bannerConnected()).toBeNull()
+    expect(bannerDisconnected()).toBeNull()
     expect(screen.getByTestId('status-item-workspace').getAttribute('data-connection')).toBe(
       'connected'
     )

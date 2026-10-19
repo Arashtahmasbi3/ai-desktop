@@ -295,6 +295,23 @@ export function summarizeCommand(command: string, maxLength: number = DEFAULT_MA
 }
 
 /**
+ * R6: a formatted action without its `server_id=…` field.
+ *
+ * The stop card prints the last action when the tool took no `command` argument
+ * (`get_system_health(server_id=34c80099-…)`), which put a raw UUID in front of the user. The
+ * machine is named by the card's server chip instead; the exact action string stays in the
+ * recent-actions disclosure, where the id is the point.
+ */
+export function withoutServerId(action: string): string {
+  return sanitizeText(action)
+    .replace(/\b(?:server_id|source_vps_id|target_vps_id)=[^,)\s]+/g, '')
+    .replace(/\(\s*,\s*/g, '(')
+    .replace(/,\s*\)/g, ')')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim()
+}
+
+/**
  * A path shortened from the left (`…/app/src/index.ts`). Whole path segments are
  * dropped, never cut in half, so the file name and its parent stay readable.
  */
