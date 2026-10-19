@@ -49,7 +49,18 @@ module.exports = {
         'accent-solid-hover': 'rgb(var(--accent-solid-hover) / <alpha-value>)'
       },
       fontFamily: {
-        sans: ['Inter', 'Vazirmatn', 'ui-sans-serif', 'system-ui', 'sans-serif']
+        /* The desktop's own face. No bundled brand font for the chrome. */
+        sans: [
+          'system-ui',
+          '-apple-system',
+          'Segoe UI',
+          'Roboto',
+          'Noto Sans',
+          'Helvetica Neue',
+          'Arial',
+          'Vazirmatn',
+          'sans-serif'
+        ]
       },
       // v2.6.4 Fix F: one type scale for the dense UI chrome. Size-only tokens
       // (no line-height) so they swap in for the old arbitrary `text-[Npx]`
@@ -60,9 +71,9 @@ module.exports = {
         '2xs': '11px'
       },
       /*
-       * Brutalist geometry (v4.0). Two radius steps — square, and a hairline micro-round for inputs
-       * and chips. The offset shadows read their colour from the theme, so light and dark each get
-       * an edge that is actually visible on their own background (see main.css).
+       * Desktop geometry (v4.3): three small radius steps (4 / 6 / 8px) and one hairline border.
+       * The shadow utilities still exist so a component cannot fail to compile, but every shadow
+       * token resolves to `none` (see main.css) — depth is not part of this language.
        */
       borderRadius: {
         'shape-sm': 'var(--shape-r-sm)',
@@ -73,15 +84,14 @@ module.exports = {
       borderWidth: {
         shape: 'var(--shape-border)'
       },
-      letterSpacing: {
-        /** The micro-label's tracking. A named token, so no component hard-codes a magic em value. */
-        label: '0.14em'
-      },
+      /*
+       * No tracking token: the redesign removed the uppercase micro-label, so there is no
+       * wide-tracking step left for a component to reach for.
+       */
       boxShadow: {
         shape: 'var(--shape-shadow)',
         'shape-sm': 'var(--shape-shadow-sm)',
-        'shape-accent': 'var(--shape-shadow-accent)',
-        'shape-outline': 'var(--shape-shadow-outline)'
+        'shape-accent': 'var(--shape-shadow-accent)'
       },
       transitionDuration: {
         fast: 'var(--motion-fast)',
