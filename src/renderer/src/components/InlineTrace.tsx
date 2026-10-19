@@ -4,6 +4,7 @@ import { Activity, AlertCircle, CheckCircle2, ChevronDown, ChevronRight } from '
 import DecisionCard from './DecisionCard'
 import { InlineMarkdown, MarkdownProse } from './Markdown'
 import { useStore, type ChatMessage } from '../store'
+import { summarizeStep, type StepSummary, type StepToolFact } from '../lib/step-summary'
 import { summarizeActivity, toolHeadline } from '../lib/tool-labels'
 import type { TraceDecision } from '@shared/trace'
 
@@ -86,6 +87,24 @@ export default function InlineTrace(): JSX.Element | null {
     if (step === undefined) return []
     return toolsByStep.get(`${decision.runId}:${step}`) ?? []
   }
+
+  /**
+   * U3-5: the step's own scan line — what ran, whether it worked, how long it took. The
+   * duration comes from the tool results the step grouped, so it is measured, not inferred.
+   */
+  const toolFact = (message: ChatMessage): StepToolFact => ({
+    ...(message.toolCall?.name ? { name: message.toolCall.name } : {}),
+    ...(message.toolCall?.ok === undefined ? {} : { ok: message.toolCall.ok }),
+    ...(message.toolCall?.command ? { command: message.toolCall.command } : {}),
+    ...(message.toolCall?.path ? { path: message.toolCall.path } : {}),
+    ...(message.toolCall?.serverId ? { serverId: message.toolCall.serverId } : {}),
+    ...(typeof message.toolCall?.durationMs === 'number'
+      ? { durationMs: message.toolCall.durationMs }
+      : {})
+  })
+
+  const summaryFor = (decision: TraceDecision, tools: readonly ChatMessage[]): StepSummary =>
+    summarizeStep(decision, tools.map(toolFact), t)
 
   /*
    * v3.0 clay — soft tier: the trace chip/container is a raised card, and everything
@@ -182,7 +201,7 @@ export default function InlineTrace(): JSX.Element | null {
             const tools = toolsFor(decision)
             return (
               <Fragment key={decision.id}>
-                <DecisionCard compact decision={decision} />
+                <DecisionCard compact decision={decision} summary={summaryFor(decision, tools)} />
                 {/*
                   v2.8.0: the model's own reasoning for this step, when the provider
                   exposes it (DeepSeek `reasoning_content`, Anthropic thinking blocks).

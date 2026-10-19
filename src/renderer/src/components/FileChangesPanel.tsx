@@ -9,6 +9,7 @@ import {
   Database,
   FileText,
   Layers,
+  Maximize2,
   X
 } from 'lucide-react'
 import type { FileChangeView } from '@shared/ui'
@@ -60,9 +61,22 @@ interface FileChangesPanelProps {
 }
 
 /**
- * Codex-style summary of the files an agent edited: per-file +/- stats, a
- * "show more" expansion, a split diff review, and apply/reject-all actions
- * gated by the active approval mode.
+ * Codex-style summary of the files an agent edited: per-file +/- stats, a split diff
+ * review, and apply/reject actions gated by the active approval mode.
+ *
+ * U3-2: the panel is the file-change surface that actually carries the diff bytes, so it
+ * follows the host's three display levels rather than "a collapsed list and a modal":
+ *
+ *   inline    the headline ("Proposed file changes", the totals) and one row per file with
+ *             its own diffstat. The summed totals are printed only for a set of two or more
+ *             files: with one file the row already is the total, and printing it twice makes
+ *             the per-file stat ambiguous. At most two actions, and no destructive one;
+ *   expanded  the diff of the selected file, in place, with its own scroll;
+ *   full screen  the whole change set in a dialog, with previous/next navigation between
+ *             files, the diff at full width, and the destructive actions that were kept out
+ *             of the inline row.
+ *
+ * Esc closes the full-screen view (through `Modal`, which also takes focus and traps Tab).
  */
 export default function FileChangesPanel({ changes }: FileChangesPanelProps): JSX.Element | null {
   const { t } = useTranslation()
@@ -70,14 +84,26 @@ export default function FileChangesPanel({ changes }: FileChangesPanelProps): JS
   const rejectFileChange = useStore((state) => state.rejectFileChange)
   const approvalMode = useStore((state) => state.settings?.approvalMode ?? 'ask')
   const [showAll, setShowAll] = useState(false)
-  const [reviewId, setReviewId] = useState<string | null>(null)
+  const [reviewIndex, setReviewIndex] = useState<number | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
   if (changes.length === 0) return null
 
   const visible = showAll ? changes : changes.slice(0, PREVIEW_LIMIT)
   const hidden = changes.length - visible.length
-  const reviewing = changes.find((change) => change.id === reviewId) ?? null
+  const totals = changes.reduce(
+    (sum, change) => {
+      const stat = diffStat(change.before, change.after)
+      return { added: sum.added + stat.added, removed: sum.removed + stat.removed }
+    },
+    { added: 0, removed: 0 }
+  )
+  const reviewing =
+    reviewIndex === null ? null : (changes[reviewIndex] ?? changes[0] ?? null)
+  // The file's number in the list, so the dialog says "2 / 3" and navigation can wrap.
+  const reviewNumber =
+    reviewing === null ? -1 : changes.findIndex((change) => change.id === reviewing.id)
+  const canNavigate = changes.length > 1
 
   const confirmWrite = (count: number): boolean =>
     approvalMode !== 'ask' ||
@@ -96,36 +122,54 @@ export default function FileChangesPanel({ changes }: FileChangesPanelProps): JS
   }
 
   const rejectAll = async (): Promise<void> => {
+    setReviewIndex(null)
     for (const id of changes.map((change) => change.id)) await rejectFileChange(id)
+  }
+
+  /** Move through the change set without leaving the full-screen view. Wraps at the ends. */
+  const navigate = (delta: number): void => {
+    if (reviewNumber < 0 || !canNavigate) return
+    const next = (reviewNumber + delta + changes.length) % changes.length
+    setReviewIndex(next)
   }
 
   return (
     <div className="mb-2 flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2 px-1">
-        <p className="flex items-center gap-1.5 text-3xs uppercase tracking-wide text-fg-muted">
-          <Layers className="h-3 w-3" />
-          {t('chat.changesTitle')}
-          <span className="text-fg-subtle">({changes.length})</span>
+        {/* U3-2 level 1: the headline and the totals, one line. */}
+        <p className="flex min-w-0 items-center gap-1.5 text-3xs uppercase tracking-wide text-fg-muted">
+          <Layers className="h-3 w-3 shrink-0" />
+          <span className="truncate">{t('chat.changesTitle')}</span>
+          <span className="shrink-0 text-fg-subtle">({changes.length})</span>
+          {/* One file has no separate total: the row below already states its diffstat. */}
+          {changes.length > 1 ? (
+            <span
+              data-testid="file-changes-totals"
+              className="flex shrink-0 items-center gap-1 font-mono text-3xs normal-case"
+            >
+              <span className="text-success">+{totals.added}</span>
+              <span className="text-danger">−{totals.removed}</span>
+            </span>
+          ) : null}
         </p>
+        {/*
+          Two actions at this level, neither of them destructive: reviewing everything, and
+          applying. Reject-all sits in the full-screen view, where it is a deliberate act
+          rather than a misclick next to Apply.
+        */}
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={() => setReviewId(changes[0]?.id ?? null)}
-            className="rounded border border-border px-2 py-0.5 text-3xs text-fg-muted hover:bg-bg-tertiary hover:text-fg"
+            onClick={() => setReviewIndex(0)}
+            className="flex items-center gap-1 rounded border border-border px-2 py-0.5 text-3xs text-fg-muted hover:bg-bg-tertiary hover:text-fg"
           >
-            {t('chat.reviewIndividually')}
-          </button>
-          <button
-            type="button"
-            onClick={() => void rejectAll()}
-            className="rounded border border-border px-2 py-0.5 text-3xs text-fg-muted hover:bg-bg-tertiary hover:text-danger"
-          >
-            {t('chat.rejectAll')}
+            <Maximize2 className="h-3 w-3" />
+            {t('disclosure.reviewAll')}
           </button>
           <button
             type="button"
             onClick={() => void applyAll()}
-            className="rounded bg-accent-solid px-2 py-0.5 text-3xs font-medium text-white hover:bg-accent-solid-hover"
+            className="rounded bg-accent-solid px-2 py-0.5 text-3xs font-medium text-accent-fg hover:bg-accent-solid-hover"
           >
             {t('chat.applyAll')}
           </button>
@@ -133,7 +177,7 @@ export default function FileChangesPanel({ changes }: FileChangesPanelProps): JS
       </div>
 
       <div className="overflow-hidden rounded-lg border border-border bg-bg-secondary">
-        {visible.map((change) => {
+        {visible.map((change, index) => {
           const stat = diffStat(change.before, change.after)
           const isOpen = expanded.has(change.id)
           return (
@@ -161,7 +205,7 @@ export default function FileChangesPanel({ changes }: FileChangesPanelProps): JS
                 </button>
                 <button
                   type="button"
-                  onClick={() => setReviewId(change.id)}
+                  onClick={() => setReviewIndex(index)}
                   className="flex min-w-0 flex-1 items-center gap-2 text-left text-fg hover:text-fg-strong"
                 >
                   <KindIcon path={change.path} className="h-3.5 w-3.5 shrink-0 text-accent" />
@@ -190,13 +234,27 @@ export default function FileChangesPanel({ changes }: FileChangesPanelProps): JS
                   <Check className="h-3.5 w-3.5" />
                 </button>
               </div>
+              {/* U3-2 level 2: this file's diff, in place, scrolled on its own. */}
               {isOpen ? (
-                <div className="max-h-64 overflow-auto border-t border-border">
-                  <DiffViewer
-                    before={change.before}
-                    after={change.after}
-                    language={languageOf(change.path)}
-                  />
+                <div className="border-t border-border">
+                  <div className="flex items-center justify-end px-2 py-0.5">
+                    <button
+                      type="button"
+                      data-testid={`file-change-fullscreen-${change.path}`}
+                      onClick={() => setReviewIndex(index)}
+                      className="flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-3xs text-fg-muted hover:border-accent hover:text-accent"
+                    >
+                      <Maximize2 className="h-3 w-3" />
+                      {t('disclosure.fullScreen')}
+                    </button>
+                  </div>
+                  <div className="max-h-64 overflow-auto">
+                    <DiffViewer
+                      before={change.before}
+                      after={change.after}
+                      language={languageOf(change.path)}
+                    />
+                  </div>
                 </div>
               ) : null}
             </div>
@@ -215,10 +273,11 @@ export default function FileChangesPanel({ changes }: FileChangesPanelProps): JS
         </button>
       ) : null}
 
+      {/* U3-2 level 3: the whole change set, one file at a time, with navigation. */}
       <Modal
-        open={Boolean(reviewing)}
-        onClose={() => setReviewId(null)}
-        maxWidth="min(64rem, 92vw)"
+        open={reviewing !== null}
+        onClose={() => setReviewIndex(null)}
+        maxWidth="min(72rem, 94vw)"
         maxHeight="calc(100vh - 3rem)"
         ariaLabel={reviewing?.path}
         closeOnBackdrop
@@ -226,32 +285,64 @@ export default function FileChangesPanel({ changes }: FileChangesPanelProps): JS
         {reviewing ? (
           <>
             <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
-              <KindIcon path={reviewing.path} className="h-3.5 w-3.5 text-accent" />
+              <KindIcon path={reviewing.path} className="h-3.5 w-3.5 shrink-0 text-accent" />
               <span className="min-w-0 flex-1 truncate font-mono text-xs text-fg" dir="ltr">
                 {reviewing.path}
               </span>
+              <span
+                data-testid="file-review-position"
+                className="shrink-0 font-mono text-3xs text-fg-subtle"
+              >
+                {reviewNumber + 1} / {changes.length}
+              </span>
               <button
                 type="button"
-                onClick={() => setReviewId(null)}
+                data-testid="file-review-previous"
+                onClick={() => navigate(-1)}
+                disabled={!canNavigate}
+                className="shrink-0 rounded border border-border px-1.5 py-0.5 text-3xs text-fg-muted hover:border-accent hover:text-accent disabled:opacity-40"
+              >
+                {t('disclosure.previousFile')}
+              </button>
+              <button
+                type="button"
+                data-testid="file-review-next"
+                onClick={() => navigate(1)}
+                disabled={!canNavigate}
+                className="shrink-0 rounded border border-border px-1.5 py-0.5 text-3xs text-fg-muted hover:border-accent hover:text-accent disabled:opacity-40"
+              >
+                {t('disclosure.nextFile')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setReviewIndex(null)}
                 aria-label={t('common.close')}
-                className="rounded p-1 text-fg-muted hover:bg-bg-tertiary hover:text-fg"
+                className="shrink-0 rounded p-1 text-fg-muted hover:bg-bg-tertiary hover:text-fg"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
             </div>
-            <div className="min-h-0 flex-1 overflow-auto">
+            <div data-testid="file-review-diff" className="min-h-0 flex-1 overflow-auto">
               <DiffViewer
                 before={reviewing.before}
                 after={reviewing.after}
                 language={languageOf(reviewing.path)}
               />
             </div>
-            <div className="flex shrink-0 justify-end gap-2 border-t border-border px-3 py-2">
+            <div className="flex shrink-0 items-center gap-2 border-t border-border px-3 py-2">
+              <button
+                type="button"
+                onClick={() => void rejectAll()}
+                className="rounded border border-border px-3 py-1 text-xs text-fg-muted hover:bg-bg-tertiary hover:text-danger"
+              >
+                {t('chat.rejectAll')}
+              </button>
+              <span className="flex-1" />
               <button
                 type="button"
                 onClick={() => {
                   void rejectFileChange(reviewing.id)
-                  setReviewId(null)
+                  setReviewIndex(null)
                 }}
                 className="rounded border border-border px-3 py-1 text-xs text-fg hover:bg-bg-tertiary hover:text-danger"
               >
@@ -262,10 +353,10 @@ export default function FileChangesPanel({ changes }: FileChangesPanelProps): JS
                 onClick={() => {
                   if (confirmWrite(1)) {
                     void applyFileChange(reviewing.id)
-                    setReviewId(null)
+                    setReviewIndex(null)
                   }
                 }}
-                className="rounded bg-accent-solid px-3 py-1 text-xs font-medium text-white hover:bg-accent-solid-hover"
+                className="rounded bg-accent-solid px-3 py-1 text-xs font-medium text-accent-fg hover:bg-accent-solid-hover"
               >
                 {t('chat.applyChange')}
               </button>

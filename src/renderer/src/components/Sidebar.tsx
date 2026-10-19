@@ -33,6 +33,7 @@ import ProjectBadges from './ProjectBadges'
 import GitStatusPill from './GitStatusPill'
 import { hasPolicyMismatch } from '../lib/project-badge'
 import { isCapabilityEnabled } from '../lib/capabilities'
+import ConnectionTestButton from './ConnectionTest'
 
 const NAV: Array<{ id: ViewId; labelKey: string; icon: typeof MessageSquare }> = [
   { id: 'chat', labelKey: 'sidebar.navChat', icon: MessageSquare },
@@ -529,6 +530,21 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                       <MoreHorizontal className="h-3.5 w-3.5" />
                     </button>
                   </div>
+
+                  {/*
+                    B2-2: this is the sidebar's server state — a remote project whose host is not
+                    connected. The app already knew how to answer "can this computer reach it?";
+                    the answer used to live on the Servers page, which a user staring at this row
+                    has no reason to open. No server selected means no control, not a dead one.
+                  */}
+                  {state === 'disconnected' && project.vpsId ? (
+                    <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1 px-2">
+                      <ConnectionTestButton
+                        serverId={project.vpsId}
+                        testId={`project-connection-test-${project.id}`}
+                      />
+                    </div>
+                  ) : null}
 
                   {projectMenuFor === project.id ? (
                     <>

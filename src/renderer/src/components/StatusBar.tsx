@@ -6,6 +6,7 @@ import {
   Languages,
   MoreHorizontal,
   Server,
+  ShieldAlert,
   ShieldCheck,
   Wallet,
   Zap,
@@ -13,11 +14,21 @@ import {
   WifiOff
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { nextApprovalMode } from '@shared/approval'
 import { useStore } from '../store'
 import { CONNECTION_TONE_CLASS, useConnectionStatus } from '../lib/connection-status'
 import { budgetState, readBudget } from '../lib/budget'
 import { uiModeLabelKey } from '../lib/ui-mode'
+import { deriveRunAccess, type RunAccessMode } from '../lib/run-access'
+import { vpsServerName } from '../lib/vps-state'
+import ConnectionTestButton from './ConnectionTest'
+
+/** Tone per access mode: full access is the one that must look like a warning. */
+const ACCESS_TONE: Record<RunAccessMode, string> = {
+  plan: 'text-accent',
+  ask: 'text-fg-muted',
+  'auto-write': 'text-fg-muted',
+  full: 'text-danger'
+}
 
 /** `ok: null` renders the neutral "unknown" dot (v2.7.0). */
 function Dot({ ok }: { ok: boolean | null }): JSX.Element {
@@ -33,7 +44,7 @@ function Dot({ ok }: { ok: boolean | null }): JSX.Element {
  * actually answer "can I run, with what, and how?":
  *
  *   1. the agent's state          2. the model
- *   3. the run mode (ask/auto)    4. the workspace / server in use
+ *   3. what the run may do       4. the workspace / server in use
  *
  * Everything else (spend cap, worker queue, CPU/RAM limits, session id, language and
  * the online/offline switch) moved into a menu that opens on **right-click** on the
@@ -64,6 +75,36 @@ export default function StatusBar(): JSX.Element {
   const uiMode = useStore((state) => state.uiMode)
   const setUiMode = useStore((state) => state.setUiMode)
   const connection = useConnectionStatus()
+  const settings = useStore((state) => state.settings)
+  /*
+   * U3-4: one item says what the next run may do. `deriveRunAccess` reads `planMode`,
+   * `settings.approvalMode` and the active project — the same state the run itself is built
+   * from — so the footer cannot describe a mode the agent is not in.
+   */
+  const planMode = useStore((state) => state.planMode)
+  const vpsServers = useStore((state) => state.vpsServers)
+  const activeProject = settings?.projects.find(
+    (project) => project.id === settings.activeProjectId
+  )
+  const accessProject = activeProject
+    ? {
+        type: activeProject.type === 'remote' ? ('remote' as const) : ('local' as const),
+        vpsId: activeProject.vpsId
+      }
+    : undefined
+  const accessServer =
+    activeProject?.type === 'remote'
+      ? (vpsServerName(vpsServers, activeProject.vpsId) ?? activeProject.vpsId)
+      : undefined
+  const access = deriveRunAccess({
+    planMode,
+    approvalMode,
+    project: accessProject,
+    serverName: accessServer
+  })
+  const accessTitle = access.titleKeys
+    .map((key) => t(key, { server: access.serverName ?? '' }))
+    .join(' ')
   const usageRecords = useStore((state) => state.usageRecords)
   /*
    * v3.1: the spend guard's read-out. Recomputed from the recorded calls rather than stored, so
@@ -150,23 +191,30 @@ export default function StatusBar(): JSX.Element {
           </span>
         </span>
 
-        {/* 3. The run mode, still switchable where it is shown. */}
-        <button
-          type="button"
-          data-testid="status-item-mode"
-          onClick={() => {
-            void useStore.getState().setApprovalMode(nextApprovalMode(approvalMode))
-          }}
-          title={t('settings.approvalMode')}
-          className={`flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 ${
-            approvalMode === 'full'
-              ? 'text-danger hover:bg-bg-tertiary'
-              : 'hover:bg-bg-tertiary hover:text-fg'
-          }`}
+        {/*
+          3. U3-4: what this run may do right now — the mode and the access level, plus whether
+          it applies to a local or a remote project. One item, because the reader wants one
+          answer; the sentence that explains it is the tooltip. The label truncates instead of
+          wrapping, so a long project never pushes the other items out of the bar.
+        */}
+        <span
+          data-testid="status-item-access"
+          data-scope={access.scope}
+          data-mode={access.mode}
+          className={`flex min-w-0 shrink items-center gap-1 ${ACCESS_TONE[access.mode]}`}
+          title={accessTitle}
         >
-          {approvalMode === 'full' ? <Zap className="h-3 w-3" /> : <ShieldCheck className="h-3 w-3" />}
-          {approvalMode}
-        </button>
+          {access.mode === 'full' ? (
+            <Zap className="h-3 w-3 shrink-0" />
+          ) : access.mode === 'plan' ? (
+            <ShieldAlert className="h-3 w-3 shrink-0" />
+          ) : (
+            <ShieldCheck className="h-3 w-3 shrink-0" />
+          )}
+          <span className="max-w-[14rem] truncate" data-testid="status-access-label">
+            {t(access.scopeKey)} · {t(access.modeKey)}
+          </span>
+        </span>
 
         {/* 4. The workspace or server this run will work in. */}
         <span
@@ -187,6 +235,19 @@ export default function StatusBar(): JSX.Element {
           <span className="truncate">{t(connection.labelKey)}</span>
           {connection.detail ? (
             <span className="max-w-[12rem] truncate text-fg-muted">· {connection.detail}</span>
+          ) : null}
+          {/*
+            B2-2: the item that reports the remote connection is where a connection problem is
+            felt, so the test is reachable from it. Absent when there is no server to test (a
+            local workspace) or nothing wrong with it — never disabled and silent.
+          */}
+          {connection.serverId &&
+          (connection.kind === 'error' || connection.kind === 'disconnected') ? (
+            <ConnectionTestButton
+              serverId={connection.serverId}
+              compact
+              testId="status-connection-test"
+            />
           ) : null}
         </span>
 
