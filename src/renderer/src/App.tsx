@@ -25,13 +25,12 @@ import Titlebar from './components/Titlebar'
 import WorkspacePanel from './components/WorkspacePanel'
 import ToastHost from './components/ToastHost'
 import { basename, subscribeToEvents, useStore } from './store'
-import { keepAliveIds, readLastVpsId, remoteVpsIds, resolveReconnectId } from './lib/vps-state'
+import { readLastVpsId, remoteVpsIds, resolveReconnectId } from './lib/vps-state'
+import { keepAlivePass, VPS_KEEPALIVE_INTERVAL_MS } from './lib/vps-keepalive'
 import { topmostEscapeTarget } from './lib/escape'
 import { resolveLayout } from './lib/layout'
 import { isCapabilityEnabled } from './lib/capabilities'
 
-/** Retry interval for a selected-but-dropped VPS connection. */
-const VPS_KEEPALIVE_MS = 30_000
 /** How often the global background-job poll runs (v2.6.2 T5.2). */
 const JOBS_POLL_MS = 10_000
 
@@ -99,27 +98,23 @@ export default function App(): JSX.Element {
 
     const keepalive = async (): Promise<void> => {
       const { vpsServerId, vpsConnected, settings, ensureVpsConnected } = useStore.getState()
-      // v2.8.0: keep every connected server alive, not only the remote-project hosts
-      // and the header selection. A server connected by hand in the Servers view got
-      // no keep-alive and was really reaped after 30 minutes — the other half of "the
-      // others need reconnecting".
-      for (const id of keepAliveIds(settings?.projects ?? [], vpsServerId, vpsConnected)) {
-        // `ensureVpsConnected` is a no-op when already connected, so this keeps
-        // every remote project's host up without touching the selection.
-        if (vpsConnected.includes(id)) {
-          // v2.6.5: an open project is in use even while the agent is idle, so the
-          // 30-minute idle watchdog used to reap it and this loop reconnected it —
-          // a reconnect every ~30 min per idle project, plus a brief "missing"
-          // state in the UI. Refresh the activity stamp instead.
-          void window.api.vps.keepAlive(id).catch(() => undefined)
-        } else {
-          await ensureVpsConnected(id)
-        }
-      }
+      // R3: ping EVERY server main reports as connected, not only the remote projects and the
+      // header selection. A hand-connected server the UI never selected used to get no ping and was
+      // really reaped after 30 minutes; a server that is not connected but that a project depends on
+      // is brought up instead. The pass itself is pure and tested (`lib/vps-keepalive.ts`).
+      await keepAlivePass({
+        projects: settings?.projects ?? [],
+        selectedVpsId: vpsServerId,
+        connected: vpsConnected,
+        ping: async (id) => {
+          await window.api.vps.keepAlive(id)
+        },
+        connect: (id) => ensureVpsConnected(id)
+      })
     }
 
     void boot().then(() => {
-      if (!cancelled) timer = setInterval(() => void keepalive(), VPS_KEEPALIVE_MS)
+      if (!cancelled) timer = setInterval(() => void keepalive(), VPS_KEEPALIVE_INTERVAL_MS)
     })
     return () => {
       cancelled = true

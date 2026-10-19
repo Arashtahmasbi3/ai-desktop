@@ -86,6 +86,32 @@ function mentions(text: string, ...needles: string[]): boolean {
   return needles.some((needle) => haystack.includes(needle))
 }
 
+/**
+ * The phrases a dropped SSH session really leaves behind (R1/R2).
+ *
+ * One list, in one place, because two very different callers have to agree on it: this table (what
+ * the stop card says) and the one-reconnect wrapper (`session-liveness-executor.ts`, what the app
+ * does about it). A second copy is how "the output matches no known failure pattern" comes back.
+ */
+const SESSION_DROPPED_PHRASES = [
+  'not connected',
+  'remote_error',
+  'channel closed',
+  'econnreset',
+  'client not connected',
+  'sock closed'
+] as const
+
+/**
+ * True when this text says the SSH session to that server is gone (R2). Case-insensitive and
+ * ANSI-tolerant, like every matcher in this table. Exported so the loop detector (R4) can share
+ * it without a cycle: this module imports only `@shared/agent` types.
+ */
+export function matchesSessionDropped(text: string): boolean {
+  const haystack = plain(text).toLowerCase()
+  return SESSION_DROPPED_PHRASES.some((phrase) => haystack.includes(phrase))
+}
+
 /** False only when the run recorded no failure detail at all — the genuine "no error" case. */
 function hasFailureText(evidence: VerdictEvidence): boolean {
   return evidence.text.trim() !== '' || (evidence.failures ?? 0) > 0
@@ -181,6 +207,7 @@ function hostProvenUp(text: string): boolean {
  * | 95     | a credential was refused   | the output names the identity; nothing else can be the cause |
  * | 92     | a privilege was refused    | the command was right, this identity may not run it        |
  * | 90     | storage or toolchain       | the machine said exactly what is missing                   |
+ * | 88     | the session is gone       | nothing ran, so nothing the command printed can explain it; it still loses to the 90+ tier where the output names the application fault |
  * | 80     | the name did not resolve   | nothing downstream can be trusted when the name is wrong   |
  * | 78     | the block is above the host | the host answered, so no rule on it can be the cause       |
  * | 77     | the port dropped, unproven  | nobody proved the host up, so nothing above it can be blamed |
@@ -316,6 +343,21 @@ export const VERDICT_PATTERNS: readonly VerdictPattern[] = [
         /([\w.+-]+)(?::| is)? not installed/i
       ]
     }
+  },
+  /*
+   * R2: the failure the screenshots actually showed. Every remote tool failed in 0.00-0.01 s
+   * with `Not connected` while the header, the banner and the tree all claimed a connection, and
+   * the stop card said "no specific cause". A gone session is a decisive client-side fact -
+   * nothing ran, so no application error can explain it. It ranks above the network hypotheses
+   * below (those describe how a connect attempt went) and below the 90+ tier, where the output
+   * itself names the application fault: when a pile contains both, the sharper app cause wins.
+   */
+  {
+    id: 'session-dropped',
+    weight: 88,
+    causeKey: 'verdict.causeSessionDropped',
+    nextStepKey: 'verdict.nextSessionDropped',
+    matches: ({ text }) => matchesSessionDropped(text)
   },
   {
     id: 'dns-lookup-failed',

@@ -113,6 +113,12 @@ export type LoopWarningKind =
   | 'failure_streak'
   | 'reasoning_loop'
   | 'turn_timeout'
+  /**
+   * R4: the session to the server was already gone (`Not connected`, `remote_error`, …), so the
+   * tool never reached the host. It is its own reason because the honest answer is neither "it made
+   * no progress" nor "it repeated itself": there was nothing to progress on and nothing to repeat.
+   */
+  | 'session_dropped'
 
 export interface LoopWarning {
   kind: LoopWarningKind

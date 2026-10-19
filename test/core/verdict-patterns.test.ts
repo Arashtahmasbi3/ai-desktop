@@ -178,6 +178,15 @@ const SAMPLES: Sample[] = [
     nextStepKey: 'verdict.nextRepeatedEvidence'
   },
   {
+    // R2: the exact failure from the screenshots. Nothing ran, so no application error can
+    // explain it; the row has to be named or the card says "no known failure pattern".
+    id: 'session-dropped',
+    label: 'remote tools that never ran because the SSH session was gone',
+    text: 'remote_list_dir failed: Not connected\nstderr: Not connected',
+    causeKey: 'verdict.causeSessionDropped',
+    nextStepKey: 'verdict.nextSessionDropped'
+  },
+  {
     id: 'upstream-blocked',
     label: 'a ping that answered, a dropped port and sshd listening on the target',
     text: UPSTREAM,
@@ -605,6 +614,53 @@ describe('matching survives the shape real output has', () => {
   })
 })
 
+describe('R2 - a dropped session is a row, not "no known failure pattern"', () => {
+  /** The real strings from the screenshots: the app's own words and the transport's. */
+  const DROPPED = [
+    'remote_list_dir failed: Not connected',
+    'stderr: Not connected',
+    'remote_shell failed: remote_error',
+    'ssh2: channel closed',
+    'Error: read ECONNRESET',
+    'Client not connected',
+    'sock closed'
+  ]
+
+  it('resolves every real dropped-session string to this row', () => {
+    for (const text of DROPPED) {
+      const verdict = diagnose({ text, failures: 1, steps: 2 })
+      expect(verdict.patternId, text).toBe('session-dropped')
+      expect(verdict.causeKey, text).toBe('verdict.causeSessionDropped')
+      expect(verdict.nextStepKey, text).toBe('verdict.nextSessionDropped')
+    }
+  })
+
+  it('names the server session, not the command, as the cause', () => {
+    const row = pattern('session-dropped')
+    expect(row.matches({ text: 'Not connected' })).toBe(true)
+    expect(row.matches({ text: 'ssh: connect to host x port 22: Connection refused' })).toBe(false)
+  })
+
+  it('keeps the sharper application cause when the pile also contains one', () => {
+    const pile = DROPPED.join('\n') + '\n' + DISK_FULL
+    // Both rows really match: the session was gone AND the disk filled up.
+    expect(pattern('session-dropped').matches({ text: pile })).toBe(true)
+    expect(pattern('disk-full').matches({ text: pile })).toBe(true)
+    expect(pattern('disk-full').weight).toBeGreaterThan(pattern('session-dropped').weight)
+    expect(diagnose({ text: pile, failures: 3, steps: 4 }).patternId).toBe('disk-full')
+    // The weight, not the declaration order, is what decides: either order gives the same answer.
+    const pair = [pattern('session-dropped'), pattern('disk-full')]
+    expect(resolve(pair, { text: pile })?.id).toBe('disk-full')
+    expect(resolve([...pair].reverse(), { text: pile })?.id).toBe('disk-full')
+  })
+
+  it('still claims nothing when the evidence names no cause', () => {
+    const verdict = diagnose({ text: 'The model returned an empty response', failures: 1 })
+    expect(verdict.patternId).toBeUndefined()
+    expect(verdict).toEqual({ ...FALLBACK_VERDICT })
+  })
+})
+
 describe('the queued advice says the right thing for each class', () => {
   const EN_SNIPPET = '../i18n/verdict-en.json'
   const FA_SNIPPET = '../i18n/verdict-fa.json'
@@ -616,6 +672,9 @@ describe('the queued advice says the right thing for each class', () => {
   // reviewed on its own.
   const EN_SNIPPET_3 = '../i18n/drift-en.json'
   const FA_SNIPPET_3 = '../i18n/drift-fa.json'
+  // The fourth merge batch: the dropped-session row (R2), staged the same way.
+  const EN_SNIPPET_4 = '../i18n/liveness2-en.json'
+  const FA_SNIPPET_4 = '../i18n/liveness2-fa.json'
   const EN_LOCALE_FILE = 'src/renderer/src/i18n/en.json'
   const FA_LOCALE_FILE = 'src/renderer/src/i18n/fa.json'
 
@@ -641,8 +700,8 @@ describe('the queued advice says the right thing for each class', () => {
   function translate(locale: 'en' | 'fa', key: string): string | undefined {
     const sources: string[] =
       locale === 'en'
-        ? [EN_LOCALE_FILE, EN_SNIPPET, EN_SNIPPET_2, EN_SNIPPET_3]
-        : [FA_LOCALE_FILE, FA_SNIPPET, FA_SNIPPET_2, FA_SNIPPET_3]
+        ? [EN_LOCALE_FILE, EN_SNIPPET, EN_SNIPPET_2, EN_SNIPPET_3, EN_SNIPPET_4]
+        : [FA_LOCALE_FILE, FA_SNIPPET, FA_SNIPPET_2, FA_SNIPPET_3, FA_SNIPPET_4]
     for (const source of sources) {
       if (!existsSync(join(process.cwd(), source))) continue
       let node: unknown = readJson(source)
@@ -676,7 +735,8 @@ describe('the queued advice says the right thing for each class', () => {
     for (const [enRelative, faRelative] of [
       [EN_SNIPPET, FA_SNIPPET],
       [EN_SNIPPET_2, FA_SNIPPET_2],
-      [EN_SNIPPET_3, FA_SNIPPET_3]
+      [EN_SNIPPET_3, FA_SNIPPET_3],
+      [EN_SNIPPET_4, FA_SNIPPET_4]
     ] as const) {
       const en = join(process.cwd(), enRelative)
       const fa = join(process.cwd(), faRelative)
@@ -776,6 +836,21 @@ describe('the queued advice says the right thing for each class', () => {
     const text = translate('fa', 'verdict.causeFiltered') ?? ''
     expect(text).toMatch(/[\u0600-\u06FF]/)
     expect(text).not.toBe(translate('en', 'verdict.causeFiltered'))
+  })
+
+  it('names the two actions for a dropped session: reconnect and retry, or another server', () => {
+    const text = translate('en', 'verdict.nextSessionDropped') ?? ''
+    expect(text).toMatch(/reconnect/i)
+    expect(text).toMatch(/retry/i)
+    expect(text).toMatch(/another server/i)
+  })
+
+  it('ships the dropped-session row in Persian too, not English in a Persian costume', () => {
+    for (const key of ['verdict.causeSessionDropped', 'verdict.nextSessionDropped']) {
+      const fa = translate('fa', key) ?? ''
+      expect(fa, key).toMatch(/[\u0600-\u06FF]/)
+      expect(fa, key).not.toBe(translate('en', key))
+    }
   })
 })
 

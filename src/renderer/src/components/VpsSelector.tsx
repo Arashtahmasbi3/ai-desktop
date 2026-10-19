@@ -2,12 +2,17 @@ import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { PlugZap, Server } from 'lucide-react'
 import { useStore } from '../store'
-import { vpsIndicator } from '../lib/vps-state'
+import { isServerConnected, serverConnectionState } from '../lib/connection-status'
 
 /**
  * Compact VPS picker for the chat header. The selected server is passed to the
  * agent run so its `remote_shell` tool targets an explicit, connected host.
  * Reads the shared VPS state so it stays in sync with every other surface.
+ *
+ * R5: the dot beside each listed server comes from the **per-server** state map
+ * (`vpsStates`), never from the singular `vpsStatus` slot — that slot names
+ * whichever server changed last, so with two connections it painted one server
+ * green and the other grey.
  */
 export default function VpsSelector(): JSX.Element {
   const { t } = useTranslation()
@@ -15,7 +20,7 @@ export default function VpsSelector(): JSX.Element {
   const setVpsServerId = useStore((state) => state.setVpsServerId)
   const running = useStore((state) => state.running)
   const servers = useStore((state) => state.vpsServers)
-  const status = useStore((state) => state.vpsStatus)
+  const vpsStates = useStore((state) => state.vpsStates)
   const connected = useStore((state) => state.vpsConnected)
   const refreshVps = useStore((state) => state.refreshVps)
 
@@ -23,7 +28,22 @@ export default function VpsSelector(): JSX.Element {
     void refreshVps()
   }, [refreshVps])
 
-  const indicator = vpsIndicator(vpsServerId, status, connected)
+  // The selected server's own fact. The connected set is only a seed for a server whose first
+  // liveness event has not arrived yet; an explicit state always wins, so a disconnect shows here
+  // in the same tick it arrives instead of waiting for the next refresh.
+  const selectedState = vpsServerId
+    ? { ...serverConnectionState(vpsServerId, vpsStates, connected), serverId: vpsServerId }
+    : undefined
+  const indicator =
+    selectedState === undefined
+      ? 'off'
+      : selectedState.status === 'connected'
+        ? 'connected'
+        : selectedState.status === 'connecting'
+          ? 'connecting'
+          : selectedState.status === 'error'
+            ? 'error'
+            : 'disconnected'
 
   return (
     <div className="flex items-center gap-1">
@@ -44,7 +64,7 @@ export default function VpsSelector(): JSX.Element {
         {servers.map((server) => (
           <option key={server.id} value={server.id}>
             {server.name}
-            {status.status === 'connected' && status.serverId === server.id ? ' 🟢' : ''}
+            {isServerConnected(server.id, vpsStates, connected) ? ' 🟢' : ''}
           </option>
         ))}
       </select>

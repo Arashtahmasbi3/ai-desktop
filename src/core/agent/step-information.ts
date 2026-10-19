@@ -16,6 +16,9 @@
  *  - **lessons** — what the output means, in the verdict table's own vocabulary
  *    ({@link evidenceSignature}): the cause it names and the ports whose state it reports. A step
  *    that produces no new lesson has contributed nothing to the failure evidence.
+ *  - **infrastructure** — R4: true when a result is the app reporting a dead session (`Not
+ *    connected`) rather than an answer. That is neither a probe's answer nor a lesson, and the loop
+ *    detector stops the run on it instead of miscounting it as drift.
  *
  * `probeOnly` is the switch between the two regimes. A step made purely of read-only probes is
  * judged by what it learned, because that is the activity that was burning the run. A step that
@@ -26,6 +29,7 @@ import { createHash } from 'node:crypto'
 import type { AgentAction, AgentToolResult } from '@shared/agent'
 import { isReadOnlyShellCommand } from '@core/remote/command-whitelist'
 import { computeLoopHash } from './loop-detector'
+import { isInfrastructureFailure } from './session-failure'
 import { evidenceSignature } from './verdict'
 
 /** Tools whose identity is the command they run, so a probe can be repeated or not. */
@@ -53,6 +57,13 @@ export interface StepInformation {
   lessons: string[]
   /** True when every action in the step was a read-only shell probe. */
   probeOnly: boolean
+  /**
+   * R4: true when any observation in the step is the app reporting a dead session
+   * ({@link isInfrastructureFailure}) instead of an answer. Such a step is neither progress nor
+   * "no new information": the command never reached the host, so there is nothing to learn from it
+   * and nothing to repeat. The loop detector stops the run on the first one.
+   */
+  infrastructure: boolean
 }
 
 /** The output as a reader sees it: no colour codes, no insignificant whitespace. */
@@ -107,6 +118,7 @@ export function informationOfStep(
   const probes: StepProbe[] = []
   const lessons = new Set<string>()
   let probeOnly = actions.length > 0
+  let infrastructure = false
 
   for (const action of actions) {
     const probe = isReadOnlyProbe(action)
@@ -114,6 +126,27 @@ export function informationOfStep(
     const result = observations.find((candidate) => candidate.actionId === action.id)
     if (!result) continue
     const text = observationText(result)
+    /*
+     * R4: a card that says `Not connected` is the app reporting a dead session, not the probe's
+     * answer. Counting it as a probe would put a fake answer ("Not connected") into the digest map,
+     * and counting its text as a lesson would let it reset the drift counter — which is how a run
+     * that never reached the host was once described as re-running probes it had already answered.
+     * It is neither: the step is flagged and the loop detector stops the run on it.
+     *
+     * A *refusal* is not a dead session, and must not stop the run: a local tool refused because the
+     * active project's VPS is offline (`code: 'blocked'`) also mentions "not connected", but its text
+     * is an explanation the model is meant to act on ("do not attempt local file operations"), not a
+     * tool that ran and found nothing. The same goes for a redirect.
+     *
+     * Nor is a *successful* result whose output happens to contain the phrase: `grep -rn "Not
+     * connected" /var/log/app.log` answered the question, and stopping on it would be a false
+     * positive. An infrastructure failure is a failed result, by definition.
+     */
+    const refused = result.blocked === true || result.code === 'blocked' || result.code === 'redirect'
+    if (!refused && !result.ok && isInfrastructureFailure(text)) {
+      infrastructure = true
+      continue
+    }
     if (probe) probes.push({ signature: computeLoopHash(action.name, action.arguments), digest: outputDigest(text) })
     for (const signal of evidenceSignature(text)) lessons.add(signal)
   }
@@ -122,6 +155,7 @@ export function informationOfStep(
     probes,
     lessons: [...lessons],
     // A step with no actions (a final answer) is not a probing step.
-    probeOnly: probeOnly && probes.length > 0
+    probeOnly: probeOnly && probes.length > 0,
+    infrastructure
   }
 }

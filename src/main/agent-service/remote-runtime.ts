@@ -11,13 +11,20 @@ import { RemoteFsToolExecutor } from '@core/tools/remote-fs-executor'
 import { REMOTE_SHELL_TOOL, type RemoteJobRunner } from '@core/tools/remote-shell-tool'
 import { RemoteShellToolExecutor } from '@core/tools/remote-shell-executor'
 import { wrapServerRefRoutes } from '@core/tools/server-ref-executor'
+import { SessionLivenessExecutor } from '@core/tools/session-liveness-executor'
 import { LIST_SERVERS_TOOL, ListServersToolExecutor, type ServerSummary } from '@core/tools/server-tools'
 import { ToolsetBuilder, type ToolGroup } from '@core/tools/toolset'
 import type { AuditEntry } from '@core/agent/audit-log'
 import type { DiagnosticPolicy } from '@core/remote/diagnostic-policy'
 import type { ToolDefinition } from '@shared/types'
 import type { ProjectRecord } from '@shared/ui'
-import type { RemoteFileEntry, ReachabilityReport, VpsExecResult } from '@shared/vps'
+import type {
+  RemoteFileEntry,
+  ReachabilityReport,
+  VpsExecResult,
+  VpsReconnectOutcome
+} from '@shared/vps'
+import type { ServerPinReason } from '../ssh/pins'
 import { planV24Tools, enabledV24ToolNames } from '../v24-tools-wiring'
 
 /**
@@ -76,11 +83,35 @@ export interface RemoteReachabilityHost {
   }): Promise<ReachabilityReport | undefined>
 }
 
+/**
+ * R3: the SSH manager's pin surface, so a run can keep its server's session alive. Both methods are
+ * optional, so a fake host in a test stays a two-method object; when present, `AgentService` holds
+ * the run's server for the lifetime of the run — a run waiting on a slow model or on an approval
+ * cannot have its session idled out from under it.
+ */
+export interface RemoteLivenessHost {
+  pin?(serverId: string, reason: ServerPinReason, detail?: string): void
+  unpin?(serverId: string, reason: ServerPinReason): void
+}
+
+/**
+ * R1: the one bounded reconnect a remote tool may ask for when it finds its session gone.
+ *
+ * Optional on purpose: a host without it (most tests, older wiring) plans exactly the tools it
+ * did before this existed.
+ */
+export interface RemoteReconnectHost {
+  reconnectOnce?(serverId: string, reason: string): Promise<VpsReconnectOutcome>
+}
+
 export type RemoteHost = RemoteShellHost &
   Partial<RemoteFsHost> &
   Partial<RemoteServerResolver> &
   Partial<RemoteServerList> &
-  Partial<RemoteReachabilityHost>
+  Partial<RemoteReachabilityHost> &
+  Partial<RemoteReconnectHost> &
+  RemoteLivenessHost
+
 /** Keywords that make the agent reach for `remote_shell` on a default chat. */
 const VPS_KEYWORDS = /\b(vps|ssh|server|remote|سرور|ریموت)\b/i
 
@@ -90,6 +121,11 @@ export interface RemoteRuntime {
   systemHint?: string
   /** Remote-first routing for local file/shell tools (v2.3.2, A.1). */
   toolRouting?: (toolName: string, args: Record<string, unknown>) => RoutingDecision
+  /**
+   * R3: the saved server this run is bound to, when it resolved one. Not an orchestrator option —
+   * `AgentService` reads it to pin the session for the run and releases the pin in its `finally`.
+   */
+  serverId?: string
 }
 /**
  * F0-2c / F0-3: extra groups (MCP servers, skills) as runtime fields, for the one path through
@@ -269,15 +305,21 @@ export function planRemoteRuntime(
   if (!target) return tools.build({ executor: extras })
 
   if (!connected.includes(target)) {
+    /*
+     * R3: the run is bound to this server even though its session is down. `AgentService` pins it
+     * for the run's lifetime, so if the session comes back (a reconnect, or the user connecting it
+     * while the model is still working) the reaper cannot take it away again mid-run.
+     */
     if (wants) {
       return {
         ...tools.build({ executor: extras }),
+        serverId: target,
         systemHint:
           `The selected VPS "${target}" is not connected. Tell the user to add or connect it ` +
           'in Settings -> Connections, then retry.'
       }
     }
-    return tools.build({ executor: extras })
+    return { ...tools.build({ executor: extras }), serverId: target }
   }
   const shellTool: ToolDefinition = {
     ...REMOTE_SHELL_TOOL,
@@ -425,23 +467,41 @@ export function planRemoteRuntime(
    */
   const foreignRoute = (route: ToolRoute): boolean =>
     [...route.names].every((name) => name.startsWith('mcp__'))
+  /*
+   * R1: every one of our remote tools that finds its session gone gets exactly ONE reconnect,
+   * and the outcome is reported with the failure. The wrapper sits inside the ref resolver below,
+   * so it sees the canonical server id, and it never re-runs the tool: the next call runs on the
+   * live session, which is what makes "never a second silent retry" true by construction.
+   */
+  const reconnect = vps.reconnectOnce?.bind(vps)
+  const withLiveness = (candidates: readonly ToolRoute[]): ToolRoute[] =>
+    reconnect === undefined
+      ? [...candidates]
+      : candidates.map((route) => ({
+          names: route.names,
+          executor: new SessionLivenessExecutor(route.executor, {
+            reconnect,
+            isConnected: (serverId) => vps.connectedServers().includes(serverId),
+            ...(target ? { fallbackServerId: target } : {})
+          })
+        }))
+  const ownedRoutes = withLiveness(routes.filter((route) => !foreignRoute(route)))
   const routable =
     typeof vps.listServers === 'function'
       ? [
-          ...wrapServerRefRoutes(
-            routes.filter((route) => !foreignRoute(route)),
-            {
-              listServers: () => vps.listServers!(),
-              connectedServers: () => vps.connectedServers()
-            }
-          ),
+          ...wrapServerRefRoutes(ownedRoutes, {
+            listServers: () => vps.listServers!(),
+            connectedServers: () => vps.connectedServers()
+          }),
           ...routes.filter(foreignRoute)
         ]
-      : routes
+      : ownedRoutes
   const executor: ToolExecutor =
-    routable.length === 1 && routes.length === 1
+    routable.length === 1 && routes.length === 1 && reconnect === undefined
       ? shellExecutor
-      : new CompositeToolExecutor(routable)
+      : routable.length === 1
+        ? routable[0]!.executor
+        : new CompositeToolExecutor(routable)
 
-  return tools.build({ systemHint: hint, executor })
+  return { ...tools.build({ systemHint: hint, executor }), serverId: target }
 }

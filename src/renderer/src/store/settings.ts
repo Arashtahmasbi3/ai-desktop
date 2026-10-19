@@ -8,6 +8,7 @@ import {
 import { appendUsage, saveUsage } from '../lib/usage'
 import type { UsageRecord } from '../lib/usage'
 import { VPS_RECONNECT_KEY } from '../lib/vps-state'
+import type { VpsConnectionState } from '@shared/vps'
 import { newId, basename } from './helpers'
 import type { StoreSet, StoreGet } from './helpers'
 import { rememberChatId } from './prefs'
@@ -58,6 +59,25 @@ function chatScopedReset(): Partial<AppState> {
   }
 }
 
+/**
+ * R5: seed the per-server map from the connected set without ever overwriting a fact.
+ *
+ * `vpsStates` is the source of truth for "which servers are connected"; the set main reports is
+ * only a seed for a server that has not had a liveness event yet (right after a restart, or
+ * before its first transition). A known entry always wins, so an error or a disconnect is never
+ * repainted as connected by a refresh.
+ */
+function seedConnectedStates(
+  states: Record<string, VpsConnectionState>,
+  connected: readonly string[]
+): Record<string, VpsConnectionState> {
+  const seeded = { ...states }
+  for (const id of connected) {
+    if (seeded[id] === undefined) seeded[id] = { status: 'connected', serverId: id }
+  }
+  return seeded
+}
+
 export function settingsActions(
   set: StoreSet,
   get: StoreGet
@@ -74,6 +94,7 @@ export function settingsActions(
   | 'connectVps'
   | 'disconnectVps'
   | 'setVpsStatus'
+  | 'applyVpsLiveness'
   | 'openSettings'
   | 'openSettingsTab'
   | 'closeSettings'
@@ -169,7 +190,12 @@ export function settingsActions(
         } catch {
           // Older bridge or transient failure: fall back to the single status.
         }
-        set({ vpsServers: servers, vpsStatus: status, vpsConnected: connected })
+        set({
+          vpsServers: servers,
+          vpsStatus: status,
+          vpsConnected: connected,
+          vpsStates: seedConnectedStates(get().vpsStates, connected)
+        })
       } catch {
         set({ vpsServers: [], vpsStatus: { status: 'disconnected' }, vpsConnected: [] })
       }
@@ -244,6 +270,16 @@ export function settingsActions(
         const concernsSelection = !serverId || !state.vpsServerId || state.vpsServerId === serverId
         return { vpsStates, ...(concernsSelection ? { vpsStatus: status } : {}) }
       }),
+
+    /**
+     * R1: apply one per-server liveness transition, in the same tick it arrives.
+     *
+     * The event names the server, so no surface has to guess from the singular slot which server
+     * changed. `vpsStatus` is still written for the one release it has left (see the deprecated
+     * field in `types.ts`); nothing new may read it.
+     */
+    applyVpsLiveness: (event) =>
+      get().setVpsStatus({ ...event.state, serverId: event.serverId }),
 
     openSettings: () => set({ settingsOpen: true, settingsTab: null }),
 

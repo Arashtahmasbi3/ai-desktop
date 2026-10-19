@@ -297,6 +297,8 @@ export function applyLoopVerdict(
     failures: input.failures,
     newAction: input.newAction,
     information: input.information,
+    // R4: one `Not connected` card is enough to stop the run for the session that is gone.
+    infrastructure: input.information.infrastructure,
     ...(input.reasoningSignature ? { reasoningSignature: input.reasoningSignature } : {}),
     ...(input.observations.some((result) => result.code === 'redirect') ? { redirected: true } : {})
   })

@@ -14,11 +14,20 @@ import type {
   ReachabilityReport,
   RemoteFileEntry,
   VpsConnectionState,
-  VpsExecResult
+  VpsExecResult,
+  VpsLivenessEvent,
+  VpsReconnectOutcome
 } from '@shared/vps'
 import { observeServerReachability } from '../reachability'
 import { evaluateHostKey, fingerprintFromKey } from './host-key-verify'
 import type { SftpEntry, SshBackend, SshConnection } from './backend'
+import {
+  DEFAULT_MANUAL_LEASE_MS,
+  PinRegistry,
+  type PinChange,
+  type ServerPin,
+  type ServerPinReason
+} from './pins'
 import { TerminalSession } from './terminal-session'
 import type { VpsServerStore } from './server-store'
 
@@ -68,8 +77,24 @@ export interface SshManagerOptions {
   idleTimeoutMs?: number
   now?: () => number
   onStatus?: (state: VpsConnectionState) => void
+  /**
+   * R1: per-server liveness, on every real transition. It carries the server id as its own
+   * field, so a consumer can update ONE server fact instead of reading the last-writer-wins
+   * `getState()` snapshot.
+   */
+  onLiveness?: (event: VpsLivenessEvent) => void
   onData?: (sessionId: string, chunk: string) => void
   readKeyFile?: (path: string) => Promise<Buffer>
+  /**
+   * R3: the dependency facts this layer cannot see for itself — which servers open remote projects
+   * point at, and which servers an agent run is using. Re-read on every idle sweep, so a project or
+   * a run that has ended releases its pin without any bookkeeping here.
+   */
+  pinSources?: () => readonly ServerPin[]
+  /** R3: told about every pin taken, released or expired, so a kept session has a stated reason. */
+  onPinChange?: (change: PinChange) => void
+  /** R3: how long one UI keep-alive keeps a hand-connected server pinned. */
+  manualLeaseMs?: number
 }
 
 /**
@@ -87,9 +112,20 @@ export class SshManager {
   private readonly idleTimeoutMs: number
   private readonly now: () => number
   private readonly onStatus?: (state: VpsConnectionState) => void
+  private readonly onLiveness?: (event: VpsLivenessEvent) => void
   private readonly onData?: (sessionId: string, chunk: string) => void
   private readonly readKeyFile: (path: string) => Promise<Buffer>
   private connections = new Map<string, ConnectionEntry>()
+  /**
+   * R3: the explicit pin set — why each connected server is exempt from the idle sweep. See
+   * `pins.ts` for the three reasons and for the lease that keeps `manual-session` honest.
+   */
+  private readonly pins: PinRegistry
+  private readonly pinSources?: () => readonly ServerPin[]
+  private readonly onPinChange?: (change: PinChange) => void
+  private readonly manualLeaseMs: number
+  /** The dependency pins seen on the previous sweep, so a take/release is logged exactly once. */
+  private sourcedPins = new Map<string, ServerPin>()
   /** In-flight connect attempts, so two callers cannot open two SSH clients. */
   private connecting = new Map<string, Promise<VpsConnectionState>>()
   private pendingFingerprints = new Map<string, string>()
@@ -107,7 +143,12 @@ export class SshManager {
     this.idleTimeoutMs = options.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS
     this.now = options.now ?? (() => Date.now())
     if (options.onStatus) this.onStatus = options.onStatus
+    if (options.onLiveness) this.onLiveness = options.onLiveness
     if (options.onData) this.onData = options.onData
+    if (options.pinSources) this.pinSources = options.pinSources
+    if (options.onPinChange) this.onPinChange = options.onPinChange
+    this.manualLeaseMs = options.manualLeaseMs ?? DEFAULT_MANUAL_LEASE_MS
+    this.pins = new PinRegistry(this.now)
     this.readKeyFile = options.readKeyFile ?? ((path) => fs.readFile(path))
   }
 
@@ -204,23 +245,115 @@ export class SshManager {
     // and the renderer answers each event with an extra `vps:connected` invoke, so
     // a repeated identical state (e.g. a keepalive re-reporting "connected") cost a
     // full IPC round-trip for nothing.
-    if (!previous || !sameConnectionState(previous, next)) this.onStatus?.(this.getState())
+    if (!previous || !sameConnectionState(previous, next)) {
+      this.onStatus?.(this.getState())
+      /*
+       * R1: the same transition as a per-server event. `onStatus` already carries this state,
+       * but its payload is the singular snapshot; this one states which server changed, which
+       * is what lets the renderer update that server entry in `vpsStates` in the same tick.
+       */
+      if (next.serverId) {
+        this.onLiveness?.({ serverId: next.serverId, state: { ...next }, at: this.now() })
+      }
+    }
     return this.getState()
   }
 
   /**
-   * Mark a server as recently used so the idle watchdog leaves it alone
-   * (v2.6.5). An open remote project is "in use" even while the agent is idle,
-   * and reaping it produced a reconnect every ~30 minutes plus a brief
-   * "project missing" state in the UI.
+   * "The UI still shows this server as connected" — the third pin reason (R3).
+   *
+   * Refreshes the idle stamp (v2.6.5) **and** takes/renews a leased `manual-session` pin, so the
+   * reason a session survives is stated rather than implied by a timestamp. The lease is what keeps
+   * the reaper alive: a renderer that stops pinging loses the pin a couple of minutes later, and a
+   * server nothing depends on is swept again.
    */
   markActive(serverId: string): void {
     this.touch(serverId)
+    this.pin(serverId, 'manual-session', 'the renderer still lists it as connected', this.manualLeaseMs)
+  }
+
+  /**
+   * Hold one server open for one stated reason (R3). Idempotent; a `leaseMs` makes the pin lapse on
+   * its own, which is how the UI's claim is expressed. Every newly taken pin is logged.
+   */
+  pin(serverId: string, reason: ServerPinReason, detail?: string, leaseMs?: number): void {
+    const change = this.pins.take({ serverId, reason, ...(detail ? { detail } : {}) }, leaseMs)
+    if (change) this.announce(change)
+  }
+
+  /** Drop one reason. The server is swept on the next idle check once nothing else pins it (R3). */
+  unpin(serverId: string, reason: ServerPinReason): void {
+    const change = this.pins.release(serverId, reason)
+    if (change) this.announce(change)
+  }
+
+  /** Every reason this server is currently pinned for: taken here plus the ones main supplies. */
+  pinsFor(serverId: string): ServerPinReason[] {
+    const held = this.pinIndex().get(serverId) ?? []
+    return held.map((pin) => pin.reason)
+  }
+
+  /** The whole pin set with its reasons — what the reaper is honouring right now (R3). */
+  pinnedServers(): ServerPin[] {
+    return [...this.pinIndex().values()].flat()
   }
 
   private touch(serverId: string): void {
     const entry = this.connections.get(serverId)
     if (entry) entry.lastActivity = this.now()
+  }
+
+  /**
+   * The pin set as the idle sweep reads it: explicitly held pins plus the dependency facts main
+   * supplies, deduplicated per `(server, reason)`.
+   */
+  private pinIndex(): Map<string, ServerPin[]> {
+    const index = new Map<string, ServerPin[]>()
+    const add = (pin: ServerPin): void => {
+      const held = index.get(pin.serverId)
+      if (!held) {
+        index.set(pin.serverId, [pin])
+        return
+      }
+      if (held.some((entry) => entry.reason === pin.reason)) return
+      held.push(pin)
+    }
+    for (const pin of this.pins.snapshot()) add(pin)
+    for (const pin of this.pinSources?.() ?? []) add(pin)
+    return index
+  }
+
+  /**
+   * Log a dependency pin the first time it appears and the time it is gone.
+   *
+   * The pins main supplies (an open remote project, a live agent run) are derived on each sweep
+   * rather than passed through add/remove calls, so their take/release is the difference between
+   * the last sweep and this one. A pin that is merely held again is not re-logged.
+   */
+  private logDependencyChanges(): void {
+    const next = new Map<string, ServerPin>()
+    for (const pin of this.pinSources?.() ?? []) next.set(pin.serverId + ':' + pin.reason, pin)
+    for (const [key, pin] of next) {
+      if (this.sourcedPins.has(key)) continue
+      this.announce({ ...pin, action: 'pinned', at: this.now() })
+    }
+    for (const [key, pin] of this.sourcedPins) {
+      if (next.has(key)) continue
+      this.announce({ ...pin, action: 'released', at: this.now() })
+    }
+    this.sourcedPins = next
+  }
+
+  /** Report a pin change. Never silent: a pin is the only reason a session was not reaped. */
+  private announce(change: PinChange): void {
+    if (this.onPinChange) {
+      this.onPinChange(change)
+      return
+    }
+    const detail = change.detail ? ' (' + change.detail + ')' : ''
+    console.info(
+      '[vps] ' + change.action + ' pin ' + change.serverId + ' for ' + change.reason + detail
+    )
   }
 
   /**
@@ -252,7 +385,7 @@ export class SshManager {
   private async doConnect(serverId: string): Promise<VpsConnectionState> {
     await this.store.load()
     const decrypted = await this.store.getDecrypted(serverId)
-    if (!decrypted) return this.setState({ status: 'error', error: `Unknown server: ${serverId}` })
+    if (!decrypted) return this.setState({ status: 'error', serverId, error: `Unknown server: ${serverId}` })
     const { server, password, passphrase } = decrypted
 
     let privateKey: Buffer | undefined
@@ -319,6 +452,12 @@ export class SshManager {
         detail: `${server.username}@${server.host}:${server.port}`
       })
       this.ensureWatchdog()
+      /*
+       * R3: a session the app just opened is pinned for the UI, not reaped on a timer while the
+       * renderer's keep-alive takes up to one interval to arrive. The pin is leased, so an app that
+       * never comes back stops being a reason to hold the connection.
+       */
+      this.pin(serverId, 'manual-session', 'connected in the app', this.manualLeaseMs)
       return this.setState({ status: 'connected', serverId, fingerprint: presented })
     } catch (error) {
       const pending = this.pendingFingerprints.get(serverId)
@@ -370,6 +509,12 @@ export class SshManager {
       this.connections.delete(serverId)
       await this.audit.record({ type: 'disconnect', ok: true, serverId, detail: reason })
     }
+    /*
+     * R3: an explicit disconnect ends the UI's claim, so its lease is dropped here rather than
+     * waiting for it to lapse. The run and project pins are not touched: a disconnect is not the end
+     * of a run, and a project still points at the server.
+     */
+    this.unpin(serverId, 'manual-session')
     if (this.connections.size === 0 && this.watchdog) {
       clearInterval(this.watchdog)
       this.watchdog = undefined
@@ -379,6 +524,48 @@ export class SshManager {
 
   async disconnectAll(): Promise<void> {
     for (const serverId of [...this.connections.keys()]) await this.disconnect(serverId)
+  }
+
+  /**
+   * R1: the one reconnect attempt after a tool found its session gone.
+   *
+   * Bounded by construction: it runs exactly once and returns that attempt outcome. There is no
+   * loop and no second silent retry. It is logged with the reason it was triggered (the tool's own
+   * failure line), and it drops the stale connection first - a dead client still sitting in
+   * `connections` would make `connect()` answer "already connected" and never open a new session.
+   * A failed attempt leaves the server `disconnected`, because that is the fact: no session.
+   */
+  async reconnectOnce(serverId: string, reason: string): Promise<VpsReconnectOutcome> {
+    await this.audit.record({
+      type: 'connect',
+      ok: false,
+      serverId,
+      detail: `liveness: one reconnect attempt - ${reason}`
+    })
+    if (this.connections.has(serverId)) await this.disconnect(serverId, `liveness: ${reason}`)
+    let attempt: VpsConnectionState
+    try {
+      attempt = await this.connect(serverId)
+    } catch (error) {
+      attempt = {
+        status: 'error',
+        serverId,
+        error: error instanceof Error ? error.message : String(error)
+      }
+    }
+    if (attempt.status === 'connected') return { ok: true, state: attempt, reason }
+    /*
+     * An unseen host key is left as the actionable `error` it is (the user must confirm the
+     * fingerprint). Every other failed attempt reports the honest fact: no session.
+     */
+    const state = attempt.pendingFingerprint
+      ? attempt
+      : this.setState({
+          status: 'disconnected',
+          serverId,
+          ...(attempt.error ? { error: attempt.error } : {})
+        })
+    return { ok: false, state, reason }
   }
 
   async exec(serverId: string, command: string, timeoutMs?: number): Promise<VpsExecResult> {
@@ -590,11 +777,26 @@ export class SshManager {
     }, config)
   }
 
-  /** Exposed for tests / a manual sweep; also driven by the watchdog timer. */
+  /**
+   * The idle sweep (R3).
+   *
+   * A **pinned** server is never swept, regardless of idle time: something depends on it (a run, an
+   * open remote project, or the UI's own claim). An **unpinned** one that genuinely idles still
+   * closes on the same 30-minute cutoff as before — the reaper is not disabled, it is told what not
+   * to reap.
+   *
+   * Leases and dependency pins are settled here first, so a pin that lapsed or a project that closed
+   * is both logged and effective in the same sweep that would otherwise have closed the session.
+   */
   async checkIdle(): Promise<string[]> {
+    for (const change of this.pins.expire()) this.announce(change)
+    this.logDependencyChanges()
     const cutoff = this.now() - this.idleTimeoutMs
+    const pinned = this.pinIndex()
     const idle: string[] = []
     for (const [serverId, entry] of this.connections) {
+      const held = pinned.get(serverId)
+      if (held && held.length > 0) continue
       if (entry.lastActivity <= cutoff) idle.push(serverId)
     }
     for (const serverId of idle) await this.disconnect(serverId, 'idle-timeout')

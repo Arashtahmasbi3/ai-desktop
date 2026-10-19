@@ -254,6 +254,11 @@ export class AgentService {
   private readonly changeLog: ChangeRecorder
   private readonly audits: AuditTrails
   private readonly runGates: RunGateFactory
+  /**
+   * R3: the SSH liveness surface, so a run can pin the session it depends on for exactly its own
+   * lifetime. Optional like every other dependency here: a local-only service has no sessions.
+   */
+  private readonly vps?: RemoteHost
 
   constructor(options: AgentServiceOptions) {
     this.sandbox = options.sandbox
@@ -273,6 +278,7 @@ export class AgentService {
     this.getDiagnosticPolicy = options.getDiagnosticPolicy
     this.resolveVpsName = options.resolveVpsName
     this.sessionProfile = options.sessionProfile
+    if (options.vps) this.vps = options.vps
     if (options.goalStore) this.goalStore = options.goalStore
     if (options.diagnoses) this.diagnoses = options.diagnoses
 
@@ -402,6 +408,13 @@ export class AgentService {
       exposure,
       mcp?.group
     )
+    /*
+     * R3: `serverId` is the host this run is bound to, and it is not an orchestrator option — it is
+     * split out here so the session can be pinned for exactly the run's lifetime. A run that waits
+     * on a slow model, an approval or a question must not have its SSH session idled out from under
+     * it, and the pin is released in the same `finally` whether the run finishes, aborts or throws.
+     */
+    const { serverId: runServerId, ...remoteOptions } = remote
     const memory = await this.projectMemory.projectMemoryHint()
     const factLedger = await this.projectMemory.factLedgerHint(activeProject?.id)
     /*
@@ -536,7 +549,8 @@ export class AgentService {
       // v2.6.1 Fix 3: persist the session's trusted plan with the session so it
       // survives a restart and resumes auto-approving in the same chat.
       sessionMetadata: () => this.planTrust.metadataFor(sessionKey),
-      ...remote,
+      // R3: `serverId` was split out of `remote` above; these are the orchestrator's own options.
+      ...remoteOptions,
       ...(effectiveSystemHint ? { systemHint: effectiveSystemHint } : {}),
       // X6: the run's diagnosis memory, scoped to the active project. No project, no ledger — a
       // diagnosis that could cross projects would be worse than having none.
@@ -601,6 +615,9 @@ export class AgentService {
     const onExternalAbort = (): void => controller.abort()
     externalSignal?.addEventListener('abort', onExternalAbort, { once: true })
 
+    // R3: from here until the `finally` below, this run is a reason for main not to reap the session.
+    if (runServerId) this.vps?.pin?.(runServerId, 'active-run', runId)
+
     this.emit({ type: 'run:start', runId, task: request.task, at: this.now() })
 
     try {
@@ -631,6 +648,8 @@ export class AgentService {
     } finally {
       externalSignal?.removeEventListener('abort', onExternalAbort)
       this.controllers.delete(controller)
+      // R3: the run is over, so it stops being a reason to keep its server's session open.
+      if (runServerId) this.vps?.unpin?.(runServerId, 'active-run')
       // v2.6.1 Fix 3: keep the trusted plan alive across the chat's runs; only an
       // expired one is dropped (and the chip hidden).
       if (this.planTrust.prune(sessionKey)) this.emit({ type: 'plan:inactive', at: this.now() })

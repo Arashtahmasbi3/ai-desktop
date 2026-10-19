@@ -48,6 +48,7 @@ import type { CustomProviderStore } from './custom-providers'
 import type { OnboardingStore } from './onboarding-store'
 import type { GitHubService } from './github/service'
 import { SshManager } from './ssh/ssh-manager'
+import { remoteProjectPins } from './ssh/pins'
 import { Ssh2Backend } from './ssh/ssh2-backend'
 import type { VpsServerStore } from './ssh/server-store'
 import { JobManager } from '@core/agent/job-manager'
@@ -241,7 +242,16 @@ export class AppServices {
         backend: new Ssh2Backend(),
         audit: createAuditLog(this.dir),
         onStatus: (state) => this.emit('vps:status', state),
-        onData: (sessionId, chunk) => this.emit('vps:data', { sessionId, chunk })
+        // R1: the per-server liveness event, so the renderer can update one server fact.
+        onLiveness: (event) => this.emit('vps:liveness', event),
+        onData: (sessionId, chunk) => this.emit('vps:data', { sessionId, chunk }),
+        /*
+         * R3: an open remote project is a dependency on its server, so the idle sweep must not reap
+         * it. Derived from the project list on every sweep rather than bookkept at each project
+         * edit, so a deleted project — or one pointed at another server — releases its pin
+         * immediately. A live agent run is pinned by `AgentService` around the run itself.
+         */
+        pinSources: () => remoteProjectPins(this.persistence.listProjects())
       })
     this.sandbox =
       options.sandbox ??

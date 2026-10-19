@@ -29,6 +29,7 @@ import ProjectBadges from './ProjectBadges'
 import GitStatusPill from './GitStatusPill'
 import { hasPolicyMismatch } from '../lib/project-badge'
 import { isCapabilityEnabled } from '../lib/capabilities'
+import { isServerConnected } from '../lib/connection-status'
 import ConnectionTestButton from './ConnectionTest'
 
 const NAV: Array<{ id: ViewId; labelKey: string; icon: typeof MessageSquare }> = [
@@ -157,6 +158,8 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
   const servers = useStore((state) => state.vpsServers)
   // v2.8.0: the connected *set*, so more than one project can show a live dot.
   const vpsConnectedServers = useStore((state) => state.vpsConnected)
+  // R1: the same per-server fact as the header dot and the banner.
+  const vpsStates = useStore((state) => state.vpsStates)
   const refreshVps = useStore((state) => state.refreshVps)
   const [vpsSearch, setVpsSearch] = useState<{
     id: string
@@ -213,7 +216,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
      * paths (`project.exists === false && project.type !== 'remote'`); the sidebar must too.
      */
     if (project.type === 'remote') {
-      return project.vpsId && vpsConnectedServers.includes(project.vpsId)
+      return project.vpsId && isServerConnected(project.vpsId, vpsStates, vpsConnectedServers)
         ? 'connected'
         : 'disconnected'
     }

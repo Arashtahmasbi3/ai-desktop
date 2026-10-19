@@ -183,6 +183,34 @@ export interface VpsConnectionState {
   error?: string
 }
 
+/**
+ * One per-server liveness transition (R1).
+ *
+ * `vps:status` carries the same transition, but its payload is the singular state and a
+ * consumer has to trust that `serverId` happens to be set. This event names the server in its
+ * own field, so the renderer can write exactly one entry of its per-server map and update that
+ * server's dot, banner and tree node in the same tick.
+ */
+export interface VpsLivenessEvent {
+  serverId: string
+  state: VpsConnectionState
+  /** Epoch ms of the transition, from the manager's injectable clock. */
+  at: number
+}
+
+/**
+ * The outcome of the one reconnect attempt a dropped session is allowed (R1).
+ *
+ * There is no second attempt by construction: the caller asks once, and `state` is the fact
+ * afterwards - `connected` when the session came back, `disconnected` when it did not.
+ */
+export interface VpsReconnectOutcome {
+  ok: boolean
+  state: VpsConnectionState
+  /** The tool's own words for why the session was believed gone. */
+  reason: string
+}
+
 export interface RemoteFileEntry {
   name: string
   path: string

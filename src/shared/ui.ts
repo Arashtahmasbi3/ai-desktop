@@ -7,7 +7,7 @@ import type {
   ToolRecoveryInfo
 } from './agent'
 import type { ChatMessage, ProviderId, Usage } from './types'
-import type { VpsConnectionState } from './vps'
+import type { VpsConnectionState, VpsLivenessEvent } from './vps'
 import type { ApprovalMode, ApprovalReason } from './approval'
 import type { Plan, ApprovedPlan, PlanDecision, PlanWarning } from './plan'
 import type { CheckpointMode } from './decision-checkpoint'
@@ -420,5 +420,7 @@ export interface AppEventMap {
   'files:changed': { root: string }
   'window:maximized': boolean
   'vps:status': VpsConnectionState
+  /** R1: one per-server liveness transition, always naming the server. */
+  'vps:liveness': VpsLivenessEvent
   'vps:data': { sessionId: string; chunk: string }
 }

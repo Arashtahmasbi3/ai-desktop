@@ -37,7 +37,7 @@ import type {
   WorkerJobRequest,
   WorkerStatus
 } from '@shared/ui'
-import type { VpsConnectionState, VpsServerView } from '@shared/vps'
+import type { VpsConnectionState, VpsLivenessEvent, VpsServerView } from '@shared/vps'
 import type { Locale } from '../i18n/locale'
 import type { ChatTransferChoice, ChatTransferPreference } from '../lib/chat-transfer'
 import type { ThemePreference } from '../lib/theme'
@@ -165,7 +165,15 @@ export interface AppState {
   vpsServerId: string | undefined
   /** Saved VPS servers, shared by every component (single source of truth). */
   vpsServers: VpsServerView[]
-  /** Live VPS connection state from the main process. */
+  /**
+   * Live VPS connection state from the main process.
+   *
+   * @deprecated R1/R5, kept for one release. This is the LAST transition only, so it names
+   * whichever server changed most recently and cannot answer "is server X connected". The
+   * per-server fact is `vpsStates`, and every surface reads that. The remaining reader is
+   * `VpsPanel.tsx`, which passes it to `vpsStateFor` as its last-resort fallback; delete this
+   * field when that panel reads `vpsStates` alone.
+   */
   vpsStatus: VpsConnectionState
   /** Light/dark/system preference (v2.7.0). */
   theme: ThemePreference
@@ -309,6 +317,11 @@ export interface AppState {
   disconnectVps: (serverId: string) => Promise<void>
   /** Apply a status pushed from the main process. */
   setVpsStatus: (status: VpsConnectionState) => void
+  /**
+   * R1: apply one per-server liveness transition (`vps:liveness`) to `vpsStates`. Separate from
+   * `setVpsStatus` so the event always names its server.
+   */
+  applyVpsLiveness: (event: VpsLivenessEvent) => void
   /** Refresh the list of currently-connected server ids. */
   refreshVpsConnected: () => Promise<void>
   /** Connect a server in the background without changing the chat-header selection. */

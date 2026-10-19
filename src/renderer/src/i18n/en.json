@@ -316,7 +316,11 @@
     "toolGroupServer": "on {{server}}",
     "toolGroupAllOk": "all ok",
     "toolGroupWarning": "with warnings",
-    "toolGroupExpand": "Show the {{count}} calls"
+    "toolGroupExpand": "Show the {{count}} calls",
+    "loopStopTitleSessionDropped": "The connection to the server was already gone",
+    "loopStopHintSessionDropped": "Reconnect that server (or choose another one) and continue — retrying cannot help until a session exists.",
+    "verdictSessionDropped": "The SSH session to that server was already gone, so the command never ran.",
+    "verdictActionReconnect": "Reconnect the server, then run the step again."
   },
   "vpsSelector": {
     "label": "VPS",
@@ -1224,7 +1228,9 @@
     "causeBlockedLocally": "The TCP connect to that port was dropped, and nothing in the evidence proves the host itself is up: reachability is unknown, so this is not yet evidence about anyone above it.",
     "nextBlockedLocally": "Prove the host is up first — open a console session on it, or ping it from this machine — and only then retest that port from the same machine. A filtered result against a host nobody checked the state of says nothing about who blocks it.",
     "causeRepeatedEvidence": "The last two steps re-ran probes whose answers were already known: the output did not change, so nothing new was learned and the run was circling the same question instead of the problem.",
-    "nextRepeatedEvidence": "Say in one sentence what is already established and what it rules out, then change the question — a different target, a different measurement, or the route through this computer — rather than re-running the same probe."
+    "nextRepeatedEvidence": "Say in one sentence what is already established and what it rules out, then change the question — a different target, a different measurement, or the route through this computer — rather than re-running the same probe.",
+    "causeSessionDropped": "The SSH session to that server is gone, so the command never ran.",
+    "nextSessionDropped": "Reconnect that server and retry the step; or switch this project to another server."
   },
   "connect": {
     "testShort": "Test",

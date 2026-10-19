@@ -98,7 +98,10 @@ export function buildStopInfo(
     failure_streak: 'several steps in a row failed',
     reasoning_loop: 'the same reasoning was repeated without a new action',
     no_progress: 'several steps in a row made no progress',
-    turn_timeout: 'the turn ran out of time'
+    turn_timeout: 'the turn ran out of time',
+    // R4: the honest sentence. The command never reached the host, so nothing was learned and
+    // nothing was repeated — the session was already gone.
+    session_dropped: 'the SSH session to the server was already gone, so the command never ran'
   }
   /*
    * v4.1: carry what failed, how far the run got, and any question it was waiting on. The card used to end

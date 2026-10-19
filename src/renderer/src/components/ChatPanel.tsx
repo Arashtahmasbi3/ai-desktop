@@ -39,6 +39,7 @@ import { decideSend, type PendingAttachment } from '../lib/context-gate'
 import { modelSupportsVision } from '@shared/attachments'
 import { attachmentPaths, dedupePaths, pasteIntent } from '../lib/attach-drop'
 import { workspaceStatus, shouldShowWorkspaceBanner } from '../lib/project-status'
+import { isServerConnected } from '../lib/connection-status'
 import { CHAT_MAX_WIDTH } from '../lib/layout'
 import { groupToolRows, visibleChatMessages } from '../lib/tool-rows'
 import { toolLabel } from '../lib/tool-labels'
@@ -72,6 +73,8 @@ export default function ChatPanel(): JSX.Element {
   const projectMissing = useStore((state) => state.projectMissing)
   const settings = useStore((state) => state.settings)
   const vpsConnectedServers = useStore((state) => state.vpsConnected)
+  // R1: the per-server fact, so this banner changes in the same tick as the header dot.
+  const vpsStates = useStore((state) => state.vpsStates)
   const connectVps = useStore((state) => state.connectVps)
   const addProject = useStore((state) => state.addProject)
   const showContextBeforeSend = useStore((state) => state.showContextBeforeSend)
@@ -131,10 +134,11 @@ export default function ChatPanel(): JSX.Element {
   // v2.8.0: ask the connected *set*, not the single status slot. With two servers
   // up the slot named whichever changed last, so a remote project whose host was
   // perfectly connected showed the red "disconnected — Reconnect" banner.
+  // R1/R5: one per-server fact, never the singular last-writer-wins status. The connected set is
+  // only a seed for a server with no liveness event yet, so a disconnect flips this in its tick.
   const vpsConnected = Boolean(
     activeProject?.type === 'remote' &&
-      activeProject.vpsId &&
-      vpsConnectedServers.includes(activeProject.vpsId)
+      isServerConnected(activeProject.vpsId, vpsStates, vpsConnectedServers)
   )
   const wsStatus = workspaceStatus({
     project: activeProject

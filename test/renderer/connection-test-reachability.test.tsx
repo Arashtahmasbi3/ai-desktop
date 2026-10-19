@@ -167,6 +167,9 @@ beforeEach(() => {
     error: null,
     planMode: false,
     vpsServers: [],
+    // R5: the per-server map is the source of truth, so a case starts with no known facts and
+    // the connected set (stubbed per test) only seeds servers that have no event yet.
+    vpsStates: {},
     vpsStatus: { status: 'disconnected' },
     vpsConnected: [],
     vpsServerId: undefined
@@ -390,7 +393,8 @@ describe('the workspace line that reports the remote connection', () => {
     useStore.setState({
       settings: settings([remoteProject]),
       vpsServers: [SERVER],
-      vpsStatus: { status: 'error', serverId: 'srv-1', error: 'Connection failed' }
+      // R5: the error is this server's own fact, not a global slot that names one host.
+      vpsStates: { 'srv-1': { status: 'error', serverId: 'srv-1', error: 'Connection failed' } }
     })
     render(<ExecutionBar timelineOpen={false} onToggleTimeline={() => undefined} />)
 

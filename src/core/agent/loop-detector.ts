@@ -32,6 +32,12 @@ export interface LoopObservation {
    * output is activity, and progress is new information about the task.
    */
   information?: StepInformation
+  /**
+   * R4: true when this step's result is the app reporting a dead session (`Not connected`,
+   * `remote_error`, `channel closed`, …) rather than an answer from the host. The run stops on the
+   * first one, with a reason of its own: it is neither progress nor "no new information".
+   */
+  infrastructure?: boolean
 }
 
 export interface LoopCheckResult {
@@ -225,6 +231,11 @@ function buildHint(warnings: LoopWarning[]): string {
           )
         case 'turn_timeout':
           return '[loop-detected] This turn exceeded its time budget. Wrap up and report progress.'
+        case 'session_dropped':
+          return (
+            '[loop-detected] The SSH session to the server is gone, so the command never ran. ' +
+            'Do not retry: reconnect the server (or pick another one) and run the step again.'
+          )
         default:
           return (
             `[loop-detected] ${warning.count} consecutive steps produced no progress. ` +
@@ -690,6 +701,38 @@ export class LoopDetector {
   observe(observation: LoopObservation): LoopCheckResult {
     const warnings: LoopWarning[] = []
     let stopReason: LoopStopReason | undefined
+
+    /*
+     * R4: a dead session is not a step.
+     *
+     * In the session this comes from, every tool answered `Not connected` in 0.00–0.01 s: the
+     * commands never reached the host. The run went on to the third failure, and the drift guard
+     * then explained the stop as "its last two steps re-ran probes whose answers it already had" —
+     * probes that never ran, answers that never existed.
+     *
+     * So this is decided before the repeat window, the progress counters and the information guard:
+     * an infrastructure failure is neither progress nor no-new-information, and waiting for a
+     * second or third occurrence only teaches the model to retry a session that is already gone. The
+     * first one stops the run, with a reason of its own so the card can name the cause.
+     */
+    if (observation.infrastructure === true) {
+      this.stopped = true
+      this.stopReason = 'session_dropped'
+      const warning: LoopWarning = {
+        kind: 'session_dropped',
+        count: 1,
+        message:
+          'The SSH session to the server was already gone, so the tool never reached the host. ' +
+          'The run stopped on the first occurrence instead of retrying.'
+      }
+      return {
+        warnings: [warning],
+        hint: buildHint([warning]),
+        shouldAskUser: false,
+        stop: true,
+        stopReason: 'session_dropped'
+      }
+    }
 
     // --- Repeated actions over a sliding window -------------------------------
     // B-5: the counters are *derived from* the window. They used to be cumulative

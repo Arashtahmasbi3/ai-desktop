@@ -151,6 +151,14 @@ export function subscribeToEvents(): void {
     useStore.getState().setVpsStatus(status)
     void useStore.getState().refreshVpsConnected()
   })
+  /*
+   * R1: the per-server liveness event. It is applied synchronously, before the async refresh
+   * above can answer, so the header dot, the banner and the tree dot read the new fact in the
+   * same tick.
+   */
+  const offVpsLiveness = window.api.events.on('vps:liveness', (event) => {
+    useStore.getState().applyVpsLiveness(event)
+  })
   const offDiagnostic = window.api.events.on('diagnostic:status', (diagnostic) =>
     useStore.setState({ diagnostic })
   )
@@ -164,6 +172,7 @@ export function subscribeToEvents(): void {
     offSettings()
     offFiles()
     offVps()
+    offVpsLiveness()
     offDiagnostic()
     offGoals()
     unsubscribe = null

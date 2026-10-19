@@ -224,6 +224,9 @@ export class ToolingAssembler {
       const extra = withExtraRuntime([mcpGroup, skillGroup])
       return {
         ...extra,
+        // R3: the run is still bound to the project's server even while that server is down, so a
+        // reconnect during the run cannot be reaped from under it.
+        ...(active?.vpsId ? { serverId: active.vpsId } : {}),
         systemHint: [withWarning, extra.systemHint].filter(Boolean).join(' '),
         ...routing
       }

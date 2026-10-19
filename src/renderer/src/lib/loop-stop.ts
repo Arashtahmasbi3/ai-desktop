@@ -77,7 +77,8 @@ const HINT_KEY: Record<LoopStopReason, string> = {
   no_progress: 'chat.loopStopHintNoProgress',
   failure_streak: 'chat.loopStopHintFailure',
   reasoning_loop: 'chat.loopStopHintReasoning',
-  turn_timeout: 'chat.loopStopHintTimeout'
+  turn_timeout: 'chat.loopStopHintTimeout',
+  session_dropped: 'chat.loopStopHintSessionDropped'
 }
 
 const TITLE_KEY: Record<LoopStopReason, string> = {
@@ -85,7 +86,8 @@ const TITLE_KEY: Record<LoopStopReason, string> = {
   no_progress: 'chat.loopStopTitle',
   failure_streak: 'chat.loopStopTitleFailure',
   reasoning_loop: 'chat.loopStopTitle',
-  turn_timeout: 'chat.loopStopTitleTimeout'
+  turn_timeout: 'chat.loopStopTitleTimeout',
+  session_dropped: 'chat.loopStopTitleSessionDropped'
 }
 
 const EMPHASIS: Record<LoopStopReason, LoopStopAction> = {
@@ -93,7 +95,8 @@ const EMPHASIS: Record<LoopStopReason, LoopStopAction> = {
   no_progress: 'correct',
   failure_streak: 'correct',
   reasoning_loop: 'correct',
-  turn_timeout: 'continue'
+  turn_timeout: 'continue',
+  session_dropped: 'continue'
 }
 
 const REMOTE_TOOLS = /^(remote_shell|remote_fs|remote_\w+)\b/
@@ -279,6 +282,20 @@ function guessVerdict(stop: LoopStopInfo): LoopStopVerdict | undefined {
       textKey: 'chat.verdictRepeated',
       evidence: [{ textKey: 'chat.verdictEvidenceSteps', params: { count: stop.steps ?? 0 } }],
       actionKey: 'chat.verdictActionCorrect'
+    }
+  }
+
+  /*
+   * R4: a session that was already gone is not an unexplained stop. The verdict table answers first
+   * whenever the `session-dropped` row is available; this is the fallback path, for a stop persisted
+   * by an older build, or one read before the verdict keys are translated. Without it such a card
+   * would say "no specific cause" — the exact sentence this fix exists to remove.
+   */
+  if (stop.reason === 'session_dropped') {
+    return {
+      textKey: 'chat.verdictSessionDropped',
+      evidence: [{ textKey: 'chat.verdictEvidenceSteps', params: { count: stop.steps ?? 0 } }],
+      actionKey: 'chat.verdictActionReconnect'
     }
   }
 

@@ -145,6 +145,11 @@ export function registerVpsIpc(services: AppServices): () => void {
     ['vps:status', () => services.vps.getState()],
     // v2.6.5: refresh the idle stamp for a host an open project depends on, so the
     // 30-minute watchdog does not reap it and force a reconnect.
+    //
+    // R3: this marks exactly ONE server, which is why the renderer sends it once per id in
+    // `vps.connected()` rather than once for the active project (`lib/vps-keepalive.ts`). The call
+    // also renews a leased `manual-session` pin, so "the UI still shows it as connected" is the
+    // stated reason the session is spared — and it lapses on its own if the window stops asking.
     [
       'vps:keepAlive',
       (id: string) => {
