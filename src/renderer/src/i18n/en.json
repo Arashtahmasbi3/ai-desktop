@@ -298,7 +298,11 @@
     "questionOptionsLabel": "Suggested answers",
     "questionOptionsHint": "These are shortcuts — you can still type your own answer.",
     "approvalNetworkTarget": "Contacts {{target}}",
-    "approvalNetworkTargetUnknown": "Target could not be read from the arguments"
+    "approvalNetworkTargetUnknown": "Target could not be read from the arguments",
+    "noProjectTitle": "No project open",
+    "noProjectBody": "You can talk to the assistant without one, but until a project is open it cannot read, run or change anything in a folder.",
+    "noProjectOpenFolder": "Open a folder…",
+    "noProjectStartAnyway": "Chat without a project"
   },
   "vpsSelector": {
     "label": "VPS",
@@ -619,7 +623,9 @@
     "checkpointHint": "A durable record of the decisions that matter, judged by whether they can be undone. In \"confirm\", anything that cannot be undone is put to you even when the approval mode above would have proceeded.",
     "checkpointOff": "Off — record nothing",
     "checkpointRecord": "Record consequential decisions",
-    "checkpointConfirm": "Ask before a change (and always before an irreversible one)"
+    "checkpointConfirm": "Ask before a change (and always before an irreversible one)",
+    "noProviderKeyTitle": "No provider key saved yet",
+    "noProviderKeyBody": "A send needs a key for the provider you use. Paste one into the provider you want below — it is encrypted before it is written and is never shown again."
   },
   "github": {
     "title": "GitHub",
@@ -667,7 +673,16 @@
     "disconnect": "Disconnect",
     "accountUnknown": "unknown",
     "panelOpenProject": "Open a project to see its git status.",
-    "panelConnect": "Connect GitHub in Settings to list your repositories."
+    "panelConnect": "Connect GitHub in Settings to list your repositories.",
+    "panelNoProjectTitle": "No project open",
+    "panelNoProjectBody": "Commit, pull and push run inside the active project folder. Open a folder — an existing repository, or one you are about to make into one — to use this view.",
+    "panelPickFolder": "Open a folder…",
+    "panelNotRepoTitle": "This project is not a git repository",
+    "panelNotRepoBody": "AI Desktop only reads and writes repositories: run `git init` in that folder, then check again. Nothing has been changed.",
+    "panelCheckAgain": "Check again",
+    "panelConnectTitle": "No repository loaded",
+    "panelLoadRepos": "Load my repositories",
+    "panelConnectAction": "Open GitHub settings"
   },
   "toast": {
     "dismiss": "Dismiss",
@@ -740,7 +755,9 @@
     "trustConnect": "Trust & connect",
     "noCommands": "No commands yet.",
     "privateKeyPath": "Private key path",
-    "keyPassphraseOptional": "Key passphrase (optional)"
+    "keyPassphraseOptional": "Key passphrase (optional)",
+    "noServersTitle": "No server saved yet",
+    "selectServerTitle": "No server selected"
   },
   "slash": {
     "new": "Start a new chat",
@@ -758,7 +775,10 @@
   "search": {
     "placeholder": "Search the codebase…",
     "hint": "Type to search across the active project.",
-    "empty": "No matches found."
+    "empty": "No matches found.",
+    "emptyTitle": "No match for “{{query}}”",
+    "emptyBody": "Search reads the open project's files line by line and ignores case. Try a shorter or more specific word.",
+    "clear": "Clear the search"
   },
   "migration": {
     "title": "Some projects could not be found",
@@ -1049,7 +1069,22 @@
     "uiMode": "Interface",
     "uiModeSimple": "Simple",
     "uiModeAdvanced": "Advanced",
-    "uiModeHint": "Simple mode rests the terminal, the chat file tree and the model's raw reasoning until you ask for them."
+    "uiModeHint": "Simple mode rests the terminal, the chat file tree and the model's raw reasoning until you ask for them.",
+    "accessAsk": "Ask",
+    "accessAutoWrite": "Auto-write",
+    "accessFull": "Full access",
+    "accessPlan": "Plan",
+    "accessScopeLocal": "Local",
+    "accessScopeRemote": "Remote",
+    "accessScopeNone": "No project",
+    "accessTitleLocal": "This run works in a local project on this computer.",
+    "accessTitleRemote": "This run works on the server {{server}}.",
+    "accessTitleRemoteNoServer": "This remote project has no server selected yet.",
+    "accessTitleNone": "No project is open, so this run has no workspace of its own.",
+    "accessTitlePlan": "Plan mode is on: the agent drafts a plan and runs no tools.",
+    "accessTitleAsk": "Ask: every tool call waits for your approval first.",
+    "accessTitleAutoWrite": "Auto-write: reads and searches run freely; writes and shell commands ask first.",
+    "accessTitleFull": "Full access: every tool runs without asking until you turn it off."
   },
   "fileExplorer": {
     "noProjects": "No project added yet. Add a project folder from Settings, or drop a folder onto the window.",
@@ -1057,7 +1092,15 @@
     "close": "Close",
     "upOneLevel": "Up one level",
     "filter": "Filter files…",
-    "empty": "Empty folder."
+    "empty": "Empty folder.",
+    "noProjectTitle": "No project open",
+    "noProjectBody": "The file explorer reads exactly one folder: the active project. Open a folder to browse, filter and open its files.",
+    "openFolder": "Open a folder…",
+    "emptyTitle": "This folder is empty",
+    "emptyBody": "There is nothing in here yet. The arrow in the header goes back up one level.",
+    "noMatchesTitle": "No file matches “{{query}}”",
+    "noMatchesBody": "The filter only matches names in the folder you are looking at, not their contents.",
+    "clearFilter": "Clear the filter"
   },
   "browser": {
     "title": "In-app browser",
@@ -1069,7 +1112,11 @@
   "diagnostics": {
     "recommendations": "⚠️ Recommendations",
     "allPresent": "All essentials are present.",
-    "needsRoot": "This recipe needs root. Confirm you want to run these commands with sudo."
+    "needsRoot": "This recipe needs root. Confirm you want to run these commands with sudo.",
+    "readFailedTitle": "System health for {{server}} could not be read",
+    "readFailedBody": "Nothing on the server was changed. Probe it again; if it keeps failing the connection is probably down — reconnect it from the Servers view and retry.",
+    "retry": "Probe again",
+    "probing": "Probing the host…"
   },
   "gitSetup": {
     "title": "Setup Git for this project?",
@@ -1157,5 +1204,45 @@
     "nextStalled": "Change the instruction, not the wording: name the exact file or command, or say which alternative to try next.",
     "nextTurnBudget": "Continue from where it stopped; nothing failed, the clock simply ran out.",
     "nextUnknown": "Read the trace above and give a narrower instruction than the one that stalled; the run has no evidence that could name a cause."
+  },
+  "connect": {
+    "testShort": "Test",
+    "testRunFrom": "Test the connection from this computer",
+    "testRunning": "Testing…",
+    "testResultTitle": "{{summary}} — tested from this computer"
+  },
+  "disclosure": {
+    "moreLines_one": "{{count}} more line",
+    "moreLines_other": "{{count}} more lines",
+    "moreLabels": "+{{count}} more",
+    "fullScreen": "Full screen",
+    "outputTitle": "Output",
+    "reviewAll": "Review all files",
+    "previousFile": "Previous",
+    "nextFile": "Next"
+  },
+  "emptyState": {
+    "technicalDetails": "Technical details"
+  },
+  "usage": {
+    "todayTitle": "Today against the cap",
+    "capNotSet": "No daily cap is set, so nothing is refused. Set a cap below to turn this total into a guard.",
+    "capFraction": "{{percent}}% of the cap used today",
+    "capLevelOff": "no cap",
+    "capLevelOk": "under the cap",
+    "capLevelWarn": "close to the cap",
+    "capLevelOver": "over the cap",
+    "daysTitle": "Last 14 days",
+    "daysHint": "Each bar is that day's tokens, scaled to the busiest day. Spend comes from the published per-model prices; a day with no calls is shown, not skipped.",
+    "dayCalls": "{{calls}} calls",
+    "noCalls": "no calls",
+    "unpriced": "unpriced",
+    "byProviderHint": "Input / output tokens, calls and spend per provider.",
+    "byModelHint": "Input / output tokens, calls and spend per model.",
+    "capEventsTitle": "Refusals and warnings",
+    "capEventsUnknown": "not recorded",
+    "capEventsBody": "The cap stops a send before the call and only raises a toast, so neither a refusal nor a warning is counted anywhere. This figure is unknown, not zero.",
+    "capEventsLevel": "Level right now",
+    "emptyBody": "One record is written per completed call, with its provider, model and tokens. The first row appears after your next message."
   }
 }

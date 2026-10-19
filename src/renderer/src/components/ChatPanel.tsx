@@ -14,6 +14,7 @@ import { PROVIDERS } from '@shared/providers'
 import { buildContextPreview, type ContextPreview } from '@shared/context-preview'
 import { buildRunIntentBlock } from '@shared/run-outputs'
 import MessageBubble from './MessageBubble'
+import EmptyState from './ui/EmptyState'
 import AttachmentChip from './AttachmentChip'
 import SourcesOutputsPanel from './SourcesOutputsPanel'
 import ContextPreviewCard from './ContextPreviewCard'
@@ -448,34 +449,59 @@ export default function ChatPanel(): JSX.Element {
         {timelineOpen ? <ProgressTimeline embedded /> : null}
 
         {messages.length === 0 ? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
-            {/* v4.0: the mark is a stamped plate and the title is a label — the empty state
-                states what this is instead of advertising it. */}
-            <div className="brutal-panel flex h-14 w-14 items-center justify-center shadow-shape-sm">
-              <Bot className="h-7 w-7 text-accent" />
+          activeProject ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
+              {/* v4.0: the mark is a stamped plate and the title is a label — the empty state
+                  states what this is instead of advertising it. */}
+              <div className="brutal-panel flex h-14 w-14 items-center justify-center shadow-shape-sm">
+                <Bot className="h-7 w-7 text-accent" />
+              </div>
+              <div>
+                <h1 className="brutal-label text-sm text-fg-strong">
+                  {t('chat.emptyTitleProject', { project: activeProject.name })}
+                </h1>
+                <p className="mt-1 max-w-md text-sm text-fg-muted">{t('chat.emptyBody')}</p>
+              </div>
+              <div className="grid max-w-lg grid-cols-1 gap-2 sm:grid-cols-2">
+                {SUGGESTION_KEYS.map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => void send(t(key))}
+                    className="brutal-btn brutal-press py-2 text-start text-xs"
+                  >
+                    {t(key)}
+                  </button>
+                ))}
+              </div>
+              <TemplateMenu currentInput={input} onPick={(text) => setInput(text)} />
             </div>
-            <div>
-              <h1 className="brutal-label text-sm text-fg-strong">
-                {activeProject
-                  ? t('chat.emptyTitleProject', { project: activeProject.name })
-                  : t('chat.emptyTitle')}
-              </h1>
-              <p className="mt-1 max-w-md text-sm text-fg-muted">{t('chat.emptyBody')}</p>
+          ) : (
+            /*
+             * U3-6: "AI Desktop" + a feature list said nothing about the thing that is actually
+             * missing. With no project open the assistant can still talk, but it cannot read or
+             * run anything in a folder — so the state names that, and offers exactly the two ways
+             * forward that exist: pick a folder, or type without one.
+             */
+            <div className="flex flex-1 flex-col items-center justify-center px-6">
+              <EmptyState
+                testId="chat-no-project"
+                className="w-full max-w-lg"
+                title={t('chat.noProjectTitle')}
+                body={t('chat.noProjectBody')}
+                primary={{
+                  label: t('chat.noProjectOpenFolder'),
+                  onClick: () => void pickWorkspace(),
+                  testId: 'chat-open-folder'
+                }}
+                secondary={{
+                  label: t('chat.noProjectStartAnyway'),
+                  onClick: () => requestAnimationFrame(() => textareaRef.current?.focus()),
+                  testId: 'chat-start-without-project'
+                }}
+              />
             </div>
-            <div className="grid max-w-lg grid-cols-1 gap-2 sm:grid-cols-2">
-              {SUGGESTION_KEYS.map((key) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => void send(t(key))}
-                  className="brutal-btn brutal-press py-2 text-start text-xs"
-                >
-                  {t(key)}
-                </button>
-              ))}
-            </div>
-            <TemplateMenu currentInput={input} onPick={(text) => setInput(text)} />
-          </div>
+          )
         ) : (
           chatMessages.map((message) => <MessageBubble key={message.id} message={message} />)
         )}

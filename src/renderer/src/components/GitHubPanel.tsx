@@ -6,13 +6,13 @@ import {
   CircleDot,
   GitBranch,
   GitCommitHorizontal,
-  GitFork,
   GitPullRequest,
   Loader2,
   RefreshCw
 } from 'lucide-react'
 import type { GitRepoStatus, GitHubIssue, GitHubPull, GitHubRepo } from '@shared/github'
-import { useStore } from '../store'
+import { basename, useStore } from '../store'
+import EmptyState from './ui/EmptyState'
 
 type Tab = 'status' | 'pulls' | 'issues'
 
@@ -24,6 +24,8 @@ function text(error: unknown): string {
 export default function GitHubPanel(): JSX.Element {
   const { t } = useTranslation()
   const settings = useStore((state) => state.settings)
+  const addProject = useStore((state) => state.addProject)
+  const openSettingsTab = useStore((state) => state.openSettingsTab)
   const active = settings?.projects.find((project) => project.id === settings.activeProjectId)
   const cwd = active?.path
 
@@ -102,6 +104,12 @@ export default function GitHubPanel(): JSX.Element {
     }
   }
 
+  /** The folder picker is the real way a project gets here; this view never had one. */
+  const pickProjectFolder = async (): Promise<void> => {
+    const picked = await window.api.dialog.pickDirectory()
+    if (picked) await addProject(basename(picked), picked)
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-bg-primary">
       <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border px-2">
@@ -144,11 +152,38 @@ export default function GitHubPanel(): JSX.Element {
       <div className="min-h-0 flex-1 overflow-auto p-3 text-xs">
         {tab === 'status' ? (
           !cwd ? (
-            <p className="text-fg-muted">{t('github.panelOpenProject')}</p>
+            /*
+             * U3-6: three dead ends lived here. Without a project the panel said "open a project"
+             * and offered nothing; a non-repository said so in a sentence and left `git init` as
+             * the user's homework with no way to re-check; the PR/issue tab told the user to
+             * connect GitHub without a button that connects it.
+             */
+            <EmptyState
+              testId="github-no-project"
+              title={t('github.panelNoProjectTitle')}
+              body={t('github.panelNoProjectBody')}
+              primary={{
+                label: t('github.panelPickFolder'),
+                onClick: () => void pickProjectFolder(),
+                testId: 'github-open-folder'
+              }}
+            />
           ) : !status?.isRepo ? (
-            <p className="text-fg-muted">
-              {status?.error ?? 'This project is not a git repository yet.'}
-            </p>
+            <EmptyState
+              testId="github-not-a-repo"
+              title={t('github.panelNotRepoTitle')}
+              body={status?.error ?? t('github.panelNotRepoBody')}
+              primary={{
+                label: t('github.panelCheckAgain'),
+                onClick: () => void refreshStatus(),
+                testId: 'github-check-again'
+              }}
+              detail={
+                status?.error
+                  ? { label: t('emptyState.technicalDetails'), text: status.error }
+                  : undefined
+              }
+            />
           ) : (
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-fg">
@@ -246,9 +281,26 @@ export default function GitHubPanel(): JSX.Element {
                 ))}
               </select>
             ) : (
-              <p className="flex items-center gap-1 text-fg-subtle">
-                <GitFork className="h-3 w-3" /> {t('github.panelConnect')}
-              </p>
+              /*
+               * An empty list is two facts at once — nothing was loaded yet, and GitHub may not be
+               * connected — so the state names both and offers both real calls rather than the
+               * old "connect GitHub" hint with no control.
+               */
+              <EmptyState
+                testId="github-no-repos"
+                title={t('github.panelConnectTitle')}
+                body={t('github.panelConnect')}
+                primary={{
+                  label: t('github.panelLoadRepos'),
+                  onClick: () => void loadRepos(),
+                  testId: 'github-load-repos'
+                }}
+                secondary={{
+                  label: t('github.panelConnectAction'),
+                  onClick: () => openSettingsTab('github'),
+                  testId: 'github-open-settings'
+                }}
+              />
             )}
 
             <ul className="space-y-1">

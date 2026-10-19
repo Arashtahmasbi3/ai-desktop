@@ -67,7 +67,7 @@ export function MarkdownProse({
  */
 export const INLINE_MARKDOWN_COMPONENTS: Components = {
   ...MARKDOWN_COMPONENTS,
-  p: ({ children }) => <span>{children} </span>,
+  p: ({ children }) => <span className="me-1">{children}</span>,
   h1: ({ children }) => <h1 className="inline font-semibold text-fg-strong">{children}</h1>,
   h2: ({ children }) => <h2 className="inline font-semibold text-fg-strong">{children}</h2>,
   h3: ({ children }) => <h3 className="inline font-semibold text-fg-strong">{children}</h3>,

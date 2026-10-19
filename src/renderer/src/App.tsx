@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Bot, AlertTriangle, UploadCloud, X } from 'lucide-react'
+import { Bot, UploadCloud } from 'lucide-react'
 import BrowserPanel from './components/BrowserPanel'
 import ChatPanel from './components/ChatPanel'
 import ChatTree from './components/ChatTree'
 import CodeViewer from './components/CodeViewer'
 import CodeSearchModal from './components/CodeSearchModal'
 import CommandPalette from './components/CommandPalette'
+import ErrorBanner from './components/ErrorBanner'
 import ErrorBoundary from './components/ErrorBoundary'
 import FileExplorer from './components/FileExplorer'
 import GitHubPanel from './components/GitHubPanel'
@@ -40,7 +41,6 @@ export default function App(): JSX.Element {
   const ready = useStore((state) => state.ready)
   const view = useStore((state) => state.view)
   const selectedFile = useStore((state) => state.selectedFile)
-  const error = useStore((state) => state.error)
   const clearError = useStore((state) => state.clearError)
   const addProject = useStore((state) => state.addProject)
   const chatTreeOpen = useStore((state) => state.chatTreeOpen)
@@ -355,20 +355,9 @@ export default function App(): JSX.Element {
         </div>
       </div>
 
-      {error ? (
-        <div className="flex items-center gap-2 border-t border-danger/30 bg-danger/10 px-3 py-1.5 text-xs text-danger">
-          <AlertTriangle className="h-3.5 w-3.5" />
-          <span className="flex-1">{error}</span>
-          <button
-            type="button"
-            onClick={clearError}
-            aria-label={t('common.close')}
-            className="rounded p-0.5 hover:bg-danger/20"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      ) : null}
+      <ErrorBoundary label="Error banner">
+        <ErrorBanner />
+      </ErrorBoundary>
 
       <ErrorBoundary label="Status bar">
         <StatusBar />

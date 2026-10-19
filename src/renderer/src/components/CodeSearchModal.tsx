@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FileCode2, Search, X } from 'lucide-react'
 import { useStore } from '../store'
+import EmptyState from './ui/EmptyState'
 
 /** Ctrl+Shift+F: case-insensitive substring search across the active project. */
 export default function CodeSearchModal(): JSX.Element | null {
@@ -74,7 +75,23 @@ export default function CodeSearchModal(): JSX.Element | null {
           {query.trim() === '' ? (
             <p className="px-3 py-4 text-xs text-fg-muted">{t('search.hint')}</p>
           ) : results.length === 0 ? (
-            <p className="px-3 py-4 text-xs text-fg-muted">{t('search.empty')}</p>
+            /*
+             * U3-6: "No matches found." did not say what had been searched or what to try next.
+             * The query is named, the scope is stated, and the one action that helps (clearing the
+             * box) is a real one — the input keeps the keyboard focus either way.
+             */
+            <div className="p-3">
+              <EmptyState
+                testId="code-search-empty"
+                title={t('search.emptyTitle', { query: query.trim() })}
+                body={t('search.emptyBody')}
+                primary={{
+                  label: t('search.clear'),
+                  onClick: () => setQuery(''),
+                  testId: 'code-search-clear'
+                }}
+              />
+            </div>
           ) : (
             results.map((match, index) => (
               <button

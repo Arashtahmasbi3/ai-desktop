@@ -12,7 +12,8 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import type { FileEntry } from '@shared/ui'
-import { useStore } from '../store'
+import { basename, useStore } from '../store'
+import EmptyState from './ui/EmptyState'
 
 function iconFor(entry: FileEntry): JSX.Element {
   if (entry.type === 'dir') return <Folder className="h-4 w-4 text-info/80" />
@@ -40,6 +41,7 @@ export default function FileExplorer({ onClose }: FileExplorerProps = {}): JSX.E
   const refreshFiles = useStore((state) => state.refreshFiles)
   const openFile = useStore((state) => state.openFile)
   const openProject = useStore((state) => state.openProject)
+  const addProject = useStore((state) => state.addProject)
   const [query, setQuery] = useState('')
 
   const visible = useMemo(() => {
@@ -55,6 +57,12 @@ export default function FileExplorer({ onClose }: FileExplorerProps = {}): JSX.E
     const parts = cwd.split('/').filter((part) => part && part !== '.')
     parts.pop()
     void refreshFiles(parts.length > 0 ? parts.join('/') : '.')
+  }
+
+  /** The one real way to get a project into this panel: the OS folder picker main owns. */
+  const pickProjectFolder = async (): Promise<void> => {
+    const picked = await window.api.dialog.pickDirectory()
+    if (picked) await addProject(basename(picked), picked)
   }
 
   return (
@@ -90,9 +98,22 @@ export default function FileExplorer({ onClose }: FileExplorerProps = {}): JSX.E
       </div>
 
       {projects.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 text-center">
-          <Folder className="h-8 w-8 text-fg-muted" />
-          <p className="text-xs text-fg-muted">{t('fileExplorer.noProjects')}</p>
+        /*
+         * U3-6: this used to be a folder icon and a sentence. A workspace with no project is the
+         * one place where "open a folder" is the actual fix, and the dialog behind it exists
+         * (`dialog.pickDirectory`), so the state offers it instead of leaving a dead end.
+         */
+        <div className="flex flex-1 flex-col justify-center p-3">
+          <EmptyState
+            testId="file-explorer-no-project"
+            title={t('fileExplorer.noProjectTitle')}
+            body={t('fileExplorer.noProjectBody')}
+            primary={{
+              label: t('fileExplorer.openFolder'),
+              onClick: () => void pickProjectFolder(),
+              testId: 'file-explorer-open-folder'
+            }}
+          />
         </div>
       ) : (
         <>
@@ -138,7 +159,32 @@ export default function FileExplorer({ onClose }: FileExplorerProps = {}): JSX.E
 
           <div className="min-h-0 flex-1 overflow-y-auto py-1">
             {visible.length === 0 ? (
-              <p className="px-3 py-3 text-xs text-fg-muted">{t('fileExplorer.empty')}</p>
+              /*
+               * Two different nothings: a filter that matched nothing (the fix is to clear it) and
+               * a folder that is genuinely empty (there is no action — the way forward is to go
+               * up, which the header's own arrow already does). Saying which one it is stops the
+               * user hunting for files that were filtered out.
+               */
+              <div className="p-2">
+                {query.trim() ? (
+                  <EmptyState
+                    testId="file-explorer-no-matches"
+                    title={t('fileExplorer.noMatchesTitle', { query: query.trim() })}
+                    body={t('fileExplorer.noMatchesBody')}
+                    primary={{
+                      label: t('fileExplorer.clearFilter'),
+                      onClick: () => setQuery(''),
+                      testId: 'file-explorer-clear-filter'
+                    }}
+                  />
+                ) : (
+                  <EmptyState
+                    testId="file-explorer-empty-folder"
+                    title={t('fileExplorer.emptyTitle')}
+                    body={t('fileExplorer.emptyBody')}
+                  />
+                )}
+              </div>
             ) : (
               visible.map((entry) => (
                 <button

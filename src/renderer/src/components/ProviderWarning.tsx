@@ -11,7 +11,12 @@ export default function ProviderWarning(): JSX.Element | null {
   const { t } = useTranslation()
   const settings = useStore((state) => state.settings)
   const selection = useStore((state) => state.selection)
-  const openSettings = useStore((state) => state.openSettings)
+  /*
+   * The button must land where the key is actually entered. `openSettings` dropped the user on
+   * whatever tab they last used, which in this report was GitHub — the same "control that does
+   * something else" the Plugins page taught us to avoid.
+   */
+  const openSettingsTab = useStore((state) => state.openSettingsTab)
 
   // Custom providers are validated in the Settings section; skip here.
   if (!settings || selection.customProviderId) return null
@@ -25,7 +30,7 @@ export default function ProviderWarning(): JSX.Element | null {
       <span className="flex-1">{t('providerWarning.noKey', { provider: label })}</span>
       <button
         type="button"
-        onClick={openSettings}
+        onClick={() => openSettingsTab('providers')}
         className="flex items-center gap-1 rounded border border-warning/40 px-2 py-0.5 text-warning hover:bg-warning/15"
       >
         <Settings className="h-3 w-3" />

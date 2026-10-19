@@ -4,6 +4,7 @@ import { CheckCircle2, Cpu, HardDrive, RefreshCw, Server, X, XCircle } from 'luc
 import type { HealthRecommendation, SystemHealth, ToolHealth } from '@shared/system-health'
 import { healthRecommendations } from '@core/remote/system-health'
 import { getInstallRecipe } from '@core/agent/install-recipes'
+import EmptyState from './ui/EmptyState'
 
 interface Props {
   serverId: string
@@ -114,8 +115,27 @@ export default function DiagnosticsPanel({ serverId, serverName, onClose }: Prop
         </div>
 
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
-          {error ? <p className="text-xs text-danger">{error}</p> : null}
-          {!health && !error ? <p className="text-xs text-fg-muted">Probing host…</p> : null}
+          {error ? (
+            /*
+             * U3-6: this panel used to print the raw rejection in red and nothing else — a dead
+             * end that did not say which read failed or what to do. The failed read is named, the
+             * probe is offered again (it is a real call), and the IPC message is kept behind the
+             * disclosure instead of being the headline.
+             */
+            <EmptyState
+              testId="diagnostics-error"
+              tone="error"
+              title={t('diagnostics.readFailedTitle', { server: serverName })}
+              body={t('diagnostics.readFailedBody')}
+              primary={{
+                label: t('diagnostics.retry'),
+                onClick: () => void load(),
+                testId: 'diagnostics-retry'
+              }}
+              detail={{ label: t('emptyState.technicalDetails'), text: error }}
+            />
+          ) : null}
+          {!health && !error ? <p className="text-xs text-fg-muted">{t('diagnostics.probing')}</p> : null}
 
           {health ? (
             <>

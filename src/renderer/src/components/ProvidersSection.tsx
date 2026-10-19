@@ -6,6 +6,7 @@ import type { ProviderId, ProviderKeyHealth, ProviderKeyHealthView } from '@shar
 import type { SettingsView } from '@shared/ui'
 import { useStore } from '../store'
 import CustomProvidersSection from './CustomProvidersSection'
+import EmptyState from './ui/EmptyState'
 
 /**
  * v3.1: the settings view carries `keyCount` — how many credentials a provider holds. It is not in
@@ -130,6 +131,13 @@ export default function ProvidersSection(): JSX.Element {
   const now = Date.now()
   const healthFor = (provider: ProviderId): ProviderKeyHealth[] =>
     health.find((entry) => entry.provider === provider)?.keys ?? []
+  /*
+   * U3-6: with no key anywhere the page was four identical cards, each with a "no key" chip and
+   * no explanation of what that means. A key is impossible to invent here, so the state says what
+   * is missing and why (and the field that fixes it is the next thing on the page) — no button is
+   * offered that cannot work.
+   */
+  const hasAnyKey = PROVIDER_IDS.some((provider) => settings?.providers?.[provider]?.hasApiKey)
 
   return (
     <section>
@@ -137,6 +145,15 @@ export default function ProvidersSection(): JSX.Element {
         <KeyRound className="h-3.5 w-3.5" />
         {t('settings.apiKeys')}
       </h3>
+      {!hasAnyKey ? (
+        <div className="mb-3">
+          <EmptyState
+            testId="providers-no-key"
+            title={t('settings.noProviderKeyTitle')}
+            body={t('settings.noProviderKeyBody')}
+          />
+        </div>
+      ) : null}
       <div className="flex flex-col gap-3">
         {PROVIDER_IDS.map((provider) => {
           const descriptor = PROVIDERS[provider]

@@ -11,9 +11,10 @@ import {
   Search,
   SquareTerminal
 } from 'lucide-react'
-import type { TraceDecision, TraceEvidence, TraceExplanation, TracePhase } from '@shared/trace'
+import type { TraceDecision, TraceEvidence, TraceExplanation, TraceOutcome, TracePhase } from '@shared/trace'
 import { TRACE_PHASES } from '@shared/trace'
 import { InlineMarkdown, MarkdownProse } from './Markdown'
+import type { StepSummary } from '../lib/step-summary'
 
 /** Colour + icon per phase, matching the dark timeline palette. */
 const PHASE_STYLE: Record<TracePhase, { icon: typeof Eye; className: string }> = {
@@ -31,6 +32,13 @@ export interface DecisionCardProps {
    * unchanged — only the collapsed header is compacted.
    */
   compact?: boolean
+  /**
+   * U3-5: what this step DID, in words a reader can scan — the tool's human label, the
+   * outcome and how long it took. It renders in the collapsed header, because a summary
+   * that only appears after expanding is not a summary. The arguments, the evidence, the
+   * decision, the reasoning and "Ask Why" all stay behind the expand.
+   */
+  summary?: StepSummary
   /** Overridable for tests; defaults to the real `Ask Why` IPC. */
   onExplain?: (decision: TraceDecision) => Promise<TraceExplanation | null>
 }
@@ -39,12 +47,21 @@ async function defaultExplain(decision: TraceDecision): Promise<TraceExplanation
   return window.api.agent.explainStep(decision.runId, decision.id)
 }
 
+/** `ok` -> `trace.outcomeOk`, so the phase and outcome vocabulary stays in i18n. */
+function outcomeKey(outcome: TraceOutcome): string {
+  return `trace.outcome${outcome.charAt(0).toUpperCase()}${outcome.slice(1)}`
+}
+
 /**
  * v2.6.2 (T3.2) - one node of the run timeline. Shows what the agent intended,
  * the evidence it collected, and the decision it took, plus an `Ask Why` button
  * that asks main to explain the decision (deterministic, no extra model call).
+ *
+ * U3-5: the row is a summary that stands on its own — the tool's human label, the
+ * outcome and the duration — so a run can be read by scanning; the detail is one click
+ * away and never replaces the scan.
  */
-export default function DecisionCard({ decision, compact, onExplain }: DecisionCardProps): JSX.Element {
+export default function DecisionCard({ decision, compact, summary, onExplain }: DecisionCardProps): JSX.Element {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [explanation, setExplanation] = useState<TraceExplanation | null>(null)
@@ -69,6 +86,10 @@ export default function DecisionCard({ decision, compact, onExplain }: DecisionC
 
   const evidenceLabel = (item: TraceEvidence): string => t(`trace.evidence${item.kind[0].toUpperCase()}${item.kind.slice(1)}`)
 
+  // A failed observation outranks the decision's own verdict: the row must not say "ok"
+  // above a tool that failed (U3-5, "did it work").
+  const outcome: TraceOutcome | undefined = summary?.outcome ?? decision.outcome
+
   return (
     <li
       data-testid="decision-card"
@@ -79,6 +100,8 @@ export default function DecisionCard({ decision, compact, onExplain }: DecisionC
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        data-testid="decision-header"
         className={`flex w-full items-center gap-2 text-left ${compact ? 'px-2 py-1' : 'px-2.5 py-2'}`}
       >
         {open ? (
@@ -91,6 +114,20 @@ export default function DecisionCard({ decision, compact, onExplain }: DecisionC
           {t(`trace.phase${decision.phase[0].toUpperCase()}${decision.phase.slice(1)}`)}
         </span>
         {/*
+          U3-5: what ran, in human words — "Ran a command · Read a file ×2". This is the
+          scan line; the raw tool ids stay in the step's chips and in the expanded body.
+        */}
+        {summary?.activity ? (
+          <span
+            data-testid="decision-activity"
+            dir="auto"
+            title={summary.activity}
+            className="max-w-[16rem] shrink-0 truncate text-3xs text-fg-muted"
+          >
+            {summary.activity}
+          </span>
+        ) : null}
+        {/*
           The intent is the model's own thought: free prose that may contain markdown and may be
           Persian. It resolves its own direction (`dir="auto"`) and renders its markdown, but as an
           inline preview so the row stays one truncated line — the full rendering is in the body.
@@ -102,17 +139,27 @@ export default function DecisionCard({ decision, compact, onExplain }: DecisionC
         >
           <InlineMarkdown text={decision.intent.summary} />
         </span>
-        {decision.outcome ? (
+        {summary?.durationLabel ? (
           <span
+            data-testid="decision-duration"
+            className="shrink-0 font-mono text-3xs text-fg-subtle"
+          >
+            {summary.durationLabel}
+          </span>
+        ) : null}
+        {outcome ? (
+          <span
+            data-testid="decision-outcome"
+            data-outcome={outcome}
             className={`shrink-0 text-3xs ${
-              decision.outcome === 'ok'
+              outcome === 'ok'
                 ? 'text-success'
-                : decision.outcome === 'failed'
+                : outcome === 'failed'
                   ? 'text-danger'
                   : 'text-warning'
             }`}
           >
-            {t(`trace.outcome${decision.outcome[0].toUpperCase()}${decision.outcome.slice(1)}`)}
+            {t(outcomeKey(outcome))}
           </span>
         ) : null}
       </button>

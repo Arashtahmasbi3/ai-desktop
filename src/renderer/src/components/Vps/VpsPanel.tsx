@@ -9,26 +9,15 @@ import type {
 } from '@shared/vps'
 import { useStore } from '../../store'
 import { vpsStateFor } from '../../lib/vps-state'
+import { testSummary } from '../../lib/connection-test'
 import RemoteFileExplorer from './RemoteFileExplorer'
 import VpsForm from './VpsForm'
+import { useConnectionTest } from '../ConnectionTest'
 import VpsTerminal from './VpsTerminal'
 import DiagnosticsPanel from '../DiagnosticsPanel'
+import EmptyState from '../ui/EmptyState'
 
 type Tab = 'terminal' | 'files' | 'audit'
-
-/**
- * One sentence for a reachability result (v4.1).
- *
- * Words, not a coloured dot: "port 22 open · 82 ms" and "port 22 timed out" are different facts, and a user who
- * is debugging a firewall needs the difference.
- */
-function testSummary(
-  result: ConnectionTestResult,
-  t: (key: string, options?: Record<string, unknown>) => string
-): string {
-  if (result.ok) return t('vps.testOpen', { port: result.port, ms: result.latencyMs ?? 0 })
-  return t('vps.testFailed', { port: result.port, reason: result.message ?? result.outcome })
-}
 
 function text(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
@@ -46,29 +35,12 @@ export default function VpsPanel(): JSX.Element {
   const { t } = useTranslation()
   const [servers, setServers] = useState<VpsServerView[]>([])
   /*
-   * v4.1: the last reachability test per server. Kept per id so testing one server never overwrites another's
-   * answer.
+   * v4.2 (B2-2): the reachability test has ONE implementation, in ConnectionTest.tsx. This panel is
+   * its full-size surface (a row per server, each keeping its own answer); the sidebar, the status
+   * bar and the run-error banner reuse the same hook, so the button beside a failure and the button
+   * here can never word the same probe differently.
    */
-  const [tests, setTests] = useState<Record<string, ConnectionTestResult | 'running'>>({})
-  const testConnection = async (id: string): Promise<void> => {
-    setTests((current) => ({ ...current, [id]: 'running' }))
-    try {
-      const result = await window.api.vps.testConnection(id)
-      setTests((current) => ({ ...current, [id]: result }))
-    } catch (error) {
-      setTests((current) => ({
-        ...current,
-        [id]: {
-          ok: false,
-          host: '',
-          port: 0,
-          outcome: 'unreachable',
-          message: String((error as Error)?.message ?? error),
-          from: 'this-machine'
-        }
-      }))
-    }
-  }
+  const { results: tests, run: testConnection } = useConnectionTest()
   const [activeId, setActiveId] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [tab, setTab] = useState<Tab>('terminal')
@@ -219,7 +191,17 @@ export default function VpsPanel(): JSX.Element {
           ) : null}
 
           {servers.length === 0 && !formOpen ? (
-            <p className="px-1 py-2 text-xs text-fg-subtle">{t('vps.noServersHint')}</p>
+            /* U3-6: a hint with no control. Adding a server is a real call and lives here too. */
+            <EmptyState
+              testId="vps-no-servers"
+              title={t('vps.noServersTitle')}
+              body={t('vps.noServersHint')}
+              primary={{
+                label: t('vps.addServer'),
+                onClick: () => setFormOpen(true),
+                testId: 'vps-add-first-server'
+              }}
+            />
           ) : null}
 
           {servers.map((server) => (
@@ -291,8 +273,13 @@ export default function VpsPanel(): JSX.Element {
 
       <section className="flex min-h-0 min-w-0 flex-1 flex-col">
         {!activeId ? (
-          <div className="flex flex-1 items-center justify-center text-sm text-fg-subtle">
-            {t('vps.selectServer')}
+          <div className="flex flex-1 items-center justify-center p-6">
+            {/* Nothing is selected, so the state says which server and why — no hidden button. */}
+            <EmptyState
+              testId="vps-no-selection"
+              title={t('vps.selectServerTitle')}
+              body={t('vps.selectServer')}
+            />
           </div>
         ) : (
           <>

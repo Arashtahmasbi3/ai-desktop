@@ -65,6 +65,16 @@ export interface DailyUsage {
   day: string
   inputTokens: number
   outputTokens: number
+  /**
+   * Sum of the known costs of that day's calls; null when none of them is priced. This needs no
+   * new recording: it is the same arithmetic as `aggregateUsage`, bucketed by day, so the
+   * dashboard cannot disagree with the all-time total.
+   */
+  cost: number | null
+  /** True when at least one call that day used a model with no known price (a lower bound). */
+  costUnknown: boolean
+  /** How many calls landed on that day (0 is a real answer: a quiet day, not a missing row). */
+  calls: number
 }
 
 export interface UsageSummary {
@@ -143,6 +153,45 @@ function groupBy(records: UsageRecord[], keyOf: (record: UsageRecord) => string)
 }
 
 /**
+ * Bucket records into the last `days` local days, oldest first, with no gaps: a day that had no
+ * call is a zero row, not a missing one. `now` is injectable so the window is deterministic.
+ *
+ * This is the only place a day boundary is computed, so the 7-day summary and the 14-day
+ * dashboard cannot disagree about which day "today" is.
+ */
+export function dailyUsage(
+  records: UsageRecord[],
+  days: number = 7,
+  now: number = Date.now()
+): DailyUsage[] {
+  const buckets = new Map<string, DailyUsage>()
+  const span = Math.max(1, Math.floor(days))
+  for (let offset = span - 1; offset >= 0; offset -= 1) {
+    const stamp = now - offset * 24 * 60 * 60 * 1000
+    const key = dayKey(stamp)
+    buckets.set(key, {
+      day: key,
+      inputTokens: 0,
+      outputTokens: 0,
+      cost: null,
+      costUnknown: false,
+      calls: 0
+    })
+  }
+  for (const record of records) {
+    const bucket = buckets.get(dayKey(record.timestamp))
+    if (!bucket) continue
+    bucket.calls += 1
+    bucket.inputTokens += record.inputTokens
+    bucket.outputTokens += record.outputTokens
+    const recordCost = costOf(record)
+    if (recordCost === null) bucket.costUnknown = true
+    else bucket.cost = (bucket.cost ?? 0) + recordCost
+  }
+  return [...buckets.values()]
+}
+
+/**
  * Aggregate records into the numbers shown in Settings → Usage. `now` is
  * injectable so the 7-day window is deterministic in tests.
  */
@@ -160,24 +209,11 @@ export function aggregateUsage(records: UsageRecord[], now: number = Date.now())
   }
   const total: UsageTotals = { inputTokens, outputTokens, cost, costUnknown, calls: records.length }
 
-  const days = new Map<string, DailyUsage>()
-  for (let offset = 6; offset >= 0; offset -= 1) {
-    const stamp = now - offset * 24 * 60 * 60 * 1000
-    const key = dayKey(stamp)
-    days.set(key, { day: key, inputTokens: 0, outputTokens: 0 })
-  }
-  for (const record of records) {
-    const bucket = days.get(dayKey(record.timestamp))
-    if (!bucket) continue
-    bucket.inputTokens += record.inputTokens
-    bucket.outputTokens += record.outputTokens
-  }
-
   return {
     total,
     byProvider: groupBy(records, (record) => record.provider),
     byModel: groupBy(records, (record) => record.model),
-    last7Days: [...days.values()]
+    last7Days: dailyUsage(records, 7, now)
   }
 }
 
