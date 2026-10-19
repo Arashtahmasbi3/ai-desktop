@@ -1,0 +1,63 @@
+name: ui
+
+# O4-4: the checks that must pass before a release, including the interface in both themes.
+#
+# The screenshot job is separate on purpose: it needs a display, so it runs on windows-latest where Electron runs
+# natively, and it is allowed to report "no baseline yet" instead of failing a first run. Everything else is headless
+# and fast.
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Type check
+        run: npm run typecheck
+      - name: Tests
+        run: npm test
+      - name: Build
+        run: npm run build
+      - name: The double-cast budget, the copy-assertion ratchet and the capability matrix are part of the suite
+        run: echo "enforced by npm test (test/security/cast-budget, test/renderer/copy-assertion-ratchet, test/docs)"
+
+  screenshots:
+    runs-on: windows-latest
+    needs: verify
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Capture both themes over CDP
+        shell: pwsh
+        run: |
+          # The packaged/unpacked app is started with the debug port this repository added for diagnosis (O4-2).
+          $electron = "node_modules\electron\dist\electron.exe"
+          $process = Start-Process -FilePath $electron -ArgumentList '.', '--remote-debugging-port=9223' -PassThru
+          Start-Sleep -Seconds 8
+          node scripts/screenshots.mjs --port 9223
+          $code = $LASTEXITCODE
+          Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+          exit $code
+      - name: Keep the captures and what changed
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-screenshots
+          path: |
+            docs/screenshots/**/*.png
+            docs/screenshots/**/*.baseline
+          if-no-files-found: warn
