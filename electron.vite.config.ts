@@ -53,23 +53,48 @@ export default defineConfig({
     esbuild: { drop: ['debugger'] },
     build: {
       ...optimizeBuild,
+      /*
+       * v4.2: `target: 'esnext'` so the chunk-level transpile step never runs.
+       *
+       * The v4.1 note below split the vendor bundle because esbuild passes a large payload to its native binary
+       * through a temp file and removing that file is denied on this machine. Splitting stopped being enough once the
+       * app chunk itself grew: `vite:esbuild-transpile` processes every chunk at the end, and that is the step that
+       * needs the temp file — so the build failed after all 2283 modules had been transformed.
+       *
+       * Nothing here needed lowering anyway. The renderer only ever runs in the Chromium that ships inside this
+       * Electron (44), which is far newer than Vite's default target, so the transpile step was work with no
+       * consumer. Skipping it removes the failure instead of dodging it, and keeps the v4.1 chunking.
+       *
+       * (It belongs at the `build` level, not inside `rollupOptions` — that is a Rollup option bag, not Vite's, and a
+       * `target` there is silently ignored, which is exactly how the first attempt at this fix changed nothing.)
+       */
+      target: 'esnext',
       rollupOptions: {
         ...optimizeBuild.rollupOptions,
-        /*
-         * v4.1: split the renderer bundle.
-         *
-         * esbuild passes any payload above an internal size limit to its native binary through a temp file. The
-         * renderer used to be a single ~2 MB chunk, and on this machine removing that temp file is denied by the
-         * OS, which aborted the build after all 2265 modules had been transformed. Keeping each chunk under the
-         * threshold avoids the temp file entirely — and a stable vendor chunk is better for updates anyway: app
-         * code changes no longer invalidate the whole bundle.
-         */
         output: {
-          manualChunks: {
-            'react-vendor': ['react', 'react-dom', 'react/jsx-runtime'],
-            'markdown-vendor': ['react-markdown', 'remark-parse', 'remark-rehype', 'unified'],
-            'i18n-vendor': ['i18next', 'react-i18next'],
-            'terminal-vendor': ['@xterm/xterm', '@xterm/addon-fit']
+          /*
+           * Split by area, not by a vendor list.
+           *
+           * v4.1 split only the vendored libraries, which was enough while the app chunk was small. It no longer is:
+           * esbuild hands a large payload to its native binary through a temp file, and on this machine removing that
+           * file is denied (Defender holds it), so the build aborted after 2283 modules had been transformed. Keeping
+           * every chunk modest is the only lever that reliably avoids the temp file — and it is a better bundle
+           * anyway: editing a component no longer invalidates the store and the libraries.
+           */
+          manualChunks(id: string) {
+            if (id.includes('node_modules')) {
+              if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return 'react-vendor'
+              if (/[\\/]node_modules[\\/](react-markdown|remark-|rehype-|unified|micromark|mdast|hast|unist)[^\\/]*[\\/]/.test(id)) {
+                return 'markdown-vendor'
+              }
+              if (/[\\/]node_modules[\\/](i18next|react-i18next)[\\/]/.test(id)) return 'i18n-vendor'
+              if (/[\\/]node_modules[\\/]@xterm[\\/]/.test(id)) return 'terminal-vendor'
+              return 'vendor'
+            }
+            if (id.includes('/src/renderer/src/components/')) return 'app-components'
+            if (id.includes('/src/renderer/src/store')) return 'app-store'
+            if (id.includes('/src/renderer/src/lib/')) return 'app-lib'
+            return undefined
           }
         }
       }
