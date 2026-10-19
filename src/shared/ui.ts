@@ -293,7 +293,11 @@ export interface AgentQuestionView {
   runId: string
   prompt: string
   options?: string[]
-  /** After this the run continues with `null` (no answer) instead of hanging. */
+  /**
+   * X2: the configured deadline after which the card stops offering its shortcuts and
+   * offers "resume with my best assumption" instead. Reaching it does **not** move the
+   * run: the gate stays pending, so no tool runs until the user acts.
+   */
   timeoutMs: number
 }
 

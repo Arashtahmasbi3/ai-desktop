@@ -133,7 +133,7 @@ describe('C-3b: project-scoped shell commands run from the project root', () => 
     return { deps, commands }
   }
 
-  it('prepends an explicit cd so the containment premise is true', async () => {
+  it('prepends an explicit cd so relative paths resolve inside the project', async () => {
     const { deps, commands } = shellDeps(ROOT)
     await executeRemoteShell(deps, { server_id: 'srv-1', command: 'ls -la' })
     expect(commands).toEqual([`cd '${ROOT}' && ls -la`])
@@ -145,7 +145,9 @@ describe('C-3b: project-scoped shell commands run from the project root', () => 
     expect(commands).toEqual(['ls -la'])
   })
 
-  it('rejects an escaping command before it reaches the host', async () => {
+  // X8: containment is a file-tool boundary now, so this one is refused by the secret-path guard
+  // instead — a relative `etc/shadow` still resolves to the privileged system file.
+  it('rejects a credentials read before it reaches the host', async () => {
     const { deps, commands } = shellDeps(ROOT)
     const result = await executeRemoteShell(deps, {
       server_id: 'srv-1',

@@ -35,7 +35,7 @@ import { routeAction } from './agent/action-routing'
 import type { ToolExecutor, ToolExecOptions } from './agent/tools'
 import type { PreflightResult, PreflightTier } from './agent/preflight'
 import type { ToolCallRecord } from './agent/success-verifier'
-import { ASK_USER_TOOL, type AgentQuestion } from './agent/question'
+import { ASK_USER_TOOL, type AgentQuestion, type AskUserAnswer } from './agent/question'
 import { answerAskUser, applyLoopGuard } from './agent/action-guards'
 import { buildTraceDecision } from './agent/trace-decision'
 import { createAdapterSummarizer } from './agent/transcript'
@@ -132,7 +132,7 @@ export class AgentOrchestrator {
   private readonly questionGate?: (
     question: AgentQuestion,
     context: { runId: string; step: number }
-  ) => Promise<string | null>
+  ) => Promise<AskUserAnswer>
   private readonly enforceSuccessVerification: boolean
   private readonly diagnosticMode?: () => boolean
   private readonly remoteContext?: RemotePromptContext
@@ -432,6 +432,8 @@ export class AgentOrchestrator {
         ])
         let guardStop: LoopCallDecision | null = null
         let planCancelled = false
+        // X2: set when the question gate reported the deadlock guard rather than an answer.
+        let questionAbandoned: string | null = null
         // v2.6.3 T3.2: the user refused a preflight block; stop the step cleanly.
         let preflightCancelled = false
         // Fix 4: durable system notes for this step, flushed after the tool
@@ -488,7 +490,14 @@ export class AgentOrchestrator {
               runId,
               index
             )
-            observations.push(asked)
+            if (asked.kind === 'abandoned') {
+              // X2's deadlock guard: nobody answered within the configured ceiling, so the
+              // run ends here instead of parking forever. The calls behind the question never
+              // ran — `settlePendingToolCalls` below still answers them for the transcript.
+              questionAbandoned = asked.reason
+              break
+            }
+            observations.push(asked.result)
             // Waiting on a human is not a stall, and a question repeated across steps
             // is not a loop: give the run its budget back.
             loopDetector.markProgress()
@@ -596,6 +605,16 @@ export class AgentOrchestrator {
         if (preflightCancelled) {
           status = 'needs_input'
           message = 'Preflight block cancelled by the user.'
+          finalAnswer = null
+          break
+        }
+
+        // X2: a question nobody ever answered ends the run with the reason instead of
+        // leaving it parked forever. Nothing executed, and the model's transcript stays
+        // consistent because `settlePendingToolCalls` answered the calls this step skipped.
+        if (questionAbandoned) {
+          status = 'needs_input'
+          message = questionAbandoned
           finalAnswer = null
           break
         }

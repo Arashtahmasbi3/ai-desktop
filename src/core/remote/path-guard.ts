@@ -128,11 +128,6 @@ export function commandReferencesParent(command: string): boolean {
   return typeof command === 'string' && PARENT_SEGMENT.test(command)
 }
 
-/**
- * Validate every absolute path referenced by a shell command against the
- * project root. Benign device paths (`/dev/null`, ...) are allowed so ordinary
- * redirections keep working. Returns the first rejection found.
- */
 /** Short options of those transports that consume the following token as their value. */
 const TRANSPORT_OPTIONS_WITH_VALUE = /^-(?:o|p|i|l|F|J|c|e|m|D|Q|W|b)$/
 
@@ -260,11 +255,57 @@ export function stripRemotePayloads(command: string): string {
   return stripped.replace(/\s+/g, ' ').trim()
 }
 
+/**
+ * Which filesystem a command's paths refer to (X8).
+ *
+ * `local` — the command runs here, inside the project, so the project root is a boundary: an
+ * absolute path that leaves it, or a `..` that walks out, is refused.
+ *
+ * `remote-host` — the command is a payload for a host we reach over SSH. The project root is that
+ * command's *working directory* there, not a sandbox: a shell on the host may `ls /opt` or
+ * `df -h /` exactly as its owner can. Comparing those paths with the project root is the v4.1 bug
+ * one layer down, and it burned two steps of a real session (`df -h /opt` and `ls /root/.ssh`, both
+ * reported as "outside project root"). Containment therefore stands down for a remote payload. What
+ * still holds for it is the secret-path guard and the deny list, and every remote call site runs
+ * both before anything reaches the host.
+ */
+export type CommandHost = 'local' | 'remote-host'
+
+/**
+ * Validate every absolute path referenced by a shell command against the
+ * project root. Benign device paths (`/dev/null`, ...) are allowed so ordinary
+ * redirections keep working. Returns the first rejection found.
+ *
+ * `host` says which filesystem those paths belong to: a command that runs on the
+ * remote host is not path-checked against the project root at all (X8).
+ */
 export function enforceCommandPaths(
   command: string,
   projectRoot: string,
-  diagnostic?: DiagnosticPolicy | null
+  diagnostic?: DiagnosticPolicy | null,
+  /** Where the command runs. `remote-host` means "any path on that machine" (X8). */
+  host: CommandHost = 'local'
 ): PathGuardResult {
+  /*
+   * A shell payload for another host is not a file-tool path: the project root is its working
+   * directory, not a boundary. Stand down — the deny list and the secret-path guard are the
+   * boundaries for it, and every remote call site runs both.
+   */
+  if (host === 'remote-host') {
+    /*
+     * X8: a READ on the host may inspect anything the shell's user can see — the project root is
+     * that command's working directory there, not a sandbox. A command that is not provably a read
+     * still changes the host, so it keeps the containment rule below: that is what still refuses
+     * `echo hi > /etc/os-release` now that reads are unconstrained.
+     */
+    if (
+      isCommandAlwaysAllowed(command) ||
+      isDiagnosticReadOnlyCommand(command) ||
+      isReadOnlyShellCommand(command)
+    ) {
+      return { ok: true }
+    }
+  }
   // A `..` segment escapes the root regardless of what the leading token is, so
   // it is refused before any allow-list shortcut can admit the command (v2.6.5:
   // `cd .. && cd .. && cat etc/shadow` used to pass every other check).

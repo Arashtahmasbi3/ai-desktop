@@ -8,7 +8,13 @@ import type { AgentAction, AgentToolResult } from '@shared/agent'
 import type { ContextManager } from './context-manager'
 import type { LoopCallDecision } from './loop-detector'
 import type { OrchestratorLog } from './orchestrator-log'
-import { formatQuestionAnswer, parseQuestion, type AgentQuestion } from './question'
+import {
+  formatQuestionAnswer,
+  isAbandonedAnswer,
+  parseQuestion,
+  type AgentQuestion,
+  type AskUserAnswer
+} from './question'
 import { answeredToolResult, failedToolResult, formatObservation } from './tool-results'
 
 export interface GuardDeps {
@@ -109,10 +115,21 @@ export interface AskUserDeps {
   questionGate: (
     question: AgentQuestion,
     context: { runId: string; step: number }
-  ) => Promise<string | null>
+  ) => Promise<AskUserAnswer>
   log: OrchestratorLog
   context: ContextManager
 }
+
+/**
+ * The outcome of an `ask_user` call, as the loop needs it.
+ *
+ * `answered` hands the model a tool result and the step carries on. `abandoned` is the X2
+ * deadlock guard: nobody answered within the configured ceiling, so the run ends here with
+ * that reason — nothing has executed and nothing will.
+ */
+export type AskUserOutcome =
+  | { kind: 'answered'; result: AgentToolResult }
+  | { kind: 'abandoned'; reason: string }
 
 /**
  * v2.8.0: the model can ask the user a question without ending the run.
@@ -122,13 +139,18 @@ export interface AskUserDeps {
  * twice is normal). Awaiting the answer keeps the same sandbox, context and step budget
  * alive — before this, the only way to ask was to end the turn with no tool calls, so
  * the reply started a brand-new run instead of resuming the work.
+ *
+ * X2: this `await` is the gate. Nothing below it runs while the question is open — no
+ * loop-guard verdict, no approval, no executor — because it sits inside the step's action
+ * loop. A gate that answered itself on a deadline is exactly how the run used to walk past
+ * an open card, so `QuestionBroker` pauses instead of resolving.
  */
 export async function answerAskUser(
   deps: AskUserDeps,
   action: AgentAction,
   runId: string,
   step: number
-): Promise<AgentToolResult> {
+): Promise<AskUserOutcome> {
   const parsed = parseQuestion(action.arguments)
   if (!parsed.ok) {
     // B2-5: a malformed option list is a correction, not a silent repair. The model
@@ -141,18 +163,28 @@ export async function answerAskUser(
       name: action.name,
       content: formatObservation(invalid)
     })
-    return invalid
+    return { kind: 'answered', result: invalid }
   }
   const answer = await deps.questionGate(parsed.question, { runId, step })
+  if (isAbandonedAnswer(answer)) {
+    // X2: the deadlock guard. The question stayed open past the configured ceiling, so the
+    // run ends with the reason instead of parking forever — and, still, without running a
+    // tool. The message is the diagnostic the user sees on the run.
+    deps.log('warn', 'agent.question_abandoned', runId, { step, reason: answer.abandoned })
+    return { kind: 'abandoned', reason: answer.abandoned }
+  }
   const content = formatQuestionAnswer(answer)
   deps.log('info', 'agent.question', runId, {
     step,
-    answered: answer !== null
+    answered: answer !== null,
+    // X2: when nobody answered, record that a *human* chose to move on — a deadline never
+    // appears here, because a deadline pauses the run instead of settling the gate.
+    ...(answer === null ? { reason: 'user_declined_to_answer' } : {})
   })
   deps.context.appendToolResult({
     toolCallId: action.id,
     name: action.name,
     content
   })
-  return answeredToolResult(action, content)
+  return { kind: 'answered', result: answeredToolResult(action, content) }
 }

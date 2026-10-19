@@ -3,7 +3,12 @@ import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { AgentOrchestrator, type ProviderEntry } from '@core/agent-orchestrator'
-import { ASK_USER_TOOL, MAX_QUESTION_OPTIONS, parseQuestion } from '@core/agent/question'
+import {
+  ASK_USER_TOOL,
+  MAX_QUESTION_OPTIONS,
+  QUESTION_OPTION_RULE,
+  parseQuestion
+} from '@core/agent/question'
 import { ScriptedAdapter, toolCall } from '../helpers/fake-adapter'
 import { createLocalManager } from '../helpers/local-sandbox-manager'
 
@@ -198,5 +203,83 @@ describe('ask_user options in the run loop (B2-5)', () => {
     expect(result.status).toBe('completed')
     expect(result.steps).toHaveLength(2)
     await manager.dispose()
+  })
+})
+
+describe('parseQuestion — an option is a button label, not an answer (X3)', () => {
+  /**
+   * The three options the model actually sent in the session behind the report, copied
+   * verbatim from the stored session: 68, 83 and 48 characters, every one a full sentence
+   * with an em dash. The chip truncated them mid-word and RTL reordering broke one into
+   * fragments — which is why an option is now refused instead of squeezed into a chip.
+   */
+  const SESSION_OPTIONS = [
+    "بله، در اپ دسکتاپ ترمینال yoserver را باز می‌کنم — دستور pull را بده",
+    "می‌خواهم IP سرور مبدأ (91.107.174.210) را در پنل userver وایت‌لیست کنم — بعد تست کن",
+    "دسکتاپم واقعاً وصل نیست، اشتباه شد — تیکت می‌زنم"
+  ]
+
+  it('refuses the three options the model actually sent, with the rule and the way out', () => {
+    // The evidence, pinned: 48, 68 and 83 characters in the real session.
+    expect(SESSION_OPTIONS.map((option) => option.length)).toEqual([68, 83, 48])
+    for (const option of SESSION_OPTIONS) {
+      const error = rejected({ question: 'Pick one', options: [option] })
+      expect(error).toContain(QUESTION_OPTION_RULE)
+      expect(error).toMatch(/button labels, not answers/)
+      expect(error).toMatch(/\u22645 words and \u226432 characters/)
+      expect(error).toContain("«وایت‌لیست می‌کنم»")
+      expect(error).toMatch(/free-text question/)
+    }
+  })
+
+  it('the rule names both limits and gives a real short example', () => {
+    expect(QUESTION_OPTION_RULE).toMatch(/\u22645 words/)
+    expect(QUESTION_OPTION_RULE).toMatch(/\u226432 characters/)
+    expect(QUESTION_OPTION_RULE).toContain("«وایت‌لیست می‌کنم»")
+  })
+
+  it('names the rule that was broken: length, words, line break, dash', () => {
+    expect(rejected({ question: 'q', options: ['this option is definitely much too long to fit'] })).toMatch(
+      /is 46 characters long/
+    )
+    expect(rejected({ question: 'q', options: ['one two three four five six'] })).toMatch(/6 words/)
+    expect(rejected({ question: 'q', options: ['line one\nline two'] })).toMatch(/line break/)
+    expect(rejected({ question: 'q', options: ['do it \u2014 now'] })).toMatch(/em dash or en dash/)
+    expect(rejected({ question: 'q', options: ['a \u2013 b'] })).toMatch(/em dash or en dash/)
+  })
+
+  it('still refuses a long session option when its em dash is taken out', () => {
+    const withoutDash = SESSION_OPTIONS[1].replace(/\u2014/g, ',')
+    const error = rejected({ question: 'Pick one', options: [withoutDash] })
+    expect(error).toMatch(/characters long|5 words/)
+  })
+
+  it('accepts a set of short single-line labels', () => {
+    const options = [
+      "وایت‌لیست می‌کنم",
+      "تیکت می‌زنم",
+      "از کنسول pull",
+      "بعداً ادامه بده"
+    ]
+    expect(parseQuestion({ question: '\u06a9\u062f\u0627\u0645\u061f', options })).toEqual({
+      ok: true,
+      question: { prompt: '\u06a9\u062f\u0627\u0645\u061f', options }
+    })
+  })
+
+  it('counts characters, not UTF-16 code units, so the limit stays a label width', () => {
+    // 17 emoji: 34 UTF-16 units but 17 characters on screen, so the label fits.
+    const emoji = String.fromCodePoint(0x1f642).repeat(17)
+    expect(parseQuestion({ question: 'q', options: [emoji] }).ok).toBe(true)
+  })
+
+  it('tells the model the rule in the schema, before it sends anything', () => {
+    const parameters = ASK_USER_TOOL.parameters as {
+      properties: { options: { description: string } }
+    }
+    const description = parameters.properties.options.description
+    expect(description).toMatch(/at most 32 characters/)
+    expect(description).toMatch(/at most 5 words/)
+    expect(description).toMatch(/no em dash/)
   })
 })

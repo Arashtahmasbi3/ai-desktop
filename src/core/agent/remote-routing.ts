@@ -111,10 +111,16 @@ export function routeToolCall(
       return { kind: 'error', message: `Blocked: command references ${secret[0].reason}` }
     }
     if (context.remotePath === undefined) return undefined
+    /*
+     * X8: a `run_command` routed here becomes a `remote_shell` payload, so its paths are the
+     * host's, not the project's. Containment stands down; the secret-path guard above and the
+     * deny list at the executor still apply.
+     */
     const guard = enforceCommandPaths(
       typeof command === 'string' ? command : '',
       context.remotePath,
-      context.diagnostic
+      context.diagnostic,
+      'remote-host'
     )
     return guard.ok
       ? undefined

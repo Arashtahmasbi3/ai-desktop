@@ -122,9 +122,11 @@ describe('routeToolCall containment', () => {
     expect(decision.kind).toBe('error')
   })
 
-  it('refuses a run_command that references an outside path', () => {
+  it('redirects a run_command that names a host path, because it runs on the host (X8)', () => {
+    // X8: `run_command` becomes a `remote_shell` payload, and a shell on that host may read
+    // /etc/passwd. The secret-path guard and the deny list still run at the executor.
     const decision = routeToolCall('run_command', { command: 'cat /etc/passwd' }, context)
-    expect(decision.kind).toBe('error')
+    expect(decision).toMatchObject({ kind: 'redirect', tool: 'remote_shell' })
   })
 
   it('still redirects a run_command that stays inside the project', () => {
@@ -191,7 +193,7 @@ describe('executeRemoteFs containment', () => {
   })
 })
 
-describe('executeRemoteShell containment', () => {
+describe('executeRemoteShell: containment is a file-tool boundary (X8)', () => {
   function deps(projectRoot?: string): RemoteShellDeps & { ran: string[] } {
     const ran: string[] = []
     const result: RemoteShellDeps & { ran: string[] } = {
@@ -206,11 +208,19 @@ describe('executeRemoteShell containment', () => {
     return result
   }
 
-  it('refuses a command referencing a path outside the project', async () => {
+  it('runs a command that inspects another part of the host filesystem', async () => {
     const d = deps(ROOT)
     const result = await executeRemoteShell(d, { server_id: 'srv-1', command: 'cat /etc/passwd' })
+    expect(result.ok).toBe(true)
+    expect(d.ran).toEqual([`cd '${ROOT}' && cat /etc/passwd`])
+  })
+
+  it('still refuses a credentials read before it reaches the host', async () => {
+    const d = deps(ROOT)
+    const result = await executeRemoteShell(d, { server_id: 'srv-1', command: 'cat /etc/shadow' })
     expect(result.ok).toBe(false)
     expect(result.blocked).toBe(true)
+    expect(result.content).not.toMatch(/outside project root/)
     expect(d.ran).toEqual([])
   })
 
@@ -224,9 +234,10 @@ describe('executeRemoteShell containment', () => {
     expect(d.ran).toHaveLength(1)
   })
 
-  it('skips enforcement when no project root is known', async () => {
+  it('skips the project-root cd when no project root is known', async () => {
     const d = deps()
     const result = await executeRemoteShell(d, { server_id: 'srv-1', command: 'cat /etc/passwd' })
     expect(result.ok).toBe(true)
+    expect(d.ran).toEqual(['cat /etc/passwd'])
   })
 })

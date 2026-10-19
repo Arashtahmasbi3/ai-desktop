@@ -1,11 +1,12 @@
 import { Fragment, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Activity, AlertCircle, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react'
+import { Activity, AlertCircle, CheckCircle2, ChevronDown, ChevronRight, ShieldAlert } from 'lucide-react'
 import DecisionCard from './DecisionCard'
 import { InlineMarkdown, MarkdownProse } from './Markdown'
 import { useStore, type ChatMessage } from '../store'
 import { summarizeStep, type StepSummary, type StepToolFact } from '../lib/step-summary'
 import { summarizeActivity, toolHeadline } from '../lib/tool-labels'
+import { isSuccessOutcome, toolOutcome } from '../lib/tool-outcome'
 import type { TraceDecision } from '@shared/trace'
 
 /** Keep the inline list light; the full run is still in the Progress panel. */
@@ -236,8 +237,30 @@ export default function InlineTrace(): JSX.Element | null {
                     className="ml-5 flex flex-wrap gap-1 list-none"
                   >
                     {tools.map((message) => {
-                      const ok = message.toolCall?.ok ?? false
-                      const Icon = ok ? CheckCircle2 : AlertCircle
+                      /*
+                       * X9: the compact row answers to the same four states as the card, so a
+                       * command that exited non-zero is never a green check here either — and an
+                       * approval refusal reads as blocked rather than as a failure.
+                       */
+                      const outcome = toolOutcome({
+                        ok: message.toolCall?.ok,
+                        code: message.toolCall?.code,
+                        exitCode: message.toolCall?.exitCode,
+                        stderr: message.toolCall?.stderr
+                      })
+                      const ok = isSuccessOutcome(outcome)
+                      const Icon =
+                        outcome === 'failed'
+                          ? AlertCircle
+                          : outcome === 'blocked'
+                            ? ShieldAlert
+                            : CheckCircle2
+                      const tone =
+                        outcome === 'failed'
+                          ? 'text-danger'
+                          : outcome === 'blocked'
+                            ? 'text-warning'
+                            : 'text-success'
                       return (
                         <span
                           key={message.id}
@@ -245,14 +268,14 @@ export default function InlineTrace(): JSX.Element | null {
                           data-tool={message.toolCall?.name}
                           title={message.toolCall?.name}
                           className={`flex items-center gap-1 rounded border px-1.5 py-0.5 text-3xs ${
-                            ok ? 'border-border text-fg-muted' : 'border-danger/40 text-danger'
+                            ok
+                              ? 'border-border text-fg-muted'
+                              : outcome === 'blocked'
+                                ? 'border-warning/40 text-warning'
+                                : 'border-danger/40 text-danger'
                           }`}
                         >
-                          <Icon
-                            className={`h-2.5 w-2.5 shrink-0 ${
-                              ok ? 'text-success' : 'text-danger'
-                            }`}
-                          />
+                          <Icon className={`h-2.5 w-2.5 shrink-0 ${tone}`} />
                           {/*
       v2.8.1: a chip that says "a file" tells the reader nothing. The prose headline
       ("Read a file", "Ran a command on the server") is self-explanatory, and the exact

@@ -302,7 +302,11 @@
     "noProjectTitle": "هیچ پروژه‌ای باز نیست",
     "noProjectBody": "بدون پروژه هم می‌توانید گفت‌وگو کنید، اما تا وقتی پروژه‌ای باز نشده دستیار نمی‌تواند هیچ پوشه‌ای را بخواند، اجرا کند یا تغییر دهد.",
     "noProjectOpenFolder": "باز کردن پوشه…",
-    "noProjectStartAnyway": "گفت‌وگو بدون پروژه"
+    "noProjectStartAnyway": "گفت‌وگو بدون پروژه",
+    "questionPaused": "هنوز پاسخی نرسیده؛ اجرا همین‌جا متوقف است و خودش ادامه نمی‌دهد.",
+    "questionResume": "با بهترین فرض من ادامه بده",
+    "toolBlocked": "مسدود",
+    "toolStderrWarnHint": "با کد ۰ تمام شد ولی در stderr نوشت — موفق با هشدار."
   },
   "vpsSelector": {
     "label": "VPS",

@@ -124,10 +124,22 @@ export async function executeRemoteShell(
   if (!connected.includes(serverId)) {
     return { ok: false, content: `Server ${serverId} is not connected.`, ...target }
   }
-  // Containment first: refuse any absolute path in the command that leaves the
-  // project root, then apply the deny list (v2.5, P0-2).
+  /*
+   * Path containment is a FILE-TOOL boundary, and this is not one (X8).
+   *
+   * `remote_shell` runs the command on the host over SSH. The project root is that command's
+   * working directory there (`cd <root> && ...` further down), not a sandbox: the agent may
+   * `ls /opt` or `df -h /` on that host exactly as its owner can. Judging those paths against the
+   * project root is the v4.1 bug one layer down — it blocked ordinary inspection (`df -h /opt`,
+   * `ls /root/.ssh`) and cost a real session two turns. The guard is still the answer for
+   * `remote_read_file`, `remote_list_dir`, `remote_write_file` and `remote_grep` (see
+   * `containPath` in remote-fs-tools).
+   *
+   * What still stops a command on the host is right below: the secret-path guard and the deny
+   * list. Neither is skipped, for any path and in any approval mode.
+   */
   if (deps.projectRoot) {
-    const guard = enforceCommandPaths(command, deps.projectRoot, deps.diagnostic)
+    const guard = enforceCommandPaths(command, deps.projectRoot, deps.diagnostic, 'remote-host')
     if (!guard.ok) {
       return { ok: false, blocked: true, content: `Blocked: ${guard.error}`, ...target }
     }

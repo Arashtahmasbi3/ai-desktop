@@ -24,7 +24,7 @@ import type { ToolExecutor } from './tools'
 import type { Plan, PlanDecision, PlanWarning } from './plan-mode'
 import type { RoutingDecision } from './remote-routing'
 import type { PreflightResult, PreflightTier } from './preflight'
-import type { AgentQuestion } from './question'
+import type { AgentQuestion, AskUserAnswer } from './question'
 import type { RemotePromptContext } from './system-prompt'
 
 /** A file that an agent `write_file` action changed during a run. */
@@ -155,11 +155,17 @@ export interface AgentOrchestratorOptions {
   /**
    * Let the model ask the user a question mid-run (v2.8.0). Consulted when the model
    * calls `ask_user`; the returned answer is appended as that tool's result and the
-   * same run continues — same sandbox, same step budget. `null` means nobody answered,
-   * and the model is told to proceed on its own judgement. Absent means `ask_user` is
-   * never offered to the model at all.
+   * same run continues — same sandbox, same step budget.
+   *
+   * X2: the gate must not resolve on its own. `null` means the user **explicitly**
+   * declined to answer ("You decide" / "resume with my best assumption") or the run was
+   * stopped — never a deadline. While the promise is pending the loop is parked on this
+   * `await`, so no step and no tool runs. `{ abandoned }` is the bounded deadlock guard:
+   * nobody answered within the configured ceiling (closed window, headless run), so the run
+   * ends with that reason instead of waiting forever — and it still never continues past the
+   * question. Absent means `ask_user` is never offered to the model at all.
    */
-  questionGate?: (question: AgentQuestion, context: { runId: string; step: number }) => Promise<string | null>
+  questionGate?: (question: AgentQuestion, context: { runId: string; step: number }) => Promise<AskUserAnswer>
   /**
    * Enforcement (v2.4, A.3). When true, a final answer that claims success is only
    * accepted if a verification-shaped tool call (test/build/health) recently passed.

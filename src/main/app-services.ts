@@ -76,6 +76,18 @@ export interface AppServicesOptions {
   dir?: string
   /** Optional remote port; 0 lets the OS choose a free port. */
   remotePort?: number
+  /**
+   * X2: how long an unanswered question waits before the run pauses. Configured here, at
+   * the composition root, so the deadline is a named value owned by `QuestionBroker` and
+   * not a literal buried inside its `ask()`.
+   */
+  questionPauseAfterMs?: number
+  /**
+   * X2: how long an unanswered question waits after the pause before the run **ends** with a
+   * diagnostic (no listener, closed window, headless worker). Also a named value, configured
+   * here rather than hard-coded, so a harness can drive it to a few milliseconds.
+   */
+  questionAbandonAfterMs?: number
   /** Optional injected custom-provider store (tests). */
   customProviders?: CustomProviderStore
   /** Optional injected onboarding store (tests). */
@@ -247,11 +259,20 @@ export class AppServices {
     this.preflights = new PreflightBroker({
       emit: (event: AgentEvent) => this.emit('agent:event', event)
     })
-    // v2.8.0: the model can ask the user a question mid-run and continue. Unlike the
-    // gates above this is not fail-closed — an unanswered question resolves `null` and
-    // the run carries on with the model's own judgement.
+    // v2.8.0: the model can ask the user a question mid-run and continue. X2: it is a
+    // gate, not a nudge — an unanswered question leaves the run parked (see
+    // QuestionBroker.pause) and only an explicit user action settles it. The abandonment
+    // ceiling is the bounded last word: a run nobody can answer ends with a reason instead
+    // of waiting forever (see QuestionBroker.abandon).
     this.questions = new QuestionBroker({
-      emit: (event: AgentEvent) => this.emit('agent:event', event)
+      emit: (event: AgentEvent) => this.emit('agent:event', event),
+      // X2: both deadlines are configuration, not magic numbers inside `ask()`.
+      ...(options.questionPauseAfterMs !== undefined
+        ? { pauseAfterMs: options.questionPauseAfterMs }
+        : {}),
+      ...(options.questionAbandonAfterMs !== undefined
+        ? { abandonAfterMs: options.questionAbandonAfterMs }
+        : {})
     })
     this.sessionProfile = new SessionProfileService(this.persistence, {
       onChanged: (state) => this.emit('session:changed', state)
@@ -288,8 +309,8 @@ export class AppServices {
           ...(await this.approvalContext())
         }),
       cancelPreflights: () => this.preflights.cancelAll(),
-      // v2.8.0: mid-run questions. Not fail-closed — an unanswered question returns
-      // null and the agent proceeds on its own judgement instead of hanging.
+      // v2.8.0: mid-run questions. X2: this promise settles only on a user action, so an
+      // unanswered question blocks the run instead of letting it proceed on its own.
       requestQuestion: (runId, question) => this.questions.ask(runId, question),
       cancelQuestions: () => this.questions.cancelAll(),
       approvedCommands: this.approvedCommands,

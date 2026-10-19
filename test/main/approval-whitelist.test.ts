@@ -52,8 +52,9 @@ function fakeHost(calls: string[]): RemoteHost {
  *
  * Root cause: approval-gate.ts only consulted requiresApproval + approvedCommands
  * and never asked the command whitelist, so `uname -a` (explicitly allow-listed)
- * still prompted. The bypass relaxes the prompt only: P0-2 containment is still
- * enforced by the remote executors.
+ * still prompted. The bypass relaxes the prompt only: the secret-path guard and the
+ * deny list are still enforced by the remote executors (and, since X8, containment is
+ * a file-tool boundary rather than a shell one).
  */
 describe('Task 2.1 - whitelist bypasses approval', () => {
   it('1. remote_shell "uname -a" needs no approval', async () => {
@@ -99,7 +100,7 @@ describe('Task 2.1 - whitelist bypasses approval', () => {
   })
 })
 
-describe('Task 2.1 - dangerous and out-of-root commands are still gated', () => {
+describe('Task 2.1 - dangerous commands and credentials are still gated', () => {
   it('5. "rm -rf /" needs approval and is deny-listed', async () => {
     const { gate, asked } = askGate()
     const destructive = shell('rm -rf / --no-preserve-root')
@@ -109,22 +110,30 @@ describe('Task 2.1 - dangerous and out-of-root commands are still gated', () => 
     expect(asked).toHaveLength(1)
   })
 
-  it('6. "cat /etc/passwd" skips approval but is BLOCKED by P0-2 at the executor', async () => {
+  it('6. "cat /etc/passwd" skips approval and runs, while a credentials read is still blocked', async () => {
     // The classifier treats `cat` as a read, so no prompt is shown...
     expect(isReadOnlyShellCommand('cat /etc/passwd')).toBe(true)
     const { gate, asked } = askGate()
     expect(await gate(shell('cat /etc/passwd'))).toBe(true)
     expect(asked).toHaveLength(0)
 
-    // ...but P0-2 containment still refuses to run it outside the project root.
+    // ...and (X8) a shell command on the host is no longer path-contained against the project
+    // root, so this ordinary read runs there.
     const calls: string[] = []
     const runtime = planRemoteRuntime('why is it slow', 'srv-1', fakeHost(calls), undefined, undefined, ROOT)
-    const result = await runtime.extraExecutor!.execute(
+    const passwd = await runtime.extraExecutor!.execute(
       action('remote_shell', { server_id: 'srv-1', command: 'cat /etc/passwd' })
     )
-    expect(result.ok).toBe(false)
-    expect(result.code).toBe('blocked')
-    expect(calls).toHaveLength(0)
+    expect(passwd.ok).toBe(true)
+    expect(calls).toHaveLength(1)
+
+    // A credentials read never reaches the host.
+    const shadow = await runtime.extraExecutor!.execute(
+      action('remote_shell', { server_id: 'srv-1', command: 'cat /etc/shadow' })
+    )
+    expect(shadow.ok).toBe(false)
+    expect(shadow.code).toBe('blocked')
+    expect(calls).toHaveLength(1)
   })
 
   it('keeps the always-allowed whitelist a strict subset of the read-only classifier', () => {

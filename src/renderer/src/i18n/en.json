@@ -302,7 +302,11 @@
     "noProjectTitle": "No project open",
     "noProjectBody": "You can talk to the assistant without one, but until a project is open it cannot read, run or change anything in a folder.",
     "noProjectOpenFolder": "Open a folder…",
-    "noProjectStartAnyway": "Chat without a project"
+    "noProjectStartAnyway": "Chat without a project",
+    "questionPaused": "No answer yet, so the run is paused here. It will not continue on its own.",
+    "questionResume": "Resume with my best assumption",
+    "toolBlocked": "blocked",
+    "toolStderrWarnHint": "Exited 0 but wrote to stderr — succeeded with warnings."
   },
   "vpsSelector": {
     "label": "VPS",

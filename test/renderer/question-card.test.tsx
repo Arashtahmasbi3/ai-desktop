@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import i18n from '../../src/renderer/src/i18n'
 import QuestionCard from '../../src/renderer/src/components/QuestionCard'
 import { useStore } from '../../src/renderer/src/store'
@@ -78,6 +78,45 @@ describe('QuestionCard (v2.8.0)', () => {
     fireEvent.click(screen.getByTestId('question-skip'))
 
     await waitFor(() => expect(respond).toHaveBeenCalledWith('question-1', null))
+  })
+
+  /**
+   * X2 — a timeout is not an answer.
+   *
+   * The run is parked on the gate in main, which is why nothing here settles it: at the
+   * deadline the open question (and its shortcut chips) is replaced by the explicit
+   * "resume with my best assumption" affordance, and the only way forward is a click.
+   */
+  it('replaces the open question at the configured deadline with an explicit resume', () => {
+    vi.useFakeTimers()
+    try {
+      useStore.setState({ pendingQuestion: question({ options: ['staging'], timeoutMs: 1000 }) })
+      render(<QuestionCard />)
+
+      // Before the deadline it is still an ordinary question with its shortcuts.
+      expect(screen.getByTestId('question-options')).toBeTruthy()
+      expect(screen.queryByTestId('question-resume')).toBeNull()
+
+      act(() => {
+        vi.advanceTimersByTime(999)
+      })
+      expect(screen.queryByTestId('question-resume')).toBeNull()
+
+      act(() => {
+        vi.advanceTimersByTime(1)
+      })
+
+      // The card is now the paused affordance, not an open question...
+      expect(screen.queryByTestId('question-options')).toBeNull()
+      expect(screen.getByTestId('question-paused')).toBeTruthy()
+      // ...the run is still waiting on this question...
+      expect(useStore.getState().pendingQuestion).not.toBeNull()
+      // ...and only the explicit click moves it on.
+      fireEvent.click(screen.getByTestId('question-resume'))
+      expect(respond).toHaveBeenCalledWith('question-1', null)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('keeps the card open when the reply fails, and says why', async () => {

@@ -24,7 +24,7 @@ import { resolveRunGoal, type RunGoalContext } from '@core/agent/goal-context'
 import type { GoalStore } from '@core/agent/goal-store'
 import type { Persistence } from '@core/agent/persistence'
 import { PlanTrustRegistry } from '@core/agent/plan-trust'
-import type { AgentQuestion } from '@core/agent/question'
+import type { AgentQuestion, AskUserAnswer } from '@core/agent/question'
 import { RunStore } from '@core/agent/run-store'
 import type { SessionStore } from '@core/agent/session-store'
 import { resolveToolExposure, toolPolicyFor } from '@core/agent/tool-policy'
@@ -146,11 +146,12 @@ export interface AgentServiceOptions {
   /** Cancel any outstanding preflight requests (e.g. the user aborted). */
   cancelPreflights?: () => void
   /**
-   * v2.8.0: ask the user a question mid-run and wait for the answer. Resolves `null`
-   * when nobody answers, so the run continues on the model's own judgement. Absent
-   * means `ask_user` is never offered to the model.
+   * v2.8.0: ask the user a question mid-run and wait for the answer. X2: this resolves only
+   * on a user action (`null` = "you decide"), or with `{ abandoned }` when the broker's
+   * bounded deadlock guard fires so the run ends with a reason instead of parking forever.
+   * Absent means `ask_user` is never offered to the model.
    */
-  requestQuestion?: (runId: string, question: AgentQuestion) => Promise<string | null>
+  requestQuestion?: (runId: string, question: AgentQuestion) => Promise<AskUserAnswer>
   /** Answer any outstanding question as unanswered (e.g. the user aborted). */
   cancelQuestions?: () => void
   /** Learned approvals that suppress future prompts (Sprint v2.3, B.3). */
@@ -214,7 +215,7 @@ export class AgentService {
   private readonly cancelApprovals?: () => void
   private readonly cancelPlans?: () => void
   private readonly cancelPreflights?: () => void
-  private readonly requestQuestion?: (runId: string, question: AgentQuestion) => Promise<string | null>
+  private readonly requestQuestion?: (runId: string, question: AgentQuestion) => Promise<AskUserAnswer>
   private readonly cancelQuestions?: () => void
   private readonly files?: ProjectFiles
   /** v2.9.0: desktop files/images the user attached to a run. */

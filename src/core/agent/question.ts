@@ -25,6 +25,27 @@ import type { ToolDefinition } from '@shared/types'
  */
 export const MAX_QUESTION_OPTIONS = 6
 
+/**
+ * X3: an option is a button label, not an answer.
+ *
+ * The three options the model sent in the session log behind the report were 68, 83 and
+ * 48 characters — full sentences, each with an em dash. The chip truncated them mid-word
+ * and RTL reordering turned one into fragments. A chip is a shortcut, so the shape is
+ * enforced here, before the card ever sees it: one line, at most 32 characters and at most
+ * 5 words, and no em/en dash (the tell-tale of a sentence squeezed into a chip).
+ */
+export const MAX_QUESTION_OPTION_CHARS = 32
+export const MAX_QUESTION_OPTION_WORDS = 5
+
+/**
+ * The rule every option refusal ends with.
+ *
+ * It names the rule, both limits and a real short example, because a refusal is a
+ * correction: the model has to be able to fix it on the next call without guessing.
+ */
+export const QUESTION_OPTION_RULE =
+  'Options are button labels, not answers: use ≤5 words and ≤32 characters, e.g. «وایت‌لیست می‌کنم».'
+
 export const ASK_USER_TOOL: ToolDefinition = {
   name: 'ask_user',
   description:
@@ -45,9 +66,11 @@ export const ASK_USER_TOOL: ToolDefinition = {
         items: { type: 'string' },
         maxItems: MAX_QUESTION_OPTIONS,
         description:
-          'Optional 2 to 6 short suggested answers, when the choice is closed. They become ' +
-          'one-click buttons, and the user may still type their own answer instead. Omit the ' +
-          'field (or pass an empty list) to ask a free-text question.'
+          'Optional 2 to 6 suggested answers, when the choice is closed. Each one is a button ' +
+          'label, not an answer: at most 32 characters, one line, at most 5 words, and no em ' +
+          'dash (—) or en dash (–). They become one-click buttons, and the user may still type ' +
+          'their own answer instead. Omit the field (or pass an empty list) to ask a free-text ' +
+          'question. An option that breaks these limits is refused, never trimmed.'
       }
     },
     required: ['question'],
@@ -59,6 +82,22 @@ export const ASK_USER_TOOL: ToolDefinition = {
 export interface AgentQuestion {
   prompt: string
   options?: string[]
+}
+
+/**
+ * What the gate can report back (X2).
+ *
+ * `string` is the user's answer and `null` is an explicit "you decide" — both continue the
+ * same run. `{ abandoned }` is the deadlock guard: nobody answered within the configured
+ * ceiling (a closed window, a headless worker, a harness with no answerer), so the run
+ * **ends** with that reason instead of parking forever. It is not a third kind of answer,
+ * and it never lets a step run: no tool has executed while the question was open.
+ */
+export type AskUserAnswer = string | null | { abandoned: string }
+
+/** True when the gate reported the deadlock guard rather than an answer. */
+export function isAbandonedAnswer(answer: AskUserAnswer): answer is { abandoned: string } {
+  return typeof answer === 'object' && answer !== null && 'abandoned' in answer
 }
 
 /**
@@ -77,6 +116,33 @@ const FREE_TEXT_HINT = 'Send no "options" (or an empty list) for a free-text que
 function describeType(value: unknown): string {
   if (value === null) return 'null'
   return Array.isArray(value) ? 'an array' : typeof value
+}
+
+/**
+ * X3: one refusal shape for every option-shape violation, so the model always gets the
+ * reason, the rule and the example in the same order — and always the way out.
+ */
+function optionShapeError(index: number, detail: string): string {
+  return (
+    'ask_user option ' +
+    (index + 1) +
+    ' ' +
+    detail +
+    '. ' +
+    QUESTION_OPTION_RULE +
+    ' ' +
+    FREE_TEXT_HINT
+  )
+}
+
+/** Characters, not UTF-16 code units, so an emoji costs one character and not two. */
+function optionLength(text: string): number {
+  return Array.from(text).length
+}
+
+/** Whitespace-separated words; an RTL label splits on spaces exactly like an LTR one. */
+function optionWordCount(text: string): number {
+  return text.split(/\s+/).filter((word) => word !== '').length
 }
 
 /**
@@ -150,6 +216,51 @@ export function parseQuestion(args: Record<string, unknown>): ParsedQuestion {
           FREE_TEXT_HINT
       }
     }
+    /*
+     * X3: an option is a button label. Shape comes before uniqueness — a duplicated
+     * 83-character sentence is first of all too long, and that is the correction the model
+     * needs to hear. Every refusal names the broken rule and the fix.
+     */
+    if (text.includes('\n') || text.includes('\r')) {
+      return {
+        ok: false,
+        error: optionShapeError(index, 'contains a line break; a button label is one line')
+      }
+    }
+    if (text.includes('\u2014') || text.includes('\u2013')) {
+      return {
+        ok: false,
+        error: optionShapeError(
+          index,
+          'contains an em dash or en dash (\u2014 or \u2013); that is how a whole sentence gets ' +
+            'squeezed into a chip'
+        )
+      }
+    }
+    if (optionLength(text) > MAX_QUESTION_OPTION_CHARS) {
+      return {
+        ok: false,
+        error: optionShapeError(
+          index,
+          'is ' +
+            optionLength(text) +
+            ' characters long, and the limit is ' +
+            MAX_QUESTION_OPTION_CHARS
+        )
+      }
+    }
+    if (optionWordCount(text) > MAX_QUESTION_OPTION_WORDS) {
+      return {
+        ok: false,
+        error: optionShapeError(
+          index,
+          'has ' +
+            optionWordCount(text) +
+            ' words, and the limit is ' +
+            MAX_QUESTION_OPTION_WORDS
+        )
+      }
+    }
     // Compared after trimming, case-sensitively: the labels are buttons, so two
     // byte-identical entries are indistinguishable, while "Start" and "start" are
     // different answers the user can tell apart.
@@ -172,16 +283,20 @@ export function parseQuestion(args: Record<string, unknown>): ParsedQuestion {
 }
 
 /**
- * The answer the model receives. A closed question with no answer (timeout, abort)
- * must say so plainly, so the model falls back to its own judgement instead of
- * inventing a user decision.
+ * The answer the model receives.
+ *
+ * X2: `null` only ever means the user **explicitly** declined to answer — they pressed
+ * "You decide" / "Resume with my best assumption", or the run was stopped. A deadline no
+ * longer settles the gate at all, so this must not claim a timeout happened; the old
+ * wording told the model the question had timed out even when the user had answered
+ * "you decide", and told the same lie while the card was still open.
  */
 export function formatQuestionAnswer(answer: string | null): string {
   if (answer === null) {
     return (
-      'The user did not answer (the question timed out or the run was stopped). ' +
+      'The user did not answer and chose to let you continue. ' +
       'Proceed with your best judgement and state the assumption you made.'
     )
   }
-  return `The user answered: ${answer}`
+  return 'The user answered: ' + answer
 }

@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { HelpCircle, Send } from 'lucide-react'
+import { Clock, HelpCircle, Send } from 'lucide-react'
 import { useStore } from '../store'
 
 /**
@@ -22,12 +22,30 @@ import { useStore } from '../store'
  * stays, and both ways call the same `submit` below, so both produce an identical
  * `respondQuestion` payload (`{ id, answer }`). Duplicating that path is how "continue
  * the same run" breaks, so there is deliberately only one.
+ *
+ * X2: the deadline. The run is parked on the gate in main and never moves on its own, so
+ * the same configured deadline (`timeoutMs`, carried by the request from the broker's
+ * `pauseAfterMs`) only changes what this card offers: the shortcut chips are replaced by
+ * an explicit "resume with my best assumption" button. Nothing here settles the gate by
+ * itself — a timeout is not an answer, and only a click is. The deadline is mirrored here
+ * rather than kept in the store because the store's event map deliberately has no pause
+ * member; the decision itself stays in `QuestionBroker`.
  */
 export default function QuestionCard(): JSX.Element | null {
   const { t } = useTranslation()
   const pending = useStore((state) => state.pendingQuestion)
   const respond = useStore((state) => state.respondQuestion)
   const [answer, setAnswer] = useState('')
+  const [paused, setPaused] = useState(false)
+  const pendingId = pending?.id ?? null
+  const deadlineMs = pending?.timeoutMs ?? 0
+
+  useEffect(() => {
+    setPaused(false)
+    if (pendingId === null || !Number.isFinite(deadlineMs) || deadlineMs <= 0) return
+    const timer = setTimeout(() => setPaused(true), deadlineMs)
+    return () => clearTimeout(timer)
+  }, [pendingId, deadlineMs])
 
   if (!pending) return null
 
@@ -48,7 +66,32 @@ export default function QuestionCard(): JSX.Element | null {
         </span>
       </p>
 
-      {pending.options && pending.options.length > 0 ? (
+      {paused ? (
+        <div
+          data-testid="question-paused"
+          className="mt-2 flex flex-wrap items-start gap-2 rounded border border-warning/40 bg-warning/10 p-2"
+        >
+          <p className="flex min-w-0 flex-1 items-start gap-1.5 text-2xs text-warning">
+            <Clock className="mt-0.5 h-3 w-3 shrink-0" />
+            <span dir="auto">
+              {t('chat.questionPaused', {
+                defaultValue:
+                  'No answer yet, so the run is paused here. It will not continue on its own.'
+              })}
+            </span>
+          </p>
+          <button
+            type="button"
+            data-testid="question-resume"
+            onClick={() => submit(null)}
+            className="rounded border border-warning/50 px-2 py-1 text-2xs font-medium text-warning transition hover:bg-warning/15"
+          >
+            {t('chat.questionResume', { defaultValue: 'Resume with my best assumption' })}
+          </button>
+        </div>
+      ) : null}
+
+      {!paused && pending.options && pending.options.length > 0 ? (
         <>
           <div
             role="group"
@@ -60,7 +103,7 @@ export default function QuestionCard(): JSX.Element | null {
               <button
                 key={option}
                 type="button"
-                data-testid={`question-option-${option}`}
+                data-testid={'question-option-' + option}
                 onClick={() => submit(option)}
                 className="rounded-lg border border-border bg-bg-primary px-2 py-1 text-2xs text-fg transition hover:border-accent/50 hover:bg-bg-tertiary"
               >
@@ -100,15 +143,17 @@ export default function QuestionCard(): JSX.Element | null {
           <Send className="h-3 w-3" />
           {t('chat.questionSend')}
         </button>
-        <button
-          type="button"
-          data-testid="question-skip"
-          onClick={() => submit(null)}
-          title={t('chat.questionSkipHint')}
-          className="rounded px-2 py-1 text-2xs text-fg-muted hover:bg-bg-tertiary hover:text-fg"
-        >
-          {t('chat.questionSkip')}
-        </button>
+        {paused ? null : (
+          <button
+            type="button"
+            data-testid="question-skip"
+            onClick={() => submit(null)}
+            title={t('chat.questionSkipHint')}
+            className="rounded px-2 py-1 text-2xs text-fg-muted hover:bg-bg-tertiary hover:text-fg"
+          >
+            {t('chat.questionSkip')}
+          </button>
+        )}
       </form>
     </div>
   )
