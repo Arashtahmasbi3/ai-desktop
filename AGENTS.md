@@ -51,6 +51,24 @@ fails, a tool is missing, or the budget ran out — ask rather than guess).
 
 ## Status
 
+**v4.2.0 released — the substrate the audit asked for, and three god files split.** Thirty-two findings from
+`ai-desktop-audit-and-plan-fa.md`, worked in the approved order. The load-bearing additions are seams rather than
+features: one `ToolsetBuilder` assembles a run's tools (a definition without a route is a tool nothing can run;
+neither mistake was visible in a diff), and on top of it **MCP** and **`SKILL.md`** — a capability can now arrive as
+a configured server or a folder on disk. MCP tools are foreign by construction (`mcp__<server>__<tool>`) and get
+shell semantics in the approval gate, because "auto-approve writes" was a choice about the agent's own tools, not
+about a process the user just installed. `store.ts` 2243 → 193, `agent-service.ts` 1967 → 744,
+`agent-orchestrator.ts` 2072 → 785, with no file in `src/` over 800 and **no importer changed**. A stopped run now
+names one of twelve causes from a table — the old chain reported a *refused* connection as a timeout — and the card
+actually renders it. The network policy covers the ways a command really reaches a host, `ask_user` stopped silently
+repairing a model's options, and three process rules became build failures: a settings switch nothing reads, a new
+double cast, a new assertion on exact UI copy (179 existing ones are a ratchet that may only shrink), plus a
+capability matrix that must name every tool the agent can be offered. **Honest limits:** one invariant of the
+settings-capability test was lost when its agent was interrupted and is deliberately not guessed back; the screenshot
+driver and the debug port are tested only in their pure halves, because Defender blocks executing a freshly built
+unsigned exe here; code signing stays deferred and the review queue needs a product decision. 327 test files / 2971
+tests green, typecheck clean. (2026-10-19)
+
 **v4.1.0 released — a stopped run explains itself, and the network became a kind of action.** The report was "I am
 not satisfied, it keeps getting stuck", backed by a screenshot and, crucially, by the session log, which changed
 the diagnosis twice. A run ended with "It looks like I got stuck" while the app knew that SSH to the target had

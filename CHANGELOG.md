@@ -7,6 +7,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.2.0] — 2026-10-19
+
+Thirty-two audit findings, worked in the order they were approved, and the substrate the app was missing: a tool
+contract, MCP, skills, and three god files split. Every item below is a commit, and every claim below is a test.
+
+### Added — capabilities that arrive as data, not code
+
+- **MCP servers.** A server configured in Settings publishes tools; they appear to the model as
+  `mcp__<server>__<tool>` and run inside every run, including a local one with no VPS. The client speaks the spec's
+  newline-delimited JSON over stdio, tolerates a banner before the protocol, negotiates the version instead of
+  enforcing it, rejects pending calls when a server dies, and closes every child process in a `finally`. A server's
+  tools are **never** silently approved: they get shell semantics and their own dialog label, because the user chose
+  "auto-approve writes" for the agent's own tools, not for a process they just installed.
+- **`SKILL.md`.** A folder with a markdown file is now a capability: the run discovers it, the system hint carries
+  only names and one-line descriptions, and `use_skill(name)` loads a body capped at 8000 characters. Names are
+  lookup keys, never path segments, so `../secrets` is simply unknown.
+- **A stopped run names its cause** from a table of twelve patterns instead of a chain of `if`s — and the card shows
+  it. The old chain reported a **refused** connection as an SSH timeout, because "connect to host" matched its
+  timeout test.
+- **A usage dashboard** that answers "where did this month's spend go": days, providers, models, against the cap.
+- **A debug port in a packaged build**, off by default and bound to loopback, so a user's install can be diagnosed.
+- **A release script** (`npm run release -- <version>`) that refuses a dirty tree, a non-master branch, an invalid
+  bump or an already-released version, prints its plan, builds outside `Documents` (the Defender trap), writes
+  checksums and stops before committing.
+- **CI** with a second job that captures the interface in both themes over CDP and reports what changed.
+
+### Changed — the substrate
+
+- **One place assembles a run's tools** (`ToolsetBuilder`). `agent-service` grew a run's tools by pushing into two
+  parallel arrays five and six times; a definition without a route is a tool nothing can run, and a route without a
+  definition is a tool nothing can call. Neither is visible in a diff.
+- **Three files over 2000 lines became thirty-four modules**, none over 800: `store.ts` 2243 → 193 (nine files, and
+  no importer changed), `agent-service.ts` 1967 → 744 (ten), `agent-orchestrator.ts` 2072 → 785 (seventeen). The
+  orchestrator's split was checked mechanically — 47 log events before and after, 213 long prompt strings still
+  present — because a reordered prompt is invisible to a type checker.
+- **The network policy covers the ways a command actually reaches a host**: raw TCP, scanners, HTTP clients, DNS,
+  remote copies, and inline interpreter sockets. `curl http://localhost:3000` **is** a network action; the dialog now
+  names the address. The read-only set did not widen.
+- **`ask_user` stopped repairing bad options.** Core used to drop and truncate a model's 8-option list silently, so
+  the card showed a set the model never designed. Now it refuses with the way out, and the run continues.
+- **Empty and error states** obey one rule through one component: say what is missing, at most two actions.
+- **Disclosure**: a file change, a long output and a trace step each have a summary that reads on its own, with the
+  detail one action away.
+
+### Fixed
+
+- `connection refused` no longer reported as a timeout (the verdict table above).
+- The file-change panel's per-file `+added / −removed` counts, dropped by the disclosure rework and restored — the
+  old assertion was kept, the behaviour was fixed.
+- A copy of `shellQuote` in seven files became one, with 22 tests that round-trip hostile values through a real shell.
+- Two effects with silenced dependency lists: one now has a `useCallback`, the other has a test proving its narrow
+  dependency list is deliberate.
+- **179 assertions on exact UI copy** are now a ratchet that may only shrink, and the 10 double casts are a budget
+  with a reason per file.
+
+### Changed — process
+
+- **Rules that were prose now fail the build**: a settings switch nothing reads, an unregistered capability, a new
+  double cast, a new exact-copy assertion, a missing capability-matrix row.
+- **`docs/CAPABILITY_MATRIX.md`** states every capability as real / partial / absent with what proves it. Code
+  signing and the review queue are listed as **absent** rather than omitted.
+
+### Known limits, stated rather than hidden
+
+- **One invariant of the settings-capability test was lost** when the agent writing it was interrupted; its body was
+  cut and left a dangling assertion. It is deliberately not guessed back, because an invented version of that scan
+  could pass while checking nothing. The other four invariants are live.
+- **The screenshot driver's runtime path is unexercised on this machine**: Defender blocks executing a freshly built
+  unsigned exe from `Documents`. Its decision logic has 13 tests; the CI job is where it runs.
+- **The debug port's flag is tested, its packaged runtime is not**, for the same reason.
+- Code signing remains deferred to the public release, and the review queue needs an explicit product decision.
+
+### Numbers
+
+327 test files, 2971 tests, 34 new modules, 15 commits. Typecheck clean.
+
 ## [4.1.0] — 2026-10-18
 
 ### Changed — a stopped run now explains itself
@@ -1444,6 +1520,7 @@ First stable release. Ships as a Windows x64 NSIS installer and a portable execu
 - Optional code signing via `CSC_LINK` / `CSC_KEY_PASSWORD` (skipped safely when absent).
 
 [Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v4.1.0...HEAD
+[4.2.0]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v4.1.0...v4.2.0
 [4.1.0]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v4.0.1...v4.1.0
 [4.0.1]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v4.0.0...v4.0.1
 [4.0.0]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v3.2.1...v4.0.0
