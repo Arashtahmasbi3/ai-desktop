@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.3.1] — 2026-10-19
+
+A second session of the same user, three screenshots, and the root cause the last six rounds kept treating as a
+symptom.
+
+### The bug that made everything else look broken
+
+Every remote tool failed in 0.00–0.01 s with `Not connected` while the chat header, the banner and the tree dot all
+said connected. The stop card then said *"no specific cause: the output matches no known failure pattern"*, and the
+drift guard claimed the last two steps had *"re-run probes whose answers it already had"* — the probes never ran.
+
+Two causes, both recorded as fixed in v2.8.0 and both regressed:
+
+- **The watchdog.** `SshManager` disconnects any server not `markActive` for 30 minutes, and only the active project's
+  server was being pinged. So a second connection died silently after half an hour. Sessions now carry **pins** (a run,
+  an open remote project, or a manual connection) and a pinned session is never swept — while an unpinned idle one
+  still closes, so the reaper is not disabled.
+- **The single status slot.** The renderer kept a last-writer-wins `vpsStatus` and two surfaces treated it as the set
+  of connected servers. `vpsStates` is now the only source of truth, and a `vps:liveness` event per server flips the
+  header, the banner and the tree dot in the same tick.
+
+### Fixed
+
+- **A dead session is a fact with a name.** `session-dropped` is now a verdict (weight 88) matching the real strings —
+  `Not connected`, `remote_error`, `channel closed`, `ECONNRESET` — with two actions: reconnect and retry, or use
+  another server.
+- **One reconnect, never two.** Every remote tool that finds its session gone gets exactly one bounded
+  `reconnectOnce(serverId, reason)`; the outcome is reported, the failed call is never re-run, and a command that
+  merely *prints* "not connected" cannot tear down a healthy session.
+- **An infrastructure failure stops the run on the first occurrence**, and is counted as neither progress nor
+  "no new information". The matcher lives in one module shared by the verdict and the loop detector.
+- **No raw UUID reaches the user.** The diagnostics message named two ids; it names the server now.
+- **`Cost unknown` is gone.** An unpriced model reports a lower bound, in those words.
+- **The `Remote:` banner is gone** — it had survived a claim that it was removed, and it asserted `(connected)` while
+  the session was dead.
+- **The simple/advanced switch is visible again** as a segmented control with `aria-pressed`; a menu item is what the
+  original U3-1 existed to undo.
+
+### Not verified, stated plainly
+
+**No screenshot pass.** `npm run build` succeeds, but launching `electron.exe` on this machine is cancelled by the OS
+(`The operation was canceled by the user`) before a debug port opens, so the shell was not looked at. The evidence for
+this release is 346 test files and the build, not a picture of the window. The session fixes are proven against
+injected clocks and fake transports; a live cut-session run is still owed.
+
+346 test files / 3188 tests green, typecheck and production build clean.
+
 ## [4.3.0] — 2026-10-19
 
 Everything here came from one real session log, not from a review of the code. The user asked four times whether a

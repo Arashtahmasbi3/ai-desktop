@@ -136,6 +136,30 @@ describe('R1 - one reconnect, then report the outcome', () => {
     expect(calls).toHaveLength(1)
   })
 
+  /*
+   * R6a: the note is appended to the failure the user reads. It used to say
+   * `... the SSH session to server 34c80099-... is gone` — the same shape of leak as the
+   * diagnostics sentence. It now names the machine; the id stays on the tool result.
+   */
+  it('names the server in the note instead of printing its id (R6)', async () => {
+    const uuid = '34c80099-2868-40a1-bef4-9b23d865db0b'
+    const executor = new SessionLivenessExecutor(
+      new ScriptedExecutor([failure('Server spmotor is not connected.')]),
+      {
+        isConnected: () => false,
+        reconnect: async () => FAILED_RECONNECT,
+        serverName: async (serverId: string) => (serverId === uuid ? 'spmotor' : undefined)
+      }
+    )
+
+    const result = await executor.execute(action(uuid))
+
+    expect(result.output).toContain('spmotor')
+    expect(result.output).not.toMatch(
+      /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
+    )
+  })
+
   it('uses the pinned server when the action names none', async () => {
     const { calls, executor } = harness({
       results: [failure('Not connected')],
