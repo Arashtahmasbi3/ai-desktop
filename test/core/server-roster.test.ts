@@ -16,7 +16,9 @@ import {
   ServerRefResolvingExecutor,
   wrapServerRefRoutes
 } from '../../src/core/tools/server-ref-executor'
+import { checkReachability } from '../../src/core/remote/reachability'
 import type { AgentAction, AgentToolResult } from '../../src/shared/agent'
+import type { ReachabilityReport } from '../../src/shared/vps'
 import type { ToolExecutor } from '../../src/core/agent/tools'
 
 /**
@@ -25,6 +27,10 @@ import type { ToolExecutor } from '../../src/core/agent/tools'
  *
  * Two structural causes: nothing enumerated the saved servers, and every id-taking tool
  * resolved by exact id. These are the two fixes.
+ *
+ * X1 (v4.3) — "offline" for a server that was up. The roster line must report three separate
+ * facts, never one status word: `hasSession` (we hold an SSH connection), the observed port
+ * reachability per path, and `configured` (it exists in Settings).
  */
 const SERVERS: ServerRefTarget[] = [
   { id: '34c80099-2868-40a1-bef4-9b23d865db0b', name: 'my-server', host: '203.0.113.23', port: 22, username: 'root' },
@@ -32,9 +38,35 @@ const SERVERS: ServerRefTarget[] = [
 ]
 
 const SUMMARIES: ServerSummary[] = [
-  { ...SERVERS[0]!, connected: true, policyMode: 'production' },
-  { ...SERVERS[1]!, connected: false, active: true }
+  { ...SERVERS[0]!, hasSession: true, configured: true, policyMode: 'production' },
+  { ...SERVERS[1]!, hasSession: false, configured: true, active: true }
 ]
+
+/** The server from the session log: up, listening, and reported as `offline` because no session was held. */
+const AT_SOURCE = Date.UTC(2026, 9, 19, 6, 12)
+const AT_LOCAL = Date.UTC(2026, 9, 19, 6, 13)
+
+const REACHABLE_TARGET: ServerSummary = {
+  id: 'e1e1e1e1-0000-0000-0000-000000000001',
+  name: 'spmotor',
+  host: '91.107.174.210',
+  port: 22,
+  username: 'root',
+  hasSession: true,
+  configured: true
+}
+
+const UNREACHABLE_FROM_SOURCE: ServerSummary = {
+  id: 'e1e1e1e1-0000-0000-0000-000000000002',
+  name: 'yoserver-spmotor',
+  host: '212.16.86.23',
+  port: 22,
+  username: 'root',
+  hasSession: false,
+  configured: true,
+  portFromSource: { from: 'source', open: false, at: AT_SOURCE, detail: 'refused' },
+  portFromLocal: { from: 'local', open: true, at: AT_LOCAL, detail: 'tcp handshake' }
+}
 
 describe('resolveServerRef (v2.8.1)', () => {
   it('resolves an exact id', () => {
@@ -108,11 +140,19 @@ describe('resolveServerRef (v2.8.1)', () => {
 })
 
 describe('formatServerList (v2.8.1)', () => {
-  it('lists id, name, user@host:port and state, and says how to reference a server', () => {
+  it('lists id, name, user@host:port and the facts, and says how to reference a server', () => {
     const text = formatServerList(SUMMARIES)
-    expect(text).toContain(`- my-server (id: ${SERVERS[0]!.id}) root@203.0.113.23:22 [connected, policy: production]`)
-    expect(text).toContain(`- demo-b (id: ${SERVERS[1]!.id}) ubuntu@203.0.113.10:2222 [offline, active project server]`)
+    expect(text).toContain(
+      `- my-server (id: ${SERVERS[0]!.id}) root@203.0.113.23:22 ` +
+        '[session open] [22 from source: unknown] [22 from local: unknown] [policy: production]'
+    )
+    expect(text).toContain(
+      `- demo-b (id: ${SERVERS[1]!.id}) ubuntu@203.0.113.10:2222 ` +
+        '[no session] [2222 from source: unknown] [2222 from local: unknown] [active project server]'
+    )
     expect(text).toMatch(/Pass the id, the name, or the host/)
+    // `configured` is stated once, so it cannot be confused with either of the other two facts.
+    expect(text).toMatch(/every one is configured in Settings/)
   })
 
   it('says there are none instead of inventing one', () => {
@@ -125,6 +165,97 @@ describe('formatServerList (v2.8.1)', () => {
     expect(matchesServerRef(SUMMARIES[0]!, '203.0.113.23')).toBe(true)
     expect(matchesServerRef(SUMMARIES[0]!, '')).toBe(false)
     expect(matchesServerRef(SUMMARIES[0]!, 'other')).toBe(false)
+  })
+})
+
+describe('X1 — three facts, never one status word', () => {
+  it('renders a server that is up but holds no session without the word offline', () => {
+    // This is the exact log line that started it: the host answered ping, sshd was listening and
+    // reachable from the user's computer, and the roster said `[offline]`.
+    const text = formatServerList([UNREACHABLE_FROM_SOURCE])
+    const line = text.split('\n').find((entry) => entry.startsWith('- ')) ?? ''
+    expect(line).toContain(
+      '- yoserver-spmotor (id: e1e1e1e1-0000-0000-0000-000000000002) root@212.16.86.23:22 ' +
+        '[no session] [22 from source: closed, 06:12] [22 from local: open, 06:13]'
+    )
+    expect(line).not.toMatch(/\boffline\b/i)
+    expect(line).not.toMatch(/\bdown\b/i)
+    // The footer is where the meaning is explained; it must never reintroduce the word either.
+    expect(text).not.toMatch(/\boffline\b/i)
+    // The absence of a session is a fact about us, and it says so.
+    expect(text).toMatch(/no session/)
+  })
+
+  it('says unknown for a path nobody probed — never closed', () => {
+    const text = formatServerList([REACHABLE_TARGET])
+    expect(text).toContain('[22 from source: unknown]')
+    expect(text).toContain('[22 from local: unknown]')
+    expect(text).toMatch(/"unknown" means nobody looked/)
+  })
+
+  it('reports the observed time in UTC so the fact reads the same anywhere', () => {
+    const text = formatServerList([
+      { ...REACHABLE_TARGET, portFromSource: { from: 'source', open: true, at: AT_SOURCE } }
+    ])
+    expect(text).toContain('[22 from source: open, 06:12]')
+  })
+})
+
+describe('X4 — the roster carries the three-path preflight', () => {
+  /** The reported situation: filtered from the source, open from this computer. */
+  async function localOpenSourceClosed(): Promise<ReachabilityReport> {
+    return checkReachability(
+      { host: '212.16.86.23', port: 22, sourceName: 'spmotor' },
+      {
+        probeFromLocal: async () => ({ open: true, detail: 'tcp handshake' }),
+        probeFromSource: async () => ({ open: false, detail: 'refused' }),
+        now: () => AT_LOCAL
+      }
+    )
+  }
+
+  it('says so in one sentence and offers both consequences', async () => {
+    const report = await localOpenSourceClosed()
+    const executor = new ListServersToolExecutor({
+      listServers: async () => [UNREACHABLE_FROM_SOURCE],
+      observe: async () => report
+    })
+    const result = await executor.execute(action('list_servers', {}))
+
+    expect(result.ok).toBe(true)
+    const output = result.output
+    // One sentence, naming both paths.
+    expect(output).toContain(
+      '212.16.86.23:22 is open from this computer and closed from spmotor'
+    )
+    // …and the two consequences: through this computer, or ask the provider.
+    expect(output).toContain('Transfer through this computer')
+    expect(output).toContain('Ask the provider to open TCP 22')
+    // The observed facts reach the line itself, with their paths and times.
+    expect(output).toContain('[22 from source: closed, 06:13]')
+    expect(output).toContain('[22 from local: open, 06:13]')
+    expect(output).not.toMatch(/\boffline\b/i)
+  })
+
+  it('leaves the roster intact when an observation fails', async () => {
+    const executor = new ListServersToolExecutor({
+      listServers: async () => [UNREACHABLE_FROM_SOURCE],
+      observe: async () => {
+        throw new Error('no route to host')
+      }
+    })
+    const result = await executor.execute(action('list_servers', {}))
+    expect(result.ok).toBe(true)
+    expect(result.output).toContain('[no session]')
+    expect(result.output).not.toMatch(/\boffline\b/i)
+  })
+
+  it('reads the roster the same way with no prober at all', async () => {
+    const executor = new ListServersToolExecutor({ listServers: async () => [REACHABLE_TARGET] })
+    const result = await executor.execute(action('list_servers', {}))
+    expect(result.ok).toBe(true)
+    expect(result.output).toContain('[session open]')
+    expect(result.output).toContain('[22 from local: unknown]')
   })
 })
 
@@ -171,6 +302,8 @@ describe('ListServersToolExecutor (v2.8.1)', () => {
     expect(LIST_SERVERS_TOOL.parameters.additionalProperties).toBe(false)
     expect(Object.keys(LIST_SERVERS_TOOL.parameters.properties ?? {})).toHaveLength(0)
     expect(LIST_SERVERS_TOOL.description).toMatch(/never ask the user for an id/i)
+    // X1: the description must not let a missing session read as a dead machine.
+    expect(LIST_SERVERS_TOOL.description).toMatch(/no session is NOT down|not connected from here/i)
   })
 })
 
@@ -237,7 +370,7 @@ describe('ServerRefResolvingExecutor (v2.8.1)', () => {
     const inner = new RecordingExecutor()
     const executor = new ServerRefResolvingExecutor(
       inner,
-      resolver(SERVERS, [SERVERS[0]!.id]) // demo-b is offline
+      resolver(SERVERS, [SERVERS[0]!.id]) // demo-b has no session
     )
 
     const asSource = await executor.execute(

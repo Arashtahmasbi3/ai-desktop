@@ -87,6 +87,69 @@ export interface VpsServerView {
 export type ConnectionOutcome = 'open' | 'timeout' | 'refused' | 'unreachable' | 'invalid'
 
 /**
+ * Where an observation of a TCP port was made from (X1/X4).
+ *
+ * `from` is part of the fact, not a label on it: "port 22 closed" means nothing until the reader knows
+ * *who* could not reach it. Three different questions used to share one word — do we hold an SSH
+ * session, can another host connect, is the server saved in Settings — and a server that was up and
+ * answering ping was reported as "offline" because only the first of the three was false.
+ */
+export type PortFactOrigin = 'source' | 'local' | 'target' | 'unknown'
+
+/**
+ * One observed fact about a port. `open: null` means **nobody has looked**, never "the machine is
+ * down": an unobserved path must not be rendered as a negative fact.
+ */
+export interface PortFact {
+  from: PortFactOrigin
+  /** true = a connection from `from` was possible; false = it was not; null = not observed. */
+  open: boolean | null
+  /** Epoch ms of the observation. Only meaningful when `open` is not null. */
+  at: number
+  /** The probe's own short words: `refused`, `timed out`, `blocked by host policy`, … */
+  detail?: string
+}
+
+/** What the three paths, compared, actually agree on. Computed from the facts — never from a model. */
+export type ReachabilityAgreement =
+  | 'all-open'
+  | 'all-closed'
+  | 'local-only'
+  | 'source-only'
+  | 'target-only'
+  | 'split'
+  | 'unobserved'
+
+/**
+ * The three-path reachability preflight (X4).
+ *
+ * Only `source → target` was ever tested, so a port filtered from two servers looked like a dead
+ * server while the machine was listening on 22 and reachable from the user's own computer. This
+ * report keeps one fact per path, says in one sentence what they mean together, and ends with the
+ * action the evidence supports.
+ */
+export interface ReachabilityReport {
+  host: string
+  port: number
+  /** source server → target port, when an SSH session to a *different* server was available. */
+  source: PortFact
+  /** this computer → target port. A different network by construction. */
+  local: PortFact
+  /** the target's own listener table (`ss -lnt`), which needs a session to the target itself. */
+  target: PortFact
+  agreement: ReachabilityAgreement
+  /** One sentence, built from the facts above, that never calls a server "down". */
+  summary: string
+  /**
+   * The one action this evidence supports. `through-this-computer` exists because that path was the
+   * only one that could have worked in the session this came from, and it was never tried.
+   */
+  recommendation?: 'through-this-computer' | 'transfer-from-source' | 'ask-the-provider'
+  /** The consequences of `recommendation`, one per line — usually two ways to proceed. */
+  nextSteps: string[]
+}
+
+/**
  * The answer to "can this computer reach that server?" (v4.1).
  *
  * It exists so the app can answer that question instead of the model improvising a port scan with
@@ -101,6 +164,12 @@ export interface ConnectionTestResult {
   message?: string
   /** The test always runs from this computer, and says so. */
   from: 'this-machine'
+  /**
+   * The same question asked from every path the app can use (X4). Optional because it needs a saved
+   * server and, for the source path, a live session; when absent the surface shows only `outcome`,
+   * which is still the honest answer for one path.
+   */
+  paths?: ReachabilityReport
 }
 
 export type VpsStatus = 'disconnected' | 'connecting' | 'connected' | 'error'

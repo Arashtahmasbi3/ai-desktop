@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Activity } from 'lucide-react'
 import type { ConnectionTestResult } from '@shared/vps'
-import { testSummary } from '../lib/connection-test'
+import { reachabilityAdvice, reachabilityFacts, testSummary } from '../lib/connection-test'
 
 /**
  * The app's connection test, as one control (v4.2, B2-2).
@@ -90,6 +90,16 @@ export default function ConnectionTestButton({
   const result = entry !== undefined && entry !== 'running' ? entry : undefined
   const summary = result ? testSummary(result, t) : ''
   const title = summary === '' ? t('connect.testRunFrom') : t('connect.testResultTitle', { summary })
+  /*
+   * X4: the local answer is one path, not the whole truth. When the probe reports the other two
+   * (from a connected source server, and from the target itself), they are shown beside it — each
+   * with its own path — and the disagreement becomes one actionable sentence instead of a gap.
+   */
+  const facts = result ? reachabilityFacts(result, t) : []
+  const advice = result ? reachabilityAdvice(result, t) : undefined
+  const factsTitle = [summary, ...facts.map((fact) => fact.text), advice ?? '']
+    .filter((part) => part !== '')
+    .join(' · ')
 
   return (
     <span className="flex min-w-0 items-center gap-1.5" data-testid={`${testId}-group`}>
@@ -124,6 +134,26 @@ export default function ConnectionTestButton({
           }`}
         >
           {summary}
+        </span>
+      ) : null}
+      {!running && result !== undefined && facts.length > 0 ? (
+        <span
+          data-testid={`${testId}-paths`}
+          dir="auto"
+          title={factsTitle}
+          className="min-w-0 max-w-[16rem] truncate text-3xs text-fg-muted"
+        >
+          {facts.map((fact) => fact.text).join(' · ')}
+        </span>
+      ) : null}
+      {!running && result !== undefined && advice !== undefined ? (
+        <span
+          data-testid={`${testId}-advice`}
+          dir="auto"
+          title={advice}
+          className="min-w-0 max-w-[16rem] truncate text-3xs text-info"
+        >
+          {advice}
         </span>
       ) : null}
     </span>

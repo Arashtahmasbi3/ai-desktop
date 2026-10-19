@@ -12,7 +12,7 @@ import { getSystemHealth } from '@core/remote/system-health'
 import { buildGitSetupCommands, type GitSetupOptions } from '@core/remote/git-setup'
 import { assertInstallAllowed, buildInstallCommands, getInstallRecipe } from '@core/agent/install-recipes'
 import { runRemoteCommands } from '@core/remote/run-commands'
-import { testServerConnection } from './server-connection-test'
+import { observeServerReachability } from './reachability'
 import type { AppServices } from './app-services'
 import { shellQuote } from '@shared/shell-quote'
 
@@ -156,6 +156,11 @@ export function registerVpsIpc(services: AppServices): () => void {
     /*
      * v4.1: answer "is it reachable from here?" without a model call and without SSH credentials. A TCP
      * connect from this computer is the honest version of what the agent used to do with /dev/tcp.
+     *
+     * X4 (v4.3): "from here" is only one path. The answer now carries `paths` — the same question asked
+     * from a connected source server and from the target itself (when a session to it exists) — because
+     * a port filtered from a server said nothing about the user's own computer, and that was the path
+     * that could have decided the whole diagnosis. A path nobody could test is reported as `unknown`.
      */
     [
       'vps:testConnection',
@@ -171,7 +176,13 @@ export function registerVpsIpc(services: AppServices): () => void {
             from: 'this-machine' as const
           }
         }
-        return testServerConnection({ host: server.host, port: server.port })
+        const observed = await observeServerReachability(services.vps, {
+          id: server.id,
+          name: server.name,
+          host: server.host,
+          port: server.port
+        })
+        return { ...observed.local, paths: observed.report }
       }
     ],
     ['vps:connect', (id: string) => services.vps.connect(id)],

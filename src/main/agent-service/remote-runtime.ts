@@ -17,7 +17,7 @@ import type { AuditEntry } from '@core/agent/audit-log'
 import type { DiagnosticPolicy } from '@core/remote/diagnostic-policy'
 import type { ToolDefinition } from '@shared/types'
 import type { ProjectRecord } from '@shared/ui'
-import type { RemoteFileEntry, VpsExecResult } from '@shared/vps'
+import type { RemoteFileEntry, ReachabilityReport, VpsExecResult } from '@shared/vps'
 import { planV24Tools, enabledV24ToolNames } from '../v24-tools-wiring'
 
 /**
@@ -60,10 +60,27 @@ export interface RemoteServerResolver {
   ): Promise<{ host: string; port: number; username: string } | undefined>
 }
 
+/**
+ * Hosts that can prove a saved server's port from every path this app can use (X4).
+ *
+ * Optional on purpose: a roster read with no prober still lists servers, and every unprobed path
+ * then reads `unknown` — which is the honest answer, and never "offline". The three probes live in
+ * `src/main/reachability.ts`; the decision logic is pure (`@core/remote/reachability`).
+ */
+export interface RemoteReachabilityHost {
+  reachability?(server: {
+    id: string
+    name: string
+    host: string
+    port: number
+  }): Promise<ReachabilityReport | undefined>
+}
+
 export type RemoteHost = RemoteShellHost &
   Partial<RemoteFsHost> &
   Partial<RemoteServerResolver> &
-  Partial<RemoteServerList>
+  Partial<RemoteServerList> &
+  Partial<RemoteReachabilityHost>
 /** Keywords that make the agent reach for `remote_shell` on a default chat. */
 const VPS_KEYWORDS = /\b(vps|ssh|server|remote|سرور|ریموت)\b/i
 
@@ -197,9 +214,28 @@ export function planRemoteRuntime(
   const hasRoster = typeof vps.listServers === 'function'
   if (hasRoster) {
     const listServers = (): Promise<ServerSummary[]> => vps.listServers!()
+    /*
+     * X4: the roster carries observed reachability when the host can probe for it. Without this,
+     * `list_servers` could only ever say "we hold no session", which is the fact that was read as
+     * "the machine is down" for a server that was up and reachable from this very computer.
+     */
+    const reachability = vps.reachability?.bind(vps)
     tools.add({
       definitions: [LIST_SERVERS_TOOL],
-      executor: new ListServersToolExecutor({ listServers })
+      executor: new ListServersToolExecutor({
+        listServers,
+        ...(reachability === undefined
+          ? {}
+          : {
+              observe: (server: ServerSummary) =>
+                reachability({
+                  id: server.id,
+                  name: server.name,
+                  host: server.host,
+                  port: server.port
+                })
+            })
+      })
     })
   }
   // A VPS is "wanted" when the task talks about one, or when a VPS-only tool
@@ -221,7 +257,8 @@ export function planRemoteRuntime(
       systemHint:
         `${resolution.error} Do not assume or auto-select a server. ` +
         (hasRoster
-          ? 'Call "list_servers" to see every saved server (id, name, host, connected), then ' +
+          ? 'Call "list_servers" to see every saved server (id, name, host, whether a session is ' +
+            'open, and what the port probe saw from each path), then ' +
             'ask the user which one to use if it is still ambiguous. '
           : 'Ask the user to pick one ') +
         'in the chat header (or select a remote project), then retry.'

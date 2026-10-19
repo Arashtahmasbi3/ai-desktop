@@ -45,6 +45,45 @@ const FILTERED_SCAN = [
   'Nmap done: 1 IP address (1 host up) scanned in 12.04 seconds'
 ].join('\n')
 
+/** A ping that came back: the host is up at the IP layer, whatever happens to port 22. */
+const PING = [
+  '$ ping -c 3 212.16.86.23',
+  'PING 212.16.86.23 (212.16.86.23) 56(84) bytes of data.',
+  '64 bytes from 212.16.86.23: icmp_seq=1 ttl=57 time=83.1 ms',
+  '64 bytes from 212.16.86.23: icmp_seq=2 ttl=57 time=82.9 ms',
+  '--- 212.16.86.23 ping statistics ---',
+  '3 packets transmitted, 3 received, 0% packet loss, time 2004ms'
+].join('\n')
+
+/** The target's own socket table, taken in a console session: sshd is bound and listening. */
+const TARGET_LISTEN = [
+  '$ ssh root@212.16.86.23 "ss -lntp"',
+  'State  Recv-Q Send-Q Local Address:Port Peer Address:Port Process',
+  'LISTEN 0      4096   0.0.0.0:22         0.0.0.0:*      users:(("sshd",pid=712,fd=3))',
+  'LISTEN 0      4096      [::]:22            [::]:*      users:(("sshd",pid=712,fd=4))',
+  "$ ssh root@212.16.86.23 'ufw status; iptables -L INPUT'",
+  // Deliberately not "ufw: command not found": a missing *diagnostic* is the `missing-tool` row's
+  // business and it weighs more, so the proof of the block has to stand on its own here.
+  'Status: inactive',
+  'Chain INPUT (policy ACCEPT)'
+].join('\n')
+
+/**
+ * The whole proof in one pile: the host answers, a remote connect to 22 is dropped, and the target
+ * says sshd is listening. This is the shape the four-session log ended on.
+ */
+const UPSTREAM = [PING, FILTERED_SCAN, TARGET_LISTEN].join('\n')
+
+/** The same conclusion with no ping at all, because the target's own socket table is the proof. */
+const UPSTREAM_TARGET_ONLY = [FILTERED_SCAN, TARGET_LISTEN].join('\n')
+
+/** A dropped connect that never names the port, so there is nothing to call upstream or local. */
+const PORTLESS_DROP = [
+  '$ ssh -o ConnectTimeout=10 root@203.0.113.9 uptime',
+  'Connection timed out during banner exchange',
+  'exit status 255'
+].join('\n')
+
 /** A host that answered, so the port is not the question: nothing is listening. */
 const REFUSED = [
   'Pseudo-terminal will not be allocated because stdin is not a terminal.',
@@ -126,16 +165,37 @@ interface Sample {
 
 const SAMPLES: Sample[] = [
   {
-    id: 'port-filtered',
-    label: 'a connect timeout',
+    id: 'upstream-blocked',
+    label: 'a ping that answered, a dropped port and sshd listening on the target',
+    text: UPSTREAM,
+    causeKey: 'verdict.causeUpstreamBlocked',
+    nextStepKey: 'verdict.nextUpstreamBlocked'
+  },
+  {
+    id: 'upstream-blocked',
+    label: 'the target listening on the dropped port with no ping behind it',
+    text: UPSTREAM_TARGET_ONLY,
+    causeKey: 'verdict.causeUpstreamBlocked',
+    nextStepKey: 'verdict.nextUpstreamBlocked'
+  },
+  {
+    id: 'port-blocked-locally',
+    label: 'a dropped connect with nothing proving the host is up',
     text: FILTERED,
-    causeKey: 'verdict.causeFiltered',
-    nextStepKey: 'verdict.nextFiltered'
+    causeKey: 'verdict.causeBlockedLocally',
+    nextStepKey: 'verdict.nextBlockedLocally'
+  },
+  {
+    id: 'port-blocked-locally',
+    label: 'a filtered scan whose "1 host up" is the scanner being told to assume it',
+    text: FILTERED_SCAN,
+    causeKey: 'verdict.causeBlockedLocally',
+    nextStepKey: 'verdict.nextBlockedLocally'
   },
   {
     id: 'port-filtered',
-    label: 'a filtered probe',
-    text: FILTERED_SCAN,
+    label: 'a dropped connection that never names the port',
+    text: PORTLESS_DROP,
     causeKey: 'verdict.causeFiltered',
     nextStepKey: 'verdict.nextFiltered'
   },
@@ -293,9 +353,12 @@ describe('every failure mode in the table has a case, and the evidence picks it'
 
 describe('a filtered port and a refused connection are two different answers', () => {
   it('never collapses them into one cause', () => {
-    const filtered = diagnose(evidenceFor(SAMPLES[0]!))
-    const refused = diagnose(evidenceFor(SAMPLES[2]!))
-    expect(filtered.causeKey).toBe('verdict.causeFiltered')
+    const filtered = diagnose({ text: FILTERED, failures: 1, steps: 2 })
+    const refused = diagnose({ text: REFUSED, failures: 1, steps: 2 })
+    // The filtered class answers through its sharper row now: the port was dropped and nothing
+    // here proves the host is up, so the cause cannot yet be the provider.
+    expect(filtered.patternId).toBe('port-blocked-locally')
+    expect(filtered.causeKey).toBe('verdict.causeBlockedLocally')
     expect(refused.causeKey).toBe('verdict.causeRefused')
     expect(filtered.causeKey).not.toBe(refused.causeKey)
     // Different cause means different advice: one says open a port, the other starts a service.
@@ -306,13 +369,13 @@ describe('a filtered port and a refused connection are two different answers', (
 
   it('still answers with exactly one of them when both phrases are in the pile', () => {
     const verdict = diagnose({ text: FILTERED + '\n' + REFUSED, failures: 2, steps: 4 })
-    expect(['verdict.causeFiltered', 'verdict.causeRefused']).toContain(verdict.causeKey)
+    expect(['verdict.causeBlockedLocally', 'verdict.causeRefused']).toContain(verdict.causeKey)
     expect(verdict.causeKey).not.toBe(FALLBACK_VERDICT.causeKey)
   })
 
   it('is not confused by the parenthesised permission form, which is authentication', () => {
     // "Permission denied (publickey)" must not be read as a filesystem permission problem.
-    const verdict = diagnose(evidenceFor(SAMPLES[4]!))
+    const verdict = diagnose({ text: SSH_KEY, failures: 1, steps: 2 })
     expect(verdict.causeKey).toBe('verdict.causeSshKey')
     expect(verdict.causeKey).not.toBe('verdict.causePermission')
   })
@@ -351,7 +414,7 @@ describe('precedence: the strongest match wins', () => {
     }
     expect(pattern('tool-timeout').matches(evidence)).toBe(true)
     expect(pattern('port-filtered').matches(evidence)).toBe(true)
-    expect(diagnose(evidence).patternId).toBe('port-filtered')
+    expect(diagnose(evidence).patternId).toBe('port-blocked-locally')
   })
 
   it('breaks a tie by declaration order — the only tie-break there is', () => {
@@ -388,6 +451,80 @@ describe('precedence: the strongest match wins', () => {
     const apiKey = pattern('auth-api-key')
     expect(resolve([sshKey, apiKey], evidence)?.id).toBe('auth-ssh-key')
     expect(resolve([apiKey, sshKey], evidence)?.id).toBe('auth-api-key')
+  })
+})
+
+describe('the two rows that separate "above the host" from "nobody knows yet"', () => {
+  it('calls it upstream when the host answered and the port still dropped', () => {
+    const verdict = diagnose({ text: UPSTREAM, failures: 3, steps: 6 })
+    expect(verdict.patternId).toBe('upstream-blocked')
+    expect(verdict.causeKey).toBe('verdict.causeUpstreamBlocked')
+    expect(verdict.nextStepKey).toBe('verdict.nextUpstreamBlocked')
+    expect(verdict.causeKey).not.toBe(FALLBACK_VERDICT.causeKey)
+    expect(verdict.nextStepKey).not.toBe(FALLBACK_VERDICT.nextStepKey)
+  })
+
+  it('accepts the target-side socket table as the proof, with no ping at all', () => {
+    expect(diagnose({ text: UPSTREAM_TARGET_ONLY, failures: 2, steps: 4 }).patternId).toBe(
+      'upstream-blocked'
+    )
+  })
+
+  it('refuses to blame the provider for the same dropped port with no proof of the host', () => {
+    const verdict = diagnose({ text: FILTERED, failures: 1, steps: 2 })
+    expect(verdict.patternId).toBe('port-blocked-locally')
+    expect(verdict.causeKey).toBe('verdict.causeBlockedLocally')
+    expect(verdict.nextStepKey).toBe('verdict.nextBlockedLocally')
+  })
+
+  it('does not read an unanswered ping as proof that the host is up', () => {
+    const dead = [
+      '$ ping -c 3 212.16.86.23',
+      '3 packets transmitted, 0 received, 100% packet loss, time 2040ms',
+      '22/tcp filtered ssh'
+    ].join('\n')
+    expect(pattern('upstream-blocked').matches({ text: dead })).toBe(false)
+    expect(diagnose({ text: dead }).patternId).toBe('port-blocked-locally')
+  })
+
+  it('does not take a LISTEN on some other port as the proof for this one', () => {
+    const wrongPort = [
+      '22/tcp filtered ssh',
+      'LISTEN 0 128 127.0.0.1:5432 0.0.0.0:* users:(("postgres",pid=1101,fd=5))'
+    ].join('\n')
+    expect(pattern('upstream-blocked').matches({ text: wrongPort })).toBe(false)
+    expect(diagnose({ text: wrongPort }).patternId).toBe('port-blocked-locally')
+  })
+
+  it('never lets both new rows match the same pile — the host is the whole difference', () => {
+    const proven: VerdictEvidence = { text: UPSTREAM, failures: 3, steps: 6 }
+    const unknown: VerdictEvidence = { text: FILTERED, failures: 1, steps: 2 }
+    expect(pattern('upstream-blocked').matches(proven)).toBe(true)
+    expect(pattern('port-blocked-locally').matches(proven)).toBe(false)
+    expect(pattern('upstream-blocked').matches(unknown)).toBe(false)
+    expect(pattern('port-blocked-locally').matches(unknown)).toBe(true)
+  })
+
+  it('beats the plain filtered row it is the sharper reading of', () => {
+    const evidence: VerdictEvidence = { text: UPSTREAM, failures: 3, steps: 6 }
+    // Both rows really match this pile: "filtered" is in it, and so is the proof above it.
+    expect(pattern('port-filtered').matches(evidence)).toBe(true)
+    expect(pattern('upstream-blocked').matches(evidence)).toBe(true)
+    expect(pattern('upstream-blocked').weight).toBeGreaterThan(pattern('port-filtered').weight)
+    const verdict = diagnose(evidence)
+    expect(verdict.patternId).toBe('upstream-blocked')
+    expect(verdict.causeKey).not.toBe('verdict.causeFiltered')
+    // And the weight is what decides: handed over in either order, the sharper row still answers.
+    const pair = [pattern('port-filtered'), pattern('upstream-blocked')]
+    expect(resolve(pair, evidence)?.id).toBe('upstream-blocked')
+    expect(resolve([...pair].reverse(), evidence)?.id).toBe('upstream-blocked')
+  })
+
+  it('beats it in the unknown-host direction too, without guessing a provider', () => {
+    const evidence: VerdictEvidence = { text: FILTERED_SCAN, failures: 1, steps: 3 }
+    expect(pattern('port-filtered').matches(evidence)).toBe(true)
+    expect(pattern('port-blocked-locally').weight).toBeGreaterThan(pattern('port-filtered').weight)
+    expect(diagnose(evidence).patternId).toBe('port-blocked-locally')
   })
 })
 
@@ -429,7 +566,7 @@ describe('unknown evidence stays honest', () => {
 describe('matching survives the shape real output has', () => {
   it('is case-insensitive', () => {
     const verdict = diagnose({ text: 'SSH: CONNECT TO HOST X PORT 22: CONNECTION TIMED OUT' })
-    expect(verdict.patternId).toBe('port-filtered')
+    expect(verdict.patternId).toBe('port-blocked-locally')
   })
 
   it('ignores ANSI colour codes, so a coloured package name is still the package name', () => {
@@ -457,6 +594,10 @@ describe('matching survives the shape real output has', () => {
 describe('the queued advice says the right thing for each class', () => {
   const EN_SNIPPET = '../i18n/verdict-en.json'
   const FA_SNIPPET = '../i18n/verdict-fa.json'
+  // The second merge batch: the two rows this change adds, in their own pair of snippets so one
+  // batch can be merged and reviewed without dragging the other along.
+  const EN_SNIPPET_2 = '../i18n/verdict2-en.json'
+  const FA_SNIPPET_2 = '../i18n/verdict2-fa.json'
   const EN_LOCALE_FILE = 'src/renderer/src/i18n/en.json'
   const FA_LOCALE_FILE = 'src/renderer/src/i18n/fa.json'
 
@@ -481,7 +622,9 @@ describe('the queued advice says the right thing for each class', () => {
    */
   function translate(locale: 'en' | 'fa', key: string): string | undefined {
     const sources: string[] =
-      locale === 'en' ? [EN_LOCALE_FILE, EN_SNIPPET] : [FA_LOCALE_FILE, FA_SNIPPET]
+      locale === 'en'
+        ? [EN_LOCALE_FILE, EN_SNIPPET, EN_SNIPPET_2]
+        : [FA_LOCALE_FILE, FA_SNIPPET, FA_SNIPPET_2]
     for (const source of sources) {
       if (!existsSync(join(process.cwd(), source))) continue
       let node: unknown = readJson(source)
@@ -512,12 +655,19 @@ describe('the queued advice says the right thing for each class', () => {
   })
 
   it('keeps the two merge snippets in step while they still exist', () => {
-    const en = join(process.cwd(), EN_SNIPPET)
-    const fa = join(process.cwd(), FA_SNIPPET)
-    // Once merged into the locale files the snippets may be deleted; the case above then covers the
-    // merged result. While they are here, a one-sided merge must fail.
-    if (!existsSync(en) || !existsSync(fa)) return
-    expect(keyPaths(readJson(FA_SNIPPET)).sort()).toEqual(keyPaths(readJson(EN_SNIPPET)).sort())
+    for (const [enRelative, faRelative] of [
+      [EN_SNIPPET, FA_SNIPPET],
+      [EN_SNIPPET_2, FA_SNIPPET_2]
+    ] as const) {
+      const en = join(process.cwd(), enRelative)
+      const fa = join(process.cwd(), faRelative)
+      // Once merged into the locale files a snippet may be deleted; the case above then covers the
+      // merged result. While it is here, a one-sided merge must fail — in either batch.
+      if (!existsSync(en) || !existsSync(fa)) continue
+      expect(keyPaths(readJson(faRelative)).sort(), enRelative).toEqual(
+        keyPaths(readJson(enRelative)).sort()
+      )
+    }
   })
 
   it('sends a filtered port to the firewall, and offers the other host as the proof', () => {
@@ -564,6 +714,45 @@ describe('the queued advice says the right thing for each class', () => {
     expect(translate('fa', 'verdict.nextMissingToolNamed')).toContain('{{tool}}')
   })
 
+  it('says the block is above the host, and why the host is not the suspect', () => {
+    const text = translate('en', 'verdict.causeUpstreamBlocked') ?? ''
+    expect(text).toMatch(/above it|above the host|upstream/i)
+    expect(text).toMatch(/provider|security group/i)
+  })
+
+  it('names the two real actions for an upstream block: the provider panel, and this computer', () => {
+    const text = translate('en', 'verdict.nextUpstreamBlocked') ?? ''
+    expect(text).toMatch(/TCP 22/)
+    expect(text).toMatch(/panel/i)
+    // The route that was never tested in the log, because every probe ran from the servers.
+    expect(text).toMatch(/this computer/i)
+    expect(text).toMatch(/transfer/i)
+  })
+
+  it('refuses to blame anyone above the host before the host is proven up', () => {
+    const cause = translate('en', 'verdict.causeBlockedLocally') ?? ''
+    expect(cause).toMatch(/unknown/i)
+    expect(cause).not.toMatch(/security group/i)
+    const next = translate('en', 'verdict.nextBlockedLocally') ?? ''
+    // Two actions, in the order that makes the second one mean something.
+    expect(next).toMatch(/ping|console/i)
+    expect(next).toMatch(/retest/i)
+  })
+
+  it('ships the two new rows in Persian too, not English in a Persian costume', () => {
+    const keys = [
+      'verdict.causeUpstreamBlocked',
+      'verdict.nextUpstreamBlocked',
+      'verdict.causeBlockedLocally',
+      'verdict.nextBlockedLocally'
+    ]
+    for (const key of keys) {
+      const fa = translate('fa', key) ?? ''
+      expect(fa, key).toMatch(/[\u0600-\u06FF]/)
+      expect(fa, key).not.toBe(translate('en', key))
+    }
+  })
+
   it('is genuinely translated into Persian, not copied English', () => {
     const text = translate('fa', 'verdict.causeFiltered') ?? ''
     expect(text).toMatch(/[\u0600-\u06FF]/)
@@ -604,9 +793,11 @@ describe('a stopped run carries the keys, alongside the sentence it already had'
 
   it('adds the cause and the next step as translatable keys', () => {
     const stop = buildStopInfo('turn_timeout', observed)
-    expect(stop.verdict?.patternId).toBe('port-filtered')
-    expect(stop.verdict?.causeKey).toBe('verdict.causeFiltered')
-    expect(stop.verdict?.nextStepKey).toBe('verdict.nextFiltered')
+    // The same failure, read one row sharper: the port was dropped and nothing here proves the
+    // host is up, so the answer cannot yet be the provider.
+    expect(stop.verdict?.patternId).toBe('port-blocked-locally')
+    expect(stop.verdict?.causeKey).toBe('verdict.causeBlockedLocally')
+    expect(stop.verdict?.nextStepKey).toBe('verdict.nextBlockedLocally')
   })
 
   it('names the loop itself when a stop recorded nothing that failed', () => {
@@ -614,6 +805,55 @@ describe('a stopped run carries the keys, alongside the sentence it already had'
     const stop = buildStopInfo('no_progress', quiet)
     expect(stop.verdict?.causeKey).toBe('verdict.causeStalled')
     expect(stop.verdict?.nextStepKey).toBe('verdict.nextStalled')
+  })
+
+  it('finds the proof across separate failed observations, not only inside one output', () => {
+    // The ping, the scan and the socket table were three different commands, so what the table sees
+    // is the join of their outputs — exactly the shape `evidenceFromStop` builds.
+    const joined: AgentStep[] = [
+      {
+        index: 0,
+        startedAt: 0,
+        finishedAt: 20_000,
+        thought: null,
+        actions: [],
+        observations: [
+          {
+            actionId: 'call-1',
+            name: 'remote_shell',
+            ok: false,
+            error: PING,
+            output: '',
+            attempts: 1,
+            durationMs: 800
+          },
+          {
+            actionId: 'call-2',
+            name: 'remote_shell',
+            ok: false,
+            error: FILTERED_SCAN,
+            output: '',
+            attempts: 1,
+            durationMs: 12_000
+          },
+          {
+            actionId: 'call-3',
+            name: 'remote_shell',
+            ok: false,
+            error: TARGET_LISTEN,
+            output: '',
+            attempts: 1,
+            durationMs: 3_000
+          }
+        ],
+        reflection: 'The host answers, the port does not, and sshd is bound.',
+        productive: false
+      }
+    ]
+    const stop = buildStopInfo('failure_streak', joined)
+    expect(stop.verdict?.patternId).toBe('upstream-blocked')
+    expect(stop.verdict?.causeKey).toBe('verdict.causeUpstreamBlocked')
+    expect(stop.verdict?.nextStepKey).toBe('verdict.nextUpstreamBlocked')
   })
 
   it('does not turn a question into a fault', () => {

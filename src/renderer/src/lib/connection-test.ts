@@ -1,4 +1,4 @@
-import type { ConnectionTestResult, VpsServerView } from '@shared/vps'
+import type { ConnectionTestResult, PortFact, VpsServerView } from '@shared/vps'
 
 /**
  * Where the reachability test is offered, and how its answer is worded (v4.2, B2-2).
@@ -86,4 +86,77 @@ export function serverForConnectionFailure(input: FailureServerInput): string | 
 
   const fallback = input.projectServerId ?? input.selectedServerId
   return fallback === undefined || fallback === '' ? undefined : fallback
+}
+
+/**
+ * X4 — the same question, asked from every path the app can use.
+ *
+ * The button used to answer "can *this computer* reach the port?", which the interface then had to
+ * present carefully, because a green dot from the wrong network means nothing. The answer now
+ * carries all three paths (`ConnectionTestResult.paths`), and this module words them so the sidebar,
+ * the status bar and the Servers page cannot describe the same report three different ways.
+ *
+ * The rule the words enforce: **an unprobed path is "not probed", never "closed"** — a missing
+ * session is not a missing server, which is the sentence that cost four sessions in the log.
+ */
+export type FactsPath = 'source' | 'local' | 'target'
+
+export interface FactsLine {
+  path: FactsPath
+  text: string
+}
+
+function stateText(fact: PortFact, port: number, t: Translate): string {
+  if (fact.open === null) return t('connfacts.pathUnknown')
+  return t(fact.open ? 'connfacts.stateOpen' : 'connfacts.stateClosed', { port })
+}
+
+/**
+ * One line per path that was actually observed, in the order a reader needs them: the path that
+ * decided the diagnosis first (this computer), then the source server, then the target itself.
+ *
+ * Returns `[]` when the result carries no `paths`, so every existing surface keeps its one-line
+ * behaviour instead of pretending it has facts it was never given.
+ */
+export function reachabilityFacts(result: ConnectionTestResult, t: Translate): FactsLine[] {
+  const report = result.paths
+  if (report === undefined) return []
+  const lines: FactsLine[] = [
+    {
+      path: 'local',
+      text: t('connfacts.pathLocal', { state: stateText(report.local, report.port, t) })
+    },
+    {
+      path: 'source',
+      text: t('connfacts.pathSource', { state: stateText(report.source, report.port, t) })
+    }
+  ]
+  if (report.target.open !== null) {
+    lines.push({
+      path: 'target',
+      text: t('connfacts.pathTarget', { state: stateText(report.target, report.port, t) })
+    })
+  }
+  return lines
+}
+
+/**
+ * The one sentence the evidence supports, or nothing at all.
+ *
+ * "Local open, source closed" must not read as a warning: it is the discovery that the port is open
+ * and the block is not on the target, so the advice names the action (transfer through this
+ * computer) instead of the fault.
+ */
+export function reachabilityAdvice(result: ConnectionTestResult, t: Translate): string | undefined {
+  const port = result.paths?.port ?? result.port
+  switch (result.paths?.recommendation) {
+    case 'through-this-computer':
+      return t('connfacts.recommendThisComputer', { port })
+    case 'transfer-from-source':
+      return t('connfacts.recommendFromSource', { port })
+    case 'ask-the-provider':
+      return t('connfacts.recommendProvider', { port })
+    default:
+      return undefined
+  }
 }

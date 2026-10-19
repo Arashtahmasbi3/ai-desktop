@@ -1207,7 +1207,11 @@
     "nextTimeout": "Run a narrower version of that step (one file, one host, a smaller range) or give it a longer budget; the same command with the same limit hits the same wall.",
     "nextStalled": "Change the instruction, not the wording: name the exact file or command, or say which alternative to try next.",
     "nextTurnBudget": "Continue from where it stopped; nothing failed, the clock simply ran out.",
-    "nextUnknown": "Read the trace above and give a narrower instruction than the one that stalled; the run has no evidence that could name a cause."
+    "nextUnknown": "Read the trace above and give a narrower instruction than the one that stalled; the run has no evidence that could name a cause.",
+    "causeUpstreamBlocked": "The host is up and that port is still dropped from another machine: nothing on the host itself can be the cause, because the block is above it — a security group or an upstream ACL at the hosting provider.",
+    "nextUpstreamBlocked": "Open inbound TCP 22 for the source address in the hosting provider's firewall panel (the provider the server's PTR names; the host's own ufw and iptables were clean, so the rule has to go there). Or transfer the project through this computer instead — pull it from the source and push it on to the target — because the route from here may not be blocked even when the other one is.",
+    "causeBlockedLocally": "The TCP connect to that port was dropped, and nothing in the evidence proves the host itself is up: reachability is unknown, so this is not yet evidence about anyone above it.",
+    "nextBlockedLocally": "Prove the host is up first — open a console session on it, or ping it from this machine — and only then retest that port from the same machine. A filtered result against a host nobody checked the state of says nothing about who blocks it."
   },
   "connect": {
     "testShort": "Test",
@@ -1248,5 +1252,16 @@
     "capEventsBody": "The cap stops a send before the call and only raises a toast, so neither a refusal nor a warning is counted anywhere. This figure is unknown, not zero.",
     "capEventsLevel": "Level right now",
     "emptyBody": "One record is written per completed call, with its provider, model and tokens. The first row appears after your next message."
+  },
+  "connfacts": {
+    "pathLocal": "from this computer: {{state}}",
+    "pathSource": "from the source server: {{state}}",
+    "pathTarget": "on the target itself: {{state}}",
+    "stateOpen": "port {{port}} open",
+    "stateClosed": "port {{port}} closed",
+    "pathUnknown": "not probed",
+    "recommendThisComputer": "Transfer through this computer: this path is open, so nothing has to be opened on the provider's side.",
+    "recommendFromSource": "Run the transfer from the server that can reach it: this computer cannot.",
+    "recommendProvider": "Ask the provider to open TCP {{port}}: the target itself is listening."
   }
 }

@@ -11,10 +11,12 @@ import type { ServerSummary } from '@core/tools/server-tools'
 import type {
   HealthCheckConfig,
   HealthCheckOutcome,
+  ReachabilityReport,
   RemoteFileEntry,
   VpsConnectionState,
   VpsExecResult
 } from '@shared/vps'
+import { observeServerReachability } from '../reachability'
 import { evaluateHostKey, fingerprintFromKey } from './host-key-verify'
 import type { SftpEntry, SshBackend, SshConnection } from './backend'
 import { TerminalSession } from './terminal-session'
@@ -148,6 +150,11 @@ export class SshManager {
    * the active project's own, so asking it to migrate to a *second* saved server ended
    * with it demanding a UUID from the user — and the UI never displays one. This exposes
    * id, name, host, port, user and connection state, and nothing secret.
+   *
+   * X1 (v4.3): the state is `hasSession` — do we hold an SSH connection *from here* — and
+   * `configured`, so that "we have no session" can never again be printed as "offline" for a
+   * machine that is up. Reachability is a separate, observed fact and is attached by the roster
+   * executor (`reachability()` below), not invented here.
    */
   async listServers(): Promise<ServerSummary[]> {
     const servers = await this.store.list()
@@ -157,9 +164,27 @@ export class SshManager {
       host: server.host,
       port: server.port,
       username: server.username,
-      connected: this.isConnected(server.id),
+      hasSession: this.isConnected(server.id),
+      configured: true,
       ...(server.policy?.mode ? { policyMode: server.policy.mode } : {})
     }))
+  }
+
+  /**
+   * X4: prove one saved server's port from every path this app can use, without a model call.
+   *
+   * Three facts, reported separately: from a connected source server (`/dev/tcp`), from this
+   * computer (a TCP connect), and from the target itself (`ss -lnt`) when a session to it exists.
+   * The decision logic is pure (`@core/remote/reachability`); this method only supplies the probes.
+   */
+  async reachability(server: {
+    id: string
+    host: string
+    port: number
+    name?: string
+  }): Promise<ReachabilityReport> {
+    const observed = await observeServerReachability(this, server)
+    return observed.report
   }
 
   auditEntries(): AuditEntry[] {

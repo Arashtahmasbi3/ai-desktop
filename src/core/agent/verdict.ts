@@ -93,6 +93,76 @@ const HTTP_403 = /(?:\D|^)403(?:\D|$)/
 const CONNECT_TIMEOUT = /connect(?:ion)? (?:timed out|timeout)|timed out during banner exchange/i
 
 /**
+ * The port a dropped line named: `22/tcp` from a scan, `port 22` from OpenSSH, `:22` from a probe
+ * that prints the socket. Without one of these a timeout is a timeout rather than a statement about
+ * a port, which is why the two rows below insist on it while `port-filtered` still answers the
+ * shapes that never name one. Case-insensitive like every matcher here, because a real pile of
+ * output is `PORT 22: CONNECTION TIMED OUT` as often as it is lowercase.
+ */
+const PORT_IN_LINE = /(\d{1,5})\/tcp|\bport\s+(\d{1,5})\b|:(\d{1,5})\b/i
+
+/** A TCP attempt that was dropped rather than answered: what "filtered" looks like in real output. */
+const DROPPED = /filtered|connect(?:ion)? (?:timed out|timeout)|timed out during banner exchange/i
+
+/** The port a line names, from whichever of those three shapes it uses. */
+function portOf(line: string): string | undefined {
+  const named = PORT_IN_LINE.exec(line)
+  return named?.slice(1).find((group) => typeof group === 'string' && group !== '')
+}
+
+/** The port a dropped attempt was aimed at, so the target-side check can ask about that same port. */
+function droppedPort(text: string): string | undefined {
+  for (const line of text.split('\n')) {
+    if (!DROPPED.test(line)) continue
+    const port = portOf(line)
+    if (port) return port
+  }
+  return undefined
+}
+
+/** True when some line both names a port and says the attempt to it was dropped. */
+function portDropped(text: string): boolean {
+  return droppedPort(text) !== undefined
+}
+
+/**
+ * True when a ping came back: a reply's TTL, or the summary's received count, or a loss figure below
+ * 100%. A ping that timed out proves nothing, and the `1 host up` note a scan prints for `-Pn` is an
+ * instruction to the scanner rather than a reply from the host.
+ */
+function pingAnswered(text: string): boolean {
+  if (/\bttl=\d+/i.test(text)) return true
+  const summary = /(\d+) packets? transmitted.*?(\d+) (?:packets? )?received/i.exec(text)
+  if (summary) return Number(summary[2]) > 0
+  const loss = /(\d+(?:\.\d+)?)% packet loss/i.exec(text)
+  return loss !== null && Number(loss[1]) < 100
+}
+
+/** True when the target's own socket table shows that same port listening. */
+function listeningOn(text: string, port: string): boolean {
+  return text.split('\n').some((line) => {
+    if (!line.trimStart().startsWith('LISTEN')) return false
+    return portOf(line) === port
+  })
+}
+
+/**
+ * True when the evidence proves the host itself is up. That is the whole difference between the two
+ * rows below: the same dropped connect is "the block is above the host" when the host answered, and
+ * "nobody has established who blocks it" when nothing about the host was settled.
+ *
+ * Two shapes count. A ping that came back, from either side. And the target's own `ss -lntp`,
+ * showing a LISTEN socket on the port that was dropped: sshd was alive and bound while the packets
+ * were being thrown away somewhere else. Both are observations the run made, neither is inferred
+ * from silence — which is why a `-Pn` scan and a timed-out ping are not proof.
+ */
+function hostProvenUp(text: string): boolean {
+  if (pingAnswered(text)) return true
+  const port = droppedPort(text)
+  return port !== undefined && listeningOn(text, port)
+}
+
+/**
  * The table. Read it top-down: it is ordered by weight, and the rows that can tie are grouped so the
  * tie-break is visible where it matters.
  *
@@ -105,6 +175,8 @@ const CONNECT_TIMEOUT = /connect(?:ion)? (?:timed out|timeout)|timed out during 
  * | 92     | a privilege was refused    | the command was right, this identity may not run it        |
  * | 90     | storage or toolchain       | the machine said exactly what is missing                   |
  * | 80     | the name did not resolve   | nothing downstream can be trusted when the name is wrong   |
+ * | 78     | the block is above the host | the host answered, so no rule on it can be the cause       |
+ * | 77     | the port dropped, unproven  | nobody proved the host up, so nothing above it can be blamed |
  * | 75     | the port is filtered       | packets were dropped, so the target's policy is the suspect |
  * | 70     | the connection was refused | the host answered: one service is down, the host is not     |
  * | 60     | the step was too slow      | an absence of evidence, so it loses to every real signal    |
@@ -113,6 +185,9 @@ const CONNECT_TIMEOUT = /connect(?:ion)? (?:timed out|timeout)|timed out during 
  * A tie only exists inside one tier, and the two ties here are between rows that describe the same
  * kind of refusal through different worlds: an SSH key versus an API key, and a POSIX `EACCES`
  * versus an HTTP `403`. When a pile contains both, the row declared first answers.
+ *
+ * The 78 and the 77 rows can never tie, because `hostProvenUp` is the only difference between
+ * them: exactly one of the two can match any given pile, so their weights are documentation.
  */
 export const VERDICT_PATTERNS: readonly VerdictPattern[] = [
   {
@@ -237,6 +312,34 @@ export const VERDICT_PATTERNS: readonly VerdictPattern[] = [
         'getaddrinfo enotfound',
         'unknown host'
       )
+  },
+  /*
+   * Two rows for one class of evidence, split by the single thing that changes the fix: whether the
+   * host itself was proven up. Both answer a dropped TCP connect that named its port, which is the
+   * shape `port-filtered` used to take on its own — so both weigh more than it and win whenever
+   * their evidence is there, while it stays the answer for a timeout that names no port at all.
+   *
+   * The session log that produced these rows: `ping` came back with 0% loss, the SSH connect to
+   * 212.16.86.23 port 22 timed out from two different source servers, `ss -lntp` on the target
+   * showed `LISTEN 0 4096 0.0.0.0:22` with sshd bound, and `ufw` was not installed, so nothing on
+   * the host could have been dropping the packets. The two real actions were a rule in
+   * `userver.ir`'s panel for the source address, and moving the project through the user's own
+   * computer — the one route the app never tested. Both rows name two actions for exactly that
+   * reason: either one alone leaves the user stuck when the other is the one that works.
+   */
+  {
+    id: 'upstream-blocked',
+    weight: 78,
+    causeKey: 'verdict.causeUpstreamBlocked',
+    nextStepKey: 'verdict.nextUpstreamBlocked',
+    matches: ({ text }) => portDropped(text) && hostProvenUp(text)
+  },
+  {
+    id: 'port-blocked-locally',
+    weight: 77,
+    causeKey: 'verdict.causeBlockedLocally',
+    nextStepKey: 'verdict.nextBlockedLocally',
+    matches: ({ text }) => portDropped(text) && !hostProvenUp(text)
   },
   {
     id: 'port-filtered',

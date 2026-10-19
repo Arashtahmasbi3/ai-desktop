@@ -336,7 +336,8 @@ describe('an MCP route beside the remote tools', () => {
           host: '10.0.0.5',
           port: 22,
           username: 'deploy',
-          connected: true
+          hasSession: true,
+          configured: true
         }
       ],
       exec: async () => ({ ok: true, stdout: '', stderr: '', exitCode: 0 })

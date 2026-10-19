@@ -9,7 +9,7 @@ import type {
 } from '@shared/vps'
 import { useStore } from '../../store'
 import { vpsStateFor } from '../../lib/vps-state'
-import { testSummary } from '../../lib/connection-test'
+import { reachabilityAdvice, reachabilityFacts, testSummary } from '../../lib/connection-test'
 import RemoteFileExplorer from './RemoteFileExplorer'
 import VpsForm from './VpsForm'
 import { useConnectionTest } from '../ConnectionTest'
@@ -204,70 +204,97 @@ export default function VpsPanel(): JSX.Element {
             />
           ) : null}
 
-          {servers.map((server) => (
-            <div
-              key={server.id}
-              className={`group mb-1 flex items-center gap-2 rounded-md px-2 py-1.5 ${
-                activeId === server.id ? 'bg-bg-tertiary' : 'hover:bg-bg-tertiary'
-              }`}
-            >
-              <button
-                onClick={() => void connect(server.id)}
-                disabled={connectingId === server.id}
-                aria-busy={connectingId === server.id}
-                className="min-w-0 flex-1 text-left disabled:opacity-60"
+          {servers.map((server) => {
+            const tested = tests[server.id]
+            const testedResult = tested !== undefined && tested !== 'running' ? tested : undefined
+            /*
+             * X4: one probe, three paths. The facts and the advice come from the same report as the
+             * summary above, so this page cannot tell a different story than the sidebar.
+             */
+            const facts = testedResult ? reachabilityFacts(testedResult, t) : []
+            const advice = testedResult ? reachabilityAdvice(testedResult, t) : undefined
+            return (
+              <div
+                key={server.id}
+                className={`group mb-1 flex items-center gap-2 rounded-md px-2 py-1.5 ${
+                  activeId === server.id ? 'bg-bg-tertiary' : 'hover:bg-bg-tertiary'
+                }`}
               >
-                <div className="truncate text-xs font-medium text-fg">
-                  {server.name}
-                  {connectingId === server.id ? (
-                    <RefreshCw className="ms-1 inline h-3 w-3 animate-spin text-accent" />
+                <button
+                  onClick={() => void connect(server.id)}
+                  disabled={connectingId === server.id}
+                  aria-busy={connectingId === server.id}
+                  className="min-w-0 flex-1 text-left disabled:opacity-60"
+                >
+                  <div className="truncate text-xs font-medium text-fg">
+                    {server.name}
+                    {connectingId === server.id ? (
+                      <RefreshCw className="ms-1 inline h-3 w-3 animate-spin text-accent" />
+                    ) : null}
+                  </div>
+                  <div className="truncate text-3xs text-fg-muted">
+                    {server.username}@{server.host}:{server.port}
+                  </div>
+                  {tests[server.id] ? (
+                    /* A span, not a div: this sits inside the connect button, and a button may only
+                     * contain phrasing content. `block` keeps it on its own line. */
+                    <span
+                      data-testid={`connection-test-${server.id}`}
+                      dir="auto"
+                      className={`block truncate text-3xs ${
+                        tests[server.id] === 'running'
+                          ? 'text-fg-muted'
+                          : (tests[server.id] as ConnectionTestResult).ok
+                            ? 'text-success'
+                            : 'text-warning'
+                      }`}
+                    >
+                      {tests[server.id] === 'running'
+                        ? t('vps.testing')
+                        : testSummary(tests[server.id] as ConnectionTestResult, t)}
+                    </span>
                   ) : null}
-                </div>
-                <div className="truncate text-3xs text-fg-muted">
-                  {server.username}@{server.host}:{server.port}
-                </div>
-                {tests[server.id] ? (
-                  /*
-                   * A span, not a div: this sits inside the connect button, and a button may only contain
-                   * phrasing content. `block` keeps it on its own line.
-                   */
-                  <span
-                    data-testid={`connection-test-${server.id}`}
-                    dir="auto"
-                    className={`block truncate text-3xs ${
-                      tests[server.id] === 'running'
-                        ? 'text-fg-muted'
-                        : (tests[server.id] as ConnectionTestResult).ok
-                          ? 'text-success'
-                          : 'text-warning'
-                    }`}
-                  >
-                    {tests[server.id] === 'running'
-                      ? t('vps.testing')
-                      : testSummary(tests[server.id] as ConnectionTestResult, t)}
-                  </span>
-                ) : null}
-              </button>
-              <button
-                onClick={() => void testConnection(server.id)}
-                disabled={tests[server.id] === 'running'}
-                className="brutal-btn shrink-0 px-1.5 py-0.5 text-3xs disabled:opacity-50"
-                title={t('vps.testConnection')}
-                aria-label={t('vps.testConnection')}
-                data-testid={`connection-test-button-${server.id}`}
-              >
-                <Activity className="h-3 w-3" />
-              </button>
-              <button
-                onClick={() => void remove(server.id, server.name)}
-                className="rounded p-1 text-fg-muted opacity-0 transition hover:text-danger focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
-                title={t('common.remove')}
-                aria-label={t('common.remove')}
-              >
-                <Trash2 className="h-3.5 w-3.5 text-fg-muted hover:text-danger" />
-              </button>
-            </div>
-          ))}
+                  {facts.map((fact) => (
+                    <span
+                      key={fact.path}
+                      data-testid={`reachability-${server.id}-${fact.path}`}
+                      dir="auto"
+                      className="block truncate text-3xs text-fg-muted"
+                    >
+                      {fact.text}
+                    </span>
+                  ))}
+                  {advice === undefined ? null : (
+                    <span
+                      data-testid={`reachability-${server.id}-advice`}
+                      dir="auto"
+                      className="block text-3xs text-info"
+                    >
+                      {advice}
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={() => void testConnection(server.id)}
+                  disabled={tests[server.id] === 'running'}
+                  className="brutal-btn shrink-0 px-1.5 py-0.5 text-3xs disabled:opacity-50"
+                  title={t('vps.testConnection')}
+                  aria-label={t('vps.testConnection')}
+                  data-testid={`connection-test-button-${server.id}`}
+                >
+                  <Activity className="h-3 w-3" />
+                </button>
+                <button
+                  onClick={() => void remove(server.id, server.name)}
+                  className="rounded p-1 text-fg-muted opacity-0 transition hover:text-danger focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100"
+                  title={t('common.remove')}
+                  aria-label={t('common.remove')}
+                >
+                  <Trash2 className="h-3.5 w-3.5 text-fg-muted hover:text-danger" />
+                </button>
+              </div>
+            )
+          })}
         </div>
       </aside>
 
