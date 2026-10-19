@@ -7,6 +7,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.3.0] — 2026-10-19
+
+Everything here came from one real session log, not from a review of the code. The user asked four times whether a
+project could be migrated between two servers, and the app answered with the same diagnosis each time while the screen
+showed contradictory facts. Reading the stored session (94 messages, 6 steps, 4 sessions) turned six guesses into facts.
+
+### The root cause was outside the app, and the app could not say so
+
+Port 22 on the target was blocked **above** the host: ping answered with 0% loss, the target's own `ss -lntp` showed
+sshd listening on 0.0.0.0:22 and [::]:22, `ufw` was absent and `iptables` had no rules — yet the TCP connect was
+filtered from two independent source networks. The provider blocks it. Nothing in the app, and no model, could transfer
+the project until that changes; the two real ways forward are to open the port in the provider's panel, or to route the
+copy through the user's own computer.
+
+### Fixed — the five things the app got wrong
+
+- **`offline` meant three things.** `list_servers` reported a server as `offline` when it merely held no SSH session,
+  and the user read "the machine is down". Each server now reports `hasSession`, its port fact per path *with the time
+  it was observed*, and never prints `offline`. An unobserved path reads `unknown`, never `closed`.
+- **Only one path was ever probed.** The local path — a different network by construction, and the one that would have
+  decided the question — was never tried. Reachability is now proven from the target itself, from a source server, and
+  from this computer, each recorded separately; "local open, source closed" produces the through-this-computer route
+  and the provider ticket, in one sentence each.
+- **The question gate resolved itself.** After five minutes it told the model "proceed with your best judgement" and
+  the run kept stepping while the card stayed on screen. Now the deadline pauses (nothing settles, no tool runs), the
+  card offers an explicit "resume with my best assumption", and a second configured ceiling ends the run as
+  `needs_input` with a recorded reason.
+- **An option was a sentence.** The three options the model sent were 48, 68 and 83 characters with em dashes; the card
+  truncated them and RTL reordering produced fragments. An option is now one line, ≤32 characters, ≤5 words, no dash,
+  and a violation is refused with the way out.
+- **Progress counted activity.** `ip -6 addr` (27.8s) and a project-wide grep (41.5s) were both "productive", so the
+  no-progress counter never moved. A step of read-only probes now counts only when it teaches something, and two such
+  steps stop the run with what it was doing and what it has ruled out.
+
+### Fixed — three smaller ones from the same log
+
+- `remote_shell` compared every absolute path in a payload with the project root, so `df -h /opt` and `ls /root/.ssh`
+  were refused as "outside project root" on the remote host. Containment now stands down for a provably read-only
+  remote command and still applies to anything that writes, moves, deletes or redirects.
+- A tool card rendered "ok" for a command that exited 2. Four outcomes now — `ok`, `warning` (exit 0 with stderr),
+  `failed` (`ok: false` or non-zero exit), `blocked` — and the words ok/success cannot appear for a failure.
+- A blocked port with the host proven up is now its own verdict (`upstream-blocked`, weight 78) with two concrete
+  actions, instead of "a firewall or security group on the target".
+
+### Added
+
+- **A diagnosis is remembered between sessions.** A per-project ledger records durable verdicts and, for 24 hours, the
+  run is told what is already established, with its timestamp, instead of re-running the same probe. The user can
+  forget any line.
+- **A Linux-desktop shell.** Six redundant surfaces deleted (see the commit): one title bar, one sidebar tree with
+  chats nested under projects, one status line, a composer of attach/input/model/send, a bottom-sheet question card,
+  and grouped tool rows. The brutalist system is replaced by 1px hairlines, 6px radius, no shadow, system font,
+  28px rows and one accent — and `brutal-tokens.test.ts` was rewritten to pin the new contract rather than deleted.
+
+### Known limits, stated rather than hidden
+
+- **No screenshot pass.** This machine refuses to execute a freshly built unsigned exe, so the new shell is verified by
+  340 test files and a production build, not by looking at the window.
+- **The migration flow (X7) is not built.** A first-class source→target form with the three-path preflight is specified
+  in the plan and remains the next piece of work; until then the transfer is still driven through the chat.
+- **`View context` has no dedicated button** — it lives in the Sources panel's "View all".
+- **The mic stays in the composer**; it was not on the removal list.
+- Status colours are still painted as text on older surfaces; the new ones use a dot for state.
+- Code signing remains deferred to the public release.
+
+### Numbers
+
+340 test files, 3139 tests, 12 checklist items closed, 1 deferred (X7). Typecheck and production build clean.
+
 ## [4.2.0] — 2026-10-19
 
 Thirty-two audit findings, worked in the order they were approved, and the substrate the app was missing: a tool
@@ -1520,6 +1589,7 @@ First stable release. Ships as a Windows x64 NSIS installer and a portable execu
 - Optional code signing via `CSC_LINK` / `CSC_KEY_PASSWORD` (skipped safely when absent).
 
 [Unreleased]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v4.1.0...HEAD
+[4.3.0]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v4.2.0...v4.3.0
 [4.2.0]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v4.1.0...v4.2.0
 [4.1.0]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v4.0.1...v4.1.0
 [4.0.1]: https://github.com/Arashtahmasbi3/ai-desktop/compare/v4.0.0...v4.0.1
