@@ -4,7 +4,7 @@ import { act, cleanup, render, screen, within } from '@testing-library/react'
 import i18n from '../../src/renderer/src/i18n'
 import ChatPanel from '../../src/renderer/src/components/ChatPanel'
 import Sidebar from '../../src/renderer/src/components/Sidebar'
-import { useStore } from '../../src/renderer/src/store'
+import { useStore, subscribeToEvents } from '../../src/renderer/src/store'
 import type { ProjectRecord, SettingsView } from '@shared/ui'
 import type { VpsConnectionState, VpsServerView } from '@shared/vps'
 
@@ -162,5 +162,87 @@ describe('R1 - the tree dot reads the same fact', () => {
 
     expect(within(node).getByRole('img', { name: 'Disconnected' })).toBeTruthy()
     expect(useStore.getState().vpsConnected).toContain('srv-a')
+  })
+})
+
+/** A fake main→renderer event bus, so a test can send the exact IPC events main sends. */
+interface EventBus {
+  emit(channel: string, payload: unknown): void
+}
+
+function eventBus(): EventBus {
+  type Listener = (payload: unknown) => void
+  const listeners = new Map<string, Listener[]>()
+  const api = (window as unknown as { api: Record<string, unknown> }).api
+  api.events = {
+    on: (channel: string, listener: Listener) => {
+      const list = listeners.get(channel) ?? []
+      list.push(listener)
+      listeners.set(channel, list)
+      return () => {
+        listeners.set(
+          channel,
+          (listeners.get(channel) ?? []).filter((entry) => entry !== listener)
+        )
+      }
+    }
+  }
+  return {
+    emit: (channel, payload) => {
+      for (const listener of listeners.get(channel) ?? []) listener(payload)
+    }
+  }
+}
+
+/**
+ * The half-open path as the window really receives it.
+ *
+ * The two cases above called `applyVpsLiveness` directly, which proves the store can hold the fact
+ * but not that a transition reaches it. Here the event travels through the same `vps:liveness`
+ * subscription the app wires at startup, carrying what the probe/reconnect left on the state: the
+ * manager now publishes `disconnected` for a handle that answered nothing (it used to publish
+ * nothing at all), so this is the path the 4.3.1 dot missed. The reason must survive to the header,
+ * too — a dot that says "disconnected" with no why is the question the card had to answer.
+ */
+describe('R1 - a liveness transition that arrives over IPC moves the header and the tree', () => {
+  it('flips both dots on a probe transition, names the reason, and flips them back', () => {
+    const bus = eventBus()
+    subscribeToEvents()
+
+    render(
+      <>
+        <ChatPanel />
+        <Sidebar />
+      </>
+    )
+    const bar = screen.getByTestId('status-item-workspace')
+    const node = screen.getByTestId('project-node-p1')
+    expect(bar.getAttribute('data-connection')).toBe('connected')
+    expect(within(node).getByRole('img', { name: 'Connected' })).toBeTruthy()
+
+    act(() => {
+      bus.emit('vps:liveness', {
+        serverId: 'srv-a',
+        state: { status: 'disconnected', serverId: 'srv-a', error: 'ECONNRESET' },
+        at: 1
+      })
+    })
+
+    expect(bar.getAttribute('data-connection')).toBe('disconnected')
+    expect(within(node).getByRole('img', { name: 'Disconnected' })).toBeTruthy()
+    expect(bar.getAttribute('title')).toContain('ECONNRESET')
+    // The connected set main reported is still stale: only the per-server fact produced this.
+    expect(useStore.getState().vpsConnected).toContain('srv-a')
+
+    act(() => {
+      bus.emit('vps:liveness', {
+        serverId: 'srv-a',
+        state: { status: 'connected', serverId: 'srv-a' },
+        at: 2
+      })
+    })
+
+    expect(bar.getAttribute('data-connection')).toBe('connected')
+    expect(within(node).getByRole('img', { name: 'Connected' })).toBeTruthy()
   })
 })

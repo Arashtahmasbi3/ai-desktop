@@ -147,11 +147,16 @@ export function deriveConnectionStatus(input: ConnectionInput): ConnectionStatus
         ...(serverId ? { serverId } : {})
       }
     }
+    /*
+     * The half-open fix leaves its reason on the state: the probe transitions the server to
+     * `disconnected`, and the failed reconnect carries the error it got. Prefer that over the bare
+     * name, so hovering the dot answers "why is it down?" without opening the card.
+     */
     return {
       kind: 'disconnected',
       tone: 'bad',
       labelKey: 'connection.disconnected',
-      detail: name,
+      detail: state.error ?? name,
       ...(serverId ? { serverId } : {})
     }
   }

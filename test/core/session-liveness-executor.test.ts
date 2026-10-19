@@ -65,20 +65,27 @@ interface ReconnectCall {
 function harness(options: {
   results: AgentToolResult[]
   connected: boolean
+  /** What the held handle answers when asked. Defaults to the cached belief. */
+  alive?: boolean
   outcome: VpsReconnectOutcome
   fallbackServerId?: string
 }) {
   const inner = new ScriptedExecutor(options.results)
   const calls: ReconnectCall[] = []
+  const probes: string[] = []
   const executor = new SessionLivenessExecutor(inner, {
     isConnected: () => options.connected,
+    probe: async (serverId) => {
+      probes.push(serverId)
+      return options.alive ?? options.connected
+    },
     reconnect: async (serverId, reason) => {
       calls.push({ serverId, reason })
       return options.outcome
     },
     ...(options.fallbackServerId ? { fallbackServerId: options.fallbackServerId } : {})
   })
-  return { inner, calls, executor }
+  return { inner, calls, probes, executor }
 }
 
 const FAILED_RECONNECT: VpsReconnectOutcome = {
@@ -95,7 +102,7 @@ const WORKED_RECONNECT: VpsReconnectOutcome = {
 
 describe('R1 - one reconnect, then report the outcome', () => {
   it('attempts exactly once, reports the failure, and never re-runs the failed call', async () => {
-    const { inner, calls, executor } = harness({
+    const { inner, calls, probes, executor } = harness({
       results: [failure('Not connected')],
       connected: false,
       outcome: FAILED_RECONNECT
@@ -108,6 +115,8 @@ describe('R1 - one reconnect, then report the outcome', () => {
     // The audit reason is the tool's own words, so the log says what triggered the attempt.
     expect(calls[0]?.reason).toContain('remote_shell')
     expect(calls[0]?.reason).toContain('Not connected')
+    // A session the app already knows is gone has no handle to ask: no probe, only the reconnect.
+    expect(probes).toHaveLength(0)
     // One run of the tool: the reconnect is not a second silent retry of the same call.
     expect(inner.calls).toBe(1)
     expect(result.ok).toBe(false)
@@ -147,6 +156,7 @@ describe('R1 - one reconnect, then report the outcome', () => {
       new ScriptedExecutor([failure('Server spmotor is not connected.')]),
       {
         isConnected: () => false,
+        probe: async () => false,
         reconnect: async () => FAILED_RECONNECT,
         serverName: async (serverId: string) => (serverId === uuid ? 'spmotor' : undefined)
       }
@@ -172,25 +182,91 @@ describe('R1 - one reconnect, then report the outcome', () => {
   })
 })
 
-describe('R1 - a live session is not torn down by a command that says "not connected"', () => {
-  it('ignores the phrase in command output while the session is connected', async () => {
-    const { calls, executor } = harness({
-      results: [failure('exit status 1', 'VPN is not connected')],
+describe('the stale belief: a half-open session is checked, not assumed', () => {
+  /*
+   * The gap 4.3.1 shipped with. The manager held a dead handle, so `isConnected` answered true; the
+   * tool's words were `Not connected`, which is the *other* branch's vocabulary; and the transport
+   * regex deliberately does not contain it. Nothing fired: no probe, no transition, no reconnect,
+   * and the dot stayed green. These cases put the observation in charge of the belief.
+   */
+  it('probes the held handle and attempts exactly one reconnect when it answers nothing', async () => {
+    const { calls, probes, executor } = harness({
+      results: [failure('Not connected')],
       connected: true,
-      outcome: WORKED_RECONNECT
+      alive: false,
+      outcome: FAILED_RECONNECT
     })
+
     const result = await executor.execute(action('srv-1'))
-    expect(calls).toHaveLength(0)
-    expect(result.output).toBe('VPN is not connected')
+
+    // The handle — not the cached map — decided.
+    expect(probes).toEqual(['srv-1'])
+    expect(calls).toHaveLength(1)
+    expect(calls[0]?.serverId).toBe('srv-1')
+    // The card says which evidence found the session gone, and what the attempt did.
+    expect(result.output).toContain('a liveness probe on the held connection found no session')
+    expect(result.output).toContain('one reconnect attempt failed')
+    expect(result.output).toContain('ECONNRESET')
+    expect(result.error).toContain('one reconnect attempt failed')
   })
 
+  it('reports a successful reconnect after the probe finds the handle dead', async () => {
+    const { calls, probes, executor } = harness({
+      results: [failure('Not connected')],
+      connected: true,
+      alive: false,
+      outcome: WORKED_RECONNECT
+    })
+
+    const result = await executor.execute(action('srv-1'))
+
+    expect(probes).toEqual(['srv-1'])
+    expect(calls).toHaveLength(1)
+    expect(result.output).toContain('one reconnect attempt succeeded')
+    expect(result.output).toContain('a liveness probe on the held connection found no session')
+  })
+
+  it('leaves the session alone when the probe says it is alive', async () => {
+    const { calls, probes, executor } = harness({
+      results: [failure('exit status 1', 'VPN is not connected')],
+      connected: true,
+      alive: true,
+      outcome: WORKED_RECONNECT
+    })
+
+    const result = await executor.execute(action('srv-1'))
+
+    // The probe ran, answered, and that answer is the short circuit: no reconnect, no note.
+    expect(probes).toEqual(['srv-1'])
+    expect(calls).toHaveLength(0)
+    expect(result.ok).toBe(false)
+    expect(result.output).toBe('VPN is not connected')
+    expect(result.error).toBe('exit status 1')
+  })
+
+  it('still reconnects on transport words without waiting for a probe', async () => {
+    const { calls, probes, executor } = harness({
+      results: [failure('channel closed by the remote host')],
+      connected: true,
+      alive: true,
+      outcome: WORKED_RECONNECT
+    })
+    await executor.execute(action('srv-1'))
+    // The handle itself reported the death: there is nothing left to ask.
+    expect(probes).toHaveLength(0)
+    expect(calls).toHaveLength(1)
+  })
+})
+
+describe('R1 - a live session is not torn down by a command that says "not connected"', () => {
   it('still reconnects when a live handle reports transport words', async () => {
-    const { calls, executor } = harness({
+    const { calls, probes, executor } = harness({
       results: [failure('remote_shell failed: Client not connected')],
       connected: true,
       outcome: WORKED_RECONNECT
     })
     await executor.execute(action('srv-1'))
+    expect(probes).toHaveLength(0)
     expect(calls).toHaveLength(1)
   })
 

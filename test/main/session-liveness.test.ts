@@ -36,7 +36,20 @@ const cipher: SecretCipher = {
 
 class FakeConnection implements SshConnection {
   ended = false
+  /**
+   * The half-open switch: the handle is still in the manager's map and the UI still says connected,
+   * but nothing behind it answers. ssh2's own words for that are `Not connected`.
+   */
+  dead = false
+  /** Every command that reached this handle, in order (the tool's call and any liveness probe). */
+  commands: string[] = []
+  /** Scripted answers, so a command can fail with output that merely *mentions* a connection. */
+  reply?: (command: string) => SshExecResult
+
   async exec(command: string): Promise<SshExecResult> {
+    this.commands.push(command)
+    if (this.dead) throw new Error('Not connected')
+    if (this.reply) return this.reply(command)
     return { stdout: `ran:${command}`, stderr: '', exitCode: 0 }
   }
   async shell(): Promise<SshShell> {
@@ -114,6 +127,19 @@ async function trusted(name: string): Promise<string> {
   })
   expect((await manager.connect(server.id)).status).toBe('connected')
   return server.id
+}
+
+/** A remote_shell call the orchestrator would make for this run. */
+function shellAction(serverId: string, command = 'pwd'): AgentAction {
+  const args = { server_id: serverId, command }
+  return {
+    id: 'call-1',
+    name: 'remote_shell',
+    arguments: args,
+    rawArguments: JSON.stringify(args),
+    valid: true,
+    signature: `remote_shell:${command}`
+  }
 }
 
 beforeEach(async () => {
@@ -209,18 +235,6 @@ describe('R1 - one reconnect attempt, with its outcome reported', () => {
 })
 
 describe('R1 - the wiring the agent actually gets', () => {
-  /** A remote_shell call the orchestrator would make for this run. */
-  function shellAction(serverId: string): AgentAction {
-    const args = { server_id: serverId, command: 'pwd' }
-    return {
-      id: 'call-1',
-      name: 'remote_shell',
-      arguments: args,
-      rawArguments: JSON.stringify(args),
-      valid: true,
-      signature: 'remote_shell:pwd'
-    }
-  }
 
   it('a session that dies mid-run gets one logged reconnect, and the failure says so', async () => {
     const a = await trusted('alpha')
@@ -260,5 +274,87 @@ describe('R1 - the wiring the agent actually gets', () => {
     expect(next.ok).toBe(true)
     expect(next.output).toContain('ran:pwd')
     expect(manager.stateFor(second).status).toBe('connected')
+  })
+})
+
+describe('R1 - the half-open session the 4.3.1 session log caught', () => {
+  /*
+   * The evidence: two tools answered `Not connected` in a millisecond while the chat header still
+   * painted a green dot, `steps: 1`, and the word "reconnect" appeared nowhere in the session file.
+   * The manager was holding a handle whose peer was gone, so the cached belief (`connected`) and the
+   * tool's words (the *other* branch's vocabulary) each excused the other and nothing fired. These
+   * cases fail on that code: a run reaches `remote_shell`, the handle answers nothing, and the
+   * probe — not the belief — is what transitions the server and lets the one reconnect happen.
+   */
+  it('probes the held handle, transitions it to disconnected, and reconnects exactly once', async () => {
+    const a = await trusted('alpha')
+    // The tools are planned while the session looks up, exactly as in the session log.
+    const runtime = planRemoteRuntime('deploy over ssh on my vps', a, manager)
+    const held = backend.lastConnection!
+    held.dead = true
+    backend.failWith = new Error('ECONNRESET')
+    const attempts = backend.connectCalls
+
+    const result = await runtime.extraExecutor!.execute(shellAction(a))
+
+    expect(result.ok).toBe(false)
+    // The tool's own call, then the probe: both on the handle the manager was still holding.
+    expect(held.commands).toEqual(['pwd', 'true'])
+    // The transition is real and it happens before the reconnect, so the UI hears it.
+    expect(manager.stateFor(a).status).toBe('disconnected')
+    expect(manager.connectedServers()).not.toContain(a)
+    expect(events.filter((event) => event.serverId === a).map((event) => event.state.status)).toContain(
+      'disconnected'
+    )
+    expect(backend.connectCalls - attempts).toBe(1)
+    const text = `${result.output}${result.error ?? ''}`
+    expect(text).toContain('a liveness probe on the held connection found no session')
+    expect(text).toContain('one reconnect attempt failed')
+    expect(text).toContain('ECONNRESET')
+  })
+
+  it('a successful reconnect after the probe leaves the session connected and usable', async () => {
+    const a = await trusted('alpha')
+    const runtime = planRemoteRuntime('deploy over ssh on my vps', a, manager)
+    const held = backend.lastConnection!
+    held.dead = true
+    const attempts = backend.connectCalls
+
+    const first = await runtime.extraExecutor!.execute(shellAction(a))
+    expect(first.ok).toBe(false)
+    expect(`${first.output}${first.error ?? ''}`).toContain('one reconnect attempt succeeded')
+    expect(backend.connectCalls - attempts).toBe(1)
+    expect(manager.stateFor(a).status).toBe('connected')
+    expect(manager.connectedServers()).toContain(a)
+    // The stale handle was dropped, and the session the next call runs on is a new one.
+    expect(held.ended).toBe(true)
+    expect(backend.lastConnection).not.toBe(held)
+    expect(events.at(-1)).toMatchObject({ serverId: a, state: { status: 'connected' } })
+
+    const next = await runtime.extraExecutor!.execute(shellAction(a))
+    expect(next.ok).toBe(true)
+    expect(next.output).toContain('ran:pwd')
+  })
+
+  it('a live session whose output says "not connected" is probed and left alone', async () => {
+    const a = await trusted('alpha')
+    const runtime = planRemoteRuntime('deploy over ssh on my vps', a, manager)
+    const held = backend.lastConnection!
+    held.reply = (command: string) =>
+      command === 'status'
+        ? { stdout: 'VPN is not connected', stderr: '', exitCode: 1 }
+        : { stdout: `ran:${command}`, stderr: '', exitCode: 0 }
+    const attempts = backend.connectCalls
+
+    const result = await runtime.extraExecutor!.execute(shellAction(a, 'status'))
+
+    expect(result.ok).toBe(false)
+    // The probe ran and answered — that answer is the short circuit no cached belief can override.
+    expect(held.commands).toEqual(['status', 'true'])
+    expect(backend.connectCalls).toBe(attempts)
+    expect(manager.stateFor(a).status).toBe('connected')
+    expect(manager.connectedServers()).toContain(a)
+    expect(result.output).toContain('VPN is not connected')
+    expect(`${result.output}${result.error ?? ''}`).not.toContain('Liveness:')
   })
 })

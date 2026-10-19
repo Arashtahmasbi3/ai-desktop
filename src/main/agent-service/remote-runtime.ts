@@ -102,6 +102,14 @@ export interface RemoteLivenessHost {
  */
 export interface RemoteReconnectHost {
   reconnectOnce?(serverId: string, reason: string): Promise<VpsReconnectOutcome>
+  /**
+   * The half-open check: ask the handle the manager is holding whether it still answers, and
+   * transition the server to `disconnected` when it does not (`SshManager.probeLiveness`).
+   *
+   * Optional, and a host without it is treated as **alive** rather than as gone: a cached belief
+   * may never be the reason a session is torn down, so no probe means "leave it alone".
+   */
+  probeLiveness?(serverId: string): Promise<boolean>
 }
 
 export type RemoteHost = RemoteShellHost &
@@ -490,12 +498,18 @@ export function planRemoteRuntime(
   const foreignRoute = (route: ToolRoute): boolean =>
     [...route.names].every((name) => name.startsWith('mcp__'))
   /*
-   * R1: every one of our remote tools that finds its session gone gets exactly ONE reconnect,
-   * and the outcome is reported with the failure. The wrapper sits inside the ref resolver below,
-   * so it sees the canonical server id, and it never re-runs the tool: the next call runs on the
-   * live session, which is what makes "never a second silent retry" true by construction.
+   * R1 / half-open fix: every one of our remote tools that finds its session gone gets exactly ONE
+   * reconnect, and the outcome is reported with the failure. The wrapper sits inside the ref
+   * resolver below, so it sees the canonical server id, and it never re-runs the tool: the next
+   * call runs on the live session, which is what makes "never a second silent retry" true by
+   * construction.
+   *
+   * `probeLiveness` is the check that makes the half-open case visible: a stale handle keeps
+   * `connectedServers()` saying "connected" while every exec fails. A host that cannot probe is
+   * treated as alive rather than as gone, so no cached belief alone can tear a session down.
    */
   const reconnect = vps.reconnectOnce?.bind(vps)
+  const probeLiveness = vps.probeLiveness?.bind(vps)
   const withLiveness = (candidates: readonly ToolRoute[]): ToolRoute[] =>
     reconnect === undefined
       ? [...candidates]
@@ -504,6 +518,7 @@ export function planRemoteRuntime(
           executor: new SessionLivenessExecutor(route.executor, {
             reconnect,
             isConnected: (serverId) => vps.connectedServers().includes(serverId),
+            probe: probeLiveness ?? (() => Promise.resolve(true)),
             ...(target ? { fallbackServerId: target } : {}),
             ...(serverName ? { serverName } : {})
           })

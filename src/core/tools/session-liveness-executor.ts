@@ -16,12 +16,35 @@ import { serverNameFor, type ServerNameLookup } from './server-names'
  * asks the SSH layer for **one** reconnect, then reports that outcome with the tool's own failure.
  * It deliberately does not re-run the tool — the next call runs on the live session — so a dead
  * session can cost the model a step, but it can never become a silent retry loop.
+ *
+ * The gap it still had (4.3.1) was the **half-open** session: the manager held a stale handle, so
+ * `isConnected` answered true while every `exec` came back `Not connected`, and the wrapper's rules
+ * fired on neither branch. The belief is never the last word now — a result that matches the
+ * dropped-session vocabulary with a handle still held is settled by asking the handle
+ * ({@link SessionLivenessDeps.probe}), and only a handle that answers nothing leads to the one
+ * reconnect.
  */
 export interface SessionLivenessDeps {
   /** The single attempt. `SshManager.reconnectOnce` never loops. */
   reconnect(serverId: string, reason: string): Promise<VpsReconnectOutcome>
-  /** Live check: does the SSH layer hold a session for this server right now? */
+  /**
+   * The cached belief: does the SSH layer *think* it holds a session for this server?
+   *
+   * It is only a belief. A half-open socket keeps its handle, so this answers `true` for a
+   * connection that is already dead — which is why {@link SessionLivenessDeps.probe} exists and
+   * why this value may never be the last word on its own.
+   */
   isConnected(serverId: string): boolean
+  /**
+   * The observation: ask the held handle whether it still works (one trivial remote command with
+   * a short deadline, `SshManager.probeLiveness`).
+   *
+   * Returns true when the session answered. When it returns false the manager has **already**
+   * transitioned that server to `disconnected` and published the liveness event, so the caller
+   * only has to reconnect. This is the seam that turns a half-open socket into an explicit
+   * transition instead of a stale green dot.
+   */
+  probe(serverId: string): Promise<boolean>
   /** The run's pinned server, used when the action's arguments name none. */
   fallbackServerId?: string
   /** R6: the saved name for an id, so the note names the server instead of printing a UUID. */
@@ -29,12 +52,13 @@ export interface SessionLivenessDeps {
 }
 
 /**
- * Transport words an SSH handle uses when the socket behind it died.
+ * Transport words that come from the *handle* rather than from a command's output.
  *
- * Deliberately narrower than the verdict matcher: `Not connected` and `remote_error` are how the
- * *app* reports a session it knows is missing, so they only count when `isConnected` agrees. A
- * command that merely printed "not connected" (a VPN status line, say) must never tear down a
- * healthy connection.
+ * These are the words ssh2 uses when the socket behind a live handle died, so they are decisive on
+ * their own: no script prints `channel closed` as a status line. `Not connected` is deliberately
+ * NOT here — that is how the app reports a session it knows is missing, and also what ssh2 answers
+ * for a stale client, so it is the shared vocabulary of both a dead and a merely-believed-stale
+ * connection. That word is settled by the probe, not by this regex.
  */
 const TRANSPORT_DROPPED = /channel closed|client not connected|sock closed|econnreset/i
 
@@ -99,23 +123,38 @@ export class SessionLivenessExecutor implements ToolExecutor {
     if (serverId === undefined) return result
 
     /*
-     * Two ways to learn the session is gone, and both are needed. When the app already knows it
-     * holds no session, its own `Not connected` words are enough. When it still holds a handle,
-     * only transport words may tear it down — otherwise any command that prints "not connected"
-     * would kill a live connection.
+     * Three ways to learn the session is gone, and each answers a different question.
+     *
+     *  - Transport words on a held handle are decisive on their own: the socket said it died.
+     *  - The app's own `Not connected` vocabulary settles it when the manager holds no session —
+     *    that is the session the app already knows is missing.
+     *  - The same vocabulary while the manager *does* hold a handle is the half-open case, and
+     *    neither the cached belief nor the words may decide it. The handle itself is asked, and
+     *    only its answer may tear the session down. A command that printed "not connected" cannot
+     *    fake that answer, so a live session is left exactly as it was.
      */
+    const dropped = matchesSessionDropped(text)
+    const transport = TRANSPORT_DROPPED.test(text)
+    // Neither vocabulary: this failure is about the command, not about the session.
+    if (!dropped && !transport) return result
+
     const connected = this.deps.isConnected(serverId)
-    if (connected && !TRANSPORT_DROPPED.test(text)) return result
-    if (!connected && !matchesSessionDropped(text)) return result
+    if (!connected && !dropped) return result
+
+    // The stale-belief branch: probe the handle, and stop here while it answers.
+    const probed = connected && !transport
+    if (probed && (await this.deps.probe(serverId))) return result
 
     const outcome = await this.deps.reconnect(serverId, `${action.name}: ${firstLine(text)}`)
     const why = outcome.state.error ?? outcome.state.status
     // R6: name the machine. The id stays in the audit log and on the tool result.
     const name = await serverNameFor(this.deps.serverName, serverId)
     const session = name === undefined ? 'the SSH session' : `the SSH session to server ${name}`
+    // Say which evidence decided it, so a reader can tell a probe from a known-missing session.
+    const found = probed ? ' (a liveness probe on the held connection found no session)' : ''
     const note = outcome.ok
-      ? `Liveness: ${session} was gone; one reconnect attempt succeeded. Call the tool again on the live session.`
-      : `Liveness: ${session} is gone; one reconnect attempt failed (${why}).`
+      ? `Liveness: ${session} was gone${found}; one reconnect attempt succeeded. Call the tool again on the live session.`
+      : `Liveness: ${session} is gone${found}; one reconnect attempt failed (${why}).`
     return withNote(result, note)
   }
 }

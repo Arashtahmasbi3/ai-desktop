@@ -34,6 +34,15 @@ import type { VpsServerStore } from './server-store'
 export const DEFAULT_IDLE_TIMEOUT_MS = 30 * 60 * 1000
 export const DEFAULT_COMMANDS_PER_MINUTE = 100
 
+/**
+ * How long the liveness probe may wait for a round trip before the handle is called dead.
+ *
+ * Short on purpose: a half-open socket does not answer at all, and the user is waiting inside a
+ * tool call. A real server answers `true` in milliseconds, so this is two orders of magnitude of
+ * headroom over the case that works.
+ */
+export const DEFAULT_LIVENESS_PROBE_TIMEOUT_MS = 2_000
+
 interface ConnectionEntry {
   connection: SshConnection
   terminal?: TerminalSession
@@ -524,6 +533,58 @@ export class SshManager {
 
   async disconnectAll(): Promise<void> {
     for (const serverId of [...this.connections.keys()]) await this.disconnect(serverId)
+  }
+
+  /**
+   * Trust the observation over the cached belief: check the handle instead of assuming it works.
+   *
+   * This is the half-open case that R1 missed. A socket whose peer is gone can stay in
+   * `connections` indefinitely: `isConnected()` still answers true, the UI dot stays green, and yet
+   * ssh2 rejects every `exec` with `Not connected` in a millisecond — so the liveness wrapper saw
+   * "the manager says connected" plus the app's own vocabulary and did nothing at all.
+   *
+   * The probe is one trivial remote command (`true`) on the held handle, with a short deadline. A
+   * handle that answers is alive and nothing happens. A handle that rejects or does not answer is
+   * dead, and this method says so as a **real transition** — `disconnect()` clears the map entry,
+   * ends the client and publishes the per-server liveness event, which is what moves the dot,
+   * the tree row and the selector.
+   *
+   * It deliberately bypasses the deny list, the host policy and the rate limiter: `true` is not a
+   * user command, it is a health check, and it must not consume the agent's command budget or be
+   * refused by a read-only host policy.
+   */
+  async probeLiveness(
+    serverId: string,
+    timeoutMs = DEFAULT_LIVENESS_PROBE_TIMEOUT_MS
+  ): Promise<boolean> {
+    const entry = this.connections.get(serverId)
+    if (!entry) {
+      /*
+       * No handle at all is already the fact. The per-server state is corrected only when it still
+       * claims `connected`, so a real `error` (an unseen host key, a bad key) is never flattened
+       * into a plain disconnect by a health check.
+       */
+      if (this.serverStates.get(serverId)?.status === 'connected') {
+        this.setState({ status: 'disconnected', serverId })
+      }
+      return false
+    }
+    let alive: boolean
+    try {
+      const probe = await entry.connection.exec('true', timeoutMs)
+      // A completed round trip is a live channel even if `true` somehow exited non-zero; only a
+      // timeout means the socket answered nothing.
+      alive = probe.timedOut !== true
+    } catch {
+      // ssh2 says `Not connected` / `channel closed` here: the write went nowhere.
+      alive = false
+    }
+    if (alive) {
+      this.touch(serverId)
+      return true
+    }
+    await this.disconnect(serverId, 'liveness probe: the held connection answered nothing')
+    return false
   }
 
   /**
