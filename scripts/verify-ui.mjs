@@ -21,6 +21,10 @@
  * The half that decides whether the interface lies is `scripts/lib/verify-ui-core.mjs`, with its own unit tests. THIS
  * half needs a display, a real Electron binary and a machine that lets it execute, so it is deliberately thin, and the
  * CI job in `.github/workflows/ui.yml` is where it runs for real.
+ *
+ * `scripts/screenshots.mjs` is deliberately NOT imported: it is a program with a top-level `main()`, so importing it
+ * would run it. Its *core* — target selection, theme switching, paths, PNG size, comparison — is reused from
+ * `scripts/lib/screenshot-core.mjs`, and this script takes its own captures with exactly those functions.
  */
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
