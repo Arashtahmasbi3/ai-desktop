@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.3.2] — 2026-10-20
+
+The release where the app stopped being trusted and started being run.
+
+### Fixed — the half-open session the 4.3.1 screenshot caught
+
+`SessionLivenessExecutor` acted only when the SSH layer held **no** session or a handle reported transport words. A
+half-open handle broke both: the manager still held it, so "no session" was false, and the tool's text was
+`Not connected`, which was the other branch's vocabulary. Nothing fired — no probe, no transition, no reconnect — and
+the header dot kept showing green while every command failed. The user's own log proved it: `steps: 1`, and not one
+occurrence of the word `reconnect`.
+
+Now a dropped-session result **while a handle is still held** runs `probeLiveness()`: one `exec('true')` on that
+connection with a 2 s deadline, bypassing the deny list, host policy and rate limiter because it is a health check and
+not a user command. An answer means alive and nothing is torn down; a rejection or timeout goes through `disconnect()`,
+which publishes the per-server liveness event so the header dot, the tree row and the selector flip in the same tick —
+and only then does exactly one reconnect run. The result text says which of the three paths fired and how the
+reconnect went, and a disconnected tooltip now carries the reason (`ECONNRESET`), not just the machine name.
+
+Proven by reverting the four changed source files with the tests kept: **7 failed, 16 passed**, then restored
+byte-identically with the sha256 checked.
+
+### Added — a command that runs the app and refuses to lie about it
+
+The app had 3196 unit tests and still shipped a shell that claimed a dead session was connected, because **no test
+ever ran it**. `node scripts/verify-ui.mjs` now does: clear `ELECTRON_RUN_AS_NODE` (the variable that silently made
+`electron.exe` run as plain Node and cost three rounds of "no screenshot possible"), stage the layout outside
+`Documents` where Defender lets it execute, launch with a debug port, poll for the page, read the DOM over CDP, assert
+six invariants (no raw UUID · no `Cost unknown` · no `Remote: … (connected)` · exactly one status bar · a visible
+two-option interface switch · the header dot agreeing with the workspace item), screenshot both themes, and exit
+non-zero listing what it found. Its decision logic is a pure module with its own tests; the launching half is small and
+says so.
+
+`docs/REGRESSIONS.md` records the bugs that were fixed and came back, each with the test that now guards it, and a test
+fails when a row names a test that does not exist or a regression nothing guards. That file exists because v2.8.0
+recorded "several VPS sessions at once" as fixed and v4.3.0 brought the same two causes back.
+
+### Not verified
+
+Still no live session-drop run **by me** against 4.3.2: the harness asserts the shell's invariants and the behaviour is
+covered by injected-transport tests, but nobody has yet watched 4.3.2 with a real dying SSH session. That is one
+screenshot away, and it is the user's to take.
+
+346 test files / 3196 tests plus the harness files, typecheck and production build clean.
+
 ## [4.3.1] — 2026-10-19
 
 A second session of the same user, three screenshots, and the root cause the last six rounds kept treating as a
