@@ -1,10 +1,15 @@
 name: ui
 
-# O4-4: the checks that must pass before a release, including the interface in both themes.
+# O4-4 / the launch gate: the checks that must pass before a release, including **the interface the app actually
+# renders**.
 #
-# The screenshot job is separate on purpose: it needs a display, so it runs on windows-latest where Electron runs
-# natively, and it is allowed to report "no baseline yet" instead of failing a first run. Everything else is headless
-# and fast.
+# One job, because there used to be two and the second one was red and unwatched: a `screenshots` job hand-started
+# electron, slept 8 seconds and ran `scripts/screenshots.mjs`, and when it failed nobody saw it. `scripts/verify-ui.mjs`
+# now stages a packaged-like layout outside the checkout, launches the app once, reads the live DOM over CDP, fails on a
+# named lie, and captures both themes on the way through. One launch, one artifact, one place to look.
+#
+# `node scripts/screenshots.mjs` still exists for the manual four-surface capture (chat, settings, trace); it needs an
+# app that is already running with a debug port, which is exactly what this job no longer asks a human to do by hand.
 on:
   push:
     branches: [master]
@@ -13,6 +18,7 @@ on:
 jobs:
   verify:
     runs-on: windows-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -29,34 +35,28 @@ jobs:
       - name: The double-cast budget, the copy-assertion ratchet and the capability matrix are part of the suite
         run: echo "enforced by npm test (test/security/cast-budget, test/renderer/copy-assertion-ratchet, test/docs)"
 
-  screenshots:
-    runs-on: windows-latest
-    needs: verify
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - name: Build
-        run: npm run build
-      - name: Capture both themes over CDP
+      # THE GATE THAT DID NOT EXIST. 3196 unit tests were green while the window showed a green dot next to a dead
+      # session, because no test ever ran the app. This launches it and reads what it renders.
+      #
+      # `continue-on-error: true`, and here is exactly what is unproven:
+      #   * that a GitHub-hosted `windows-latest` runner lets the staged, unsigned `electron.exe` execute at all. The
+      #     launch was proven on one Windows machine (staging outside `Documents`, `ELECTRON_RUN_AS_NODE` cleared) and
+      #     nowhere else; a runner image may block it differently, or lack a desktop session;
+      #   * that the first-run profile seeded in the staging directory is enough for the shell to reach `ready` there.
+      # Remove this line as soon as one run is green — then it is required, and a lie in the UI breaks the build. Do
+      # not leave it soft forever: a check nobody enforces is the thing this repository is trying to stop doing.
+      - name: Launch the app and verify what it renders over CDP
+        continue-on-error: true
         shell: pwsh
-        run: |
-          # The packaged/unpacked app is started with the debug port this repository added for diagnosis (O4-2).
-          $electron = "node_modules\electron\dist\electron.exe"
-          $process = Start-Process -FilePath $electron -ArgumentList '.', '--remote-debugging-port=9223' -PassThru
-          Start-Sleep -Seconds 8
-          node scripts/screenshots.mjs --port 9223
-          $code = $LASTEXITCODE
-          Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
-          exit $code
-      - name: Keep the captures and what changed
+        run: node scripts/verify-ui.mjs --port 9222
+
+      # The captures are the evidence: a failed invariant is a log line, but "what did it look like?" is a PNG. Kept
+      # even when the step above fails, which is when they matter most.
+      - name: Keep the live captures and their baselines
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ui-screenshots
+          name: ui-live-verify
           path: |
             docs/screenshots/**/*.png
             docs/screenshots/**/*.baseline

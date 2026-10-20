@@ -25,3 +25,21 @@ node scripts/screenshots.mjs --port 9223 --baseline
 
 Committing a new baseline is a deliberate act: it says "this is the interface now", so the diff of the baseline files
 is part of the review.
+
+## The live window (`live-shell.png`)
+
+`node scripts/verify-ui.mjs` stages a packaged-like layout, launches the app and writes `light/live-shell.png` and
+`dark/live-shell.png` for the window it just checked, so a failed invariant always has a picture next to it:
+
+```bash
+npm run build
+node scripts/verify-ui.mjs            # checks the invariants, writes both captures
+node scripts/verify-ui.mjs --baseline # same, and seeds the two `.baseline` files
+```
+
+Two differences from the four-surface captures above, both deliberate:
+
+- it is **one** surface (the shell a user lands on), because that is the window the invariants are read from;
+- the PNG is in **device pixels**, so its width and height depend on display scaling. A baseline captured on a 125%
+  display does not match the same window on a 100% CI runner and would be reported as `size-changed`. Seed baselines
+  on the machine that will compare them; the CI job runs without `--baseline` and uploads the PNGs.
