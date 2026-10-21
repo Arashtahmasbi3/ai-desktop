@@ -92,6 +92,7 @@ export function settingsActions(
   | 'refreshVpsConnected'
   | 'ensureVpsConnected'
   | 'connectVps'
+  | 'connectVpsInPlace'
   | 'disconnectVps'
   | 'setVpsStatus'
   | 'applyVpsLiveness'
@@ -214,11 +215,15 @@ export function settingsActions(
      * v2.6.4: background connect for keepalive / other projects. Unlike
      * `connectVps`, this never moves the chat-header selection, so bringing a
      * second project's host up does not yank the user's current choice.
+     *
+     * R7: it asks main for an **automatic** connect. This pass runs every 30 seconds for every open
+     * remote project, so it is the request that used to reopen a server the user had just
+     * disconnected. Main refuses while that decision stands, and the state that comes back says so.
      */
     async ensureVpsConnected(serverId) {
       if (get().vpsConnected.includes(serverId)) return
       try {
-        const status = await window.api.vps.connect(serverId)
+        const status = await window.api.vps.connect(serverId, 'automatic')
         get().setVpsStatus(status)
       } catch (error) {
         get().setVpsStatus({
@@ -230,13 +235,11 @@ export function settingsActions(
       await get().refreshVpsConnected()
     },
 
-    async connectVps(serverId) {
-      // Select first so the status that comes back is treated as the *selected*
-      // server's (v2.6.5), then let setVpsStatus route it.
-      set({ vpsServerId: serverId })
+    /** A click on Connect, in place: manual, so it may reopen a user-disconnected server. */
+    async connectVpsInPlace(serverId) {
       get().setVpsStatus({ status: 'connecting', serverId })
       try {
-        const status = await window.api.vps.connect(serverId)
+        const status = await window.api.vps.connect(serverId, 'manual')
         get().setVpsStatus(status)
         await get().refreshVpsConnected()
       } catch (error) {
@@ -247,6 +250,13 @@ export function settingsActions(
         })
         await get().refreshVpsConnected()
       }
+    },
+
+    async connectVps(serverId) {
+      // Select first so the status that comes back is treated as the *selected*
+      // server's (v2.6.5), then let setVpsStatus route it.
+      set({ vpsServerId: serverId })
+      await get().connectVpsInPlace(serverId)
     },
 
     async disconnectVps(serverId) {

@@ -311,8 +311,18 @@ export interface AppState {
   setDiagnosticMode: (enabled: boolean) => Promise<void>
   /** Load the saved VPS list and current connection state into the store. */
   refreshVps: () => Promise<void>
-  /** Connect to a VPS (updates the shared status on every UI surface). */
+  /**
+   * Connect to a VPS (updates the shared status on every UI surface).
+   *
+   * R7: a **manual** connect — the user asking — so it is the one request that may reopen a server
+   * they disconnected, and it moves the chat-header selection to that server.
+   */
   connectVps: (serverId: string) => Promise<void>
+  /**
+   * R7: a manual connect that must not move the chat-header selection (the Servers panel's Connect
+   * button). Clears the user-disconnected fact, unlike `ensureVpsConnected`.
+   */
+  connectVpsInPlace: (serverId: string) => Promise<void>
   /** Disconnect a VPS and clear the shared status. */
   disconnectVps: (serverId: string) => Promise<void>
   /** Apply a status pushed from the main process. */
@@ -324,7 +334,12 @@ export interface AppState {
   applyVpsLiveness: (event: VpsLivenessEvent) => void
   /** Refresh the list of currently-connected server ids. */
   refreshVpsConnected: () => Promise<void>
-  /** Connect a server in the background without changing the chat-header selection. */
+  /**
+   * Bring a dependency's host up in the background, without changing the chat-header selection.
+   *
+   * R7: this is an **automatic** connect. It refuses to reopen a server the user disconnected, so
+   * the keep-alive that runs every 30 s cannot undo a manual Disconnect.
+   */
   ensureVpsConnected: (serverId: string) => Promise<void>
   setPlanMode: (value: boolean) => void
   setApprovalMode: (mode: ApprovalMode) => Promise<void>

@@ -22,12 +22,34 @@ describe('i18n locales', () => {
   })
 
   it('has no empty translations', () => {
-    for (const locale of [en, fa]) {
-      const empty = Object.values(locale)
-        .flatMap((section) => Object.values(section as Record<string, string>))
-        .filter((value) => value.trim() === '')
-      expect(empty).toEqual([])
+    /*
+     * Every **leaf** is checked, not every value one level down.
+     *
+     * A section may contain a section (`state.waitingReason.*` names the blocker of a waiting
+     * state), and flattening exactly one level either crashes on the nested object (`value.trim is
+     * not a function`) or, if it silently skipped it, would hide an empty nested translation. This
+     * walks the same shape `keyPaths` in `locale.ts` walks for the parity check above, so both
+     * checks agree on what a key is — and this one is strictly stronger than the old two-level scan.
+     */
+    const emptyLeaves = (locale: Record<string, unknown>): string[] => {
+      const empty: string[] = []
+      const walk = (node: unknown, prefix: string): void => {
+        if (typeof node === 'string') {
+          if (node.trim() === '') empty.push(prefix)
+          return
+        }
+        if (typeof node !== 'object' || node === null) return
+        for (const [key, value] of Object.entries(node)) {
+          walk(value, prefix === '' ? key : `${prefix}.${key}`)
+        }
+      }
+      walk(locale, '')
+      return empty
     }
+    // Guard against a vacuous pass: the walker must reach a nested leaf and report an empty one.
+    expect(emptyLeaves({ nested: { section: '   ' } })).toEqual(['nested.section'])
+    expect(emptyLeaves(en as Record<string, unknown>)).toEqual([])
+    expect(emptyLeaves(fa as Record<string, unknown>)).toEqual([])
   })
 
   it('maps locales to text direction', () => {

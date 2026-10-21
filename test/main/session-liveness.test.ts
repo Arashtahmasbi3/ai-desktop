@@ -188,7 +188,8 @@ describe('R1 - one reconnect attempt, with its outcome reported', () => {
     const b = await trusted('bravo')
     const attempts = backend.connectCalls
 
-    await manager.disconnect(a)
+    // R7: the session dropped on its own (not a click on Disconnect, which is sticky now).
+    await manager.disconnect(a, 'transport error')
     backend.failWith = new Error('ECONNRESET')
     const outcome = await manager.reconnectOnce(a, 'remote_shell: Not connected')
 
@@ -244,7 +245,9 @@ describe('R1 - the wiring the agent actually gets', () => {
     expect(runtime.extraTools?.some((tool) => tool.name === 'remote_shell')).toBe(true)
 
     // ...and then the session is gone before the first tool runs.
-    await manager.disconnect(a)
+    // R7: a session that *died* is not a user decision. `disconnect()` with no reason means the user
+    // clicked Disconnect (and is sticky now), so the drop this case is about says what it was.
+    await manager.disconnect(a, 'transport error')
     backend.failWith = new Error('ECONNRESET')
     const attempts = backend.connectCalls
 
@@ -262,7 +265,8 @@ describe('R1 - the wiring the agent actually gets', () => {
   it('a successful reconnect means the next tool call runs', async () => {
     const a = await trusted('alpha')
     const runtime = planRemoteRuntime('deploy over ssh on my vps', a, manager)
-    await manager.disconnect(a)
+    // R7: a drop, not a click on Disconnect.
+    await manager.disconnect(a, 'transport error')
     const second = await trusted('bravo')
 
     const first = await runtime.extraExecutor!.execute(shellAction(a))

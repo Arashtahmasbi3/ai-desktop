@@ -62,7 +62,7 @@ export default function VpsPanel(): JSX.Element {
   const vpsStates = useStore((state) => state.vpsStates)
   const vpsConnected = useStore((state) => state.vpsConnected)
   const vpsStatus = useStore((state) => state.vpsStatus)
-  const ensureVpsConnected = useStore((state) => state.ensureVpsConnected)
+  const connectVpsInPlace = useStore((state) => state.connectVpsInPlace)
   const disconnectVps = useStore((state) => state.disconnectVps)
 
   const refresh = useCallback(async (): Promise<void> => {
@@ -114,9 +114,10 @@ export default function VpsPanel(): JSX.Element {
     setActiveId(id)
     setError(null)
     try {
-      // `ensureVpsConnected` deliberately does not move the chat-header selection,
-      // so connecting here cannot yank the user's chosen host.
-      await ensureVpsConnected(id)
+      // R7: a click is the user asking, so it is a **manual** connect — the only kind that may
+      // reopen a server they disconnected. `connectVpsInPlace` deliberately does not move the
+      // chat-header selection, so connecting here cannot yank the user's chosen host.
+      await connectVpsInPlace(id)
       const state = useStore.getState()
       const next = vpsStateFor(id, state.vpsStates, state.vpsConnected, state.vpsStatus)
       if (next.status === 'error' && !next.pendingFingerprint) {
@@ -149,6 +150,18 @@ export default function VpsPanel(): JSX.Element {
 
   const status = vpsStateFor(activeId, vpsStates, vpsConnected, vpsStatus)
   const connected = Boolean(activeId) && status.status === 'connected'
+
+  /*
+   * R8: this local line belongs to a *failed* attempt, not to the server.
+   *
+   * The 15:05 screenshot read `connected` and `Timed out while waiting for handshake` at once: the
+   * failed attempt set this copy, the keep-alive then reconnected without ever running `connect()`,
+   * and the copy outlived the state it described. Clearing it on the transition also stops an old
+   * error resurfacing at the next drop, and the render below refuses to print it while connected.
+   */
+  useEffect(() => {
+    if (connected) setError(null)
+  }, [connected])
 
   return (
     <div className="flex h-full min-h-0 flex-1">
@@ -320,6 +333,14 @@ export default function VpsPanel(): JSX.Element {
                   {status.fingerprint}
                 </span>
               ) : null}
+              {status.userDisconnected ? (
+                /* R7: the reason Connect is the only way back, stated where the state is shown. */
+                <span data-testid="vps-user-disconnected" className="truncate text-2xs text-fg-muted">
+                  {t('vps.userDisconnected', {
+                    defaultValue: 'You disconnected this server; it stays down until you connect.'
+                  })}
+                </span>
+              ) : null}
               <div className="ml-auto">
                 {connected ? (
                   <button
@@ -357,7 +378,7 @@ export default function VpsPanel(): JSX.Element {
               </div>
             ) : null}
 
-            {error ? <p className="px-3 py-1.5 text-xs text-danger">{error}</p> : null}
+            {!connected && error ? <p className="px-3 py-1.5 text-xs text-danger">{error}</p> : null}
 
             <div className="flex items-center gap-1 border-b border-border px-2">
               {(['terminal', 'files', 'audit'] as const).map((item) => (

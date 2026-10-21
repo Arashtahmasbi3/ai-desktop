@@ -2,7 +2,7 @@ import { ipcMain } from 'electron'
 import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import type { HealthCheckConfig, SshConfigHost, VpsServerInput } from '@shared/vps'
+import type { HealthCheckConfig, SshConfigHost, VpsConnectMode, VpsServerInput } from '@shared/vps'
 import type { RemoteWorkspaceInfo } from '@shared/workspace-info'
 import type { SystemHealth } from '@shared/system-health'
 import { parseSshConfig } from '@core/remote/ssh-config'
@@ -190,7 +190,16 @@ export function registerVpsIpc(services: AppServices): () => void {
         return { ...observed.local, paths: observed.report }
       }
     ],
-    ['vps:connect', (id: string) => services.vps.connect(id)],
+    /*
+     * R7: the mode is part of the request, because only a click may reopen a server the user
+     * disconnected. It defaults to `automatic` so a caller that forgets the argument cannot
+     * silently overrule the user's decision; `connectVps`/`connectVpsInPlace` pass `manual`.
+     */
+    [
+      'vps:connect',
+      (id: string, mode?: VpsConnectMode) =>
+        mode === 'manual' ? services.vps.connect(id) : services.vps.connectAutomatically(id)
+    ],
     ['vps:disconnect', (id: string) => services.vps.disconnect(id)],
     ['vps:approveFingerprint', (id: string) => services.vps.approveFingerprint(id)],
     ['vps:exec', (id: string, command: string) => services.vps.exec(id, command)],

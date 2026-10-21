@@ -61,8 +61,27 @@ export function vpsStateFor(
   if (!serverId) return globalStatus
   if (connected.includes(serverId)) return { status: 'connected', serverId }
   const known = states[serverId]
-  if (known) return known
-  return globalStatus.serverId === serverId ? globalStatus : { status: 'disconnected' }
+  if (known) return normalizeConnectionState(known)
+  return globalStatus.serverId === serverId
+    ? normalizeConnectionState(globalStatus)
+    : { status: 'disconnected' }
+}
+
+/**
+ * R8: a connected state may not also carry an error (or a fingerprint still awaiting approval).
+ *
+ * The screenshot was `connected` beside `Timed out while waiting for handshake`: the first attempt
+ * timed out, a later one worked, and the older attempt's words survived on the chip. `connected` is
+ * the newer fact, so the read side drops whatever contradicts it — a stale map entry, a seed, or a
+ * copied state cannot repaint an error under a green dot. The manager's success path is the write
+ * side of the same rule (`test/main/connect-error-reset.test.ts`).
+ */
+export function normalizeConnectionState(state: VpsConnectionState): VpsConnectionState {
+  if (state.status !== 'connected') return state
+  const normalized: VpsConnectionState = { status: 'connected' }
+  if (state.serverId !== undefined) normalized.serverId = state.serverId
+  if (state.fingerprint !== undefined) normalized.fingerprint = state.fingerprint
+  return normalized
 }
 
 /**

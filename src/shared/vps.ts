@@ -174,6 +174,16 @@ export interface ConnectionTestResult {
 
 export type VpsStatus = 'disconnected' | 'connecting' | 'connected' | 'error'
 
+/**
+ * R7: who asked for a connect.
+ *
+ * `manual` is a click (the Connect button, a project's reconnect banner) and is the only request
+ * that may reopen a server the user disconnected. `automatic` is the app bringing a dependency up
+ * (the one reconnect after a dropped tool, the renderer's keep-alive for an open remote project) and
+ * must leave a user-disconnected server exactly as it is.
+ */
+export type VpsConnectMode = 'manual' | 'automatic'
+
 export interface VpsConnectionState {
   status: VpsStatus
   serverId?: string
@@ -181,6 +191,12 @@ export interface VpsConnectionState {
   /** Set when the host key is unseen and needs explicit approval. */
   pendingFingerprint?: string
   error?: string
+  /**
+   * R7: the user explicitly disconnected this server, so it stays down until they connect it again.
+   * Automatic paths refuse while it is true; a manual connect clears it. A `connected` state never
+   * carries it — the fact and a live session cannot both be true.
+   */
+  userDisconnected?: boolean
 }
 
 /**
@@ -209,6 +225,11 @@ export interface VpsReconnectOutcome {
   state: VpsConnectionState
   /** The tool's own words for why the session was believed gone. */
   reason: string
+  /**
+   * R7: set when no attempt was made at all. `user-disconnected` means the user asked for this
+   * server to be down, so the caller must not retry and must say so in those words.
+   */
+  refused?: 'user-disconnected'
 }
 
 export interface RemoteFileEntry {

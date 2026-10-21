@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.3.3] — 2026-10-21
+
+Two bugs the user photographed an hour after 4.3.2, and one test that was asserting the opposite of its own name.
+
+### Fixed — a manual Disconnect is a decision, not an interruption
+
+At 15:04 the user disconnected `spmotor` (red dot, `Connect` button). At 15:05 it was `connected` again without a
+click: `reconnectOnce` was the only automatic connect path and it never asked who had asked for the session to be down.
+
+`SshManager.userDisconnected` now records it. `disconnect(id)` — the UI's Disconnect — sets it; the idle reaper, the
+liveness probe and a transport failure do **not**; a manual `connect(id)` is the only thing that clears it. While it is
+set, `reconnectOnce` and `connectAutomatically` refuse to open, write one audit line, and the tool result tells the
+model the session **was disconnected by the user**, that no reconnect was attempted and none will be while it stays
+down, so it should ask rather than retry. `vps:connect` now carries a mode and defaults to **automatic** (fail-closed);
+the background keep-alive asks for automatic, the Connect button, the banner and the migration dialog ask for manual.
+The R3 pins were checked: they keep an *existing* session and never open one.
+
+### Fixed — a success no longer carries the previous attempt's error
+
+The same screen showed `connected` **and** `Timed out while waiting for handshake`: the first attempt timed out, a later
+one succeeded, and the older error stayed. The manager's success state is now built fresh (the live-handle branch no
+longer spreads the cached state), `normalizeConnectionState` drops `error` and `pendingFingerprint` from any connected
+state, and the panel clears its own copy on the transition and never renders it while connected.
+
+### Fixed — a test that contradicted its name
+
+`test/renderer/thread-state.test.ts > never claims one legacy spelling for two different states` keyed by **state** and
+required the raw spelling to match — which forbids the synonym map the module documents (`pending`, `scheduled`,
+`waiting_to_start` all mean `queued`). Two spellings sharing a state is the feature; one spelling drifting between two
+states is the bug. The body now checks the invariant its name states. It was red before this release and nobody was
+watching, which is the same failure mode as the red CI job.
+
+### Verified
+
+Proven the way that counts here: twelve source files were backed up with sha256, reverted with the tests kept →
+**10 failed, 2 passed**, restored with all twelve hashes re-verified. 354 test files / 3293 tests green, typecheck clean,
+locale parity 1212 keys in both languages.
+
+### Not verified
+
+Nobody has yet watched 4.3.3 with a real dying SSH session, and the harness (`scripts/verify-ui.mjs`) checks the shell's
+six invariants rather than a live drop. That screenshot is still owed.
+
 ## [4.3.2] — 2026-10-20
 
 The release where the app stopped being trusted and started being run.

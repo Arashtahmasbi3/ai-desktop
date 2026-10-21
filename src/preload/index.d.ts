@@ -22,6 +22,7 @@ import type {
   HealthCheckOutcome,
   RemoteFileEntry,
   SshConfigHost,
+  VpsConnectMode,
   VpsConnectionState,
   VpsExecResult,
   VpsServerInput,
@@ -185,7 +186,11 @@ export interface Api {
     remove(id: string): Promise<boolean>
     status(): Promise<VpsConnectionState>
     connected(): Promise<string[]>
-    connect(id: string): Promise<VpsConnectionState>
+    /**
+     * R7: `manual` is the user asking (the only mode that may reopen a server they disconnected),
+     * `automatic` is the app bringing a dependency up. Defaults to `automatic`.
+     */
+    connect(id: string, mode?: VpsConnectMode): Promise<VpsConnectionState>
     disconnect(id: string): Promise<VpsConnectionState>
     /** Refresh a server's idle stamp so the watchdog keeps an open project's host up. */
     keepAlive(id: string): Promise<VpsConnectionState>

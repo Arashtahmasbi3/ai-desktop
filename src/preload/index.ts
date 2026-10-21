@@ -17,6 +17,7 @@ import type {
   HealthCheckOutcome,
   RemoteFileEntry,
   SshConfigHost,
+  VpsConnectMode,
   VpsConnectionState,
   VpsExecResult,
   VpsServerInput,
@@ -229,7 +230,8 @@ export const api = {
     connected: (): Promise<string[]> => invoke('vps:connected'),
     testConnection: (id: string): Promise<ConnectionTestResult> =>
       invoke('vps:testConnection', id),
-    connect: (id: string): Promise<VpsConnectionState> => invoke('vps:connect', id),
+    connect: (id: string, mode?: VpsConnectMode): Promise<VpsConnectionState> =>
+      invoke('vps:connect', id, mode),
     disconnect: (id: string): Promise<VpsConnectionState> => invoke('vps:disconnect', id),
     keepAlive: (id: string): Promise<VpsConnectionState> => invoke('vps:keepAlive', id),
     approveFingerprint: (id: string): Promise<VpsConnectionState> =>

@@ -775,7 +775,8 @@
     "privateKeyPath": "Private key path",
     "keyPassphraseOptional": "Key passphrase (optional)",
     "noServersTitle": "No server saved yet",
-    "selectServerTitle": "No server selected"
+    "selectServerTitle": "No server selected",
+    "userDisconnected": "You disconnected this server; it stays down until you connect."
   },
   "slash": {
     "new": "Start a new chat",
@@ -1288,5 +1289,20 @@
   "questionSheet": {
     "title": "The agent has a question",
     "skip": "Skip"
+  },
+  "state": {
+    "queued": "Queued",
+    "running": "Running",
+    "waiting": "Waiting for you",
+    "paused": "Paused",
+    "done": "Done",
+    "failed": "Failed",
+    "cancelled": "Cancelled",
+    "waitingReason": {
+      "approval": "approval",
+      "question": "an answer",
+      "budget": "budget",
+      "network": "connection"
+    }
   }
 }

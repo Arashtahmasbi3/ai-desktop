@@ -72,7 +72,9 @@ export default function MigrationDialog(): JSX.Element | null {
     try {
       let remotePath = path
       if (connectedId !== serverId) {
-        const state = await window.api.vps.connect(serverId)
+        // R7: the user asked for this, so it is a manual connect and may reopen a server they
+        // disconnected earlier.
+        const state = await window.api.vps.connect(serverId, 'manual')
         if (state.status !== 'connected') throw new Error(t('vps.notConnected'))
       }
       const matches = await window.api.vps.searchProject(serverId, basename(path) || name)

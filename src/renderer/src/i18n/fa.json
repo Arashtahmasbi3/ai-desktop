@@ -775,7 +775,8 @@
     "privateKeyPath": "مسیر کلید خصوصی",
     "keyPassphraseOptional": "گذرواژهٔ کلید (اختیاری)",
     "noServersTitle": "هنوز هیچ سروری ذخیره نشده",
-    "selectServerTitle": "هیچ سروری انتخاب نشده"
+    "selectServerTitle": "هیچ سروری انتخاب نشده",
+    "userDisconnected": "این سرور را خودتان قطع کردید؛ تا وقتی دوباره متصلش نکنید پایین می‌ماند."
   },
   "slash": {
     "new": "شروع چت جدید",
@@ -1288,5 +1289,20 @@
   "questionSheet": {
     "title": "عامل سؤالی دارد",
     "skip": "رد کردن"
+  },
+  "state": {
+    "queued": "در صف",
+    "running": "در حال اجرا",
+    "waiting": "منتظر شما",
+    "paused": "متوقف",
+    "done": "انجام شد",
+    "failed": "ناموفق",
+    "cancelled": "لغو شد",
+    "waitingReason": {
+      "approval": "تأیید",
+      "question": "پاسخ",
+      "budget": "بودجه",
+      "network": "اتصال"
+    }
   }
 }

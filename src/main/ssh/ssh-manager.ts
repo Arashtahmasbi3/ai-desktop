@@ -56,7 +56,10 @@ function sameConnectionState(a: VpsConnectionState, b: VpsConnectionState): bool
     a.serverId === b.serverId &&
     a.fingerprint === b.fingerprint &&
     a.pendingFingerprint === b.pendingFingerprint &&
-    (a.error ?? '') === (b.error ?? '')
+    (a.error ?? '') === (b.error ?? '') &&
+    // R7: "the user asked for this to be down" is part of the situation, so taking or clearing it
+    // is a real transition the renderer must hear about (it decides whether Connect is offered).
+    a.userDisconnected === b.userDisconnected
   )
 }
 
@@ -140,6 +143,15 @@ export class SshManager {
   private pendingFingerprints = new Map<string, string>()
   /** Last known state per server, so the UI can reason about each independently. */
   private serverStates = new Map<string, VpsConnectionState>()
+  /**
+   * R7: the servers the user explicitly took down.
+   *
+   * A disconnect is an observation or a decision, and only the decision has to stick. The reaper,
+   * the liveness probe and a transport error all *found* the session gone; the user *asked* for it.
+   * This set is the difference, and it is the only thing that gates opening a new session — nothing
+   * here weakens the reaper or the probe, which still disconnect freely.
+   */
+  private readonly userDisconnected = new Set<string>()
   private state: VpsConnectionState = { status: 'disconnected' }
   private watchdog?: ReturnType<typeof setInterval>
 
@@ -183,6 +195,15 @@ export class SshManager {
 
   isConnected(serverId: string): boolean {
     return this.connections.has(serverId)
+  }
+
+  /**
+   * R7: did the user explicitly take this server down? While true, no automatic path opens it —
+   * `reconnectOnce` refuses and `connectAutomatically` is a no-op — and only a manual `connect`
+   * clears it. It is a fact about a person's intent, so it is read at call time, never cached.
+   */
+  isUserDisconnected(serverId: string): boolean {
+    return this.userDisconnected.has(serverId)
   }
 
   /** Connection details for a saved server, used by cross-server tools. */
@@ -366,7 +387,12 @@ export class SshManager {
   }
 
   /**
-   * Connect to a saved server.
+   * Connect to a saved server because the **user** asked for it (the Connect button, a project's
+   * reconnect banner, or `vps:connect` in manual mode).
+   *
+   * R7: this is the one path that clears "the user asked for this to be down", so it is also the
+   * only path that may reopen a server a manual Disconnect took down. A click is the statement of
+   * intent, so the click is what clears the fact.
    *
    * v2.6.5: concurrent attempts for the same server are coalesced. A double-click
    * on Connect, or the keepalive racing a manual connect, used to open two SSH
@@ -374,12 +400,40 @@ export class SshManager {
    * an authenticated connection for the life of the process.
    */
   async connect(serverId: string): Promise<VpsConnectionState> {
+    this.userDisconnected.delete(serverId)
+    return this.openConnection(serverId)
+  }
+
+  /**
+   * Open a session **without** the user asking (R7): the one reconnect a dropped tool is allowed,
+   * and the renderer's dependency keep-alive for an open remote project.
+   *
+   * A server the user disconnected is left exactly as it is — no attempt, no state change. This is
+   * deliberately silent, because a 30-second keep-alive must not write an audit line every time it
+   * is refused; the refusal that matters (a run's tool) is reported by {@link reconnectOnce}, which
+   * returns a stated outcome and leaves a note for the model.
+   */
+  async connectAutomatically(serverId: string): Promise<VpsConnectionState> {
+    if (this.userDisconnected.has(serverId)) return this.stateFor(serverId)
+    return this.openConnection(serverId)
+  }
+
+  /** The shared body: coalesce, reuse a live handle, or run one attempt. */
+  private async openConnection(serverId: string): Promise<VpsConnectionState> {
     const existing = this.connections.get(serverId)
     if (existing) {
+      /*
+       * R8: `connected` and an earlier attempt's error are contradictory facts, so the cached
+       * state contributes its fingerprint only. Spreading it wholesale (`{ ...known, status:
+       * 'connected' }`) was how a success could publish `connected` together with the previous
+       * attempt's `Timed out while waiting for handshake`.
+       */
       const known = this.serverStates.get(serverId)
-      return this.setState(
-        known ? { ...known, status: 'connected' } : { status: 'connected', serverId }
-      )
+      return this.setState({
+        status: 'connected',
+        serverId,
+        ...(known?.fingerprint ? { fingerprint: known.fingerprint } : {})
+      })
     }
     const inFlight = this.connecting.get(serverId)
     if (inFlight) return inFlight
@@ -467,6 +521,11 @@ export class SshManager {
        * never comes back stops being a reason to hold the connection.
        */
       this.pin(serverId, 'manual-session', 'connected in the app', this.manualLeaseMs)
+      /*
+       * R8: a success is a new fact, not a patch of the previous one. The object is built from the
+       * attempt that just worked, so an error or a pending fingerprint from an earlier attempt has
+       * nowhere to survive — `stateFor` will answer `connected` and nothing else.
+       */
       return this.setState({ status: 'connected', serverId, fingerprint: presented })
     } catch (error) {
       const pending = this.pendingFingerprints.get(serverId)
@@ -511,6 +570,14 @@ export class SshManager {
   }
 
   async disconnect(serverId: string, reason = 'user'): Promise<VpsConnectionState> {
+    /*
+     * R7: a user disconnect is a **decision**, every other reason is an **observation**, and only
+     * the decision has to stick. The reaper found the session idle, the probe found the socket dead,
+     * a tool found the transport gone — none of them says the user wants this server down, so none
+     * of them may survive as one. The default is `user` because the only caller that omits the
+     * reason is the UI's own Disconnect (`vps:disconnect`).
+     */
+    if (reason === 'user') this.userDisconnected.add(serverId)
     const entry = this.connections.get(serverId)
     if (entry) {
       entry.terminal?.close()
@@ -528,11 +595,25 @@ export class SshManager {
       clearInterval(this.watchdog)
       this.watchdog = undefined
     }
-    return this.setState({ status: 'disconnected', serverId })
+    return this.setState({
+      status: 'disconnected',
+      serverId,
+      /*
+       * R7: the fact travels with the state, so a surface can say *why* it is down (and why Connect
+       * is the only way back) instead of guessing from a bare `disconnected`.
+       */
+      ...(this.userDisconnected.has(serverId) ? { userDisconnected: true } : {})
+    })
   }
 
+  /**
+   * Drop every session on shutdown. The reason is not `user`: quitting the app is not the user
+   * asking for these servers to stay down, so it must not leave the sticky fact behind.
+   */
   async disconnectAll(): Promise<void> {
-    for (const serverId of [...this.connections.keys()]) await this.disconnect(serverId)
+    for (const serverId of [...this.connections.keys()]) {
+      await this.disconnect(serverId, 'shutdown')
+    }
   }
 
   /**
@@ -597,6 +678,21 @@ export class SshManager {
    * A failed attempt leaves the server `disconnected`, because that is the fact: no session.
    */
   async reconnectOnce(serverId: string, reason: string): Promise<VpsReconnectOutcome> {
+    /*
+     * R7: the user asked for this server to be down, and no automatic path may overrule that. There
+     * is no attempt to make — not one "polite" one — because a session opening a minute after a
+     * manual Disconnect is exactly the reported bug. The outcome names the refusal so the caller can
+     * tell the model who decided, and the audit line keeps "why did this run stop?" answerable.
+     */
+    if (this.userDisconnected.has(serverId)) {
+      await this.audit.record({
+        type: 'connect',
+        ok: false,
+        serverId,
+        detail: `auto-connect refused: the user disconnected this server - ${reason}`
+      })
+      return { ok: false, state: this.stateFor(serverId), reason, refused: 'user-disconnected' }
+    }
     await this.audit.record({
       type: 'connect',
       ok: false,
@@ -606,7 +702,7 @@ export class SshManager {
     if (this.connections.has(serverId)) await this.disconnect(serverId, `liveness: ${reason}`)
     let attempt: VpsConnectionState
     try {
-      attempt = await this.connect(serverId)
+      attempt = await this.connectAutomatically(serverId)
     } catch (error) {
       attempt = {
         status: 'error',

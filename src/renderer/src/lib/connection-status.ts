@@ -1,5 +1,5 @@
 import type { VpsConnectionState, VpsServerView } from '@shared/vps'
-import { vpsServerName } from './vps-state'
+import { normalizeConnectionState, vpsServerName } from './vps-state'
 import { useStore } from '../store'
 
 /**
@@ -73,7 +73,9 @@ export function serverConnectionState(
   seed: readonly string[] = []
 ): VpsConnectionState {
   const known = states[serverId]
-  if (known) return known
+  // R8: the same read-side rule as `vpsStateFor`, so no surface can show "connected" plus the
+  // previous attempt's error.
+  if (known) return normalizeConnectionState(known)
   return seed.includes(serverId)
     ? { status: 'connected', serverId }
     : { status: 'disconnected', serverId }

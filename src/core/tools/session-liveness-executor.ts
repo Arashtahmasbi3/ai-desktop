@@ -146,12 +146,24 @@ export class SessionLivenessExecutor implements ToolExecutor {
     if (probed && (await this.deps.probe(serverId))) return result
 
     const outcome = await this.deps.reconnect(serverId, `${action.name}: ${firstLine(text)}`)
-    const why = outcome.state.error ?? outcome.state.status
     // R6: name the machine. The id stays in the audit log and on the tool result.
     const name = await serverNameFor(this.deps.serverName, serverId)
     const session = name === undefined ? 'the SSH session' : `the SSH session to server ${name}`
     // Say which evidence decided it, so a reader can tell a probe from a known-missing session.
     const found = probed ? ' (a liveness probe on the held connection found no session)' : ''
+    /*
+     * R7: nothing was attempted, because the user took this session down on purpose. The words
+     * matter more than the outcome: a model told "reconnect failed" retries, and a model told "the
+     * user disconnected it" stops and asks. So this says who decided, that no attempt was made, and
+     * where the way back is — without inviting another tool call.
+     */
+    if (outcome.refused === 'user-disconnected') {
+      return withNote(
+        result,
+        `Liveness: ${session} was disconnected by the user. No reconnect was attempted, and none will be while it stays down: do not retry this tool. Tell the user it is disconnected and ask them to press Connect in the Servers view if they want it back.`
+      )
+    }
+    const why = outcome.state.error ?? outcome.state.status
     const note = outcome.ok
       ? `Liveness: ${session} was gone${found}; one reconnect attempt succeeded. Call the tool again on the live session.`
       : `Liveness: ${session} is gone${found}; one reconnect attempt failed (${why}).`
