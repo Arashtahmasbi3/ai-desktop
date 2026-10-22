@@ -68,12 +68,22 @@ describe('S5 — staged bring-up and database keys', () => {
     }
   })
 
-  it('does not reuse a namespace that already exists in the shipped locale files', () => {
-    for (const name of ['en.json', 'fa.json']) {
+  it('does not reuse a namespace that already means something else in the shipped locales', () => {
+    // The keys are staged while the locale files are frozen; once they are merged (a `target` object
+    // appears in `en.json`/`fa.json`) the merge must be **lossless** — same leaf set as the staged
+    // file, not a partial overwrite. A flat key at the root is what replaced `preflight` during S4.
+    const pairs: Array<[string, string]> = [
+      ['en.json', 'target-en.json'],
+      ['fa.json', 'target-fa.json']
+    ]
+    for (const [shippedName, stagedName] of pairs) {
       const shipped = JSON.parse(
-        readFileSync(join(__dirname, '..', '..', 'src', 'renderer', 'src', 'i18n', name), 'utf8')
+        readFileSync(join(__dirname, '..', '..', 'src', 'renderer', 'src', 'i18n', shippedName), 'utf8')
       ) as Record<string, unknown>
-      expect(Object.keys(shipped)).not.toContain('target')
+      if (!Object.prototype.hasOwnProperty.call(shipped, 'target')) continue
+      expect(Array.isArray(shipped.target)).toBe(false)
+      expect(typeof shipped.target).toBe('object')
+      expect(leaves(shipped.target).sort()).toEqual(leaves(load(stagedName).target).sort())
     }
   })
 
