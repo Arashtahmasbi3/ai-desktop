@@ -192,14 +192,22 @@ describe('the source probe is a bounded, validated command', () => {
       '$(hostname)',
       '`id`',
       '1.2.3.4 22',
-      '::1',
-      '[::1]',
+      /*
+       * S4.7: `::1` and `[::1]` used to be refused here, because the `/dev/tcp` probe was assumed to
+       * have no IPv6 form. It does — bash splits the pseudo-path at the last slash, and the brackets
+       * are stripped — so an IPv6 target is now probed instead of reported as `unknown`. What is
+       * still refused is anything that is *not* a literal: a stray colon, or two `::` groups.
+       */
+      '::1:',
+      '1::2::3',
+      '2001:db8::1 22',
       "1.2.3.4'",
       ''
     ]) {
       expect(buildSourcePortProbe(hostile, 22), hostile).toBeUndefined()
     }
     expect(probeSafeHost('91.107.174.210')).toBe(true)
+    expect(probeSafeHost('2001:db8::1')).toBe(true)
     expect(probeSafeHost('host.example.com')).toBe(true)
     expect(buildSourcePortProbe('10.0.0.5', 0)).toBeUndefined()
     expect(buildSourcePortProbe('10.0.0.5', 70000)).toBeUndefined()

@@ -1,4 +1,5 @@
 import type { PortFact, ReachabilityAgreement, ReachabilityReport } from '@shared/vps'
+import { bareHost, isIpv6Literal } from '@shared/host-address'
 
 /**
  * Reachability, proved from every path the app can use (X4).
@@ -64,13 +65,19 @@ export function usablePort(value: number | undefined): number | undefined {
 /**
  * Is `host` safe to write into a shell command *and* a legal target?
  *
- * Deliberately narrow: dot-separated labels, no `:` (the `/dev/tcp` probe has no IPv6 form), no
- * quotes, no `$`, no whitespace, no `;`. Anything else is refused rather than escaped, because a
- * reachability probe must never be able to become a different command.
+ * Deliberately narrow: dot-separated labels or an IPv6 literal, no quotes, no `$`, no whitespace, no
+ * `;`. Anything else is refused rather than escaped, because a reachability probe must never be able
+ * to become a different command.
+ *
+ * S4.7: an IPv6 literal used to be refused here, which made every IPv6 target report `unknown`. The
+ * `/dev/tcp` pseudo-device does accept one — bash splits the path at the **last** slash, so
+ * `/dev/tcp/2001:db8::1/22` is address `2001:db8::1`, port 22 — and brackets must be stripped
+ * because they would be handed to `getaddrinfo` verbatim.
  */
 export function probeSafeHost(host: string): boolean {
-  const value = host.trim()
+  const value = bareHost(host)
   if (value === '' || value.length > 253) return false
+  if (isIpv6Literal(value)) return true
   return /^[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$/.test(value)
 }
 
@@ -81,17 +88,18 @@ export function probeSafeHost(host: string): boolean {
  * port scanner; `timeout` bounds it so a filtered port cannot hang the run. `PROBE_EXIT:` is the
  * machine-readable half — the rest of the output is the shell's own words and is kept as `detail`.
  *
- * Returns `undefined` for a target that cannot be written safely (an IPv6 literal, or anything that
- * is not a host name). The caller must then report the path as `unknown` — never as closed.
+ * Returns `undefined` for a target that cannot be written safely (anything that is not a host name or
+ * a valid IPv6 literal). The caller must then report the path as `unknown` — never as closed.
  */
 export function buildSourcePortProbe(host: string, port: number): string | undefined {
   if (!probeSafeHost(host)) return undefined
   if (usablePort(port) === undefined) return undefined
-  return `timeout 5 bash -c 'exec 3<>/dev/tcp/${host.trim()}/${port}' 2>&1; printf 'PROBE_EXIT:%s\\n' "$?"`
+  const address = bareHost(host)
+  return `timeout 5 bash -c 'exec 3<>/dev/tcp/${address}/${port}' 2>&1; printf 'PROBE_EXIT:%s\\n' "$?"`
 }
 
 /** Read the probe's answer back. Never invents "closed" from output it does not understand. */
-export function parseSourcePortProbeOutput(output: string): ProbeAnswer {
+export function parseSourcePortProbeOutput(output: string, host?: string): ProbeAnswer {
   const text = output ?? ''
   const match = /PROBE_EXIT:(\d+)/.exec(text)
   const words = text
@@ -111,6 +119,14 @@ export function parseSourcePortProbeOutput(output: string): ProbeAnswer {
     return { open: null, detail: 'bash or timeout is not installed on the source server' }
   }
   if (/no such file or directory/i.test(words) && /\/dev\/tcp/i.test(words)) {
+    // S4.7: an IPv6 literal can fail here on a bash that will not `getaddrinfo` it, which says
+    // nothing about the port — so it must not be reported as "no /dev/tcp support" either.
+    if (host !== undefined && isIpv6Literal(host)) {
+      return {
+        open: null,
+        detail: 'this bash could not open /dev/tcp to an IPv6 literal, so this path is unknown'
+      }
+    }
     // A bash built without net redirections has no `/dev/tcp`: it answers nothing, so we say so.
     return { open: null, detail: 'the source server has no /dev/tcp support' }
   }

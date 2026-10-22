@@ -15,9 +15,10 @@ import VpsForm from './VpsForm'
 import { useConnectionTest } from '../ConnectionTest'
 import VpsTerminal from './VpsTerminal'
 import DiagnosticsPanel from '../DiagnosticsPanel'
+import MigrateProjectForm from '../MigrateProjectForm'
 import EmptyState from '../ui/EmptyState'
 
-type Tab = 'terminal' | 'files' | 'audit'
+type Tab = 'terminal' | 'files' | 'audit' | 'migrate'
 
 function text(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
@@ -381,7 +382,7 @@ export default function VpsPanel(): JSX.Element {
             {!connected && error ? <p className="px-3 py-1.5 text-xs text-danger">{error}</p> : null}
 
             <div className="flex items-center gap-1 border-b border-border px-2">
-              {(['terminal', 'files', 'audit'] as const).map((item) => (
+              {(['terminal', 'files', 'audit', 'migrate'] as const).map((item) => (
                 <button
                   key={item}
                   onClick={() => setTab(item)}
@@ -406,7 +407,13 @@ export default function VpsPanel(): JSX.Element {
             </div>
 
             <div className="min-h-0 flex-1">
-              {!connected ? (
+              {/*
+                S4: the migration form is not about the *selected* server — it names both ends itself —
+                so it is rendered before the "connect first" guard.
+              */}
+              {tab === 'migrate' ? (
+                <MigrateProjectForm servers={servers} />
+              ) : !connected ? (
                 <div className="flex h-full items-center justify-center text-sm text-fg-subtle">
                   Connect to use the {tab}.
                 </div>

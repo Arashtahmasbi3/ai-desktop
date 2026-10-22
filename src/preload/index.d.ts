@@ -6,6 +6,7 @@ import type {
 } from '@shared/types'
 import type { OnboardingStatus } from '@shared/onboarding'
 import type { AttachmentRefView } from '@shared/attachments'
+import type { MigrationPlan, MigrationRequest, MigrationRun } from '@shared/migration'
 import type { UpdateCheckResult, UpdateDownloadResult } from '@shared/update'
 import type { LearnResultView, ProjectFact } from '@shared/memory-facts'
 import type { ProviderKeyHealthView } from '@shared/types'
@@ -279,6 +280,12 @@ export interface Api {
   }
   shell: {
     exec(command: string): Promise<LocalShellResult>
+  }
+  /** S4: the migration form posts a request and gets a plan; it never builds a command. */
+  migration: {
+    preflight(request: MigrationRequest): Promise<MigrationPlan>
+    start(request: MigrationRequest): Promise<MigrationRun>
+    cancel(): Promise<boolean>
   }
   /**
    * v2.6.5: this whole namespace existed in `preload/index.ts` but was never

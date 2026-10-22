@@ -148,7 +148,8 @@ export async function observeServerReachability(
           const result = await runOn(host, sourceId, command)
           const guarded = guardOutcome(result)
           if (guarded !== undefined) return guarded
-          return parseSourcePortProbeOutput(`${result?.stdout ?? ''}\n${result?.stderr ?? ''}`)
+          /* S4.7: the host is passed so an IPv6 failure is reported as such, not as "no /dev/tcp". */
+          return parseSourcePortProbeOutput(`${result?.stdout ?? ''}\n${result?.stderr ?? ''}`, hostName)
         }
 
   const probeTarget = targetHasSession

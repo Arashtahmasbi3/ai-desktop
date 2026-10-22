@@ -52,6 +52,7 @@ import type {
   WorkerStatus
 } from '@shared/ui'
 import type { AttachmentRefView } from '@shared/attachments'
+import type { MigrationPlan, MigrationRequest, MigrationRun } from '@shared/migration'
 import type { AuditVerifyResult, TraceExplanation } from '@shared/trace'
 import type { ProjectMetadataPatch } from '@shared/project-metadata'
 import type { Goal, GoalUpdate, NewGoalInput } from '@shared/goal'
@@ -367,6 +368,17 @@ export const api = {
 
   shell: {
     exec: (command: string): Promise<LocalShellResult> => invoke('shell:exec', command)
+  },
+
+  /**
+   * S4: the migration form's three calls. It posts ids and paths — never a command — so the renderer
+   * cannot assemble its own `rsync` line, and progress arrives as `migration:progress` events.
+   */
+  migration: {
+    preflight: (request: MigrationRequest): Promise<MigrationPlan> =>
+      invoke('migration:preflight', request),
+    start: (request: MigrationRequest): Promise<MigrationRun> => invoke('migration:start', request),
+    cancel: (): Promise<boolean> => invoke('migration:cancel')
   },
 
   jobs: {

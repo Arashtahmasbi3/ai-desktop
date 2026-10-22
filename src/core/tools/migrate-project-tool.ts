@@ -3,6 +3,7 @@ import type { VpsExecResult } from '@shared/vps'
 import { checkDenyList } from '@core/agent/deny-list'
 import type { AuditEntry } from '@core/agent/audit-log'
 import { shellQuote } from '@shared/shell-quote'
+import { sshUserAtHost } from '@shared/host-address'
 import { connectedServerNames, notConnectedMessage, serverLabel, type ServerNameLookup } from './server-names'
 
 /** Tool the agent can call to copy a project from one VPS to another over SSH. */
@@ -184,6 +185,10 @@ const USERNAME_RE = /^[A-Za-z0-9._-]+$/
 /**
  * Build the rsync command that runs on the source host and pushes the source
  * directory's contents into the target directory over SSH.
+ *
+ * S4.7: the destination goes through `sshUserAtHost`, so an IPv6 target is written
+ * `root@[2001:db8::1]:/srv/app/`. rsync splits a destination at the first `:` it finds *after* the
+ * host, so a bare literal used to work by accident and a bracketed one became `[[…]]`.
  */
 export function buildRsyncCommand(
   sourcePath: string,
@@ -192,7 +197,7 @@ export function buildRsyncCommand(
   options: { dryRun?: boolean } = {}
 ): string {
   const from = `${sourcePath.replace(/\/+$/, '')}/`
-  const to = `${target.username}@${target.host}:${targetPath.replace(/\/+$/, '')}/`
+  const to = `${sshUserAtHost(target.username, target.host)}:${targetPath.replace(/\/+$/, '')}/`
   // BatchMode=yes fails fast instead of hanging on a password prompt; the
   // source host is expected to authenticate to the target with a key/agent.
   const ssh = `ssh -p ${target.port} -o BatchMode=yes -o StrictHostKeyChecking=accept-new`
@@ -218,7 +223,7 @@ export function buildFileTransferCommand(
 ): string {
   const directory = toPath.replace(/[^/]+$/, '')
   const ssh = `ssh -p ${target.port} -o BatchMode=yes -o StrictHostKeyChecking=accept-new`
-  const to = `${target.username}@${target.host}:${toPath}`
+  const to = `${sshUserAtHost(target.username, target.host)}:${toPath}`
   // Create the destination directory first so rsync does not fail on a missing dir.
   return (
     `mkdir -p ${shellQuote(directory)} && ` +
@@ -269,7 +274,7 @@ export function buildTreeHashCommand(path: string): string {
 
 /** Run the tree hash on `path` over `target` from the source host. */
 export function buildTreeHashViaSshCommand(target: ServerConnection, path: string): string {
-  const destination = shellQuote(`${target.username}@${target.host}`)
+  const destination = shellQuote(sshUserAtHost(target.username, target.host))
   return `ssh -p ${target.port} -o BatchMode=yes ${destination} ${shellQuote(buildTreeHashCommand(path))}`
 }
 

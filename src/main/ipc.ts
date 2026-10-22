@@ -9,14 +9,65 @@ import type { ProjectMetadataPatch } from '@shared/project-metadata'
 import type { GitCommitInput } from '@shared/github'
 import type { AgentRunRequest, WorkerJobRequest } from '@shared/ui'
 import type { GoalUpdate, NewGoalInput } from '@shared/goal'
-
+import type { MigrationRequest } from '@shared/migration'
 import type { AppServices } from './app-services'
 import { registerVpsIpc } from './vps-ipc'
 import { registerMcpIpc } from './mcp-ipc'
 import { runLocalCommand } from './local-shell'
+import { observeServerReachability } from './reachability'
+import {
+  cancelActiveMigration,
+  localFreeBytes,
+  localStagingDirFor,
+  preflightMigrationRequest,
+  runLocalArgv,
+  runMigrationRequest,
+  type MigrationServiceOptions
+} from './migrate-project-service'
+import { tmpdir } from 'node:os'
 import { searchProject } from './project-search'
 import { canRememberTool, createRememberedApproval } from '@core/agent/remember-policy'
 import { toAttachmentRefView } from '@shared/attachments'
+
+/**
+ * Assemble the two machines a migration runs on, from the services this window already has (S4).
+ *
+ * This decides nothing about the migration itself — `@core` owns direct-vs-relay and every command.
+ * It is the one place that knows the source server is reached through `SshManager` (so the host
+ * policy, deny list and audit still apply) and that this computer is `execFile` with an exact argv.
+ */
+async function migrationOptions(
+  services: AppServices,
+  request: MigrationRequest
+): Promise<MigrationServiceOptions> {
+  const target = await services.vps.resolveServer(request.targetServerId)
+  const staging = localStagingDirFor(target?.host ?? 'target')
+  const names = new Map((await services.vps.listServers()).map((entry) => [entry.id, entry.name]))
+  return {
+    host: {
+      connectedServers: () => services.vps.connectedServers(),
+      resolveServer: (id) => services.vps.resolveServer(id),
+      exec: (serverId, command) => services.vps.exec(serverId, command),
+      listServers: () => services.vps.listServers()
+    },
+    local: (argv, signal) => runLocalArgv(argv, signal),
+    /* The relay stages under the OS temp directory, so that is the filesystem whose space matters. */
+    localFreeBytes: () => localFreeBytes(tmpdir()),
+    localStagingDir: staging,
+    reachability: async (probe) => {
+      const observed = await observeServerReachability(
+        services.vps,
+        { id: request.targetServerId, host: probe.host, port: probe.port },
+        { sourceId: probe.sourceServerId }
+      )
+      return observed.report
+    },
+    audit: async (entry) => {
+      await services.vps.recordAudit(entry)
+    },
+    serverName: (id) => names.get(id)
+  }
+}
 
 /**
  * Registers every IPC channel the renderer is allowed to call. Handlers only
@@ -459,6 +510,21 @@ export function registerIpc(
     ],
 
     ['jobs:list', () => services.jobs.listJobs()],
+    /*
+     * S4: the migration form's three channels.
+     *
+     * The renderer posts a request (two ids, two paths, the excludes) and gets a plan back; the plan
+     * carries the mode and the exact argv. Progress is an event, not a poll, and `cancel` aborts the
+     * one controller the run holds — which also kills the local rsync child.
+     */
+    ['migration:preflight', async (request: MigrationRequest) =>
+      preflightMigrationRequest(await migrationOptions(services, request), request)],
+    ['migration:start', async (request: MigrationRequest) =>
+      runMigrationRequest(await migrationOptions(services, request), request, {
+        onProgress: (event) => send('migration:progress', event)
+      })],
+    ['migration:cancel', () => cancelActiveMigration()],
+
     ['jobs:refresh', () => services.jobs.refreshAll()],
     ['jobs:status', (id: string) => {
       const job = services.jobs.getJob(id)
