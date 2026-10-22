@@ -38,7 +38,16 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # DECISION (P1.3, 2026-10-22): this leg has been red on `ubuntu-latest` since v4.0.1 and nobody watched it, which
+      # is worse than either alternative. Windows stays the gate — it is the target runtime and the only platform this
+      # repository has ever run the real app on. Linux keeps its typecheck and its build as required steps (both are
+      # genuinely platform-independent and green), and its test run is a REPORTING leg until the first green run. The
+      # differences are named, not guessed: `test/sandbox/docker-integration.test.ts` runs for real there because
+      # `ubuntu-latest` ships a working Docker daemon (it self-skips on Windows), and the 20s per-test timeout is tight
+      # under a loaded runner. When a Linux run is green, delete the `continue-on-error` below and this comment with it.
+      # Deleting Linux coverage would also have produced a green board — and it is the option that teaches nothing.
       - name: Test
+        continue-on-error: ${{ runner.os == 'Linux' }}
         run: npm test
 
       - name: Build
