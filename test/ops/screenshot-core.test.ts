@@ -115,3 +115,24 @@ describe('shotPath and summarize', () => {
     expect(summary.ok).toBe(true)
   })
 })
+
+/*
+ * P1.4 - scale-aware comparison. These two cases are the whole point of the change: a baseline captured on a 125 %
+ * display must still be usable on a 100 % runner (same window, more pixels), while a window that really changed shape
+ * must still be caught. Without them the suite only proved that the old behaviour did not break.
+ */
+describe('a baseline captured at another scale is still useful', () => {
+  const wide = { width: 1280, height: 800, bytes: 1000 }
+
+  it('accepts the same window at 1.25x instead of calling it size-changed', () => {
+    const scaled = { width: 1600, height: 1000, bytes: 1562 }
+    const result = compareShot(wide, scaled)
+    expect(result.status).toBe('ok')
+    expect(result.scale).toBeCloseTo(1.25, 5)
+  })
+
+  it('still refuses a different shape', () => {
+    const tall = { width: 1000, height: 1280, bytes: 1000 }
+    expect(compareShot(wide, tall).status).toBe('size-changed')
+  })
+})
