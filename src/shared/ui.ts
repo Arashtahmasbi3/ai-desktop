@@ -9,6 +9,7 @@ import type {
 import type { ChatMessage, ProviderId, Usage } from './types'
 import type { VpsConnectionState, VpsLivenessEvent } from './vps'
 import type { MigrationProgress } from './migration'
+import type { BringUpProgress } from './bring-up'
 import type { ApprovalMode, ApprovalReason } from './approval'
 import type { Plan, ApprovedPlan, PlanDecision, PlanWarning } from './plan'
 import type { CheckpointMode } from './decision-checkpoint'
@@ -426,4 +427,8 @@ export interface AppEventMap {
   'vps:data': { sessionId: string; chunk: string }
   /** S4.6: one tick per migration phase, so the form's progress comes from main, never a timer. */
   'migration:progress': MigrationProgress
+  /** S5.1: the database migration's coarse phase ticks (same shape, its own channel). */
+  'migration:database-progress': MigrationProgress
+  /** S5.2: one event per checklist step, when it starts and when it is marked. */
+  'migration:bringup-progress': BringUpProgress
 }

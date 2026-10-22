@@ -53,6 +53,8 @@ import type {
 } from '@shared/ui'
 import type { AttachmentRefView } from '@shared/attachments'
 import type { MigrationPlan, MigrationRequest, MigrationRun } from '@shared/migration'
+import type { DatabasePlan, DatabaseRequest, DatabaseRun } from '@shared/database-migration'
+import type { BringUpPlan, BringUpRequest, BringUpRun } from '@shared/bring-up'
 import type { AuditVerifyResult, TraceExplanation } from '@shared/trace'
 import type { ProjectMetadataPatch } from '@shared/project-metadata'
 import type { Goal, GoalUpdate, NewGoalInput } from '@shared/goal'
@@ -371,14 +373,30 @@ export const api = {
   },
 
   /**
-   * S4: the migration form's three calls. It posts ids and paths — never a command — so the renderer
-   * cannot assemble its own `rsync` line, and progress arrives as `migration:progress` events.
+   * S4/S5: the migration surface's calls. It posts ids, paths and the container — never a command —
+   * so the renderer cannot assemble its own `rsync`/`pg_dump`/`nginx` line, and progress arrives as
+   * `migration:*` events. `database.preflight` is the dry run; `bringUp.plan` builds the checklist
+   * and runs nothing at all.
    */
   migration: {
     preflight: (request: MigrationRequest): Promise<MigrationPlan> =>
       invoke('migration:preflight', request),
     start: (request: MigrationRequest): Promise<MigrationRun> => invoke('migration:start', request),
-    cancel: (): Promise<boolean> => invoke('migration:cancel')
+    cancel: (): Promise<boolean> => invoke('migration:cancel'),
+    database: {
+      preflight: (request: DatabaseRequest): Promise<DatabasePlan> =>
+        invoke('migration:database:preflight', request),
+      start: (request: DatabaseRequest): Promise<DatabaseRun> =>
+        invoke('migration:database:start', request),
+      cancel: (): Promise<boolean> => invoke('migration:database:cancel')
+    },
+    bringUp: {
+      plan: (request: BringUpRequest): Promise<BringUpPlan> =>
+        invoke('migration:bringup:plan', request),
+      start: (request: BringUpRequest): Promise<BringUpRun> =>
+        invoke('migration:bringup:start', request),
+      cancel: (): Promise<boolean> => invoke('migration:bringup:cancel')
+    }
   },
 
   jobs: {

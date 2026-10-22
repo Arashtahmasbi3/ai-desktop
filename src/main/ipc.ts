@@ -10,6 +10,8 @@ import type { GitCommitInput } from '@shared/github'
 import type { AgentRunRequest, WorkerJobRequest } from '@shared/ui'
 import type { GoalUpdate, NewGoalInput } from '@shared/goal'
 import type { MigrationRequest } from '@shared/migration'
+import type { DatabaseRequest } from '@shared/database-migration'
+import type { BringUpRequest } from '@shared/bring-up'
 import type { AppServices } from './app-services'
 import { registerVpsIpc } from './vps-ipc'
 import { registerMcpIpc } from './mcp-ipc'
@@ -24,6 +26,14 @@ import {
   runMigrationRequest,
   type MigrationServiceOptions
 } from './migrate-project-service'
+import {
+  cancelActiveBringUp,
+  cancelActiveDatabaseMigration,
+  planBringUpRequest,
+  preflightDatabaseRequest,
+  runBringUpRequest,
+  runDatabaseMigrationRequest
+} from './bring-up-service'
 import { tmpdir } from 'node:os'
 import { searchProject } from './project-search'
 import { canRememberTool, createRememberedApproval } from '@core/agent/remember-policy'
@@ -32,13 +42,13 @@ import { toAttachmentRefView } from '@shared/attachments'
 /**
  * Assemble the two machines a migration runs on, from the services this window already has (S4).
  *
- * This decides nothing about the migration itself — `@core` owns direct-vs-relay and every command.
+ * This decides nothing about the migration itself â€” `@core` owns direct-vs-relay and every command.
  * It is the one place that knows the source server is reached through `SshManager` (so the host
  * policy, deny list and audit still apply) and that this computer is `execFile` with an exact argv.
  */
 async function migrationOptions(
   services: AppServices,
-  request: MigrationRequest
+  request: { sourceServerId: string; targetServerId: string }
 ): Promise<MigrationServiceOptions> {
   const target = await services.vps.resolveServer(request.targetServerId)
   const staging = localStagingDirFor(target?.host ?? 'target')
@@ -71,7 +81,7 @@ async function migrationOptions(
 
 /**
  * Registers every IPC channel the renderer is allowed to call. Handlers only
- * expose the curated service methods — the renderer never gets direct access to
+ * expose the curated service methods â€” the renderer never gets direct access to
  * Node, the filesystem or child processes.
  */
 export function registerIpc(
@@ -161,7 +171,7 @@ export function registerIpc(
       async (mode: ApprovalMode) => {
         if (mode === 'full') {
           // v2.6.2 (P0-5): `full` is a scoped, TTL-bounded elevation grant owned
-          // by main — never merely a persisted preference the renderer can set.
+          // by main â€” never merely a persisted preference the renderer can set.
           await services.grantElevation()
         } else {
           // v2.6.1 compat: `ask`/`auto-write` stay Develop profile; the persisted
@@ -311,7 +321,7 @@ export function registerIpc(
     // v2.8.1: the `gh` CLI is very often already installed and logged in, so the
     // one-click path is offered first. `detectCli` only reads (never the token);
     // `connectCli` reads the token, validates it with `GET /user` and stores it
-    // encrypted through setToken — the token never crosses this boundary.
+    // encrypted through setToken â€” the token never crosses this boundary.
     ['github:detectCli', () => services.github.detectCli()],
     ['github:connectCli', () => services.github.connectWithCli()],
     ['github:setClientId', (clientId: string) => services.github.setClientId(clientId)],
@@ -397,7 +407,7 @@ export function registerIpc(
       }
     ],
     ['agent:applyChange', (id: string) => services.agent.applyChange(id)],
-    // v2.6.5: one source of truth for the version shown in the UI. Settings →
+    // v2.6.5: one source of truth for the version shown in the UI. Settings â†’
     // Developer hardcoded "v2.3.3" in a 2.6.4 build.
     ['app:version', () => app.getVersion()],
     // v2.6.5: the local terminal now passes the same guards as every remote
@@ -435,7 +445,7 @@ export function registerIpc(
       (runId: string, decisionId: string) => services.agent.explainStep(runId, decisionId)
     ],
 
-    // v2.6.2 (T3.3): audit mode. The path is shown in Settings → Advanced, and
+    // v2.6.2 (T3.3): audit mode. The path is shown in Settings â†’ Advanced, and
     // Verify recomputes the hash chain to surface tampering.
     ['audit:path', () => services.agent.auditPath()],
     ['audit:verify', () => services.agent.verifyAudit()],
@@ -515,7 +525,7 @@ export function registerIpc(
      *
      * The renderer posts a request (two ids, two paths, the excludes) and gets a plan back; the plan
      * carries the mode and the exact argv. Progress is an event, not a poll, and `cancel` aborts the
-     * one controller the run holds — which also kills the local rsync child.
+     * one controller the run holds â€” which also kills the local rsync child.
      */
     ['migration:preflight', async (request: MigrationRequest) =>
       preflightMigrationRequest(await migrationOptions(services, request), request)],
@@ -524,6 +534,28 @@ export function registerIpc(
         onProgress: (event) => send('migration:progress', event)
       })],
     ['migration:cancel', () => cancelActiveMigration()],
+
+    /*
+     * S5: the database migration and the target bring-up.
+     *
+     * Same shape as S4 and the same wiring underneath (`@core` decides, main says where). The dry run
+     * is a separate channel because it must be possible to plan without any path to "start"; the
+     * checklist's `plan` channel builds the steps and runs nothing at all.
+     */
+    ['migration:database:preflight', async (request: DatabaseRequest) =>
+      preflightDatabaseRequest(await migrationOptions(services, request), request)],
+    ['migration:database:start', async (request: DatabaseRequest) =>
+      runDatabaseMigrationRequest(await migrationOptions(services, request), request, {
+        onProgress: (event) => send('migration:database-progress', event)
+      })],
+    ['migration:database:cancel', () => cancelActiveDatabaseMigration()],
+    ['migration:bringup:plan', async (request: BringUpRequest) =>
+      planBringUpRequest(await migrationOptions(services, request), request)],
+    ['migration:bringup:start', async (request: BringUpRequest) =>
+      runBringUpRequest(await migrationOptions(services, request), request, {
+        onProgress: (event) => send('migration:bringup-progress', event)
+      })],
+    ['migration:bringup:cancel', () => cancelActiveBringUp()],
 
     ['jobs:refresh', () => services.jobs.refreshAll()],
     ['jobs:status', (id: string) => {

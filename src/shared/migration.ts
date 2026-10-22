@@ -25,6 +25,8 @@ export type MigrationPhase =
   | 'verify'
   | 'verify-target'
   | 'commit'
+  /** S5.1: the database's one destructive step — a restore, which replaces the target's objects. */
+  | 'restore'
   | 'done'
 
 export type MigrationStepId =

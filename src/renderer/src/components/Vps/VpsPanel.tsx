@@ -15,7 +15,7 @@ import VpsForm from './VpsForm'
 import { useConnectionTest } from '../ConnectionTest'
 import VpsTerminal from './VpsTerminal'
 import DiagnosticsPanel from '../DiagnosticsPanel'
-import MigrateProjectForm from '../MigrateProjectForm'
+import MigrationTab from '../MigrationTab'
 import EmptyState from '../ui/EmptyState'
 
 type Tab = 'terminal' | 'files' | 'audit' | 'migrate'
@@ -57,7 +57,7 @@ export default function VpsPanel(): JSX.Element {
    *
    * This panel used to keep one `status` and overwrite it on every `vps:status`
    * event, so with two servers up it named whichever changed last and every other
-   * row rendered "Connect" again while its socket was still open — the reported
+   * row rendered "Connect" again while its socket was still open â€” the reported
    * "connect one, the other gets disconnected". No connection was ever dropped.
    */
   const vpsStates = useStore((state) => state.vpsStates)
@@ -115,7 +115,7 @@ export default function VpsPanel(): JSX.Element {
     setActiveId(id)
     setError(null)
     try {
-      // R7: a click is the user asking, so it is a **manual** connect — the only kind that may
+      // R7: a click is the user asking, so it is a **manual** connect â€” the only kind that may
       // reopen a server they disconnected. `connectVpsInPlace` deliberately does not move the
       // chat-header selection, so connecting here cannot yank the user's chosen host.
       await connectVpsInPlace(id)
@@ -315,7 +315,7 @@ export default function VpsPanel(): JSX.Element {
       <section className="flex min-h-0 min-w-0 flex-1 flex-col">
         {!activeId ? (
           <div className="flex flex-1 items-center justify-center p-6">
-            {/* Nothing is selected, so the state says which server and why — no hidden button. */}
+            {/* Nothing is selected, so the state says which server and why â€” no hidden button. */}
             <EmptyState
               testId="vps-no-selection"
               title={t('vps.selectServerTitle')}
@@ -408,11 +408,11 @@ export default function VpsPanel(): JSX.Element {
 
             <div className="min-h-0 flex-1">
               {/*
-                S4: the migration form is not about the *selected* server — it names both ends itself —
+                S4: the migration form is not about the *selected* server â€” it names both ends itself â€”
                 so it is rendered before the "connect first" guard.
               */}
               {tab === 'migrate' ? (
-                <MigrateProjectForm servers={servers} />
+                <MigrationTab servers={servers} />
               ) : !connected ? (
                 <div className="flex h-full items-center justify-center text-sm text-fg-subtle">
                   Connect to use the {tab}.

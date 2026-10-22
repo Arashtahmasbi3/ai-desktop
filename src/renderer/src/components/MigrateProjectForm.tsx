@@ -26,6 +26,8 @@ import { DEFAULT_MIGRATION_EXCLUDES } from '@shared/migration'
 
 interface MigrateProjectFormProps {
   servers: VpsServerView[]
+  /** Optional: the migration surface folds this into the shared verdict (S5.3). */
+  onRun?: ((run: MigrationRun) => void) | undefined
 }
 
 /** `node_modules, .next` → `['node_modules', '.next']`. Main validates; this only splits. */
@@ -46,7 +48,7 @@ const STATUS_TONE: Record<'pass' | 'warn' | 'fail', string> = {
   fail: 'text-danger'
 }
 
-export default function MigrateProjectForm({ servers }: MigrateProjectFormProps): JSX.Element {
+export default function MigrateProjectForm({ servers, onRun }: MigrateProjectFormProps): JSX.Element {
   const { t } = useTranslation()
   const [sourceId, setSourceId] = useState<string>(servers[0]?.id ?? '')
   const [targetId, setTargetId] = useState<string>(servers[1]?.id ?? servers[0]?.id ?? '')
@@ -95,7 +97,9 @@ export default function MigrateProjectForm({ servers }: MigrateProjectFormProps)
     setRun(null)
     setProgress(null)
     try {
-      setRun(await window.api.migration.start(request))
+      const finished = await window.api.migration.start(request)
+      setRun(finished)
+      onRun?.(finished)
     } catch (cause) {
       setError(textOf(cause))
     } finally {
