@@ -170,9 +170,17 @@ export default function ProjectCard({ project }: { project: ProjectRecord }): JS
           {t(ENV_KEY[environment] ?? ENV_KEY.development)}
         </span>
 
-        {project.exists === false ? (
+        {/*
+          S3: the Locate picker is a **local** folder picker, so it is only offered for a local
+          project. A remote project's `exists: false` means "its server is not connected", and the
+          fix for that is connecting the server — not pointing the project at a folder on this
+          computer, which the local path normaliser would happily accept and store as a remote root.
+          (The sidebar's tree row made the same correction in v2.9.2.)
+        */}
+        {!isRemote && project.exists === false ? (
           <button
             type="button"
+            data-testid="project-locate"
             onClick={() => void locate()}
             title={t('sidebar.locate')}
             aria-label={t('settings.missingPath')}

@@ -213,6 +213,14 @@ export class RunGateFactory {
           ...(activeProject
             ? { projectId: activeProject.id, vpsId: activeProject.vpsId ?? '' }
             : {}),
+          /*
+           * S1.3: the remote project's root on the host. A remote_shell write that names a path
+           * outside it is escalated to the user (even in `full` mode), because S1 removed
+           * containment from the remote shell itself.
+           */
+          ...(activeProject && activeProject.type === 'remote' && activeProject.path
+            ? { remoteProjectRoot: activeProject.path }
+            : {}),
           requestApproval: (action, reason) => requestApproval(runId, action, reason),
           reasonFor: (action) =>
             activeTrust() ? 'outside_plan' : describeApprovalReason(action),

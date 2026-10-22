@@ -20,6 +20,13 @@ export interface AgentAction {
   valid: boolean
   /** Deterministic signature (name + sorted args) used for loop detection. */
   signature: string
+  /**
+   * S1.3: set by the approval gate when the user approved a `remote_shell` WRITE whose path leaves
+   * the project root. The remote shell executor refuses such a write without this stamp, so the
+   * approval is the only way through and it can never be skipped by a mode that auto-approves
+   * ordinary writes.
+   */
+  approvedOutsideRoot?: boolean
 }
 
 /** What the run chose to do after an action failed (v2.5.2). */

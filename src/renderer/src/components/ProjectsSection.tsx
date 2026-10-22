@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FolderPlus, Search, Server } from 'lucide-react'
 import { useStore } from '../store'
@@ -16,6 +16,8 @@ export default function ProjectsSection(): JSX.Element {
   // v2.8.0: this only needs *a* connected server as a sensible default discovery
   // target; the connected set is the honest source now that several can be up.
   const vpsConnectedServers = useStore((state) => state.vpsConnected)
+  // S3.3: a refusal can propose a path; the form opens pre-filled but still needs Add.
+  const projectPrefill = useStore((state) => state.projectPrefill)
 
   const [projectName, setProjectName] = useState('')
   const [projectPath, setProjectPath] = useState('')
@@ -25,9 +27,27 @@ export default function ProjectsSection(): JSX.Element {
   const [discovering, setDiscovering] = useState(false)
   // v2.3.3 (B.1): offer git setup for a freshly added non-repo remote project.
   const [gitSetupFor, setGitSetupFor] = useState<{ serverId: string; path: string } | null>(null)
+  // Which pre-fill has already been applied, so a re-render never overwrites typing.
+  const appliedPrefill = useRef<number | null>(null)
 
+  /*
+   * S3: the server a new remote project belongs to. A connected server is the best default, but a
+   * *saved* one is still where the folder lives: requiring a live session before the path could
+   * even be typed made "add a second root on my one server" look impossible while the session was
+   * down. Add stays disabled only when there is no server to attach the path to at all.
+   */
   const connectedId = vpsConnectedServers[0]
-  const targetVpsId = remoteVpsId || connectedId || ''
+  const defaultVpsId = connectedId ?? servers[0]?.id ?? ''
+  const targetVpsId = remoteVpsId || defaultVpsId
+
+  useEffect(() => {
+    if (!projectPrefill) return
+    if (appliedPrefill.current === projectPrefill.at) return
+    appliedPrefill.current = projectPrefill.at
+    setRemotePath(projectPrefill.path)
+    setRemoteVpsId(projectPrefill.vpsId ?? '')
+    setRemoteName(projectPrefill.name ?? '')
+  }, [projectPrefill])
 
   const browse = async (): Promise<void> => {
     const picked = await window.api.dialog.pickDirectory()
@@ -121,11 +141,13 @@ export default function ProjectsSection(): JSX.Element {
           onChange={(event) => setRemotePath(event.target.value)}
           placeholder={t('settings.remoteProjectPath')}
           dir="ltr"
+          data-testid="remote-project-path"
           className="flex-1 rounded border border-border bg-bg-primary px-2 py-1 font-mono text-xs text-fg outline-none focus:border-accent/50"
         />
         <select
           value={remoteVpsId}
           onChange={(event) => setRemoteVpsId(event.target.value)}
+          data-testid="remote-project-server"
           className="max-w-[9rem] rounded border border-border bg-bg-primary px-2 py-1 text-xs text-fg"
         >
           <option value="">
@@ -151,12 +173,21 @@ export default function ProjectsSection(): JSX.Element {
           type="button"
           disabled={!remotePath.trim() || !targetVpsId}
           onClick={() => void addRemote()}
+          data-testid="add-remote-project"
           className="flex items-center gap-1 rounded bg-accent-solid px-3 py-1 text-xs text-white hover:bg-accent-solid-hover disabled:opacity-40"
         >
           <Server className="h-3 w-3" />
           {t('common.add')}
         </button>
       </div>
+      {projectPrefill ? (
+        <p data-testid="project-prefill-hint" className="mb-1 text-2xs leading-relaxed text-info">
+          {t('settings.prefilledFromRefusal', {
+            path: projectPrefill.path,
+            defaultValue: 'Pre-filled from a refusal: {{path}}'
+          })}
+        </p>
+      ) : null}
       <p className="mb-3 text-2xs leading-relaxed text-fg-subtle">
         {t('settings.remoteHint')}
       </p>

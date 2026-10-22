@@ -13,15 +13,35 @@
  * themselves before calling.
  */
 import * as path from 'path'
+import { refusalMessage } from '@shared/refusal'
+import {
+  matchPathAllowScope,
+  type PathAllowContext,
+  type PathAllowScope
+} from '@core/agent/server-grant'
 import { isDiagnosticAllowed, type DiagnosticPolicy } from './diagnostic-policy'
-import { isCommandAlwaysAllowed, isDiagnosticReadOnlyCommand, isReadOnlyShellCommand } from './command-whitelist'
+import {
+  isCommandAlwaysAllowed,
+  isDiagnosticReadOnlyCommand,
+  isReadOnlyShellCommand
+} from './command-whitelist'
 
 export interface PathGuardResult {
   ok: boolean
   resolvedPath?: string
   error?: string
-  /** Which rule admitted the path: the project root or Diagnostic Mode (v2.5.3). */
-  source?: 'project' | 'diagnostic'
+  /** Which rule admitted the path: the project root, an allow scope, or Diagnostic Mode. */
+  source?: 'project' | 'diagnostic' | 'allow-scope'
+  /**
+   * S1.3: the path is a WRITE that leaves the project root on a remote host. It is not refused
+   * here — a remote write outside the project is an approval, not a wall — so the caller must
+   * pass it to the approval gate and only run it once the user said yes.
+   */
+  approvalRequired?: boolean
+  /** The rule that produced this verdict, when it is a refusal or an approval. */
+  rule?: 'containment' | 'approval-required'
+  /** S2.3: the scope that admitted the path, so the caller can record it in the audit log. */
+  allowScope?: PathAllowScope
 }
 
 /** Device/pseudo files that are safe to reference regardless of the project. */
@@ -52,13 +72,19 @@ export function enforceProjectPath(
    * Diagnostic Mode is read-only: a write (`mode: 'write'`) may never leave the
    * project root, even for a path the diagnostic policy would otherwise expose.
    */
-  mode: 'read' | 'write' = 'read'
+  mode: 'read' | 'write' = 'read',
+  /**
+   * S2.3: the user's time-boxed "allow this path once" scopes. Consulted *inside* this decision —
+   * after the empty/control/`..` rules and never for a write — so a scope can only widen a read
+   * that every other guard already admitted.
+   */
+  allow?: PathAllowContext
 ): PathGuardResult {
   if (!requestedPath || typeof requestedPath !== 'string') {
-    return { ok: false, error: 'Invalid path' }
+    return { ok: false, error: 'Invalid path', rule: 'containment' }
   }
   if (!projectRoot || typeof projectRoot !== 'string') {
-    return { ok: false, error: 'Invalid project root' }
+    return { ok: false, error: 'Invalid project root', rule: 'containment' }
   }
 
   const root = normalizeRoot(projectRoot)
@@ -67,12 +93,33 @@ export function enforceProjectPath(
     : path.posix.normalize(path.posix.join(root, requestedPath))
 
   if (/[\x00-\x1f]/.test(resolved)) {
-    return { ok: false, error: 'Path contains control characters' }
+    return {
+      ok: false,
+      rule: 'containment',
+      error: refusalMessage({
+        rule: 'containment',
+        detail: `Path ${JSON.stringify(resolved)} contains control characters`,
+        path: requestedPath,
+        alternatives: ['use a normal path without control characters']
+      })
+    }
   }
 
   const contained = root === '/' || resolved === root || resolved.startsWith(root + '/')
   if (contained) {
     return { ok: true, resolvedPath: resolved, source: 'project' }
+  }
+
+  if (mode === 'read' && allow !== undefined) {
+    const scope = matchPathAllowScope(
+      allow.scopes,
+      resolved,
+      { vpsId: allow.vpsId, projectId: allow.projectId },
+      allow.now ?? Date.now()
+    )
+    if (scope !== undefined) {
+      return { ok: true, resolvedPath: resolved, source: 'allow-scope', allowScope: scope }
+    }
   }
 
   // P0-2 says no; Diagnostic Mode (user-enabled, read-only, expiring) may still
@@ -87,7 +134,12 @@ export function enforceProjectPath(
 
   return {
     ok: false,
-    error: `Path "${requestedPath}" is outside project root "${root}"`
+    rule: 'containment',
+    error: refusalMessage({
+      rule: 'containment',
+      detail: `Path ${JSON.stringify(requestedPath)} is outside project root ${JSON.stringify(root)}`,
+      path: requestedPath
+    })
   }
 }
 
@@ -256,20 +308,57 @@ export function stripRemotePayloads(command: string): string {
 }
 
 /**
- * Which filesystem a command's paths refer to (X8).
+ * Which filesystem a command's paths refer to (S1, formerly X8).
  *
  * `local` — the command runs here, inside the project, so the project root is a boundary: an
  * absolute path that leaves it, or a `..` that walks out, is refused.
  *
- * `remote-host` — the command is a payload for a host we reach over SSH. The project root is that
- * command's *working directory* there, not a sandbox: a shell on the host may `ls /opt` or
- * `df -h /` exactly as its owner can. Comparing those paths with the project root is the v4.1 bug
- * one layer down, and it burned two steps of a real session (`df -h /opt` and `ls /root/.ssh`, both
- * reported as "outside project root"). Containment therefore stands down for a remote payload. What
- * still holds for it is the secret-path guard and the deny list, and every remote call site runs
- * both before anything reaches the host.
+ * `remote-host` — the command is a payload for a host we reach over SSH. **Containment does not
+ * apply to it at all** (S1). The project root is a *write-scope for the tools that write on the
+ * agent's behalf*, not a read-scope for a shell on a machine the user is root on: `ls /opt/other`
+ * there protects nothing and only blocks the work. That is why the earlier version — which stood
+ * containment down only when the command was *provably* read-only — was wrong in practice: every
+ * real diagnostic (`2>/dev/null`, `| head`, a `for … done` loop) failed the proof and was
+ * contained anyway. What still governs a remote command is the deny list, the secret-path guard,
+ * the host policy, the approval gate and the audit log, and every remote call site runs them.
+ *
+ * The one protection kept is a *write*: a write-shaped command whose path leaves the project root
+ * is not refused here — it is marked `approvalRequired` so the caller asks the user (S1.3).
  */
 export type CommandHost = 'local' | 'remote-host'
+
+/**
+ * Absolute paths a **write-shaped** command names that leave `projectRoot`, plus `..` when the
+ * command can write (S1.3).
+ *
+ * A command that inspects the host and can prove it is read-only never appears here — that is
+ * S1.1. The harder case is a read that merely *moves* (`cd .. && ls /opt`): the parent-directory
+ * rule alone makes the classifier call it a write, which is exactly the fail-closed behaviour that
+ * kept the whole exemption unreachable. It is neutralised here — the `..` is replaced with `/` and
+ * the command is re-classified — so a move that only reads is a read, while `cd .. && echo hi > x`
+ * (which writes through the move) still escalates.
+ */
+export function escapedWritePaths(command: string, projectRoot: string): string[] {
+  if (typeof command !== 'string' || command.trim() === '') return []
+  if (typeof projectRoot !== 'string' || projectRoot.trim() === '') return []
+  if (isCommandAlwaysAllowed(command) || isReadOnlyShellCommand(command)) return []
+  const root = normalizeRoot(projectRoot)
+  if (root === '/') return []
+
+  const localCommand = stripRemotePayloads(command)
+  const neutralized = localCommand.replace(/(^|[\s=/])\.\.(?=$|[\s/])/g, '$1/')
+  if (isCommandAlwaysAllowed(neutralized) || isReadOnlyShellCommand(neutralized)) return []
+
+  const escaped: string[] = []
+  if (commandReferencesParent(localCommand)) escaped.push('..')
+  for (const candidate of extractAbsolutePaths(localCommand)) {
+    const resolved = path.posix.normalize(candidate)
+    if (isBenign(resolved)) continue
+    if (resolved === root || resolved.startsWith(root + '/')) continue
+    escaped.push(resolved)
+  }
+  return escaped
+}
 
 /**
  * Validate every absolute path referenced by a shell command against the
@@ -277,35 +366,46 @@ export type CommandHost = 'local' | 'remote-host'
  * redirections keep working. Returns the first rejection found.
  *
  * `host` says which filesystem those paths belong to: a command that runs on the
- * remote host is not path-checked against the project root at all (X8).
+ * remote host is not path-checked against the project root (S1), while a write
+ * that leaves it needs an approval (S1.3).
  */
 export function enforceCommandPaths(
   command: string,
   projectRoot: string,
   diagnostic?: DiagnosticPolicy | null,
-  /** Where the command runs. `remote-host` means "any path on that machine" (X8). */
+  /** Where the command runs. `remote-host` means "any path on that machine" (S1). */
   host: CommandHost = 'local'
 ): PathGuardResult {
   /*
-   * A shell payload for another host is not a file-tool path: the project root is its working
-   * directory, not a boundary. Stand down — the deny list and the secret-path guard are the
-   * boundaries for it, and every remote call site runs both.
+   * S1.1: a remote payload is not contained by this project's root.
+   *
+   * The project root is the working directory of that command on the host (`cd <root> && …`), not
+   * a sandbox: its owner is root on that machine and may `ls /opt`, `du -sh /srv`, `cat
+   * /etc/nginx/…` exactly as the shell allows. The whole read-only-proof shortcut is gone, because
+   * requiring a proof that no real diagnostic can produce made the exemption unreachable.
+   *
+   * S1.3: the one thing that still needs a human is a WRITE that lands outside the root. It is
+   * reported as `approvalRequired` (never as a block) so the caller can ask, and it runs when the
+   * user approves. The deny list and the secret-path guard are not consulted here — they run at
+   * the executor for every command, in every mode.
    */
   if (host === 'remote-host') {
-    /*
-     * X8: a READ on the host may inspect anything the shell's user can see — the project root is
-     * that command's working directory there, not a sandbox. A command that is not provably a read
-     * still changes the host, so it keeps the containment rule below: that is what still refuses
-     * `echo hi > /etc/os-release` now that reads are unconstrained.
-     */
-    if (
-      isCommandAlwaysAllowed(command) ||
-      isDiagnosticReadOnlyCommand(command) ||
-      isReadOnlyShellCommand(command)
-    ) {
-      return { ok: true }
+    const escaped = escapedWritePaths(command, projectRoot)
+    if (escaped.length > 0) {
+      return {
+        ok: false,
+        approvalRequired: true,
+        rule: 'approval-required',
+        error: refusalMessage({
+          rule: 'approval-required',
+          detail: `outside project root: ${escaped[0]}`,
+          path: escaped[0]
+        })
+      }
     }
+    return { ok: true }
   }
+
   // A `..` segment escapes the root regardless of what the leading token is, so
   // it is refused before any allow-list shortcut can admit the command (v2.6.5:
   // `cd .. && cd .. && cat etc/shadow` used to pass every other check).
@@ -318,7 +418,13 @@ export function enforceCommandPaths(
   if (commandReferencesParent(localCommand)) {
     return {
       ok: false,
-      error: `".." is not allowed in a project-scoped command; use a path inside "${normalizeRoot(projectRoot)}"`
+      rule: 'containment',
+      error: refusalMessage({
+        rule: 'containment',
+        detail: `".." is not allowed in a project-scoped command`,
+        path: '..',
+        alternatives: [`use a path inside ${JSON.stringify(normalizeRoot(projectRoot))}`]
+      })
     }
   }
   // Read-only host introspection (uname, df, ...) carries no project/system path
@@ -337,7 +443,13 @@ export function enforceCommandPaths(
     if (guard.source === 'diagnostic' && !readOnly) {
       return {
         ok: false,
-        error: `Path "${candidate}" is exposed by Diagnostic Mode but "${command}" is not a read-only command`
+        rule: 'containment',
+        error: refusalMessage({
+          rule: 'containment',
+          detail: `Path ${JSON.stringify(candidate)} is exposed by Diagnostic Mode but this is not a read-only command`,
+          path: candidate,
+          alternatives: ['use a read-only command, or narrow it to a path inside the project']
+        })
       }
     }
   }

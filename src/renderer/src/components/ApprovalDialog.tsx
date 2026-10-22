@@ -69,6 +69,12 @@ function reasonKey(reason: string): string {
       return 'chat.approvalReasonOutsidePlan'
     case 'write':
       return 'chat.approvalReasonWrite'
+    /*
+     * S1.3: a remote write outside the project root. It changes files, so it reuses the "changes
+     * files" copy — the path itself is already in the command preview above the reason.
+     */
+    case 'outside_project_root':
+      return 'chat.approvalReasonWrite'
     case 'dangerous':
       return 'chat.approvalReasonDangerous'
     case 'network_action':

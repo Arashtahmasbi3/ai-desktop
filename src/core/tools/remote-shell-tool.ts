@@ -4,6 +4,7 @@ import { checkDenyList } from '@core/agent/deny-list'
 import { enforceCommandPaths } from '@core/remote/path-guard'
 import { shellQuote } from '@shared/shell-quote'
 import { findSecretPathsInCommand } from '@shared/secret-paths'
+import { refusalMessage } from '@shared/refusal'
 import type { DiagnosticPolicy } from '@core/remote/diagnostic-policy'
 import { connectedServerNames, notConnectedMessage, type ServerNameLookup } from './server-names'
 
@@ -105,10 +106,17 @@ function isTimeout(error: unknown): error is { remoteTimeout: true; ms: number }
 /**
  * Guarded entry point for the agent. Applies the deny list again (defence in
  * depth — the manager also enforces it) and refuses unknown servers.
+ *
+ * S1: path containment is a FILE-TOOL boundary, and this is not one. The project
+ * root is this command's working directory on the host, not a sandbox — the
+ * command's owner is root there and may inspect the machine. The one write that
+ * still needs a human (a path outside the root) arrives here as
+ * `approvalRequired`, and runs only when the approval gate stamped the action.
  */
 export async function executeRemoteShell(
   deps: RemoteShellDeps,
-  args: { server_id?: unknown; command?: unknown }
+  args: { server_id?: unknown; command?: unknown },
+  options: { approvedOutsideRoot?: boolean } = {}
 ): Promise<RemoteShellResult> {
   const serverId = String(args.server_id ?? '').trim()
   const command = String(args.command ?? '').trim()
@@ -131,23 +139,34 @@ export async function executeRemoteShell(
     return { ok: false, content: await notConnectedMessage(deps.serverName, serverId), ...target }
   }
   /*
-   * Path containment is a FILE-TOOL boundary, and this is not one (X8).
+   * S1.1 — containment stands down for a remote payload; S1.3 — an off-root WRITE is an
+   * approval, not a wall.
    *
-   * `remote_shell` runs the command on the host over SSH. The project root is that command's
-   * working directory there (`cd <root> && ...` further down), not a sandbox: the agent may
-   * `ls /opt` or `df -h /` on that host exactly as its owner can. Judging those paths against the
-   * project root is the v4.1 bug one layer down — it blocked ordinary inspection (`df -h /opt`,
-   * `ls /root/.ssh`) and cost a real session two turns. The guard is still the answer for
-   * `remote_read_file`, `remote_list_dir`, `remote_write_file` and `remote_grep` (see
-   * `containPath` in remote-fs-tools).
-   *
-   * What still stops a command on the host is right below: the secret-path guard and the deny
-   * list. Neither is skipped, for any path and in any approval mode.
+   * The old code stood containment down only for a command it could prove read-only, so every
+   * real diagnostic (`2>/dev/null`, `| head`, a `for … done` loop) was still contained. Now the
+   * guard answers `ok` for a read of anything on the host, and `approvalRequired` for a write that
+   * leaves the project root. Nothing else is skipped: the secret-path guard and the deny list
+   * below run for every command, in every mode.
    */
   if (deps.projectRoot) {
     const guard = enforceCommandPaths(command, deps.projectRoot, deps.diagnostic, 'remote-host')
     if (!guard.ok) {
-      return { ok: false, blocked: true, content: `Blocked: ${guard.error}`, ...target }
+      const approvedOutsideRoot =
+        guard.approvalRequired === true && options.approvedOutsideRoot === true
+      if (!approvedOutsideRoot) {
+        return {
+          ok: false,
+          blocked: true,
+          content:
+            guard.error ??
+            refusalMessage({
+              rule: 'approval-required',
+              detail: 'a write outside the project root',
+              path: deps.projectRoot
+            }),
+          ...target
+        }
+      }
     }
   }
   // Secret Path Guard: never let a command reference a credential path, even in
@@ -157,13 +176,24 @@ export async function executeRemoteShell(
     return {
       ok: false,
       blocked: true,
-      content: `Blocked: command references ${secret[0].reason}`,
+      content: refusalMessage({
+        rule: 'secret-path',
+        detail: `the command references ${secret[0].reason}`
+      }),
       ...target
     }
   }
   const denial = checkDenyList(command)
   if (denial.blocked) {
-    return { ok: false, blocked: true, content: `Blocked by policy: ${denial.reason}`, ...target }
+    return {
+      ok: false,
+      blocked: true,
+      content: refusalMessage({
+        rule: 'deny-list',
+        detail: denial.reason ?? 'the command is on the deny list'
+      }),
+      ...target
+    }
   }
   // v2.6.5: the containment reasoning above assumes the project root is the
   // working directory, but an ssh2 `exec` request starts in the login directory
@@ -228,7 +258,10 @@ export async function executeRemoteShell(
     return {
       ok: false,
       blocked: true,
-      content: `Blocked by policy: ${result.reason}`,
+      content: refusalMessage({
+        rule: 'host-policy',
+        detail: result.reason ?? 'the host policy refused this command'
+      }),
       ...target,
       ...streams
     }
@@ -237,7 +270,13 @@ export async function executeRemoteShell(
     return {
       ok: false,
       blocked: true,
-      content: `Approval required by host policy: ${result.reason}`,
+      // The lead-in is kept verbatim for every existing caller that pins it; the rule name is
+      // added so the sentence answers "which rule?", and the alternative answers "what now?".
+      content: refusalMessage({
+        rule: 'approval-required',
+        headline: 'Approval required by host policy (approval-required)',
+        detail: result.reason ?? 'the host policy requires approval for this command'
+      }),
       ...target,
       ...streams
     }

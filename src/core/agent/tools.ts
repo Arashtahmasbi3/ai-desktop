@@ -5,6 +5,7 @@ import type { AgentAction, AgentToolResult, ToolErrorCode } from '@shared/agent'
 import { SandboxError, normalizeSandboxPath } from '@core/sandbox'
 import { listCommandFor, resolveSandboxShell } from '@core/sandbox/shell'
 import { findSecretPathsInCommand, inspectSecretPath } from '@shared/secret-paths'
+import { refusalMessage } from '@shared/refusal'
 
 export interface ToolExecOptions {
   signal?: AbortSignal
@@ -157,13 +158,23 @@ function secretGuardForAction(action: AgentAction): string | undefined {
   const path = typeof action.arguments.path === 'string' ? action.arguments.path : undefined
   if (path) {
     const result = inspectSecretPath(path)
-    if (result.blocked) return `Blocked: ${result.reason}`
+    if (result.blocked) {
+      return refusalMessage({
+        rule: 'secret-path',
+        detail: result.reason ?? 'the path holds credentials'
+      })
+    }
   }
   const command =
     typeof action.arguments.command === 'string' ? action.arguments.command : undefined
   if (command) {
     const hits = findSecretPathsInCommand(command)
-    if (hits.length > 0) return `Blocked: command references ${hits[0].reason}`
+    if (hits.length > 0) {
+      return refusalMessage({
+        rule: 'secret-path',
+        detail: `the command references ${hits[0].reason}`
+      })
+    }
   }
   return undefined
 }

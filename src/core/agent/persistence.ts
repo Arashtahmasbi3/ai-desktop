@@ -157,7 +157,35 @@ export function normalizeRemoteProjectPath(path: string): string {
   if (!trimmed.startsWith('/')) {
     throw new Error(`Remote project path must be absolute: ${trimmed}`)
   }
-  return normalize(trimmed).replace(/\\/g, '/')
+  /*
+   * A remote path is POSIX by definition, so it is normalised with the POSIX rules even when this
+   * process runs on Windows — and the trailing slash is dropped. Without that, `/opt/app/` and
+   * `/opt/app` were two different projects for the duplicate check, so adding the same folder twice
+   * (one way by hand, one way from a refusal) produced two records for one root.
+   */
+  const normalized = posix.normalize(trimmed).replace(/\\/g, '/')
+  return normalized.length > 1 ? normalized.replace(/\/+$/, '') : normalized
+}
+
+/**
+ * The workspace kind a project record gets from its path, when nothing forces it.
+ *
+ * One rule, two callers: reading a record back (`migrateProjectRecord`) and creating one
+ * (`Persistence.addProject`). A POSIX path on Windows cannot be a folder on this machine, so the
+ * record is a **remote** project that still needs a server chosen — the same conclusion the
+ * migration reached on the next launch. Keeping add-time and reload-time on one function is what
+ * stops a record from being `local` for the rest of the session and `remote` after a restart.
+ *
+ * An explicit `type` always wins, and an ordinary local path (a drive letter on Windows, a folder
+ * on POSIX) stays local.
+ */
+export function projectTypeForPath(
+  path: string,
+  explicit: 'local' | 'remote' | undefined,
+  platform: string
+): 'local' | 'remote' | undefined {
+  if (explicit === 'local' || explicit === 'remote') return explicit
+  return platform === 'win32' && path.startsWith('/') ? 'remote' : undefined
 }
 
 function emptySettings(now: number): AppSettings {
@@ -258,15 +286,13 @@ export function migrateProjectRecord(
     createdAt: typeof old.createdAt === 'number' ? old.createdAt : now
   }
 
-  if (old.type === 'remote') {
-    record.type = 'remote'
-    if (typeof old.vpsId === 'string') record.vpsId = old.vpsId
-  } else if (old.type === 'local') {
-    // explicitly local — keep as-is
-  } else if (platform === 'win32' && path.startsWith('/')) {
-    record.type = 'remote'
-    if (typeof old.vpsId === 'string') record.vpsId = old.vpsId
-  }
+  const kind = projectTypeForPath(
+    path,
+    old.type === 'remote' ? 'remote' : old.type === 'local' ? 'local' : undefined,
+    platform
+  )
+  if (kind) record.type = kind
+  if (kind === 'remote' && typeof old.vpsId === 'string') record.vpsId = old.vpsId
 
   copyProjectMetadata(old, record)
   return applyProjectMetadataDefaults(record, now)
@@ -681,15 +707,22 @@ export class Persistence {
     options: { type?: 'local' | 'remote'; vpsId?: string; metadata?: ProjectMetadata } = {}
   ): Promise<ProjectRecord> {
     await this.load()
+    /*
+     * S3: the caller may not know the kind — `settings:addProject` is "add this folder" — so the
+     * platform decides when the path cannot be local (`projectTypeForPath`), and a POSIX path added
+     * on Windows becomes a remote project that still needs a server instead of a local record
+     * pointing at a folder this machine does not have.
+     */
+    const kind = projectTypeForPath(path, options.type, process.platform)
     const normalized =
-      options.type === 'remote' ? normalizeRemoteProjectPath(path) : normalizeProjectPath(path)
+      kind === 'remote' ? normalizeRemoteProjectPath(path) : normalizeProjectPath(path)
     const base: ProjectRecord = {
       id: this.idFactory(),
       name: name.trim() || normalized,
       path: normalized,
       createdAt: this.now(),
-      ...(options.type === 'remote' ? { type: 'remote' as const } : {}),
-      ...(options.type === 'remote' && options.vpsId ? { vpsId: options.vpsId } : {})
+      ...(kind ? { type: kind } : {}),
+      ...(kind === 'remote' && options.vpsId ? { vpsId: options.vpsId } : {})
     }
     const project = applyProjectMetadataDefaults(
       { ...base, ...(options.metadata ?? {}) },
@@ -728,9 +761,16 @@ export class Persistence {
   /** Point an existing project at a new folder (used by the "Locate" action). */
   async updateProjectPath(id: string, path: string): Promise<ProjectRecord | null> {
     await this.load()
-    const normalized = normalizeProjectPath(path)
     const project = this.settings.projects.find((entry) => entry.id === id)
     if (!project) return null
+    /*
+     * S3: the new root is normalised for the kind of project it belongs to. A remote project's
+     * root lives on its server, so a path from this computer is refused rather than silently
+     * replacing it — the record used to keep `type: 'remote'` while pointing at `C:\...`, which is
+     * the opposite of giving it the right root.
+     */
+    const normalized =
+      project.type === 'remote' ? normalizeRemoteProjectPath(path) : normalizeProjectPath(path)
     project.path = normalized
     if (!project.name.trim()) project.name = normalized
     await this.persist()

@@ -1,4 +1,5 @@
 import type { SandboxProvider } from '@shared/sandbox'
+import { refusalMessage } from '@shared/refusal'
 
 export type SandboxErrorCode =
   | 'not_found'
@@ -54,7 +55,21 @@ export class LimitExceededError extends SandboxError {
 
 export class PathEscapeError extends SandboxError {
   constructor(attempted: string, sandboxId?: string) {
-    super(`Path escapes the sandbox workspace: ${attempted}`, 'path_escape', { sandboxId })
+    /*
+     * S2: a refusal says which rule refused it and what to do instead. The sandbox workspace is the
+     * project folder (or the run's own workspace), so the fix is a different path — not "add it as
+     * a project", which is the remote file tools' fix.
+     */
+    super(
+      refusalMessage({
+        rule: 'containment',
+        detail: `Path ${JSON.stringify(attempted)} escapes the sandbox workspace`,
+        path: attempted,
+        alternatives: ['use a path inside the project workspace']
+      }),
+      'path_escape',
+      { sandboxId }
+    )
   }
 }
 

@@ -10,7 +10,9 @@
  * The logic is a pure function so it can be unit-tested without SSH or an LLM.
  */
 import { enforceCommandPaths, enforceProjectPath } from '@core/remote/path-guard'
+import type { PathAllowScope } from '@core/agent/server-grant'
 import { findSecretPathsInCommand, inspectSecretPath } from '@shared/secret-paths'
+import { refusalMessage } from '@shared/refusal'
 import type { DiagnosticPolicy } from '@core/remote/diagnostic-policy'
 
 /** Local tool name → remote tool name. */
@@ -43,6 +45,13 @@ export interface RoutingContext {
   connected: boolean
   /** Read-only widening while Diagnostic Mode is on (v2.5.3). */
   diagnostic?: DiagnosticPolicy | null
+  /**
+   * S2.3: the project id and its time-boxed one-shot path allows. A routed local file-tool call
+   * goes through the same containment decision as the remote tool, so the scope must apply here
+   * too — otherwise the two routes would disagree about the same path.
+   */
+  projectId?: string
+  pathAllows?: readonly PathAllowScope[]
 }
 
 export type RoutingDecision =
@@ -107,23 +116,46 @@ export function routeToolCall(
     // Secret Path Guard applies before routing, with or without a known root
     // (v2.6.2, §5).
     const secret = inspectSecretPath(resolved)
-    if (secret.blocked) return { kind: 'error', message: `Blocked: ${secret.reason}` }
+    if (secret.blocked) {
+      return {
+        kind: 'error',
+        message: refusalMessage({
+          rule: 'secret-path',
+          detail: secret.reason ?? 'the path holds credentials'
+        })
+      }
+    }
     // Without a known remote root there is nothing to contain the path to.
     if (context.remotePath === undefined) return resolved
-    const guard = enforceProjectPath(resolved, root, context.diagnostic, mode)
+    const allow =
+      context.projectId !== undefined && context.projectId !== ''
+        ? {
+            scopes: context.pathAllows ?? [],
+            vpsId: context.serverId ?? '',
+            projectId: context.projectId
+          }
+        : undefined
+    const guard = enforceProjectPath(resolved, root, context.diagnostic, mode, allow)
     return guard.ok ? guard.resolvedPath! : { kind: 'error', message: guard.error! }
   }
 
   const guardedCommand = (command: unknown): RoutingDecision | undefined => {
     const secret = findSecretPathsInCommand(typeof command === 'string' ? command : '')
     if (secret.length > 0) {
-      return { kind: 'error', message: `Blocked: command references ${secret[0].reason}` }
+      return {
+        kind: 'error',
+        message: refusalMessage({
+          rule: 'secret-path',
+          detail: `the command references ${secret[0].reason}`
+        })
+      }
     }
     if (context.remotePath === undefined) return undefined
     /*
-     * X8: a `run_command` routed here becomes a `remote_shell` payload, so its paths are the
+     * S1: a `run_command` routed here becomes a `remote_shell` payload, so its paths are the
      * host's, not the project's. Containment stands down; the secret-path guard above and the
-     * deny list at the executor still apply.
+     * deny list at the executor still apply. An off-root WRITE now comes back as
+     * `approvalRequired`, and the executor refuses it unless the approval gate stamped the action.
      */
     const guard = enforceCommandPaths(
       typeof command === 'string' ? command : '',
@@ -131,9 +163,7 @@ export function routeToolCall(
       context.diagnostic,
       'remote-host'
     )
-    return guard.ok
-      ? undefined
-      : { kind: 'error', message: `Command references a path outside the project: ${guard.error}` }
+    return guard.ok ? undefined : { kind: 'error', message: guard.error ?? 'Blocked' }
   }
 
   let remoteArgs: Record<string, unknown>

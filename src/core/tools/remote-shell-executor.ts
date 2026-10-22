@@ -39,7 +39,15 @@ export class RemoteShellToolExecutor implements ToolExecutor {
     if (this.pinnedServerId) args.server_id = this.pinnedServerId
 
     try {
-      const result = await executeRemoteShell(this.deps, args)
+      /*
+       * S1.3: `approvedOutsideRoot` is the stamp the approval gate sets when the user approved a
+       * write whose path leaves the project root. The executor refuses such a write without it, so
+       * removing containment from the remote shell never turns "outside the project" into a
+       * silent, unapproved write.
+       */
+      const result = await executeRemoteShell(this.deps, args, {
+        approvedOutsideRoot: action.approvedOutsideRoot === true
+      })
       return {
         ...base,
         ok: result.ok,

@@ -4,7 +4,9 @@ import { checkDenyList } from '@core/agent/deny-list'
 import type { AuditEntry } from '@core/agent/audit-log'
 import { backupPathFor } from '@core/remote/backup'
 import { enforceProjectPath } from '@core/remote/path-guard'
+import { pathAllowAuditEntry, type PathAllowScope } from '@core/agent/server-grant'
 import { findSecretPathsInCommand, inspectSecretPath } from '@shared/secret-paths'
+import { refusalMessage } from '@shared/refusal'
 import type { DiagnosticPolicy } from '@core/remote/diagnostic-policy'
 import { shellQuote } from '@shared/shell-quote'
 import { connectedServerNames, notConnectedMessage, type ServerNameLookup } from './server-names'
@@ -104,6 +106,13 @@ export interface RemoteFsDeps {
   diagnostic?: DiagnosticPolicy | null
   /** R6: the saved name for an id, so a refusal names the server instead of printing a UUID. */
   serverName?: ServerNameLookup
+  /**
+   * S2.3: the project these file tools are bound to, and the user's time-boxed one-shot allows.
+   * Both are needed for an allow scope to match — an empty project id can never match a scope, so
+   * omitting it leaves the old containment exactly as it was.
+   */
+  projectId?: string
+  pathAllows?: () => readonly PathAllowScope[]
 }
 
 export interface RemoteFsResult {
@@ -140,6 +149,7 @@ function cleanPath(value: unknown): string | undefined {
  */
 function containPath(
   deps: RemoteFsDeps,
+  serverId: string,
   path: string,
   mode: 'read' | 'write' = 'read'
 ): { blocked?: RemoteFsResult; resolvedPath: string } {
@@ -147,12 +157,41 @@ function containPath(
   // even in Elevated mode (v2.6.2, §5).
   const secret = inspectSecretPath(path)
   if (secret.blocked) {
-    return { blocked: fail(`Blocked: ${secret.reason}`, true), resolvedPath: path }
+    return {
+      blocked: fail(
+        refusalMessage({ rule: 'secret-path', detail: secret.reason ?? 'the path holds credentials' }),
+        true
+      ),
+      resolvedPath: path
+    }
   }
   if (!deps.projectRoot) return { resolvedPath: path }
-  const guard = enforceProjectPath(path, deps.projectRoot, deps.diagnostic, mode)
+  const scopes = deps.pathAllows?.() ?? []
+  const allow =
+    deps.projectId !== undefined && deps.projectId !== ''
+      ? {
+          scopes,
+          vpsId: serverId,
+          projectId: deps.projectId,
+          ...(deps.now ? { now: deps.now() } : {})
+        }
+      : undefined
+  const guard = enforceProjectPath(path, deps.projectRoot, deps.diagnostic, mode, allow)
   if (!guard.ok) {
-    return { blocked: fail(`Blocked: ${guard.error}`, true), resolvedPath: path }
+    return {
+      blocked: fail(
+        guard.error ?? 'Blocked by containment: the path is outside the project root',
+        true
+      ),
+      resolvedPath: path
+    }
+  }
+  /*
+   * S2.3: a scope that admitted the path is a security-relevant decision, so it is recorded —
+   * `allow-scope <path> until <time>` — like every other command that reaches this host.
+   */
+  if (guard.source === 'allow-scope' && guard.allowScope) {
+    void deps.audit?.(pathAllowAuditEntry(guard.allowScope))
   }
   return { resolvedPath: guard.resolvedPath ?? path }
 }
@@ -161,10 +200,21 @@ function containPath(
 function guardCommand(command: string): RemoteFsResult | undefined {
   const secret = findSecretPathsInCommand(command)
   if (secret.length > 0) {
-    return fail(`Blocked: command references ${secret[0].reason}`, true)
+    return fail(
+      refusalMessage({
+        rule: 'secret-path',
+        detail: `the command references ${secret[0].reason}`
+      }),
+      true
+    )
   }
   const denial = checkDenyList(command)
-  if (denial.blocked) return fail(`Blocked by policy: ${denial.reason}`, true)
+  if (denial.blocked) {
+    return fail(
+      refusalMessage({ rule: 'deny-list', detail: denial.reason ?? 'the command is on the deny list' }),
+      true
+    )
+  }
   return undefined
 }
 
@@ -240,7 +290,7 @@ async function readFile(
 ): Promise<RemoteFsResult> {
   const path = cleanPath(args.path)
   if (!path) return fail('remote_read_file requires a non-empty "path"')
-  const { blocked, resolvedPath } = containPath(deps, path)
+  const { blocked, resolvedPath } = containPath(deps, serverId, path)
   if (blocked) return blocked
   try {
     const content = await deps.readFile(serverId, resolvedPath)
@@ -263,7 +313,7 @@ async function writeFile(
     return fail('remote_write_file requires "path" and "content"')
   }
   // Writes never use the Diagnostic Mode widening, even for an exposed path.
-  const { blocked, resolvedPath } = containPath(deps, path, 'write')
+  const { blocked, resolvedPath } = containPath(deps, serverId, path, 'write')
   if (blocked) return blocked
 
   // Back up an existing file before overwriting it so the change can be undone.
@@ -303,7 +353,7 @@ async function listDir(
   args: Record<string, unknown>
 ): Promise<RemoteFsResult> {
   const path = cleanPath(args.path) ?? '.'
-  const { blocked, resolvedPath } = containPath(deps, path)
+  const { blocked, resolvedPath } = containPath(deps, serverId, path)
   if (blocked) return blocked
   const entries = await deps.listFiles(serverId, resolvedPath)
   await deps.audit?.({ type: 'exec', ok: true, serverId, command: `fs:list ${resolvedPath}` })
@@ -325,7 +375,7 @@ async function exists(
 ): Promise<RemoteFsResult> {
   const path = cleanPath(args.path)
   if (!path) return fail('remote_exists requires a non-empty "path"')
-  const contained = containPath(deps, path)
+  const contained = containPath(deps, serverId, path)
   if (contained.blocked) return contained.blocked
   const resolvedPath = contained.resolvedPath
   const command = `test -e ${shellQuote(resolvedPath)} && echo yes || echo no`
@@ -347,7 +397,7 @@ async function grep(
     return fail('remote_grep requires a single-line "pattern"')
   }
   const path = cleanPath(args.path) ?? '.'
-  const contained = containPath(deps, path)
+  const contained = containPath(deps, serverId, path)
   if (contained.blocked) return contained.blocked
   const resolvedPath = contained.resolvedPath
   const command = `grep -rnE -- ${shellQuote(pattern)} ${shellQuote(resolvedPath)} 2>/dev/null | head -n 200`
@@ -369,7 +419,7 @@ async function gitStatus(
 ): Promise<RemoteFsResult> {
   const path = cleanPath(args.path)
   if (!path) return fail('remote_git_status requires a non-empty "path"')
-  const contained = containPath(deps, path)
+  const contained = containPath(deps, serverId, path)
   if (contained.blocked) return contained.blocked
   const command = `cd ${shellQuote(contained.resolvedPath)} && git status --porcelain=v1 -b 2>&1 | head -n 200`
   const blocked = guardCommand(command)

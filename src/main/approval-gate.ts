@@ -10,6 +10,7 @@ import { type CheckpointMode, type ImpactVerdict } from '@shared/decision-checkp
 import type { ApprovedCommands } from '@core/agent/approved-commands'
 import { canRememberTool, createRememberedApproval } from '@core/agent/remember-policy'
 import { isCommandAlwaysAllowed, isReadOnlyShellCommand } from '@core/remote/command-whitelist'
+import { escapedWritePaths } from '@core/remote/path-guard'
 import { detectNetworkAction } from '@core/remote/network-action'
 import { classifyShellCommand } from '@core/agent/approval'
 import { READ_ONLY_TOOL_NAMES } from '@shared/profile'
@@ -27,6 +28,13 @@ export interface ApprovalGateOptions {
    */
   vpsId?: string
   projectId?: string
+  /**
+   * S1.3: the active remote project's root on the host. When set, a `remote_shell` WRITE that names
+   * a path outside it is escalated to the user even in `full` mode, and the approved action is
+   * stamped so the executor lets it through. Omitted for local projects, where containment is the
+   * file tools' boundary and the shell runs in a sandbox.
+   */
+  remoteProjectRoot?: string
   /** Ask the user to approve a tool call. */
   requestApproval: (action: AgentAction, reason?: ApprovalReason) => Promise<ApprovalOutcome>
   /**
@@ -93,10 +101,13 @@ export interface ApprovalRequirement {
  * - the remote read-only tools (`remote_read_file`, ...) → no approval
  * - write tools, dangerous commands and everything else → approval
  */
-export function shouldRequireApproval(action: {
-  name: string
-  arguments: Record<string, unknown>
-}): ApprovalRequirement {
+export function shouldRequireApproval(
+  action: {
+    name: string
+    arguments: Record<string, unknown>
+  },
+  options: { remoteProjectRoot?: string } = {}
+): ApprovalRequirement {
   if (isDenyListedAction(action)) return { required: true, reason: 'dangerous' }
 
   // v4.2: an MCP server's tool is a foreign process. Ask, in those words, before it runs.
@@ -123,6 +134,17 @@ export function shouldRequireApproval(action: {
       if (detectNetworkAction(command) !== undefined) return { required: true, reason: 'network_action' }
       if (isCommandAlwaysAllowed(command)) return { required: false, reason: 'whitelisted_command' }
       if (isReadOnlyShellCommand(command)) return { required: false, reason: 'read_only_shell' }
+      /*
+       * S1.3: the remote shell is no longer contained by the project root (S1.1), so the one write
+       * that lands outside it is the thing this gate exists to ask about. Checked before the plain
+       * `write` reason so the prompt says why this particular write is different.
+       */
+      if (
+        options.remoteProjectRoot !== undefined &&
+        escapedWritePaths(command, options.remoteProjectRoot).length > 0
+      ) {
+        return { required: true, reason: 'outside_project_root' }
+      }
       /*
        * v4.1: say "this changes files" when that is what it does. `remote_shell` classifies as `shell`, so the
        * fallback below could only ever say "not whitelisted" — a sentence that tells the user nothing about a
@@ -188,6 +210,20 @@ export function createApprovalGate(
 
   return async (action: AgentAction): Promise<boolean> => {
     const denyListed = isDenyListedAction(action)
+    /*
+     * S1.3: a remote write that leaves the project root. It is NOT suppressed by a remembered
+     * approval or by the scoped server grant, and it is NOT auto-approved by `full` mode: the whole
+     * point of removing containment from the remote shell is that this one remaining protection
+     * becomes a real question instead of a wall.
+     */
+    const escaped =
+      options.remoteProjectRoot === undefined
+        ? []
+        : escapedWritePaths(
+            typeof action.arguments.command === 'string' ? action.arguments.command : '',
+            options.remoteProjectRoot
+          )
+    const escalated = !denyListed && escaped.length > 0
 
     /*
      * v3.1: judge the action once, up front, and write it down before anything else can decide to
@@ -205,7 +241,7 @@ export function createApprovalGate(
             .catch(() => undefined)
         : undefined
 
-    if (!denyListed) {
+    if (!denyListed && !escalated) {
       if (approvedCommands?.isApproved(action.name, action.arguments, sessionId, scope)) {
         /*
          * A remembered approval covers an ordinary change, but not something that cannot be undone.
@@ -237,7 +273,9 @@ export function createApprovalGate(
       if (!shouldRequireApproval(action).required) return true
     }
 
-    const reason = options.reasonFor?.(action) ?? shouldRequireApproval(action).reason
+    const reason: ApprovalReason = escalated
+      ? 'outside_project_root'
+      : (options.reasonFor?.(action) ?? shouldRequireApproval(action).reason)
     const outcome = await options.requestApproval(action, reason)
     if (recordId && options.checkpoint?.resolve) {
       await options.checkpoint
@@ -245,6 +283,9 @@ export function createApprovalGate(
         .catch(() => undefined)
     }
     if (!outcome.approved) return false
+
+    // The stamp the executor checks: only an approved off-root write carries it.
+    if (escalated) action.approvedOutsideRoot = true
 
     if (outcome.remember && !denyListed) await remember(action, outcome.remember)
 

@@ -34,6 +34,8 @@ export const useStore = create<AppState>((set, get) => ({
   settingsOpen: false,
   /** A tab for Settings to open on, consumed and cleared by SettingsPanel. */
   settingsTab: null as string | null,
+  /** S3.3: what Settings → Projects opens pre-filled with, set only by an explicit click. */
+  projectPrefill: null,
   view: 'chat',
 
   messages: [],

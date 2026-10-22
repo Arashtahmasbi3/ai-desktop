@@ -320,7 +320,10 @@
     "loopStopTitleSessionDropped": "The connection to the server was already gone",
     "loopStopHintSessionDropped": "Reconnect that server (or choose another one) and continue — retrying cannot help until a session exists.",
     "verdictSessionDropped": "The SSH session to that server was already gone, so the command never ran.",
-    "verdictActionReconnect": "Reconnect the server, then run the step again."
+    "verdictActionReconnect": "Reconnect the server, then run the step again.",
+    "approvalReasonOutsideRoot": "This command writes outside the project root",
+    "addRefusedPath": "Add as a project",
+    "addRefusedPathTitle": "Add {{path}} as a project on this server"
   },
   "vpsSelector": {
     "label": "VPS",
@@ -643,7 +646,8 @@
     "checkpointRecord": "Record consequential decisions",
     "checkpointConfirm": "Ask before a change (and always before an irreversible one)",
     "noProviderKeyTitle": "No provider key saved yet",
-    "noProviderKeyBody": "A send needs a key for the provider you use. Paste one into the provider you want below — it is encrypted before it is written and is never shown again."
+    "noProviderKeyBody": "A send needs a key for the provider you use. Paste one into the provider you want below — it is encrypted before it is written and is never shown again.",
+    "prefilledFromRefusal": "Pre-filled from a refusal: {{path}}"
   },
   "github": {
     "title": "GitHub",
@@ -1304,5 +1308,31 @@
       "budget": "budget",
       "network": "connection"
     }
+  },
+  "refusal": {
+    "headlineContainment": "Blocked by containment",
+    "headlineDenyList": "Blocked by policy (deny-list)",
+    "headlineSecretPath": "Blocked by policy (secret-path)",
+    "headlineHostPolicy": "Blocked by policy (host-policy)",
+    "headlineApprovalRequired": "Approval required (approval-required)",
+    "headlineHostApprovalRequired": "Approval required by host policy (approval-required)",
+    "altAddProject": "add {{path}} as a project",
+    "altRemoteShell": "read it with a remote shell command",
+    "altAllowOnce": "allow this path once (time-boxed, recorded in the audit)",
+    "altRewordCommand": "reword the command without it — this rule is always on",
+    "altNonSecretPath": "choose a path that is not a credential file — this rule is always on",
+    "altChangeHostPolicy": "change this host's policy in Settings -> Connections",
+    "altReadOnlyCommand": "use a read-only command",
+    "altApproveOnce": "approve it once in the approval dialog",
+    "altRunItYourself": "run it from a shell prompt on the server yourself",
+    "trailerContainment": "To reach it",
+    "trailerInstead": "Instead",
+    "trailerProceed": "To proceed",
+    "containment": "Blocked by containment: {{detail}} To reach it: {{alternatives}}.",
+    "denyList": "Blocked by policy (deny-list): {{detail}} Instead: {{alternatives}}.",
+    "secretPath": "Blocked by policy (secret-path): {{detail}} Instead: {{alternatives}}.",
+    "hostPolicy": "Blocked by policy (host-policy): {{detail}} Instead: {{alternatives}}.",
+    "approvalRequired": "Approval required (approval-required): {{detail}} To proceed: {{alternatives}}.",
+    "hostApprovalRequired": "Approval required by host policy (approval-required): {{detail}} To proceed: {{alternatives}}."
   }
 }

@@ -320,7 +320,10 @@
     "loopStopTitleSessionDropped": "اتصال به سرور از قبل از بین رفته بود",
     "loopStopHintSessionDropped": "به آن سرور دوباره وصل شوید (یا سرور دیگری انتخاب کنید) و ادامه دهید — تا وقتی نشستی وجود ندارد، تکرار فرمان کمکی نمی‌کند.",
     "verdictSessionDropped": "نشست SSH به آن سرور از قبل از بین رفته بود، بنابراین فرمان هرگز اجرا نشد.",
-    "verdictActionReconnect": "سرور را دوباره وصل کنید، بعد همین مرحله را دوباره اجرا کنید."
+    "verdictActionReconnect": "سرور را دوباره وصل کنید، بعد همین مرحله را دوباره اجرا کنید.",
+    "approvalReasonOutsideRoot": "این فرمان بیرون از ریشهٔ پروژه می‌نویسد",
+    "addRefusedPath": "افزودن به‌عنوان پروژه",
+    "addRefusedPathTitle": "افزودن {{path}} به‌عنوان پروژه روی همین سرور"
   },
   "vpsSelector": {
     "label": "VPS",
@@ -643,7 +646,8 @@
     "checkpointRecord": "ثبت تصمیم‌های مهم",
     "checkpointConfirm": "قبل از تغییر بپرس (و همیشه قبل از کار برگشت‌ناپذیر)",
     "noProviderKeyTitle": "هنوز کلید هیچ ارائه‌دهنده‌ای ذخیره نشده",
-    "noProviderKeyBody": "ارسال پیام به کلیدِ ارائه‌دهنده‌ای نیاز دارد که استفاده می‌کنید. کلید را در همان ارائه‌دهنده‌ی پایین بچسبانید — پیش از نوشتن رمزگذاری می‌شود و دیگر نمایش داده نمی‌شود."
+    "noProviderKeyBody": "ارسال پیام به کلیدِ ارائه‌دهنده‌ای نیاز دارد که استفاده می‌کنید. کلید را در همان ارائه‌دهنده‌ی پایین بچسبانید — پیش از نوشتن رمزگذاری می‌شود و دیگر نمایش داده نمی‌شود.",
+    "prefilledFromRefusal": "از روی پیام رد شدن پیش‌پر شد: {{path}}"
   },
   "github": {
     "title": "گیت‌هاب",
@@ -1304,5 +1308,31 @@
       "budget": "بودجه",
       "network": "اتصال"
     }
+  },
+  "refusal": {
+    "headlineContainment": "مسدود شد توسط containment",
+    "headlineDenyList": "مسدود شد توسط فهرست ممنوع (deny-list)",
+    "headlineSecretPath": "مسدود شد توسط محافظ مسیرهای محرمانه (secret-path)",
+    "headlineHostPolicy": "مسدود شد توسط سیاست میزبان (host-policy)",
+    "headlineApprovalRequired": "نیازمند تأیید (approval-required)",
+    "headlineHostApprovalRequired": "سیاست میزبان تأیید می‌خواهد (approval-required)",
+    "altAddProject": "این مسیر را به‌عنوان پروژه اضافه کن: {{path}}",
+    "altRemoteShell": "با یک فرمان پوستهٔ راهدور بخوانش",
+    "altAllowOnce": "این مسیر را یک‌بار اجازه بده (زمان‌دار، در audit ثبت می‌شود)",
+    "altRewordCommand": "فرمان را بدون آن بازنویسی کن — این قاعده همیشه روشن است",
+    "altNonSecretPath": "مسیری را انتخاب کن که فایل اعتبارنامه نباشد — این قاعده همیشه روشن است",
+    "altChangeHostPolicy": "سیاست این میزبان را در Settings -> Connections عوض کن",
+    "altReadOnlyCommand": "از یک فرمان فقط‌خواندنی استفاده کن",
+    "altApproveOnce": "یک‌بار در پنجرهٔ تأیید، تأییدش کن",
+    "altRunItYourself": "خودت آن را از یک پوسته روی سرور اجرا کن",
+    "trailerContainment": "برای رسیدن به آن",
+    "trailerInstead": "در عوض",
+    "trailerProceed": "برای ادامه",
+    "containment": "مسدود شد توسط containment: {{detail}} برای رسیدن به آن: {{alternatives}}.",
+    "denyList": "مسدود شد توسط فهرست ممنوع (deny-list): {{detail}} در عوض: {{alternatives}}.",
+    "secretPath": "مسدود شد توسط محافظ مسیرهای محرمانه (secret-path): {{detail}} در عوض: {{alternatives}}.",
+    "hostPolicy": "مسدود شد توسط سیاست میزبان (host-policy): {{detail}} در عوض: {{alternatives}}.",
+    "approvalRequired": "نیازمند تأیید (approval-required): {{detail}} برای ادامه: {{alternatives}}.",
+    "hostApprovalRequired": "سیاست میزبان تأیید می‌خواهد (approval-required): {{detail}} برای ادامه: {{alternatives}}."
   }
 }

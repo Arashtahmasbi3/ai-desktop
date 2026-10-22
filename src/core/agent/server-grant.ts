@@ -68,6 +68,157 @@ export function isServerGrantValid(
   return now < grant.expiresAt
 }
 
+/**
+ * S2.3 — the one-shot allow, in the same shape as the server grant above.
+ *
+ * The containment refusal offers "allow this path once"; this is what that click mints. It is
+ * deliberately narrower than the server grant:
+ *  - ONE path prefix (a prefix, never a subtree regex, with a path-segment boundary so
+ *    `/opt/app` cannot admit `/opt/app-evil`);
+ *  - one `vpsId` **and** one `projectId`, so an allow for a remote project can never cover local
+ *    work or another server;
+ *  - it admits **reads only** — the refusal it answers is about reading a directory the user owns,
+ *    and a write outside the project still goes through the approval gate;
+ *  - it expires, and expiry is evaluated on read (`Date.now()` at the decision), never by a timer.
+ *
+ * Shorter than the 30-minute server grant on purpose: it clears one inspection, not a work session.
+ */
+export const PATH_ALLOW_TTL_MS = 10 * 60 * 1000
+
+export interface PathAllowScope {
+  id: string
+  vpsId: string
+  projectId: string
+  /** Absolute path prefix that may be read, e.g. `/opt/zoonestore`. */
+  pathPrefix: string
+  createdAt: number
+  expiresAt: number
+}
+
+export interface PathAllowContext {
+  scopes: readonly PathAllowScope[]
+  vpsId: string
+  projectId: string
+  /** Clock read at decision time, so a test (and a restart) sees the real expiry. */
+  now?: number
+}
+
+/** Lexically collapse `.`/`..`, keep an absolute prefix, never return an empty string. */
+function normalizeAllowPrefix(prefix: string): string {
+  if (typeof prefix !== 'string' || !prefix.trim().startsWith('/')) return ''
+  const parts: string[] = []
+  for (const part of prefix.trim().split('/')) {
+    if (part === '' || part === '.') continue
+    if (part === '..') {
+      parts.pop()
+      continue
+    }
+    parts.push(part)
+  }
+  return parts.length === 0 ? '/' : `/${parts.join('/')}`
+}
+
+/** Mint a path allow. The caller supplies the clock so this stays testable. */
+export function createPathAllowScope(
+  vpsId: string,
+  projectId: string,
+  pathPrefix: string,
+  options: { ttlMs?: number; now?: number; id?: string } = {}
+): PathAllowScope {
+  const now = options.now ?? Date.now()
+  const ttlMs = options.ttlMs ?? PATH_ALLOW_TTL_MS
+  const normalized = normalizeAllowPrefix(pathPrefix)
+  return {
+    id: options.id ?? `allow-scope:${vpsId}:${projectId}:${normalized}:${now}`,
+    vpsId,
+    projectId,
+    pathPrefix: normalized,
+    createdAt: now,
+    expiresAt: now + ttlMs
+  }
+}
+
+/**
+ * Fail closed: a missing/empty scope, a missing prefix, any mismatch, or an expired scope is
+ * invalid. An empty `vpsId`/`projectId` (a local run) can never match a remote allow.
+ */
+export function isPathAllowScopeValid(
+  scope: PathAllowScope,
+  context: { vpsId: string; projectId: string },
+  now: number = Date.now()
+): boolean {
+  if (!scope.vpsId || !scope.projectId) return false
+  if (scope.vpsId !== context.vpsId) return false
+  if (scope.projectId !== context.projectId) return false
+  if (normalizeAllowPrefix(scope.pathPrefix) === '') return false
+  if (!Number.isFinite(scope.expiresAt)) return false
+  return now < scope.expiresAt
+}
+
+/** Whether `path` is the allowed prefix itself or lives under it (segment boundary, not text). */
+export function pathAllowCovers(scope: PathAllowScope, path: string): boolean {
+  const prefix = normalizeAllowPrefix(scope.pathPrefix)
+  const target = normalizeAllowPrefix(path)
+  if (prefix === '' || target === '') return false
+  if (prefix === '/') return true
+  return target === prefix || target.startsWith(`${prefix}/`)
+}
+
+/**
+ * The first valid, unexpired scope that covers `path` — or `undefined`.
+ *
+ * This is the containment-side API: `enforceProjectPath` calls it inside its own decision, so a
+ * scope can only ever widen a read that the secret guard and the `..` rule already passed.
+ */
+export function matchPathAllowScope(
+  scopes: readonly PathAllowScope[],
+  path: string,
+  context: { vpsId: string; projectId: string },
+  now: number = Date.now()
+): PathAllowScope | undefined {
+  for (const scope of scopes) {
+    if (!isPathAllowScopeValid(scope, context, now)) continue
+    if (pathAllowCovers(scope, path)) return scope
+  }
+  return undefined
+}
+
+/** Seed scopes from disk, dropping anything unparseable. */
+export function parsePathAllowScopes(raw: unknown): PathAllowScope[] {
+  if (!Array.isArray(raw)) return []
+  const scopes: PathAllowScope[] = []
+  for (const entry of raw) {
+    if (entry === null || typeof entry !== 'object') continue
+    const record = entry as Record<string, unknown>
+    const { id, vpsId, projectId, pathPrefix, createdAt, expiresAt } = record
+    if (typeof id !== 'string' || typeof vpsId !== 'string' || typeof projectId !== 'string') continue
+    if (typeof pathPrefix !== 'string') continue
+    if (typeof createdAt !== 'number' || typeof expiresAt !== 'number') continue
+    scopes.push({ id, vpsId, projectId, pathPrefix, createdAt, expiresAt })
+  }
+  return scopes
+}
+
+/** The audit line for a scope: `allow-scope <path> until <time>` (S2.3). */
+export function pathAllowAuditLine(scope: PathAllowScope): string {
+  return `allow-scope ${normalizeAllowPrefix(scope.pathPrefix)} until ${new Date(scope.expiresAt).toISOString()}`
+}
+
+/** The audit entry for a scope, ready for `AuditLog.record` / `recordAudit`. */
+export function pathAllowAuditEntry(scope: PathAllowScope): {
+  type: 'exec'
+  ok: true
+  serverId: string
+  command: string
+} {
+  return {
+    type: 'exec',
+    ok: true,
+    serverId: scope.vpsId,
+    command: pathAllowAuditLine(scope)
+  }
+}
+
 /** Seed grants from disk, dropping anything unparseable. */
 export function parseServerGrants(raw: unknown): ServerGrant[] {
   if (!Array.isArray(raw)) return []

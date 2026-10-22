@@ -22,12 +22,18 @@ function make(): Persistence {
 describe('Persistence projects', () => {
   it('adds a project and makes it active', async () => {
     const persistence = make()
-    const project = await persistence.addProject('Demo', '/home/me/demo')
+    /*
+     * S3: the type is stated here on purpose. Without one, a POSIX path on Windows is inferred as a
+     * *remote* project (`projectTypeForPath`), because `/home/me/demo` cannot be a folder on this
+     * machine — and this case is specifically about a local project.
+     */
+    const project = await persistence.addProject('Demo', '/home/me/demo', { type: 'local' })
     expect(project).toEqual({
       id: 'project-1',
       name: 'Demo',
       path: '/home/me/demo',
       createdAt: 1000,
+      type: 'local',
       // v2.3.2 C.1 — new projects get metadata defaults.
       updatedAt: 1000,
       environment: 'development',

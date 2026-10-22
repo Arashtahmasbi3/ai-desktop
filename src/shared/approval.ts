@@ -72,6 +72,12 @@ export type ApprovalReason =
    * about in its own words and never silently approved in a mode chosen for the agent's own writes.
    */
   | 'mcp_tool'
+  /**
+   * S1.3: a `remote_shell` WRITE whose path leaves the project root. Escalated on purpose even in
+   * `full` mode: removing containment from the remote shell keeps the one write that lands outside
+   * the project an explicit, per-command consent rather than a silent one.
+   */
+  | 'outside_project_root'
 
 /** The user's answer to an approval prompt. */
 export interface ApprovalOutcome {

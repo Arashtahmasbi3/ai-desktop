@@ -120,6 +120,8 @@ export function settingsActions(
   | 'toggleRemote'
   | 'addProject'
   | 'addRemoteProject'
+  | 'prefillAddProject'
+  | 'clearProjectPrefill'
   | 'searchVpsProject'
   | 'removeProject'
   | 'openProject'
@@ -442,12 +444,42 @@ export function settingsActions(
 
     async addProject(name, path) {
       set({ settings: await window.api.settings.addProject(name || basename(path), path) })
+      // A pre-filled path has now become a project, so the suggestion is spent.
+      set({ projectPrefill: null })
       await get().refreshFiles('.')
+      await get().refreshGoals()
     },
 
     async addRemoteProject(name, path, vpsId) {
       set({ settings: await window.api.settings.addRemoteProject(name || basename(path), path, vpsId) })
+      set({ projectPrefill: null })
+      // The new project is the active one, so the surfaces bound to it are re-read here rather than
+      // showing the previous project's tree until something else happens to refresh them.
+      await get().refreshFiles('.')
+      await get().refreshGoals()
     },
+
+    /**
+     * S3.3: "add this path as a project" — one click from a refusal.
+     *
+     * Deliberately a *navigation*, not an action: it opens Settings → Projects on the add form with
+     * the path and server filled in, and the user still has to press Add. The agent never gets a
+     * new root without a person choosing it.
+     */
+    prefillAddProject(input) {
+      set({
+        projectPrefill: {
+          path: input.path,
+          at: Date.now(),
+          ...(input.vpsId ? { vpsId: input.vpsId } : {}),
+          ...(input.name ? { name: input.name } : {})
+        },
+        settingsOpen: true,
+        settingsTab: 'projects'
+      })
+    },
+
+    clearProjectPrefill: () => set({ projectPrefill: null }),
 
     async searchVpsProject(name) {
       const status = await window.api.vps.status()

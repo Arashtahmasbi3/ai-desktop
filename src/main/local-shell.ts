@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs'
 import type { LocalShellResult } from '@shared/ui'
 import { checkDenyList } from '@core/agent/deny-list'
 import { findSecretPathsInCommand } from '@shared/secret-paths'
+import { refusalMessage } from '@shared/refusal'
 
 export const DEFAULT_SHELL_TIMEOUT_MS = 30_000
 const MAX_BUFFER = 4 * 1024 * 1024
@@ -67,7 +68,11 @@ export function runLocalCommand(
     record(false, `blocked: ${secret[0].reason}`)
     return Promise.resolve({
       stdout: '',
-      stderr: `Blocked: command references ${secret[0].reason}`,
+      // S2: the refusal names the rule and the way forward, for the terminal too.
+      stderr: refusalMessage({
+        rule: 'secret-path',
+        detail: `the command references ${secret[0].reason}`
+      }),
       exitCode: 126,
       blocked: true
     })
@@ -81,7 +86,10 @@ export function runLocalCommand(
     record(false, `blocked by policy: ${denial.reason}`)
     return Promise.resolve({
       stdout: '',
-      stderr: `Blocked by policy: ${denial.reason}`,
+      stderr: refusalMessage({
+        rule: 'deny-list',
+        detail: denial.reason ?? 'the command is on the deny list'
+      }),
       exitCode: 126,
       blocked: true
     })

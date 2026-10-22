@@ -39,6 +39,7 @@ import type {
 } from '@shared/ui'
 import type { VpsConnectionState, VpsLivenessEvent, VpsServerView } from '@shared/vps'
 import type { Locale } from '../i18n/locale'
+import type { AddProjectPrefill } from '../lib/add-project-from-refusal'
 import type { ChatTransferChoice, ChatTransferPreference } from '../lib/chat-transfer'
 import type { ThemePreference } from '../lib/theme'
 import type { UiMode } from '../lib/ui-mode'
@@ -98,6 +99,11 @@ export interface AppState {
   settingsOpen: boolean
   /** Set by `openSettingsTab`; SettingsPanel seeds its tab from this and clears it. */
   settingsTab: string | null
+  /**
+   * S3.3: what Settings → Projects should open pre-filled with, set by an explicit click on the
+   * refusal surface (or by nothing at all). Never written by the agent.
+   */
+  projectPrefill: AddProjectPrefill | null
   view: ViewId
 
   messages: ChatMessage[]
@@ -465,6 +471,13 @@ export interface AppState {
 
   addProject: (name: string, path: string) => Promise<void>
   addRemoteProject: (name: string, path: string, vpsId: string) => Promise<void>
+  /**
+   * S3.3: open Settings → Projects with the add form pre-filled from a refusal. An explicit user
+   * action — the exact opposite of the agent widening its own scope.
+   */
+  prefillAddProject: (input: { path: string; vpsId?: string; name?: string }) => void
+  /** Drop the pre-fill (after the project was added, or when the user dismisses the strip). */
+  clearProjectPrefill: () => void
   removeProject: (id: string) => Promise<void>
   openProject: (id: string) => Promise<void>
   /** Open a project without offering to transfer the open chat. */
