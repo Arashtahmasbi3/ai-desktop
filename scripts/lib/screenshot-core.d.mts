@@ -32,6 +32,10 @@ export interface CompareResult {
   status: CompareStatus
   detail?: string
   drift?: number
+  /** current width divided by baseline width; 1 when the sizes match. */
+  scale?: number
+  /** how far the aspect ratio moved, when status is `size-changed`. */
+  aspectDrift?: number
 }
 
 export interface ShotResult {
