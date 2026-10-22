@@ -7,6 +7,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.3.4] — 2026-10-22
+
+The release where the agent can finally work outside the project it was opened on, and move a real project to a new
+server — the two things that had blocked the user's migration for weeks.
+
+### Changed — containment belongs to the file tools, not to a remote shell
+
+The app refused to **read** a directory on a server the user owns as root:
+
+> `Blocked: Path "/opt/zoonestore/apps" is outside project root "/opt/sepehr-motor"`
+
+The exemption for a remote command required the command to be **provably read-only**, and every real diagnostic fails
+that proof because of a redirect, a pipe or a loop — so the exemption existed and was unreachable. `enforceCommandPaths`
+with `CommandHost = 'remote-host'` now does no path checking at all: the project root is a write-scope for tools that
+write on the agent's behalf, not a read-scope for a shell on a host the user is root on. The file tools keep
+containment, the `..` rule, the secret guard and the deny list.
+
+A write through `remote_shell` whose path escapes the root is no longer a wall: it goes to the **approval gate**, even
+in `full` mode, ignoring remembered approvals and the server grant for that one case, and runs only when approved.
+
+### Added — a refusal that says which rule and what to do
+
+Every refusal now names the rule (`containment`, `deny-list`, `secret-path`, `host-policy`, `approval-required`), offers
+at least one runnable alternative ("add <path> as a project", "read it with a remote shell command", "allow this path
+once"), and redacts any UUID. A **time-boxed one-shot allow** (10 minutes, one prefix, one server, one project,
+read-only, expiry evaluated on read) is checked inside the containment decision and audited as
+`allow-scope <path> until <time>`.
+
+### Added — a second project on the same server
+
+The fence was never the blocker and there was no uniqueness rule: `addProject` already allowed two roots on one server.
+The root a record *received* was broken — no add-time rule for an absolute path that cannot be local here (the record
+changed kind across a restart), a remote re-root that used the local normaliser, a trailing slash that made two roots
+out of one, a local folder picker offered for a remote project, and an Add button disabled unless a server was
+connected. All fixed, and the error banner now carries a click-only **Add as a project** button that opens the add form
+pre-filled from the refused path.
+
+### Added — migrating a project, with the route chosen rather than guessed
+
+Source server + path → target server + path, and the mode comes from the existing three-path reachability report:
+`direct` when the source can reach the target, **`relay` through this computer** when only the local path can. Fourteen
+preflight facts each PASS/WARN/FAIL — target free space fails, a source over 85 % only warns — default excludes printed
+in the exact argv, a baseline before and a 20-file sampled sha256 after with a loud failure on any mismatch. Bytes go to
+a staging directory and appear at the destination through a single `mv -T`, so an interrupted run can never leave a
+directory that looks complete; staging names are derived, so a re-run resumes. Cancel kills the child. IPv6 targets are
+bracketed for `ssh`/`rsync` while the `/dev/tcp` probe writes the bare literal.
+
+### Added — the database and the new host
+
+`migrate_database` dry-runs first (the exact commands and the size, nothing written), then dumps, restores and compares
+a baseline: table count, bounded per-table row counts and the dump's sha256. The bring-up checklist is a first-class
+flow, not free-form chat: `.env` keys reported **present or missing and never by value**, `npm ci`, build, PM2 for both
+apps, the nginx site with `nginx -t`, certbot for both domains, then a health check per app — each step with its
+command, its expected result and a PASS/FAIL mark, resumable and cancellable. The database report shares one surface
+with the file verification.
+
+### Verified
+
+373 test files / 3586 tests green, typecheck clean, locale parity 1308 keys. Every new command path is exercised through
+an injected runner — no test runs `rsync`, `ssh`, `docker`, `psql`, `nginx` or `certbot`, and none touches a network.
+
+### Not verified
+
+Nobody has run a migration against the real pair of servers with this release. The flows are covered by injected
+runners and exact-argv assertions, not by bytes crossing the wire; and the relay needs a POSIX `rsync` on this computer.
+
 ## [4.3.3] — 2026-10-21
 
 Two bugs the user photographed an hour after 4.3.2, and one test that was asserting the opposite of its own name.
