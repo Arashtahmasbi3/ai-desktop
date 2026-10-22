@@ -38,15 +38,20 @@ jobs:
       # THE GATE THAT DID NOT EXIST. 3196 unit tests were green while the window showed a green dot next to a dead
       # session, because no test ever ran the app. This launches it and reads what it renders.
       #
-      # `continue-on-error: true`, and here is exactly what is unproven:
-      #   * that a GitHub-hosted `windows-latest` runner lets the staged, unsigned `electron.exe` execute at all. The
-      #     launch was proven on one Windows machine (staging outside `Documents`, `ELECTRON_RUN_AS_NODE` cleared) and
-      #     nowhere else; a runner image may block it differently, or lack a desktop session;
-      #   * that the first-run profile seeded in the staging directory is enough for the shell to reach `ready` there.
-      # Remove this line as soon as one run is green — then it is required, and a lie in the UI breaks the build. Do
-      # not leave it soft forever: a check nobody enforces is the thing this repository is trying to stop doing.
+      # It is REQUIRED (no `continue-on-error`). Two things are still unproven about a GitHub-hosted runner, and they
+      # are announced below instead of swallowed:
+      #   * whether a `windows-latest` runner lets the staged, unsigned `electron.exe` execute at all — the launch was
+      #     proven on one Windows machine (staging outside `Documents`, `ELECTRON_RUN_AS_NODE` cleared) and nowhere
+      #     else, and a runner image may block it or lack a desktop session;
+      #   * whether the first-run profile seeded in the staging directory is enough for the shell to reach `ready`.
+      # If this step fails on the runner for either reason, the job goes red ON PURPOSE and the log says which one. A
+      # red check that names its cause is worth more than a green one nobody earns.
+      - name: Say what the live check still cannot prove on a hosted runner
+        shell: pwsh
+        run: |
+          Write-Output "::notice title=Live UI verification::Unproven on a hosted runner: (1) that it executes the staged unsigned electron.exe, (2) that the seeded first-run profile reaches ready. Proven on one Windows machine. A failure here is information, not noise."
+
       - name: Launch the app and verify what it renders over CDP
-        continue-on-error: true
         shell: pwsh
         run: node scripts/verify-ui.mjs --port 9222
 
