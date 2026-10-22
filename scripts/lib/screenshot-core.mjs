@@ -44,17 +44,43 @@ export function compareShot(baseline, current, options = {}) {
   const tolerance = options.tolerance ?? 0.02
   if (baseline === undefined || baseline === null) return { status: 'missing-baseline' }
   if (current === undefined || current === null) return { status: 'missing-current' }
-  if (baseline.width !== current.width || baseline.height !== current.height) {
+  if (baseline.bytes === 0 || current.bytes === 0) return { status: 'empty' }
+
+  /*
+   * Scale-aware on purpose. A capture taken on a 125 % display and one taken on a 100 % runner differ in pixels while
+   * showing the same window, and comparing raw dimensions made every baseline captured on this machine useless on CI
+   * (`size-changed` forever). Two things actually mean "the window changed":
+   *
+   *   * the aspect ratio moved — the window is a different shape, not the same window at another scale;
+   *   * the compressed bytes per pixel moved — the picture gained or lost detail.
+   *
+   * A pure scale change leaves both alone: 1502x1003 and 1202x803 share the same aspect, and PNG density barely moves.
+   * The raw pixel size is reported in `detail`, never treated as fatal.
+   *
+   * The divisor is guarded with `Number.EPSILON`, not `1`: density here is ~1e-3, so `Math.max(1, …)` would flatten
+   * every ratio to near zero and call a 40 % change "ok". That exact bug is why this landed once and was reverted.
+   */
+  const aspectOf = (shot) => (shot.height > 0 ? shot.width / shot.height : 0)
+  const baselineAspect = aspectOf(baseline)
+  const currentAspect = aspectOf(current)
+  const aspectTolerance = options.aspectTolerance ?? 0.005
+  const aspectDrift = baselineAspect > 0 ? Math.abs(currentAspect - baselineAspect) / baselineAspect : 0
+  if (aspectDrift > aspectTolerance) {
     return {
       status: 'size-changed',
-      detail: `${baseline.width}x${baseline.height} -> ${current.width}x${current.height}`
+      detail: `${baseline.width}x${baseline.height} -> ${current.width}x${current.height} (aspect ${baselineAspect.toFixed(3)} -> ${currentAspect.toFixed(3)})`,
+      aspectDrift
     }
   }
-  if (baseline.bytes === 0 || current.bytes === 0) return { status: 'empty' }
-  const drift = Math.abs(current.bytes - baseline.bytes) / baseline.bytes
+
+  const densityOf = (shot) => shot.bytes / Math.max(1, shot.width * shot.height)
+  const baselineDensity = densityOf(baseline)
+  const drift = Math.abs(densityOf(current) - baselineDensity) / Math.max(baselineDensity, Number.EPSILON)
+  const scale = baseline.width > 0 ? current.width / baseline.width : 1
+  const detail = `${(drift * 100).toFixed(1)}% bytes/px${scale === 1 ? '' : ` at ${scale.toFixed(3)}x`}`
   return drift > tolerance
-    ? { status: 'drift', detail: `${(drift * 100).toFixed(1)}% of ${baseline.bytes} bytes`, drift }
-    : { status: 'ok', drift }
+    ? { status: 'drift', detail, drift, scale }
+    : { status: 'ok', drift, scale }
 }
 
 /** PNG width/height from the IHDR chunk, so a size change is caught without a decoder dependency. */
