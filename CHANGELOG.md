@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [4.3.4] — 2026-10-22
+## [4.3.5] — 2026-10-22
 
 The release where the agent can finally work outside the project it was opened on, and move a real project to a new
 server — the two things that had blocked the user's migration for weeks.
