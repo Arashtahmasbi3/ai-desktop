@@ -68,6 +68,7 @@ if (flag('--help')) {
       '',
       '  --port <n>   CDP port, default ' + String(DEFAULT_PORT) + ' (loopback only)',
       '  --baseline   write today\u2019s captures as the new baseline (a deliberate act)',
+    '  --allow-drift  report a capture drift without failing (local runs on another GPU driver)',
       '  --out <dir>  where the captures go, default docs/screenshots',
       '  --root <dir> staging directory, default C:\\aidverify-verify on win32 and $TMP/aidverify-verify elsewhere'
     ].join('\n')
@@ -78,6 +79,7 @@ if (flag('--help')) {
 const PORT = Number(value('--port', String(DEFAULT_PORT)))
 const OUT_DIR = value('--out', 'docs/screenshots')
 const WRITE_BASELINE = flag('--baseline')
+const ALLOW_DRIFT = flag('--allow-drift')
 const STAGING_ROOT = value('--root', undefined)
 const LAUNCH_TIMEOUT_MS = 45_000
 const READY_TIMEOUT_MS = 30_000
@@ -445,17 +447,22 @@ async function main() {
       const summary = summarize(shots)
       log('  ' + summary.line)
       /*
-       * The capture check fails on the two outcomes that are always a real bug: an empty PNG (a blank window is not a
-       * passing screenshot) and a changed window size. A byte-length drift is *reported* for a human to open, because
-       * without a pixel decoder it cannot say what moved — pretending otherwise is how a screenshot check gets ignored.
+       * All three outcomes fail: an empty PNG (a blank window is not a passing screenshot), a different window shape,
+       * and a density drift. Drift used to be reported and then ignored — which meant `ui.yml` printed "1 changed" and
+       * exited 0, so a red-looking line never failed a build and the baselines guarded nothing. A check that does not
+       * enforce is the thing this repository is trying to stop doing.
        *
-       * Caveat, stated so nobody seeds a trap: the PNG is in device pixels, so a baseline captured on a 125%-scaled
-       * display has a different width than the same window on a 100% CI runner and would report `size-changed` there.
-       * Seed baselines on the machine that will compare them; CI runs without `--baseline` and uploads the PNGs.
+       * Drift is judged on bytes per pixel over the compressed PNG, not per pixel of colour, so it can say "the window
+       * looks different" and cannot say where. A human opens the artifact for that; the comment says so instead of
+       * pretending to a diff this does not do. A false positive on a different GPU driver is answered with
+       * `--allow-drift` for a local run, never by weakening the default.
+       *
+       * Scale is handled in `compareShot`: aspect and density, so a baseline captured on a 125%-scaled display is
+       * comparable on a 100% runner. Seed baselines on this machine with `--baseline`; CI compares without it.
        */
-      for (const shot of shots.filter(
-        (entry) => entry.status === 'empty' || entry.status === 'size-changed'
-      )) {
+      const fatal = (entry) =>
+        entry.status === 'empty' || entry.status === 'size-changed' || (entry.status === 'drift' && !ALLOW_DRIFT)
+      for (const shot of shots.filter(fatal)) {
         report = {
           ...report,
           ok: false,
