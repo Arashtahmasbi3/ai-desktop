@@ -334,6 +334,16 @@ const SAMPLES: Sample[] = [
     failures: 1,
     causeKey: 'verdict.causeTransferFiltered',
     nextStepKey: 'verdict.nextTransferFiltered'
+  },
+  {
+    // The refused-key pile: rsync reached the far side and the key was rejected there.
+    id: 'transfer-auth-failed',
+    label: 'a transfer the target refused, key rejected',
+    text: 'Permission denied (publickey).\nrsync: connection unexpectedly closed (0 bytes' +
+      ' received so far) [sender]\nrsync error: error in rsync protocol data stream (code 12)',
+    failures: 1,
+    causeKey: 'verdict.causeTransferAuth',
+    nextStepKey: 'verdict.nextTransferAuth'
   }
 ]
 
@@ -994,5 +1004,134 @@ describe('a stopped run carries the keys, alongside the sentence it already had'
     const stop = buildStopInfo('turn_timeout', asked)
     expect(stop.pendingQuestion).toBe('Do you have SSH access to yoserver?')
     expect(stop.verdict?.causeKey).toBe('verdict.causeTurnBudget')
+  })
+})
+
+/**
+ * A transfer failure used to fall into the generic loop verdict: `rsync exited with code 126`
+ * matched no row, and the card said the run was circling a question while the truth — the machine
+ * that had to run rsync could not run it — was never named. The cases above pin one row each;
+ * these pin the readings a user actually hits, the silence a bare exit code must keep, and where
+ * these rows sit in the precedence order.
+ */
+const TRANSFER_127 = [
+  '$ migrate_project from=source to=target',
+  'migrate_project: Dry-run failed: rsync exited with code 127'
+].join('\n')
+
+const TRANSFER_126 = [
+  '$ migrate_project from=source to=target',
+  'migrate_project: Dry-run failed: rsync exited with code 126',
+  'rsync: failed to exec ssh: No such file or directory (2)'
+].join('\n')
+
+const TRANSFER_AUTH = [
+  "$ rsync -az -e 'ssh -p 22 -o BatchMode=yes' /opt/app root@203.0.113.9:/srv/app",
+  'Permission denied (publickey).',
+  'rsync: connection unexpectedly closed (0 bytes received so far) [sender]',
+  'rsync error: error in rsync protocol data stream (code 12) at io.c(228) [sender=3.2.7]'
+].join('\n')
+
+const TRANSFER_FILTERED = [
+  "$ rsync -az -e 'ssh -p 22 -o BatchMode=yes' /opt/app root@212.16.86.23:/srv/app",
+  'ssh: connect to host 212.16.86.23 port 22: Connection timed out',
+  'rsync: connection unexpectedly closed (0 bytes received so far) [sender]',
+  'rsync error: unexplained error (code 255) at io.c(228) [sender=3.2.7]'
+].join('\n')
+
+/** A plain non-zero exit with nothing else in the pile: no row may claim a cause from this. */
+const TRANSFER_BARE_EXIT = 'migrate_project: Dry-run failed: rsync exited with code 1'
+
+/** The four rows, and the pile each one is for. */
+const TRANSFER_ROWS: readonly string[] = [
+  'transfer-runner-missing',
+  'transfer-remote-not-executable',
+  'transfer-auth-failed',
+  'transfer-port-filtered'
+]
+
+const TRANSFER_TEXT: Record<string, string> = {
+  'transfer-runner-missing': TRANSFER_127,
+  'transfer-remote-not-executable': TRANSFER_126,
+  'transfer-auth-failed': TRANSFER_AUTH,
+  'transfer-port-filtered': TRANSFER_FILTERED
+}
+
+describe('a transfer failure names its cause instead of the loop verdict', () => {
+  it('names the machine that had no rsync, from the exit code alone', () => {
+    const verdict = diagnose({ text: TRANSFER_127, failures: 1, steps: 3 })
+    expect(verdict.patternId).toBe('transfer-runner-missing')
+    expect(verdict.causeKey).toBe('verdict.causeTransferRunnerMissing')
+    expect(verdict.nextStepKey).toBe('verdict.nextTransferRunnerMissing')
+  })
+
+  it('outranks the plain timeout the same pile would otherwise become', () => {
+    const pile = TRANSFER_127 + '\nCommand timed out after 120000ms'
+    expect(pattern('tool-timeout').matches({ text: pile })).toBe(true)
+    expect(diagnose({ text: pile, failures: 2, steps: 5 }).patternId).toBe('transfer-runner-missing')
+  })
+
+  it('names rsync present on the far side but not executable there', () => {
+    const verdict = diagnose({ text: TRANSFER_126, failures: 1, steps: 3 })
+    expect(verdict.patternId).toBe('transfer-remote-not-executable')
+    expect(verdict.causeKey).toBe('verdict.causeTransferNotExecutable')
+    expect(verdict.nextStepKey).toBe('verdict.nextTransferNotExecutable')
+  })
+
+  it('names the refused key on a transfer, and leaves a plain SSH failure alone', () => {
+    const verdict = diagnose({ text: TRANSFER_AUTH, failures: 1, steps: 3 })
+    expect(verdict.patternId).toBe('transfer-auth-failed')
+    expect(verdict.causeKey).toBe('verdict.causeTransferAuth')
+    expect(verdict.nextStepKey).toBe('verdict.nextTransferAuth')
+    // No rsync in the pile, so the older credential row still owns a plain refused key.
+    expect(diagnose({ text: SSH_KEY, failures: 1, steps: 2 }).patternId).toBe('auth-ssh-key')
+  })
+
+  it('names the filtered port behind an rsync that timed out', () => {
+    const verdict = diagnose({ text: TRANSFER_FILTERED, failures: 1, steps: 3 })
+    expect(verdict.patternId).toBe('transfer-port-filtered')
+    expect(verdict.causeKey).toBe('verdict.causeTransferFiltered')
+    expect(verdict.nextStepKey).toBe('verdict.nextTransferFiltered')
+    // Both generic readings of the same pile are there, and both lose.
+    expect(pattern('port-blocked-locally').matches({ text: TRANSFER_FILTERED })).toBe(true)
+    expect(pattern('tool-timeout').matches({ text: TRANSFER_FILTERED })).toBe(true)
+  })
+
+  it('claims no cause at all from a bare non-zero exit', () => {
+    const verdict = diagnose({ text: TRANSFER_BARE_EXIT, failures: 1, steps: 2 })
+    for (const row of TRANSFER_ROWS) {
+      expect(pattern(row).matches({ text: TRANSFER_BARE_EXIT }), row).toBe(false)
+    }
+    expect(verdict).toEqual({ ...FALLBACK_VERDICT })
+  })
+
+  it('gives way to a dropped session, which means nothing ran', () => {
+    const below = TRANSFER_ROWS.filter((row) => pattern(row).weight < pattern('session-dropped').weight)
+    // The three rows that sit below `session-dropped` (88). The credential row is not one of them;
+    // the case after this one pins what it does instead, and why.
+    expect(below).toEqual([
+      'transfer-runner-missing',
+      'transfer-remote-not-executable',
+      'transfer-port-filtered'
+    ])
+    for (const row of below) {
+      const pile = (TRANSFER_TEXT[row] ?? '') + '\nremote_shell failed: Not connected'
+      expect(diagnose({ text: pile, failures: 2, steps: 4 }).patternId, row).toBe('session-dropped')
+    }
+  })
+
+  it('keeps the refused-key row in the 95 tier, where it can actually answer', () => {
+    // The one place these rows depart from the brief, and the reason: this row requires
+    // `Permission denied (publickey`, which `auth-ssh-key` (95) also matches, so at any weight
+    // below 95 it would match, lose and never answer — a dead row that `covers every row` above
+    // would catch. It sits in that tier and wins the tie by declaration order, the table's own
+    // rule. The consequence is stated, not hidden: a refused key outranks "the session is gone"
+    // here, exactly as `auth-ssh-key` already does for a plain SSH failure.
+    expect(pattern('transfer-auth-failed').weight).toBe(pattern('auth-ssh-key').weight)
+    expect(VERDICT_PATTERNS.indexOf(pattern('transfer-auth-failed'))).toBeLessThan(
+      VERDICT_PATTERNS.indexOf(pattern('auth-ssh-key'))
+    )
+    const pile = TRANSFER_AUTH + '\nremote_shell failed: Not connected'
+    expect(diagnose({ text: pile, failures: 2, steps: 4 }).patternId).toBe('transfer-auth-failed')
   })
 })

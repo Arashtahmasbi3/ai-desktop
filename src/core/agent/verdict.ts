@@ -208,6 +208,7 @@ function hostProvenUp(text: string): boolean {
  * | 92     | a privilege was refused    | the command was right, this identity may not run it        |
  * | 90     | storage or toolchain       | the machine said exactly what is missing                   |
  * | 88     | the session is gone       | nothing ran, so nothing the command printed can explain it; it still loses to the 90+ tier where the output names the application fault |
+ * | 86     | the transfer failed by name | the exit code says which one — 127 the runner has no rsync, 126 it exists but cannot be executed, 255/timeout a port that never opened — so it outranks the plain timeout the same pile would otherwise become |
  * | 80     | the name did not resolve   | nothing downstream can be trusted when the name is wrong   |
  * | 78     | the block is above the host | the host answered, so no rule on it can be the cause       |
  * | 77     | the port dropped, unproven  | nobody proved the host up, so nothing above it can be blamed |
@@ -237,6 +238,23 @@ export const VERDICT_PATTERNS: readonly VerdictPattern[] = [
     causeKey: 'verdict.causeRepeatedEvidence',
     nextStepKey: 'verdict.nextRepeatedEvidence',
     matches: (evidence) => evidence.noNewInformation === true
+  },
+  /*
+   * The transfer reading of the credential tier, and the one transfer row that is not in the
+   * 83-86 band. It cannot be: the row below matches every pile this one matches (both require
+   * `Permission denied (publickey`), so any lower weight would make it match, lose, and never
+   * answer — a dead row, and `covers every row` in `verdict-patterns.test.ts` catches exactly
+   * that. Equal weight plus declaration order is this table's own tie-break, so the sharper name
+   * wins only when the evidence is a transfer; a plain SSH failure still answers `auth-ssh-key`,
+   * because this row also requires `rsync`. The consequence is stated, not hidden: a refused key
+   * outranks "the session is gone" here, exactly as `auth-ssh-key` already does on its own.
+   */
+  {
+    id: 'transfer-auth-failed',
+    weight: 95,
+    causeKey: 'verdict.causeTransferAuth',
+    nextStepKey: 'verdict.nextTransferAuth',
+    matches: ({ text }) => /permission denied \(publickey/i.test(text) && /\brsync\b/i.test(text)
   },
   {
     id: 'auth-ssh-key',
@@ -359,6 +377,42 @@ export const VERDICT_PATTERNS: readonly VerdictPattern[] = [
     nextStepKey: 'verdict.nextSessionDropped',
     matches: ({ text }) => matchesSessionDropped(text)
   },
+  /*
+   * A transfer that failed, named by its exit code. Before these rows, `migrate_project: Dry-run
+   * failed: rsync exited with code 126` matched nothing, fell through to the generic loop rows and
+   * the card said the run was circling a question while the real fact — the machine that had to run
+   * rsync could not run it — was never named; the model, left without a cause to act on, re-probed
+   * until the loop detector stopped it.
+   *
+   * 127 is "no such program" on the machine that ran the transfer, 126 is "found but not
+   * executable" on the far side, and 255 (rsync's own status for a connection that never opened,
+   * usually after a timeout) is a filtered port. They weigh less than a dropped session (88), so a
+   * dead session still wins, and more than the plain timeout (60) they would otherwise become.
+   * Deliberately narrow: a bare non-zero exit claims nothing, because a cause the app cannot prove
+   * is worse than no cause at all. The credential case is the row in the 95 tier; its comment says
+   * why a lower weight there would never answer.
+   */
+  {
+    id: 'transfer-runner-missing',
+    weight: 86,
+    causeKey: 'verdict.causeTransferRunnerMissing',
+    nextStepKey: 'verdict.nextTransferRunnerMissing',
+    matches: ({ text }) => /\b(rsync|pg_dump|pg_restore|docker)\b[^\n]*\bcode 127\b/i.test(text)
+  },
+  {
+    id: 'transfer-remote-not-executable',
+    weight: 85,
+    causeKey: 'verdict.causeTransferNotExecutable',
+    nextStepKey: 'verdict.nextTransferNotExecutable',
+    matches: ({ text }) => /\b(rsync|pg_dump|pg_restore)\b[^\n]*\bcode 126\b/i.test(text)
+  },
+  {
+    id: 'transfer-port-filtered',
+    weight: 83,
+    causeKey: 'verdict.causeTransferFiltered',
+    nextStepKey: 'verdict.nextTransferFiltered',
+    matches: ({ text }) => /\brsync\b/i.test(text) && /\b(255|timed out|timeout)\b/i.test(text)
+  },
   {
     id: 'dns-lookup-failed',
     weight: 80,
@@ -396,27 +450,6 @@ export const VERDICT_PATTERNS: readonly VerdictPattern[] = [
     causeKey: 'verdict.causeUpstreamBlocked',
     nextStepKey: 'verdict.nextUpstreamBlocked',
     matches: ({ text }) => portDropped(text) && hostProvenUp(text)
-  },
-  {
-    id: 'transfer-runner-missing',
-    weight: 86,
-    causeKey: 'verdict.causeTransferRunnerMissing',
-    nextStepKey: 'verdict.nextTransferRunnerMissing',
-    matches: ({ text }) => /\b(rsync|pg_dump|pg_restore|docker)\b[^\n]*\bcode 127\b/i.test(text)
-  },
-  {
-    id: 'transfer-remote-not-executable',
-    weight: 85,
-    causeKey: 'verdict.causeTransferNotExecutable',
-    nextStepKey: 'verdict.nextTransferNotExecutable',
-    matches: ({ text }) => /\b(rsync|pg_dump|pg_restore)\b[^\n]*\bcode 126\b/i.test(text)
-  },
-  {
-    id: 'transfer-port-filtered',
-    weight: 83,
-    causeKey: 'verdict.causeTransferFiltered',
-    nextStepKey: 'verdict.nextTransferFiltered',
-    matches: ({ text }) => /\brsync\b/i.test(text) && /\b(255|timed out|timeout)\b/i.test(text)
   },
   {
     id: 'port-blocked-locally',
