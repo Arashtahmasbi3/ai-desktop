@@ -15,6 +15,9 @@ does, because the guard is a test that fails on the *behaviour*, not on the vers
 |---|---|---|---|
 | several VPS sessions at once (single status slot) | v2.8.0 | v4.3.0 | `test/renderer/vps-multi-connect.test.tsx` `every connected server reads as connected even though the slot names the last one` |
 | the idle reaper closing a session in use | v2.8.0 | v4.3.0 | `test/main/vps-pins.test.ts` `advances 35 virtual minutes and both servers are still connected` |
+| the updater feed skipped the whole 4.2 and 4.3 line | v4.2.0 | never fixed until v4.3.5 | `test/ops/publish-feed.test.ts` `targets the repository the updater actually reads` |
+| a script a test imports had no type declaration, so typecheck went red behind a green vitest | v4.2.0 | v4.3.5 | `test/ops/script-declarations.test.ts` `has a sibling .d.mts, because typecheck is what the release runs` |
+| a failed transfer was reported as a loop instead of its cause | - | 4.3.5 | `test/core/verdict-patterns.test.ts` `names rsync present on the far side but not executable there` |
 | a dead session reported as connected | — | 4.3.1 | `test/main/session-liveness.test.ts` `probes the held handle, transitions it to disconnected, and reconnects exactly once` |
 | `Cost unknown` for an unpriced model | — | 4.3.0 | `test/renderer/status-line.test.tsx` `7. an unpriced model renders a lower bound, never "Cost unknown"` |
 | the `Remote: … (connected)` banner | claimed removed in 4.3.0 | still there in 4.3.1 | `test/renderer/project-status.test.ts` `remote project with a connected VPS shows no banner at all (R6)` |
@@ -27,7 +30,7 @@ does, because the guard is a test that fails on the *behaviour*, not on the vers
 | chat history in one flat list instead of grouped under its project | v2.8.0 | — | `test/renderer/sidebar-chat-grouping.test.tsx` `renders ONE tree: each project appears once, with its own chats nested under it` |
 | a settings upgrade silently dropping every API key after the first | v3.1.1 | — | `test/agent/persistence.test.ts` `resolves both an old single-key file and a new pool file (v3.1)` |
 
-**Rows: 13. Marked `MISSING`: 0** — every row above names a test that exists today.
+**Rows: 16. Marked `MISSING`: 0** — every row above names a test that exists today.
 
 ## How to read a row
 
