@@ -45,6 +45,13 @@ document exists because claims rot.
 | `diagnose_crash` and the named diagnostics (`get_service_logs`, `get_disk_usage`, `get_system_health`, `get_process_list`) | real | per run | `test/core/diagnostics-*.test.ts` |
 | `list_servers`, and server references by id, name or host | real | automatic | `test/core/server-ref*.test.ts` |
 | `migrate_project` between two servers | real | per run | `test/core/migrate-project*.test.ts` |
+| Migration form: route chosen by preflight (direct / relay) | real | per run | `test/core/migrate-project-flow.test.ts`, `test/core/migrate-argv.test.ts`; **not proven against a live pair of servers** |
+| Target bring-up checklist (env, build, PM2, nginx, certbot) | real | per run | `test/core/bring-up-flow.test.ts`, `test/renderer/bring-up-checklist.test.tsx`; every command injected, none executed |
+| Database migration with a baseline | real | per run | `test/core/db-migrate-flow.test.ts`; dry run asserted read-only, baseline SQL never run against a real postgres |
+| Session liveness: a dead session is not reported connected | real | per run | `test/main/session-liveness.test.ts`, `test/core/session-liveness-executor.test.ts` |
+| Refusal surface: rule named, alternative offered, one-shot allow | real | per run | `test/security/refusal-clarity-s2.test.ts`, `test/security/path-allow-once-s2-3.test.ts` |
+| Transfer failure names its cause (127 / 126 / filtered) | real | per run | `test/core/verdict-patterns.test.ts` |
+| Live UI verification (`scripts/verify-ui.mjs`) | partial | manual | runs the real app and asserts six invariants on this machine; **not proven on a CI runner** |
 | Per-host command policy (read-only / staging / production) | real | Settings → Connections | `test/core/host-policy.test.ts` |
 | Connection test, offered where a failure is felt | real | sidebar / status bar | `test/renderer/connection-test-reachability.test.tsx` |
 
