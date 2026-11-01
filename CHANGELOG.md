@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.3.6] - 2026-10-22
+
+The release where the app stops calling its own failures a loop, and where the updater finally sees this line at all.
+
+### Fixed - a failed transfer names its cause
+
+`migrate_project: Dry-run failed: rsync exited with code 126` used to be the whole story. No verdict row matched a transfer failure, so it fell into the generic loop row: the card said the run was "circling the same question", and the model - with no cause to act on - re-probed until the loop detector stopped it.
+
+Four rows now name the fact and one action each: `transfer-runner-missing` (127 - the machine that must run rsync does not have it), `transfer-remote-not-executable` (126 - it exists there but cannot execute), `transfer-auth-failed` (a refused key during a transfer, weight 95, declared before the general credential row so it can actually win), and `transfer-port-filtered` (an rsync whose connection answered nothing). They sit above the generic rows and below `session-dropped`, each has a case, and `covers every row` will not let a fifth arrive without one. A bare non-zero exit still claims nothing.
+
+### Fixed - the updater was unaware of seven releases
+
+The app reads `Arashtahmasbi3/ai-desktop-releases`; `release.mjs` publishes to the private repository. Nothing closed that gap, so 4.2.0 through 4.3.4 shipped and were invisible: `/releases/latest` still answered `v4.1.0`, and an app on 4.1.0 told its user it was up to date. 4.3.5 was published to the feed by hand; this release adds `scripts/publish-feed.mjs` - plain SemVer, refuses what it cannot parse, `--clobber`, four retries because the two 107 MB assets have timed out before, and `--dry-run` - and runs it.
+
+### Fixed - the two Windows flakes, each for its real reason
+
+`settings-capability` reads and parses about 193 files: 3.5 s idle, 24 s when another run shares the CPU, against a 20 s timeout, so a slowdown looked like a failure. Its own timeout is 45 s now and its work is untouched. `goal-panel` failed in `afterEach` because the cleanup deleted a temp directory while the store's write handle was still closing; `rm` retries now, which is the documented Windows answer. Five consecutive runs, zero failures.
+
+### Added - three rules became build failures
+
+A `scripts/*.mjs` that a test imports must have a sibling `.d.mts`, or the build fails: three times in one session a missing declaration turned typecheck red behind a green vitest, because vitest strips types and typecheck is what the release preflight runs. The capability matrix now names what shipped in this line and marks the live UI harness `partial` with the unproven part spelled out. And the regression ledger carries this session's three findings - the feed gap, the missing declaration, the transfer reported as a loop - each with the test that guards it, its stated count matching the table.
+
+### Verified
+
+375 test files / 3609 tests green, typecheck clean, locale parity 1316. The feed publication is proven by `/releases/latest` answering this version with three assets whose digests match `release/SHA256SUMS.txt`.
+
+### Not verified
+
+Nobody has run a migration against the real pair of servers. The transfer paths are covered by injected runners and exact-argv assertions, and the relay still needs a POSIX `rsync` on the machine that runs it.
 ## [4.3.5] — 2026-10-22
 
 The release where the agent can finally work outside the project it was opened on, and move a real project to a new
