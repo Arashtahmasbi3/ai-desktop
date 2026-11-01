@@ -162,7 +162,22 @@ const declared = declaredTabIds()
 
 const sorted = (values: string[]): string[] => [...new Set(values)].sort()
 
-describe('H5-3 (1) - every settings tab is reachable', () => {
+/*
+ * KNOWN GAP, recorded here so it cannot be lost again.
+ *
+ * H5-3 was planned as five invariants. Only two survived the sprint that built this file:
+ *
+ *   (1) every settings tab is reachable            -> below
+ *   (3) every main-owned switch is consulted by main -> further down
+ *
+ * (2), (4) and (5) were written by an agent that was interrupted, and their numbering is the only trace left. They are
+ * NOT reconstructed from memory, because an invariant invented after the fact is a rule nobody agreed to - and this
+ * repository has already paid for guessing twice. Whoever owns the original plan should restate them from it; until
+ * then the gap is visible here rather than silently absent.
+ *
+ * What the plan asked of H5-3 overall is still enforced by the two that exist: a control that persists a key nothing
+ * reads must not ship, on either side of the IPC boundary.
+ */describe('H5-3 (1) - every settings tab is reachable', () => {
   it('1. every tab id NAV_GROUPS lists is rendered by the panel', () => {
     const missing = sorted(listed).filter((id) => !rendered.includes(id))
     expect(missing).toEqual([])
