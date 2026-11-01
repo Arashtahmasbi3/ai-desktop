@@ -55,6 +55,13 @@ jobs:
         shell: pwsh
         run: node scripts/verify-ui.mjs --port 9222
 
+      # The bugs that were fixed and came back, checked against the app that actually runs. A scenario that cannot be
+      # proven reports skipped with its reason and is counted; it is never a pass. Same launch, same staging, so the
+      # cost is one more verify run rather than a second environment.
+      - name: Run the runtime regression scenarios
+        shell: pwsh
+        run: node scripts/run-scenarios.mjs --port 9222
+
       # The captures are the evidence: a failed invariant is a log line, but "what did it look like?" is a PNG. Kept
       # even when the step above fails, which is when they matter most.
       - name: Keep the live captures and their baselines
