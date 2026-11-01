@@ -107,7 +107,13 @@ beforeEach(async () => {
 
 afterEach(async () => {
   cleanup()
-  await rm(dir, { recursive: true, force: true })
+  /*
+   * `maxRetries` is the Windows fix, not a papering over. The store writes a goal file and the delete can run while the
+   * handle is still closing, so `rm` throws EPERM/EBUSY and the test fails *after* it passed — which is why this was
+   * written off as a flake for months. Node retries the unlink for us; the directory is a throwaway mkdtemp under the
+   * system temp, so a leftover is harmless if all three attempts lose.
+   */
+  await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
 })
 
 async function addGoal(title: string, criteria: string): Promise<void> {
