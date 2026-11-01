@@ -1,6 +1,15 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
+
+/*
+ * This file reads and parses ~193 source files several times, so it is the slowest unit test in the suite by an order of
+ * magnitude: 3.5 s on an idle machine and 24 s when another full run shares the CPU. It has been recorded as a Windows
+ * flake twice for that reason, which is the worst outcome — a real regression in it looks like noise and a time-out looks
+ * like a regression. The per-file timeout is raised rather than the work reduced, because the work is the point: every
+ * switch must be proven to have a consumer.
+ */
+vi.setConfig({ testTimeout: 45_000 })
 
 /**
  * H5-3 — "no interface without a capability", enforced instead of remembered.
