@@ -65,7 +65,7 @@ with the file verification.
 
 ### Verified
 
-373 test files / 3586 tests green, typecheck clean, locale parity 1308 keys. Every new command path is exercised through
+373 test files / 3589 tests green, typecheck clean, locale parity 1308 keys. Every new command path is exercised through
 an injected runner — no test runs `rsync`, `ssh`, `docker`, `psql`, `nginx` or `certbot`, and none touches a network.
 
 ### Not verified
