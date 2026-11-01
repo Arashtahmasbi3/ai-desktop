@@ -1237,7 +1237,15 @@
     "causeRepeatedEvidence": "The last two steps re-ran probes whose answers were already known: the output did not change, so nothing new was learned and the run was circling the same question instead of the problem.",
     "nextRepeatedEvidence": "Say in one sentence what is already established and what it rules out, then change the question — a different target, a different measurement, or the route through this computer — rather than re-running the same probe.",
     "causeSessionDropped": "The SSH session to that server is gone, so the command never ran.",
-    "nextSessionDropped": "Reconnect that server and retry the step; or switch this project to another server."
+    "nextSessionDropped": "Reconnect that server and retry the step; or switch this project to another server.",
+    "causeTransferRunnerMissing": "This machine has no rsync, so the transfer could not start.",
+    "nextTransferRunnerMissing": "Install rsync on this computer, or open the target's SSH port in the provider panel so the source can push directly, then run the transfer again.",
+    "causeTransferNotExecutable": "rsync exists on the far side but could not be executed there.",
+    "nextTransferNotExecutable": "Check that rsync is executable on that host (ls -l /usr/bin/rsync) and that its filesystem is not mounted noexec.",
+    "causeTransferAuth": "The source could not authenticate to the target over SSH.",
+    "nextTransferAuth": "Add the source's public key to the target with ssh-copy-id, or choose the relay route through this computer.",
+    "causeTransferFiltered": "The target's SSH port was filtered from the source, so the connection never opened.",
+    "nextTransferFiltered": "Allow that port for the source's IP in the provider panel, or use the relay route through this computer."
   },
   "connect": {
     "testShort": "Test",

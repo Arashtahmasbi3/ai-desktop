@@ -310,6 +310,30 @@ const SAMPLES: Sample[] = [
     failures: 0,
     causeKey: 'verdict.causeStalled',
     nextStepKey: 'verdict.nextStalled'
+  },
+  {
+    id: 'transfer-runner-missing',
+    label: 'the machine that must run rsync does not have it',
+    text: 'migrate_project: Dry-run failed: rsync exited with code 127',
+    failures: 1,
+    causeKey: 'verdict.causeTransferRunnerMissing',
+    nextStepKey: 'verdict.nextTransferRunnerMissing'
+  },
+  {
+    id: 'transfer-remote-not-executable',
+    label: 'rsync on the far side could not execute',
+    text: 'migrate_project: Dry-run failed: rsync exited with code 126',
+    failures: 1,
+    causeKey: 'verdict.causeTransferNotExecutable',
+    nextStepKey: 'verdict.nextTransferNotExecutable'
+  },
+  {
+    id: 'transfer-port-filtered',
+    label: 'the target port answered nothing during a transfer',
+    text: 'migrate: rsync error: unexplained error (code 255) at io.c(231) [sender=3.2.7]',
+    failures: 1,
+    causeKey: 'verdict.causeTransferFiltered',
+    nextStepKey: 'verdict.nextTransferFiltered'
   }
 ]
 

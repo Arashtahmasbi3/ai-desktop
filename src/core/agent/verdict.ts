@@ -398,6 +398,27 @@ export const VERDICT_PATTERNS: readonly VerdictPattern[] = [
     matches: ({ text }) => portDropped(text) && hostProvenUp(text)
   },
   {
+    id: 'transfer-runner-missing',
+    weight: 86,
+    causeKey: 'verdict.causeTransferRunnerMissing',
+    nextStepKey: 'verdict.nextTransferRunnerMissing',
+    matches: ({ text }) => /\b(rsync|pg_dump|pg_restore|docker)\b[^\n]*\bcode 127\b/i.test(text)
+  },
+  {
+    id: 'transfer-remote-not-executable',
+    weight: 85,
+    causeKey: 'verdict.causeTransferNotExecutable',
+    nextStepKey: 'verdict.nextTransferNotExecutable',
+    matches: ({ text }) => /\b(rsync|pg_dump|pg_restore)\b[^\n]*\bcode 126\b/i.test(text)
+  },
+  {
+    id: 'transfer-port-filtered',
+    weight: 83,
+    causeKey: 'verdict.causeTransferFiltered',
+    nextStepKey: 'verdict.nextTransferFiltered',
+    matches: ({ text }) => /\brsync\b/i.test(text) && /\b(255|timed out|timeout)\b/i.test(text)
+  },
+  {
     id: 'port-blocked-locally',
     weight: 77,
     causeKey: 'verdict.causeBlockedLocally',
