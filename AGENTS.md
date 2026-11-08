@@ -51,6 +51,21 @@ fails, a tool is missing, or the budget ran out — ask rather than guess).
 
 ## Status
 
+**The 4.3 line, after the November audit.** An external audit read commit `1c68058` (v4.3.6) on a clean
+checkout and found the repository was not green there, which it was not: five test files read their expected key sets
+from `../i18n`, a directory outside the repository, so the suite passed only on the machine that happened to have it
+and typecheck reported two missing JSON modules. Those expectations now live in `test/fixtures/i18n/`, and
+`test/ops/no-outside-imports.test.ts` fails the build on either shape that reaches outside the root — a relative import
+that resolves above it, or a `join(__dirname, …)` chain with more parent steps than the file's depth. `merge-i18n.mjs`
+moved into `scripts/` for the same reason. Electron went 44.6.0 → 44.10.2 for the intermediate-certificate advisory, and
+`npm audit fix` took the high count from two to zero; the six remaining moderates are all in `electron-builder` and are
+recorded, with the reason not to force a downgrade, in `docs/SECURITY-ADVISORIES.md`. `scripts/ensure-electron.mjs` runs
+as `predev`/`pretest` so a hardened `npm ci` that skips install scripts can no longer leave the app without a binary.
+The composer strip now outranks the workspace overlay (`relative z-50`), because at 1200px the panel covered the send
+button and the model selector — proven by a class contract that fails without it and by a live capture that drifted 6.2%
+before the baseline was re-seeded. Proof of the whole pass, with `../i18n` renamed away: typecheck clean and
+379 files / 3621 tests green. 2026-11-08
+
 **v4.2.0 released — the substrate the audit asked for, and three god files split.** Thirty-two findings from
 `ai-desktop-audit-and-plan-fa.md`, worked in the approved order. The load-bearing additions are seams rather than
 features: one `ToolsetBuilder` assembles a run's tools (a definition without a route is a tool nothing can run;

@@ -3,7 +3,9 @@
 An Electron desktop AI assistant — a local, Codex-like companion that connects to the
 DeepSeek API, VPS servers (SSH), GitHub (Git), and your local files.
 
-> Status: **v2.7.0 (latest release)**. A Codex-like agent workspace:
+> Status: **4.3 line** — [CHANGELOG](CHANGELOG.md) and the
+> [latest release](https://github.com/Arashtahmasbi3/ai-desktop/releases/latest) are the source of truth for the
+> version. A Codex-like agent workspace:
 > provider-agnostic LLM
 > adapters (OpenAI/Anthropic/DeepSeek/Google), the `SandboxManager` code-execution layer, the
 > `AgentOrchestrator` Planning → Execution → Observation → Reflection loop, token-budgeted

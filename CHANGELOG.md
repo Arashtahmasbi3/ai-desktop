@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [4.3.6] - 2026-10-22
 
+> **Correction, 2026-11-08.** This entry claims "375 test files / 3609 tests green". That number was true on one machine
+> and not reproducible from this commit: five test files read their expected key sets from `../i18n`, a directory
+> outside the repository, so a clean checkout failed typecheck with two `TS2307` errors and lost 15 tests across 5 files.
+> The cause is fixed in the 4.3.7 line (fixtures moved into `test/fixtures/i18n/`, plus a guard that fails the build on
+> any test reaching outside the repository). **v4.3.6 therefore stays a pre-release** and should not be promoted.
+
 The release where the app stops calling its own failures a loop, and where the updater finally sees this line at all.
 
 ### Fixed - a failed transfer names its cause
