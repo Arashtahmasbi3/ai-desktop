@@ -587,7 +587,14 @@ export default function ChatPanel(): JSX.Element {
 
       {terminalOpen ? <TerminalPanel /> : null}
 
-      <div className="shrink-0 border-t border-border bg-bg-secondary py-3">
+      {/*
+       * The composer is the one control that must never be covered. At 1200px the layout plan decides the workspace
+       * panel is an overlay (1200 - 256 sidebar - 352 panel < the 820 reading measure), and an overlay drawn with
+       * `inset-y-0 end-0 z-40` reaches the bottom of the column — over the send button and the model selector, which is
+       * what the audit photographed. Raising this strip above the drawer keeps the primary action clickable at every
+       * width; the drawer simply ends behind it, which is the right order for a peek panel against a send button.
+       */}
+      <div className="relative z-50 shrink-0 border-t border-border bg-bg-secondary py-3">
         <div
           data-testid="chat-composer"
           style={{ maxWidth: CHAT_MAX_WIDTH }}
