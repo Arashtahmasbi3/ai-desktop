@@ -84,16 +84,22 @@ export default defineConfig({
           manualChunks(id: string) {
             if (id.includes('node_modules')) {
               if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return 'react-vendor'
-              if (/[\\/]node_modules[\\/](react-markdown|remark-|rehype-|unified|micromark|mdast|hast|unist)[^\\/]*[\\/]/.test(id)) {
-                return 'markdown-vendor'
-              }
+              /*
+               * No separate markdown chunk on purpose. The old rule matched a fixed list of package prefixes, so the
+               * markdown tree's own helpers (vfile, property-information, devlop, bail, trough, ...) landed in
+               * `vendor`; markdown needed vendor and vendor needed markdown, and Vite reported the circular chunk.
+               * A name list would have to grow with every transitive dependency; one bucket cannot contain a cycle.
+               */
               if (/[\\/]node_modules[\\/](i18next|react-i18next)[\\/]/.test(id)) return 'i18n-vendor'
               if (/[\\/]node_modules[\\/]@xterm[\\/]/.test(id)) return 'terminal-vendor'
               return 'vendor'
             }
             if (id.includes('/src/renderer/src/components/')) return 'app-components'
-            if (id.includes('/src/renderer/src/store')) return 'app-store'
-            if (id.includes('/src/renderer/src/lib/')) return 'app-lib'
+            /*
+             * store and lib import each other, so splitting them by folder produced
+             * `app-store -> app-lib -> app-store`. One bucket cannot contain a cycle.
+             */
+            if (id.includes('/src/renderer/src/store') || id.includes('/src/renderer/src/lib/')) return 'app-core'
             return undefined
           }
         }
