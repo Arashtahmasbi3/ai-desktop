@@ -7,6 +7,88 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.3.7] - 2026-11-08
+
+An external audit read v4.3.6 on a clean checkout. It was right about the things that mattered, and this release is the
+response to it, in the audit's own order.
+
+### The suite was only green on one machine
+
+Five test files read their expected i18n key sets from `../i18n`, a directory outside this repository. On a clean
+checkout they had nothing to read: `npm run typecheck` reported two `TS2307` errors and the suite went 5 files and 15
+tests red. The release note claiming 3609 green was true on the machine that happened to have that directory, and it could
+not be reproduced from the commit — which is the worst kind of green, because it is trusted.
+
+The expectation was never the problem: a snippet's key set is the scope of its assertion, and it spans several root
+namespaces. Its location was. Those files now live in `test/fixtures/i18n/` with a README saying they are expectations
+rather than translations, every stale comment that named the old directory is corrected, and
+`test/ops/no-outside-imports.test.ts` fails the build on either shape that reaches outside the root — a relative import
+that resolves above it, or a `join(__dirname, …)` chain with more parent steps than the file's own depth. The second
+shape is why the rule had to be mechanical: no literal there looks like a traversal. `scripts/merge-i18n.mjs` moved into
+the repository for the same reason, lost its default source, and refuses the fixtures directory, any path outside the
+repository, and any conflicting value.
+
+Proof, with `../i18n` renamed away: typecheck clean, 379 files / 3621 tests green.
+
+### Electron was past its certificate advisory
+
+The lock pinned 44.6.0; versions below 44.9.1 are affected by the intermediate-certificate advisory
+([GHSA-jr5w-w6x2-84p9](https://github.com/electron/electron/security/advisories/GHSA-jr5w-w6x2-84p9)), a TLS forgery risk
+for an app that talks to APIs and SSH. Now 44.10.2 — the newest of the same major, so the smallest step that clears it.
+Verified by launching the app: six invariants, both screenshots unchanged, and the runtime scenarios still 3 passed.
+
+### Advisories: two high became zero
+
+`npm audit fix`, without `--force`, cleared `undici` (unbounded memory in the EventSource parser, reached through
+`node-gyp`) and the non-major `vitest`, `@vitest/mocker`, `fast-uri`, `postcss-selector-parser` and
+`electron-builder-squirrel-windows` findings. Six moderates remain, all inside `electron-builder` and its sub-packages;
+`docs/SECURITY-ADVISORIES.md` records why they are not forced out: shipped dependencies are exactly `["ssh2"]`, npm's
+suggested "fix" is a downgrade to a version older than the one in use, and `--force` here is how a release pipeline breaks
+quietly.
+
+### The workspace panel covered the composer
+
+At a 1200px window the layout plan overlays the workspace panel (`1200 - 256 sidebar - 352 panel` is below the 820
+reading measure) and the drawer was drawn full height, over the send button and the model selector. The default opens the
+panel, so this happened on first launch at the most common laptop width. The composer strip now outranks the drawer
+(`relative z-50`) and keeps its opaque background: the peek panel ends behind the primary action. Proven by a class
+contract that fails without it, and by the live capture drifting 6.2% before the baseline was re-seeded.
+
+### A clean install repairs its own Electron binary
+
+A hardened npm policy skips dependency install scripts, so `node_modules/electron` arrives without `dist/` and
+`npm run dev` dies with "Electron uninstall" until someone finds the line in the README — it happened twice here, once
+during the upgrade above. `scripts/ensure-electron.mjs` compares `dist/version` with the installed package version and
+installs only when they disagree; it runs as `predev` and `pretest`. Proven by renaming `dist` away and running
+`npm test`: the hook reported the binary missing, installed it, and the suite ran green.
+
+### Two circular chunks
+
+Vite warned about `markdown-vendor -> vendor -> markdown-vendor` and `app-store -> app-lib -> app-store` on every build.
+The first came from matching a fixed list of markdown package prefixes, so the tree's own helpers fell into `vendor` and
+each chunk needed the other; a list that must grow with every transitive dependency is a list that rots, so the markdown
+tree shares one bucket. The second came from `store` and `lib` importing each other, which no folder split survives, so
+both are one `app-core` chunk. No circular-chunk warning remains, and the largest chunk is unchanged at 386 kB.
+
+### Documentation that described another version
+
+The README announced v2.7.0 as the latest release and had survived every release since. It now names the 4.3 line and
+points at the CHANGELOG and the latest release, so it cannot rot the same way. The CHANGELOG's 4.3.6 entry carries an
+explicit correction: its count was not reproducible, and **v4.3.6 stays a pre-release**. The feed release for 4.3.6 was
+corrected to a pre-release too, and `publish-feed.mjs` now mirrors that flag — the feed is what every installed app
+reads, so an unmarked copy offers a held-back build to everyone.
+
+### Verified
+
+`../i18n` renamed away: typecheck clean, 379 files / 3621 tests green. The production build succeeds with no chunk
+warnings. The real app launches: six DOM invariants, both screenshots unchanged. `run-scenarios`: 3 passed, 0 failed,
+3 skipped with reasons. `npm audit`: 0 high, 6 moderate, all in build tooling and documented.
+
+### Not verified
+
+Nobody has installed this build on a clean Windows machine, so it stays a pre-release. The three runtime scenarios that
+need a live SSH host still report skipped with their reasons rather than passing.
+
 ## [4.3.6] - 2026-10-22
 
 > **Correction, 2026-11-08.** This entry claims "375 test files / 3609 tests green". That number was true on one machine
