@@ -10,12 +10,14 @@
     "node": ">=20"
   },
   "scripts": {
+    "predev": "node scripts/ensure-electron.mjs",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
+    "pretest": "node scripts/ensure-electron.mjs",
     "test": "vitest run",
     "test:e2e": "vitest run test/e2e",
     "test:watch": "vitest",
