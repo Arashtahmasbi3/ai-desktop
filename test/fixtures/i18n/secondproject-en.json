@@ -1,0 +1,9 @@
+{
+  "chat": {
+    "addRefusedPath": "Add as a project",
+    "addRefusedPathTitle": "Add {{path}} as a project on this server"
+  },
+  "settings": {
+    "prefilledFromRefusal": "Pre-filled from a refusal: {{path}}"
+  }
+}

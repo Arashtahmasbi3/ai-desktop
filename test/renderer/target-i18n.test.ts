@@ -5,13 +5,13 @@ import { join } from 'node:path'
 /**
  * The staged keys for S5 must be mergeable, and no component may invent a key.
  *
- * `src/renderer/src/i18n/en.json` and `fa.json` are frozen while this work is in flight, so the
- * keys the checklist and the database form introduce live in `_research/i18n/target-en.json` /
+ * The expected key set for this feature lives in `test/fixtures/i18n/`, so the
+ * keys the checklist and the database form introduce are listed in `test/fixtures/i18n/target-en.json` /
  * `target-fa.json`, **nested under `target`** — a flat file at the root is what overwrote the
  * `preflight` object during S4 and turned four unrelated tests red.
  */
 
-const I18N = join(__dirname, '..', '..', '..', 'i18n')
+const I18N = join(__dirname, '..', 'fixtures', 'i18n')
 const COMPONENTS = join(__dirname, '..', '..', 'src', 'renderer', 'src', 'components')
 
 const SOURCES = [

@@ -14,7 +14,7 @@
  *   failed   non-zero exit, or ok === false -> failed wording, reason on the collapsed row
  *   blocked  refused before it ran          -> "blocked", never "error" or "failed"
  *
- * The keys these surfaces need ship as `_research/i18n/toolcard-en.json` / `-fa.json` and are merged
+ * The keys these surfaces need are listed in `test/fixtures/i18n/toolcard-en.json` / `-fa.json` and are merged
  * into en.json/fa.json separately, so they are installed here first. Assertions read state from
  * `data-testid`s and compare against `i18n.t(...)`, so they survive a copy change.
  */
@@ -29,8 +29,8 @@ import {
   isSuccessOutcome,
   toolOutcome
 } from '../../src/renderer/src/lib/tool-outcome'
-import toolcardEn from '../../../i18n/toolcard-en.json'
-import toolcardFa from '../../../i18n/toolcard-fa.json'
+import toolcardEn from '../fixtures/i18n/toolcard-en.json'
+import toolcardFa from '../fixtures/i18n/toolcard-fa.json'
 
 beforeAll(async () => {
   i18n.addResourceBundle('en', 'translation', toolcardEn, true, true)

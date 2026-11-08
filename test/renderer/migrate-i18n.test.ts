@@ -5,12 +5,12 @@ import { join } from 'node:path'
 /**
  * The staged keys for S4 must be mergeable, and the component must not invent a key.
  *
- * `src/renderer/src/i18n/en.json` and `fa.json` are frozen while this work is in flight, so the
- * keys the migration form introduces live in `_research/i18n/migrate-en.json` / `migrate-fa.json`
+ * The expected key set for this feature lives in `test/fixtures/i18n/`, so the
+ * keys the migration form introduces are listed in `test/fixtures/i18n/migrate-en.json` / `migrate-fa.json`
  * and are used through `t(key, { defaultValue })`. The defaultValue is what the jsdom test asserts,
  * so a missing merge still renders English rather than `migrate.title`.
  */
-const DIR = join(__dirname, '..', '..', '..', 'i18n')
+const DIR = join(__dirname, '..', 'fixtures', 'i18n')
 const COMPONENT = join(
   __dirname,
   '..',
@@ -59,7 +59,7 @@ describe('S4 — staged migration keys', () => {
   })
 
   it('nests its keys under a `migrate` namespace, so a merge cannot collide with `preflight`', () => {
-    // The staged files follow `_research/i18n/secondproject-en.json`: one namespace per file, deep
+    // The fixtures follow `test/fixtures/i18n/secondproject-en.json`: one namespace per file, deep
     // merged. A flat file overwrites the existing `preflight` object — which is exactly what happened
     // once during this work: `preflight.proceed` vanished and four unrelated tests went red.
     for (const name of ['migrate-en.json', 'migrate-fa.json']) {

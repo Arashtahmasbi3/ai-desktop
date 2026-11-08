@@ -1,0 +1,6 @@
+{
+  "chat": {
+    "toolBlocked": "blocked",
+    "toolStderrWarnHint": "Exited 0 but wrote to stderr — succeeded with warnings."
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "chat": {
+    "addRefusedPath": "افزودن به‌عنوان پروژه",
+    "addRefusedPathTitle": "افزودن {{path}} به‌عنوان پروژه روی همین سرور"
+  },
+  "settings": {
+    "prefilledFromRefusal": "از روی پیام رد شدن پیش‌پر شد: {{path}}"
+  }
+}

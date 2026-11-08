@@ -1,0 +1,27 @@
+{
+  "migrate": {
+    "title": "Move a project to another server",
+    "body": "Pick both ends. Preflight decides whether the bytes go straight from the source or relay through this computer, and nothing is copied until every check passes.",
+    "needTwoServers": "A migration needs two saved servers. Add the destination in Settings → Connections.",
+    "source": "Source",
+    "target": "Target",
+    "server": "Saved server",
+    "pickServer": "Pick a server…",
+    "absolutePath": "Absolute path",
+    "excludes": "Excluded from the transfer",
+    "excludesHint": "These are the build outputs that make a project bigger than the source disk. One path component each; the exact rsync command below shows them.",
+    "resetExcludes": "Defaults",
+    "preflight": "Run preflight",
+    "start": "Start transfer",
+    "cancel": "Cancel transfer",
+    "mode": "Mode chosen by preflight",
+    "resuming": "resuming an interrupted transfer",
+    "excludesInPlan": "Excludes in the transfer",
+    "none": "none",
+    "blocked": "Preflight stopped this migration",
+    "commands": "Exact commands, in order, before anything runs",
+    "progress": "Transfer progress",
+    "cancelled": "Cancelled. The staging directory is kept, so running it again resumes — the destination was not touched.",
+    "verification": "After: {{files}} files, {{dirs}} directories, {{bytes}} bytes — sample checksum compared."
+  }
+}

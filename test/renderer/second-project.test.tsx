@@ -247,7 +247,7 @@ describe('the project card keeps a remote root on its server', () => {
  * key nobody wrote a translation for must not reach `en.json` alone.
  */
 describe('S3 staged i18n keys are mergeable', () => {
-  const DIR = join(__dirname, '..', '..', '..', 'i18n')
+  const DIR = join(__dirname, '..', 'fixtures', 'i18n')
 
   function leaves(node: unknown, prefix = ''): string[] {
     if (typeof node !== 'object' || node === null) return [prefix]

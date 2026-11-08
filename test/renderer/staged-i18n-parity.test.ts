@@ -5,13 +5,13 @@ import { join } from 'node:path'
 /**
  * The staged keys for this stage (v4.3) must be mergeable.
  *
- * `src/renderer/src/i18n/en.json` and `fa.json` are frozen while this work is in flight, so the
- * keys the redesign introduces live in `_research/i18n/ui-en.json` / `ui-fa.json` and are used
+ * The expected key set for this feature lives in `test/fixtures/i18n/`, so the
+ * keys the redesign introduces are listed in `test/fixtures/i18n/ui-en.json` / `ui-fa.json` and are used
  * through `t(key, { defaultValue })` in the components. `test/renderer/i18n.test.ts` only checks
  * key parity for the two shipped locales, so without this case the staging files could drift into
  * a state where merging them would break the Persian build.
  */
-const DIR = join(__dirname, '..', '..', '..', 'i18n')
+const DIR = join(__dirname, '..', 'fixtures', 'i18n')
 
 function load(name: string): Record<string, unknown> {
   return JSON.parse(readFileSync(join(DIR, name), 'utf8')) as Record<string, unknown>

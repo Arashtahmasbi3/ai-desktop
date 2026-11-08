@@ -1,0 +1,6 @@
+{
+  "chat": {
+    "toolBlocked": "مسدود",
+    "toolStderrWarnHint": "با کد ۰ تمام شد ولی در stderr نوشت — موفق با هشدار."
+  }
+}

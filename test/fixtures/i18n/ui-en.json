@@ -1,0 +1,25 @@
+{
+  "statusBar": {
+    "sessionTokens": "{{tokens}} tokens"
+  },
+  "titlebar": {
+    "menu": "Preferences"
+  },
+  "sidebar": {
+    "openProject": "Open project"
+  },
+  "chat": {
+    "toolGroupCommands_one": "{{count}} command",
+    "toolGroupCommands_other": "{{count}} commands",
+    "toolGroup_one": "{{count}} call",
+    "toolGroup_other": "{{count}} calls",
+    "toolGroupServer": "on {{server}}",
+    "toolGroupAllOk": "all ok",
+    "toolGroupWarning": "with warnings",
+    "toolGroupExpand": "Show the {{count}} calls"
+  },
+  "questionSheet": {
+    "title": "The agent has a question",
+    "skip": "Skip"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "statusBar": {
+    "sessionTokens": "{{tokens}} توکن"
+  },
+  "titlebar": {
+    "menu": "ترجیحات"
+  },
+  "sidebar": {
+    "openProject": "باز کردن پروژه"
+  },
+  "chat": {
+    "toolGroupCommands_one": "{{count}} فرمان",
+    "toolGroupCommands_other": "{{count}} فرمان",
+    "toolGroup_one": "{{count}} فراخوانی",
+    "toolGroup_other": "{{count}} فراخوانی",
+    "toolGroupServer": "روی {{server}}",
+    "toolGroupAllOk": "همه موفق",
+    "toolGroupWarning": "با هشدار",
+    "toolGroupExpand": "نمایش {{count}} فراخوانی"
+  },
+  "questionSheet": {
+    "title": "عامل سؤالی دارد",
+    "skip": "رد کردن"
+  }
+}
