@@ -1198,3 +1198,18 @@ so every control reported a state change that never happened. The rule now:
 - an informational row must say where the setting actually lives, and its button must land on that tab;
 - a capability that is planned but absent is reported as absent (the Sources panel shows web search disabled rather
   than pretending), never rendered as a control that silently does nothing.
+
+## Pattern: a test may only read inside the repository
+
+- `test/ops/no-outside-imports.test.ts` fails the build on either shape that escapes the repo root: a relative `import`
+  or `require` that resolves above it, and a `join(__dirname, '..', ...)` chain with more parent steps than the file's
+  own depth. The second shape is why the rule is mechanical: no literal there looks like `../../../`.
+- Expected i18n key sets live in `test/fixtures/i18n/` and are **expectations, not translations**. The shipped truth
+  stays `src/renderer/src/i18n/{en,fa}.json`, and the tests compare the two.
+- A new translation key is written into **both** shipped locales in one edit. `scripts/merge-i18n.mjs --from <dir>`
+  exists only to replay an old staging directory: it refuses `test/fixtures/i18n`, refuses any path outside the
+  repository, and refuses a conflict instead of picking a wording.
+- Why this is a rule and not a preference: five test files once read their expected keys from `../i18n`, a sibling
+  directory that is not in the repository. Everything passed on the machine that had it and nothing passed on a clean
+  checkout — two `TS2307` errors and five red files — while the release note claimed a green suite. A green run that
+  depends on an untracked path is not evidence of anything.
