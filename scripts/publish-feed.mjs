@@ -10,7 +10,7 @@
  * It is deliberately separate from `release.mjs`: the release path is load-bearing and audited, and a network step that
  * uploads ~107 MB twice has no business inside it. Run this after the private release exists.
  *
- *   node scripts/publish-feed.mjs 4.3.6 [--dry-run]
+ *   node scripts/publish-feed.mjs 4.3.6 [--prerelease] [--dry-run]
  *
  * Required: `gh` on PATH, authenticated, with write access to the feed repo. Assets come from `release/`:
  * `AI Desktop Setup <v>.exe`, `AI Desktop <v> Portable.exe`, `SHA256SUMS.txt`.
@@ -35,14 +35,20 @@ export function feedAssets(version) {
 export function parseArgs(argv) {
   const version = argv.find((arg) => !arg.startsWith('--'))
   if (!version || !/^\d+\.\d+\.\d+$/.test(version)) return null
-  return { version, dryRun: argv.includes('--dry-run') }
+  return { version, dryRun: argv.includes('--dry-run'), prerelease: argv.includes('--prerelease') }
 }
 
 /** The `gh` invocations, as data, so a test can assert them without running anything. */
-export function planCommands(version, notes) {
+export function planCommands(version, notes, options = {}) {
   const tag = 'v' + version
+  const create = ['release', 'create', tag, '--repo', FEED_REPO, '--title', 'AI Desktop ' + version, '--notes', notes]
+  /*
+   * The feed must mirror the state of the release it copies. A pre-release held back in the private repository and
+   * published unlocked here is how every installed app gets offered a build nobody promoted.
+   */
+  if (options.prerelease) create.push('--prerelease')
   return [
-    ['release', 'create', tag, '--repo', FEED_REPO, '--title', 'AI Desktop ' + version, '--notes', notes],
+    create,
     ...feedAssets(version).map((asset) => ['release', 'upload', tag, asset, '--repo', FEED_REPO, '--clobber'])
   ]
 }
@@ -50,15 +56,15 @@ export function planCommands(version, notes) {
 async function main() {
   const parsed = parseArgs(process.argv.slice(2))
   if (!parsed) {
-    console.error('usage: node scripts/publish-feed.mjs <x.y.z> [--dry-run]')
+    console.error('usage: node scripts/publish-feed.mjs <x.y.z> [--prerelease] [--dry-run]')
     process.exit(2)
   }
-  const { version, dryRun } = parsed
+  const { version, dryRun, prerelease } = parsed
   const notes =
     'The updater feed. See the private repository Arashtahmasbi3/ai-desktop for the release notes of v' +
     version +
     '.'
-  const commands = planCommands(version, notes)
+  const commands = planCommands(version, notes, { prerelease })
   for (const command of commands) {
     console.log((dryRun ? '[dry-run] ' : '') + 'gh ' + command.join(' '))
   }
@@ -76,7 +82,7 @@ async function main() {
       await new Promise((resolve) => setTimeout(resolve, 10_000))
     }
   }
-  console.log('published v' + version + ' to ' + FEED_REPO)
+  console.log('published v' + version + ' to ' + FEED_REPO + (prerelease ? ' (pre-release)' : ''))
 }
 
 if (process.argv[1] && process.argv[1].endsWith('publish-feed.mjs')) {

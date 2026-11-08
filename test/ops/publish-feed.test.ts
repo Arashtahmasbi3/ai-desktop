@@ -29,8 +29,9 @@ describe('the feed publication step', () => {
   })
 
   it('reads a plain version and the dry-run flag', () => {
-    expect(parseArgs(['4.3.6'])).toEqual({ version: '4.3.6', dryRun: false })
-    expect(parseArgs(['4.3.6', '--dry-run'])).toEqual({ version: '4.3.6', dryRun: true })
+    expect(parseArgs(['4.3.6'])).toEqual({ version: '4.3.6', dryRun: false, prerelease: false })
+    expect(parseArgs(['4.3.6', '--dry-run'])).toEqual({ version: '4.3.6', dryRun: true, prerelease: false })
+    expect(parseArgs(['4.3.6', '--prerelease'])).toEqual({ version: '4.3.6', dryRun: false, prerelease: true })
   })
 
   it('creates the release, then uploads each asset with --clobber so a retry is safe', () => {
@@ -43,5 +44,11 @@ describe('the feed publication step', () => {
       expect(upload).toContain('--clobber')
       expect(upload).toContain(FEED_REPO)
     }
+  })
+
+  it('mirrors a pre-release, because the feed is what every installed app reads', () => {
+    /* A build held back in the private repository must not be offered unlocked by the updater. */
+    expect(planCommands('4.3.6', 'notes')[0]).not.toContain('--prerelease')
+    expect(planCommands('4.3.6', 'notes', { prerelease: true })[0]).toContain('--prerelease')
   })
 })
