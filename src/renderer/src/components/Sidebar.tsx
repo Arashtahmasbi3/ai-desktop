@@ -384,6 +384,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
     return (
       <nav
         aria-label={t('sidebar.chats')}
+        /* Width mirrors SIDEBAR_RAIL_WIDTH; test/renderer/sidebar-width.test.ts keeps the two in step. */
         className="flex w-[52px] shrink-0 flex-col items-center gap-1 border-e border-border bg-shell py-2 transition-all duration-200"
       >
         {VISIBLE_NAV.map((item) => {
@@ -447,7 +448,8 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
   return (
     <nav
       aria-label={t('sidebar.chats')}
-      className="flex w-64 shrink-0 flex-col border-e border-border bg-bg-secondary transition-all duration-200"
+      /* Width mirrors SIDEBAR_EXPANDED_WIDTH; test/renderer/sidebar-width.test.ts keeps the two in step. */
+      className="flex w-[372px] shrink-0 flex-col border-e border-border bg-bg-secondary transition-all duration-200"
     >
       {/* Sticky header: the actions and the search, never scrolled away with the tree. */}
       <div className="flex shrink-0 flex-col gap-1.5 border-b border-border p-2">
