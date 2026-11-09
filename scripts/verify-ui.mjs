@@ -71,7 +71,8 @@ if (flag('--help')) {
     '  --allow-drift  report a capture drift without failing (local runs on another GPU driver)',
       '  --out <dir>  where the captures go, default docs/screenshots',
       '  --root <dir> staging directory, default C:\\aidverify-verify on win32 and $TMP/aidverify-verify elsewhere',
-  '  --probe <js> evaluate one expression in the live renderer, print it as JSON, and exit'
+  '  --probe <js> evaluate one expression in the live renderer, print it as JSON, and exit',
+  '  --viewport <w>x<h> override the CSS viewport (Emulation), so a probe can measure a width the window does not have'
     ].join('\n')
   )
   process.exit(0)
@@ -84,6 +85,8 @@ const ALLOW_DRIFT = flag('--allow-drift')
 const STAGING_ROOT = value('--root', undefined)
 /** One expression to evaluate in the live renderer, then exit. Used to answer geometry questions with a measurement. */
 const PROBE = value('--probe', undefined)
+/** Optional CSS viewport override, so the same app can be measured at 900, 1200 and 1440 without rebuilding anything. */
+const VIEWPORT = value('--viewport', undefined)
 const LAUNCH_TIMEOUT_MS = 45_000
 const READY_TIMEOUT_MS = 30_000
 
@@ -395,6 +398,20 @@ async function main() {
     page = await connect(target.webSocketDebuggerUrl)
     try {
       await page.send('Page.enable')
+
+      if (VIEWPORT !== undefined) {
+        const parts = String(VIEWPORT).split('x').map((n) => Number(n))
+        if (parts.length !== 2 || parts.some((n) => !Number.isFinite(n) || n <= 0)) {
+          throw new Error('--viewport must look like 900x800')
+        }
+        await page.send('Emulation.setDeviceMetricsOverride', {
+          width: parts[0],
+          height: parts[1],
+          deviceScaleFactor: 1,
+          mobile: false
+        })
+        log('verify-ui: viewport overridden to ' + String(parts[0]) + 'x' + String(parts[1]))
+      }
       await waitForShell(page, 'after launch')
 
       if (PROBE !== undefined) {
