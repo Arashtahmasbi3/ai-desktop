@@ -11,12 +11,17 @@
  * Pure and dependency-free so the rules can be unit-tested without a DOM.
  */
 
-/** Comfortable reading measure for the conversation (v2.6.3 spec). */
-export const CHAT_MAX_WIDTH = 820
+/** The widest the conversation, its composer and its cards ever get (v4.4, measured client profile). */
+export const CHAT_MAX_WIDTH = 1120
+/**
+ * The narrowest a docked column may leave the conversation. Separate from {@link CHAT_MAX_WIDTH} on purpose: the cap is
+ * how wide the text grows, this is the point below which an extra column stops docking and floats instead.
+ */
+export const CHAT_DOCK_FLOOR = 820
 /** Icon rail width when the sidebar cannot stay expanded. */
-export const SIDEBAR_RAIL_WIDTH = 56
+export const SIDEBAR_RAIL_WIDTH = 52
 /** Expanded sidebar width. */
-export const SIDEBAR_EXPANDED_WIDTH = 256
+export const SIDEBAR_EXPANDED_WIDTH = 372
 /** Left file-tree column width when it is docked. */
 export const TREE_PANEL_WIDTH = 256
 /** Right workspace column width when it is docked. */
@@ -56,18 +61,18 @@ export interface LayoutPlan {
 export function resolveLayout(input: LayoutInput): LayoutPlan {
   const { width, sidebarPinned, sidebarCollapsed, treeOpen, workspaceOpen } = input
 
-  const sidebarFloor = sidebarPinned ? MIN_CHAT_WIDTH : CHAT_MAX_WIDTH
+  const sidebarFloor = sidebarPinned ? MIN_CHAT_WIDTH : CHAT_DOCK_FLOOR
   const expanded = !sidebarCollapsed && width - SIDEBAR_EXPANDED_WIDTH >= sidebarFloor
   const sidebar = expanded ? SIDEBAR_EXPANDED_WIDTH : SIDEBAR_RAIL_WIDTH
 
   const treeStatic =
     treeOpen &&
     width - sidebar - TREE_PANEL_WIDTH - (workspaceOpen ? WORKSPACE_PANEL_WIDTH : 0) >=
-      CHAT_MAX_WIDTH
+      CHAT_DOCK_FLOOR
   const workspaceStatic =
     workspaceOpen &&
     width - sidebar - (treeStatic ? TREE_PANEL_WIDTH : 0) - WORKSPACE_PANEL_WIDTH >=
-      CHAT_MAX_WIDTH
+      CHAT_DOCK_FLOOR
 
   return {
     sidebar: expanded ? 'expanded' : 'rail',

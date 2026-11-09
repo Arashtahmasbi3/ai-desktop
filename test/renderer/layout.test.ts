@@ -5,10 +5,12 @@
  *
  * The sidebar has two controls: `sidebarCollapsed` (Ctrl+B) always wins and forces
  * the rail; `sidebarPinned` keeps it expanded down to MIN_CHAT_WIDTH, while an
- * unpinned sidebar only stays expanded when the chat can reach CHAT_MAX_WIDTH.
+ * unpinned sidebar only stays expanded when the chat can reach CHAT_DOCK_FLOOR, while CHAT_MAX_WIDTH caps how wide the
+ * conversation itself grows.
  */
 import { describe, expect, it } from 'vitest'
 import {
+  CHAT_DOCK_FLOOR,
   CHAT_MAX_WIDTH,
   MIN_CHAT_WIDTH,
   SIDEBAR_EXPANDED_WIDTH,
@@ -26,8 +28,9 @@ const everythingOpen = {
 
 describe('resolveLayout', () => {
   it('keeps the full layout docked only when the chat still gets 820px', () => {
+    // The floor is what a docked column must leave; the cap only limits how wide the text grows.
     const needed =
-      SIDEBAR_EXPANDED_WIDTH + TREE_PANEL_WIDTH + WORKSPACE_PANEL_WIDTH + CHAT_MAX_WIDTH
+      SIDEBAR_EXPANDED_WIDTH + TREE_PANEL_WIDTH + WORKSPACE_PANEL_WIDTH + CHAT_DOCK_FLOOR
     const plan = resolveLayout({ width: needed, ...everythingOpen })
     expect(plan).toEqual({ sidebar: 'expanded', tree: 'static', workspace: 'static' })
 
