@@ -580,3 +580,24 @@
   height: var(--row-h-status);
   min-height: var(--row-h-status);
 }
+/*
+ * v4.4: the shape of an overlay is a property of its ROLE, not of each component's class list.
+ *
+ * There is no shared menu primitive in this codebase - six components each carry their own radius - so a per-component
+ * change would drift the moment one is added. Roles are already on every one of them, and the measured profile names a
+ * radius per role: 16 for a menu or a listbox, 12 for a dialog. Unlayered and last, so it wins over any component class.
+ */
+[role='menu'],
+[role='listbox'] {
+  border-radius: var(--shape-r-xl);
+}
+
+[role='dialog'] {
+  border-radius: var(--shape-r-lg);
+}
+
+/* The menu row: 29px, one step shorter than the dense 32px row. Must come after .ui-row for the same cascade reason. */
+.ui-row-menu {
+  height: var(--row-h-menu);
+  min-height: var(--row-h-menu);
+}

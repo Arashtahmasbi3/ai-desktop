@@ -337,7 +337,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
               type="button"
               role="menuitem"
               onClick={() => onRename(chat)}
-              className="ui-row ui-press w-full px-3 text-left text-fg"
+              className="ui-row ui-row-menu ui-press w-full px-3 text-left text-fg"
             >
               {t('common.rename')}
             </button>
@@ -348,7 +348,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                 setChatMenuFor(null)
                 void duplicateChat(chat.id)
               }}
-              className="ui-row ui-press w-full gap-1.5 px-3 text-left text-fg"
+              className="ui-row ui-row-menu ui-press w-full gap-1.5 px-3 text-left text-fg"
             >
               <Copy className="h-3 w-3" />
               {t('common.duplicate')}
@@ -360,7 +360,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                 setChatMenuFor(null)
                 exportChat(chat)
               }}
-              className="ui-row ui-press w-full gap-1.5 px-3 text-left text-fg"
+              className="ui-row ui-row-menu ui-press w-full gap-1.5 px-3 text-left text-fg"
             >
               <Download className="h-3 w-3" />
               {t('common.export')}
@@ -369,7 +369,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
               type="button"
               role="menuitem"
               onClick={() => onDelete(chat)}
-              className="ui-row ui-press w-full gap-1.5 px-3 text-left text-danger"
+              className="ui-row ui-row-menu ui-press w-full gap-1.5 px-3 text-left text-danger"
             >
               <Trash2 className="h-3 w-3" />
               {t('common.delete')}
@@ -643,7 +643,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                             setProjectMenuFor(null)
                             void openProject(project.id)
                           }}
-                          className="ui-row ui-press w-full gap-1.5 px-3 text-left text-fg"
+                          className="ui-row ui-row-menu ui-press w-full gap-1.5 px-3 text-left text-fg"
                         >
                           <FolderTree className="h-3 w-3" />
                           {t('sidebar.openProject', { defaultValue: 'Open project' })}
@@ -655,7 +655,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                             setProjectMenuFor(null)
                             void locate(project.id)
                           }}
-                          className="ui-row ui-press w-full gap-1.5 px-3 text-left text-fg"
+                          className="ui-row ui-row-menu ui-press w-full gap-1.5 px-3 text-left text-fg"
                         >
                           <MapPin className="h-3 w-3" />
                           {t('sidebar.locate')}
@@ -666,7 +666,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                             role="menuitem"
                             disabled={searchingId === project.id}
                             onClick={() => void searchOnVps(project)}
-                            className="ui-row ui-press w-full gap-1.5 px-3 text-left text-fg disabled:opacity-40"
+                            className="ui-row ui-row-menu ui-press w-full gap-1.5 px-3 text-left text-fg disabled:opacity-40"
                           >
                             <Server className="h-3 w-3" />
                             {t('sidebar.searchOnVps')}
@@ -681,7 +681,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
                               void removeProject(project.id)
                             }
                           }}
-                          className="ui-row ui-press w-full gap-1.5 px-3 text-left text-danger"
+                          className="ui-row ui-row-menu ui-press w-full gap-1.5 px-3 text-left text-danger"
                         >
                           <Trash2 className="h-3 w-3" />
                           {t('common.remove')}
