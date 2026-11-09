@@ -85,20 +85,25 @@ function rule(selector: string): string {
   return flat.slice(open + 1, close)
 }
 
-describe('geometry: 6px radius and 1px hairlines (v4.3)', () => {
-  it('keeps ONE 6px system step, with a hairline round below and a dialog step above', () => {
-    expect(css).toContain('--shape-r: 6px;')
-    expect(css).toContain('--shape-r-sm: 4px;')
-    expect(css).toContain('--shape-r-lg: 8px;')
-    // A pill survives only for status dots and the round composer buttons, which are circles
-    // by definition rather than by style choice.
+describe('geometry: the role-named radius scale and 1px hairlines (v4.4)', () => {
+  it('keeps one ordered radius scale, each step owned by a role', () => {
+    // 8 control · 10 navigation tile · 12 dialog · 14 workspace shell · 16 menu and grouped settings.
+    expect(css).toContain('--shape-r-sm: 8px;')
+    expect(css).toContain('--shape-r: 10px;')
+    expect(css).toContain('--shape-r-lg: 12px;')
+    expect(css).toContain('--shape-r-xl: 16px;')
+    expect(css).toContain('--shape-r-shell: 14px;')
+    // A pill survives only for status dots and the round composer action, which are circles by definition.
     expect(css).toContain('--shape-pill: 999px;')
-    // The three steps really are ordered, so "small" and "large" mean something.
     const sm = lengthIn(lightBlock(), '--shape-r-sm')
     const base = lengthIn(lightBlock(), '--shape-r')
     const lg = lengthIn(lightBlock(), '--shape-r-lg')
+    const shell = lengthIn(lightBlock(), '--shape-r-shell')
+    const xl = lengthIn(lightBlock(), '--shape-r-xl')
     expect(sm).toBeLessThan(base)
     expect(base).toBeLessThan(lg)
+    expect(lg).toBeLessThan(shell)
+    expect(shell).toBeLessThan(xl)
   })
 
   it('declares exactly one border width, and it is a hairline', () => {
@@ -119,20 +124,28 @@ describe('geometry: 6px radius and 1px hairlines (v4.3)', () => {
     }
   })
 
-  it('casts no shadow at all — depth is a background step, not a light source', () => {
+  it('casts soft, always-blurred depth — never a hard offset', () => {
+    // Every shadow token is real, and every one carries a blur radius (the third length).
     for (const token of ['--shape-shadow', '--shape-shadow-sm', '--shape-shadow-accent']) {
-      expect(css, token + ' must resolve to none').toMatch(
-        new RegExp(token + ':\\s*none;')
-      )
+      const value = css.match(new RegExp(token + ':\\s*([^;]+);'))?.[1]?.trim() ?? ''
+      expect(value, token + ' must be defined').not.toBe('')
+      expect(value, token + ' must not be none').not.toBe('none')
+      // Everything before the colour is the geometry: x-offset, y-offset, blur, and sometimes spread.
+      const geometry = value.split(/rgb|rgba|hsl|#/)[0]!.trim().split(/\s+/).filter(Boolean)
+      expect(geometry.length, token + ' needs offset and blur').toBeGreaterThanOrEqual(3)
+      const blur = Number(geometry[2]!.replace('px', ''))
+      expect(blur, token + ' blur must be non-zero').toBeGreaterThan(0)
+      // No offset-hard shadow: a zero-blur pair of offsets is the retired language.
+      expect(value, token + ' must not be a hard offset').not.toMatch(/^0 2px 0\b| 0 0 0\b/)
     }
-    // The old offset-source token is gone, so nothing can reintroduce a theme-dependent shadow.
-    expect(css).not.toMatch(/--shape-shadow-outline/)
-    // `shadow-none` is the only shadow utility a component may name.
-    const users = sources.filter((source) => /(?:^|[\s"'`])shadow-(?!none)/.test(source.text))
-    expect(users.map((source) => source.path)).toEqual([])
-    // And the stylesheet itself declares no shadow other than `none`.
+    // A component may use the shared shadow utilities, but never an inline hard offset.
+    const hard = sources
+      .filter((source) => /shadow-\[0_(?:1|2|3)px_0[^\]]*\]/.test(source.text))
+      .map((source) => source.path)
+    expect(hard).toEqual([])
+    // The stylesheet only ever paints a shadow through a token.
     for (const match of css.matchAll(/box-shadow:\s*([^;]+);/g)) {
-      expect(match[1]!.trim()).toBe('none')
+      expect(match[1]!.trim()).toMatch(/^(?:none|var\(--shape-shadow)/)
     }
   })
 })
@@ -161,22 +174,24 @@ describe('typography: the system font, no micro-caps (v4.3)', () => {
 })
 
 describe('the dense row and the motion scale (v4.3)', () => {
-  it('gives every list row the same 28px height, through one token', () => {
-    expect(css).toContain('--row-h: 28px;')
+  it('gives the dense lists their measured heights, through tokens', () => {
+    expect(css).toContain('--row-h: 32px;')
+    expect(css).toContain('--row-h-chat: 31px;')
+    expect(css).toContain('--row-h-menu: 29px;')
     const body = rule('.ui-row')
     expect(body).toContain('height: var(--row-h)')
     // A token nothing reads is a comment with a colon in it.
     expect(sources.some((source) => source.text.includes('ui-row'))).toBe(true)
   })
 
-  it('moves instantly or for 120ms, never longer', () => {
+  it('moves for at most 200ms, with an ease-out that reads as a response', () => {
     const fast = durationIn(lightBlock(), '--motion-fast')
     const base = durationIn(lightBlock(), '--motion-base')
     const slow = durationIn(lightBlock(), '--motion-slow')
     expect(fast).toBeLessThan(base)
     expect(base).toBeLessThanOrEqual(slow)
-    expect(slow).toBeLessThanOrEqual(120)
-    // A control that eases for a quarter of a second reads as an animation, not as a response.
+    // The measured client tops out just under a quarter second; anything longer reads as an animation.
+    expect(slow).toBeLessThanOrEqual(200)
     expect(css).toMatch(/--ease-shape:\s*ease-out;/)
   })
 

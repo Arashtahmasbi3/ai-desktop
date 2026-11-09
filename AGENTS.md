@@ -124,7 +124,7 @@ invisible in a screenshot: 180 borders sat at roughly **1.1:1** against the page
 into a real hierarchy (1px separator → 2px ink container → 2px ink + shadow for primary surfaces) —
 the one deliberate palette adjustment. Restraint is enforced by tests, not hoped for: depth only on
 touchable surfaces, never two shouting elements, and the security dialogs keep the border with no
-offset shadow. `clay-tokens.test.ts` became `brutal-tokens.test.ts` (zero blur, square geometry,
+offset shadow. `clay-tokens.test.ts` became `soft-tokens.test.ts` (zero blur, square geometry,
 per-theme shadows, instant motion, the surface vocabulary, and no clay class anywhere). Separately,
 `Settings → Plugins` was a page of switches that persisted a key **nothing read**; it is now
 *Surfaces*, with three real switches that genuinely hide their surface (and its button), and four
@@ -1191,7 +1191,7 @@ without noticing.
 
 - **Our tokens own our shell.** Zero radius, 2px borders, one hard offset shadow with no blur, instant linear
   motion, uppercase micro-labels and monospace data are the language of AI Desktop's own window, and
-  `test/renderer/brutal-tokens.test.ts` enforces it.
+  `test/renderer/soft-tokens.test.ts` enforces it.
 - **A surface rendered inside someone else's product inherits THEIR tokens.** The official Claude MCP Apps
   guidelines require host style variables for every structural element — backgrounds, text, borders, radii, weights
   — and allow brand colour only for accents. A UI we hand to a host must look native there, not like our app

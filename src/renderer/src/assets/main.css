@@ -18,17 +18,23 @@
   :root {
     color-scheme: light;
 
-    --bg-primary: 245 244 241;
-    --bg-secondary: 250 249 246;
-    --bg-tertiary: 237 235 231;
-    --bg-elevated: 255 255 254;
+    /*
+     * Soft workspace (v4.4). The canvas is white and regions are separated by a 1px hairline and a very small tone
+     * step, not by dark 2px frames: that is the measured client relationship, and it is what makes the screen read as
+     * light. Values are space-separated RGB so Tailwind's /alpha modifiers keep working.
+     */
+    --bg-primary: 255 255 255;
+    --bg-secondary: 251 251 252;
+    --bg-tertiary: 237 237 237;
+    --bg-elevated: 255 255 255;
     /*
      * Border hierarchy. One hairline for structure, one stronger line for a surface that
      * must read as a container. Both are visible against the page (the pre-3.0 values sat at
      * roughly 1.1:1 and rendered as nothing).
      */
-    --border: 176 169 159;
-    --border-strong: 66 62 58;
+    /* A hairline for structure, and one step up for a surface that must read as a container. Never a dark frame. */
+    --border: 228 231 236;
+    --border-strong: 203 209 218;
 
     /*
      * A four-step text ramp where every step still clears 4.5:1 on the darkest
@@ -36,25 +42,36 @@
      * 3.25:1, which is below the readable threshold for metadata users do need to
      * read (file sizes, hints, timestamps).
      */
-    --fg-strong: 28 26 23;
-    --fg: 66 62 58;
-    --fg-muted: 92 87 81;
-    --fg-subtle: 104 98 92;
+    --fg-strong: 31 31 31;
+    --fg: 66 66 66;
+    --fg-muted: 92 92 92;
+    --fg-subtle: 107 107 107;
 
     /* `accent` is for text/borders/tints; `accent-solid` is a filled surface. */
-    --accent: 109 67 255;
-    --accent-hover: 91 52 224;
-    --accent-solid: 109 67 255;
-    --accent-solid-hover: 91 52 224;
+    /* The captured send-button blue. One accent, used for send and unread state, never as decoration. */
+    --accent: 44 103 197;
+    --accent-hover: 36 88 170;
+    --accent-solid: 44 103 197;
+    --accent-solid-hover: 36 88 170;
     --accent-fg: 255 255 255;
-    --accent-muted: 196 183 255;
+    --accent-muted: 198 216 245;
 
     --danger: 194 38 54;
     --warning: 154 97 0;
     --success: 15 122 74;
-    --info: 11 107 203;
+    --info: 13 116 128;
 
-    --focus-ring: 109 67 255;
+    /*
+     * Keyboard focus is a neutral fill inside the target, not a coloured ring outside it. The global rule below uses
+     * this value with a negative offset so the indicator sits within the control's own box — no layout shift, and no
+     * second visual language.
+     */
+    --focus-ring: 140 149 163;
+    --focus-fill: 240 241 243;
+    /** Surfaces the old system had no name for. */
+    --surface-hover: 240 241 243;
+    --nav-selected: 228 231 236;
+    --shell: 240 243 249;
     --scrollbar-thumb: 208 204 198;
     --scrollbar-thumb-hover: 180 175 168;
 
@@ -64,9 +81,15 @@
      * dialog. "Pill" survives solely for status dots and the composer's round buttons,
      * which are circles by definition rather than by style choice.
      */
-    --shape-r-sm: 4px;
-    --shape-r: 6px;
-    --shape-r-lg: 8px;
+    /*
+     * One radius scale, role-named, from the measured profile: 8 on controls, 10 on the navigation tile, 12 on dialogs,
+     * 14 around a workspace surface, 16 on menus and grouped settings. Nothing else may invent a radius.
+     */
+    --shape-r-sm: 8px;
+    --shape-r: 10px;
+    --shape-r-lg: 12px;
+    --shape-r-xl: 16px;
+    --shape-r-shell: 14px;
     --shape-pill: 999px;
     /** The one border width that means "this is a surface". A hairline, by contract. */
     --shape-border: 1px;
@@ -75,22 +98,29 @@
      * background step, not with an offset or a blurred shadow — this token exists so a
      * component that asks for one gets nothing rather than inventing its own.
      */
-    --shape-shadow: none;
-    --shape-shadow-sm: none;
-    --shape-shadow-accent: none;
+    /*
+     * Soft, always-blurred depth. Three layers: a hairline shadow for rest, a lifted one for cards and the composer, and
+     * one tinted layer for the primary action. There is no offset-hard shadow anywhere — that was the old language.
+     */
+    --shape-shadow-sm: 0 1px 2px rgb(16 24 40 / 0.05);
+    --shape-shadow: 0 1px 2px rgb(16 24 40 / 0.06), 0 8px 24px -8px rgb(16 24 40 / 0.14);
+    --shape-shadow-accent: 0 6px 18px -8px rgb(44 103 197 / 0.5);
 
     /*
      * Motion: instant, or one short step. Nothing eases for longer than 120ms — a control
      * that moves for a quarter of a second reads as an animation, not as a response. Non-zero
      * so transitionend listeners still fire, which the reduced-motion block depends on.
      */
-    --motion-fast: 60ms;
-    --motion-base: 90ms;
-    --motion-slow: 120ms;
+    --motion-fast: 120ms;
+    --motion-base: 160ms;
+    --motion-slow: 200ms;
     --ease-shape: ease-out;
 
     /** The dense list row: one height for every row in the tree, the menus and the status line. */
-    --row-h: 28px;
+    --row-h: 32px;
+    /** Measured row heights for the two dense lists. */
+    --row-h-chat: 31px;
+    --row-h-menu: 29px;
 
     /* A real scale, so overlays stop guessing with arbitrary z-[N] values. */
     --z-base: 0;
@@ -107,17 +137,17 @@
   .dark {
     color-scheme: dark;
 
-    --bg-primary: 17 16 15;
-    --bg-secondary: 27 25 23;
-    --bg-tertiary: 37 34 32;
-    --bg-elevated: 31 29 27;
-    --border: 92 87 80;
-    --border-strong: 176 169 159;
+    --bg-primary: 24 24 24;
+    --bg-secondary: 28 29 30;
+    --bg-tertiary: 42 42 42;
+    --bg-elevated: 35 35 35;
+    --border: 58 58 58;
+    --border-strong: 74 74 74;
 
-    --fg-strong: 245 243 240;
-    --fg: 226 222 217;
-    --fg-muted: 170 164 157;
-    --fg-subtle: 148 142 135;
+    --fg-strong: 245 245 245;
+    --fg: 224 224 224;
+    --fg-muted: 176 176 176;
+    --fg-subtle: 154 154 154;
 
     /*
      * On a near-black surface the accent has to be light to be read as text, and
@@ -125,19 +155,24 @@
      * the filled surface is its own token. `accent` at #7c5cff was 4.24:1 on
      * `bg-secondary`, just under the readable threshold.
      */
-    --accent: 157 134 255;
-    --accent-hover: 178 160 255;
-    --accent-solid: 107 76 230;
-    --accent-solid-hover: 92 64 208;
+    /* On a near-black surface the accent has to be light to read as text and dark to carry white text when filled. */
+    --accent: 134 174 247;
+    --accent-hover: 160 192 250;
+    --accent-solid: 44 103 197;
+    --accent-solid-hover: 58 118 214;
     --accent-fg: 255 255 255;
-    --accent-muted: 76 58 153;
+    --accent-muted: 37 56 90;
 
     --danger: 248 113 113;
     --warning: 251 191 36;
     --success: 52 211 153;
-    --info: 96 165 250;
+    --info: 45 212 191;
 
-    --focus-ring: 167 139 250;
+    --focus-ring: 148 158 172;
+    --focus-fill: 51 51 51;
+    --surface-hover: 51 51 51;
+    --nav-selected: 48 49 52;
+    --shell: 32 33 35;
     --scrollbar-thumb: 55 52 49;
     --scrollbar-thumb-hover: 72 68 64;
   }
@@ -185,9 +220,14 @@
    * `:root :focus-visible` is (0,2,0) specificity, so it also wins over the
    * `.outline-none` utility (0,1,0) that would otherwise hide it.
    */
+  /*
+   * Focus is a neutral indicator INSIDE the target. The old rule drew a coloured ring outside the control, which in
+   * this language reads as a second visual system: every button would have a violet halo. A negative offset keeps the
+   * indicator within the control's own box, so the layout does not shift and the control's fill carries the state.
+   */
   :root :focus-visible {
     outline: 2px solid rgb(var(--focus-ring));
-    outline-offset: 1px;
+    outline-offset: -2px;
   }
 
   /* Slim scrollbars that match the active theme instead of the OS default. */

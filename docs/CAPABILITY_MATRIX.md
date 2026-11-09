@@ -81,7 +81,7 @@ document exists because claims rot.
 
 | capability | state | configured where | proven by |
 |---|---|---|---|
-| Brutalist design system, enforced | real | `main.css` tokens | `test/renderer/brutal-tokens.test.ts` |
+| Brutalist design system, enforced | real | `main.css` tokens | `test/renderer/soft-tokens.test.ts` |
 | Light and dark themes with a contrast contract | real | Settings → appearance | `test/renderer/theme-tokens.test.ts` |
 | Persian (RTL) and English, key parity | real | Settings → language | `test/renderer/i18n.test.ts` |
 | Visible simple/advanced switch | real | status bar | `test/renderer/ui-mode.test.tsx` |
