@@ -123,7 +123,7 @@ export default function Titlebar(): JSX.Element {
   return (
     <header
       data-testid="titlebar"
-      className="drag-region relative flex h-10 shrink-0 select-none items-center gap-1.5 border-b border-border bg-bg-secondary px-2 text-xs text-fg-muted"
+      className="drag-region relative flex h-11 shrink-0 select-none items-center gap-1.5 border-b border-border bg-shell px-2 text-xs text-fg-muted"
       onDoubleClick={() => void window.api.window.toggleMaximize().then(setMaximized)}
     >
       <button
@@ -467,7 +467,7 @@ export default function Titlebar(): JSX.Element {
           onClick={() => void window.api.window.minimize()}
           title={t('titlebar.minimize')}
           aria-label={t('titlebar.minimize')}
-          className="flex h-10 w-10 items-center justify-center rounded-shape-sm hover:bg-bg-tertiary hover:text-fg-strong"
+          className="flex h-9 w-9 items-center justify-center rounded-shape-sm hover:bg-hover hover:text-fg-strong"
         >
           <Minus className="h-3.5 w-3.5" />
         </button>
@@ -476,7 +476,7 @@ export default function Titlebar(): JSX.Element {
           onClick={() => void window.api.window.toggleMaximize().then(setMaximized)}
           title={maximized ? t('titlebar.restore') : t('titlebar.maximize')}
           aria-label={maximized ? t('titlebar.restore') : t('titlebar.maximize')}
-          className="flex h-10 w-10 items-center justify-center rounded-shape-sm hover:bg-bg-tertiary hover:text-fg-strong"
+          className="flex h-9 w-9 items-center justify-center rounded-shape-sm hover:bg-hover hover:text-fg-strong"
         >
           {maximized ? <Square className="h-3 w-3" /> : <Maximize2 className="h-3.5 w-3.5" />}
         </button>
@@ -485,7 +485,7 @@ export default function Titlebar(): JSX.Element {
           onClick={() => void window.api.window.close()}
           title={t('titlebar.close')}
           aria-label={t('titlebar.close')}
-          className="flex h-10 w-10 items-center justify-center rounded-shape-sm text-fg-muted hover:bg-danger hover:text-accent-fg"
+          className="flex h-9 w-9 items-center justify-center rounded-shape-sm text-fg-muted hover:bg-danger hover:text-accent-fg"
         >
           <X className="h-4 w-4" />
         </button>

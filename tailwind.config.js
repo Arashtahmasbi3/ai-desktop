@@ -46,7 +46,15 @@ module.exports = {
          * one value cannot satisfy both (v2.7.0).
          */
         'accent-solid': 'rgb(var(--accent-solid) / <alpha-value>)',
-        'accent-solid-hover': 'rgb(var(--accent-solid-hover) / <alpha-value>)'
+        'accent-solid-hover': 'rgb(var(--accent-solid-hover) / <alpha-value>)',
+        /*
+         * v4.4 surfaces the soft language needs by name: the pointer hover fill, the selected navigation tile, the
+         * window shell behind the title bar and rail, and the neutral focus fill that replaced the outer ring.
+         */
+        hover: 'rgb(var(--surface-hover) / <alpha-value>)',
+        'nav-selected': 'rgb(var(--nav-selected) / <alpha-value>)',
+        shell: 'rgb(var(--shell) / <alpha-value>)',
+        'focus-fill': 'rgb(var(--focus-fill) / <alpha-value>)'
       },
       fontFamily: {
         /* The desktop's own face. No bundled brand font for the chrome. */
@@ -79,6 +87,8 @@ module.exports = {
         'shape-sm': 'var(--shape-r-sm)',
         shape: 'var(--shape-r)',
         'shape-lg': 'var(--shape-r-lg)',
+        'shape-xl': 'var(--shape-r-xl)',
+        'shape-shell': 'var(--shape-r-shell)',
         'shape-pill': 'var(--shape-pill)'
       },
       borderWidth: {

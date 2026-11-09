@@ -384,7 +384,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
     return (
       <nav
         aria-label={t('sidebar.chats')}
-        className="flex w-14 shrink-0 flex-col items-center gap-1 border-e border-border bg-bg-secondary py-2 transition-all duration-200"
+        className="flex w-[52px] shrink-0 flex-col items-center gap-1 border-e border-border bg-shell py-2 transition-all duration-200"
       >
         {VISIBLE_NAV.map((item) => {
           const Icon = item.icon
@@ -396,13 +396,13 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
               title={t(item.labelKey)}
               aria-label={t(item.labelKey)}
               onClick={() => setView(item.id)}
-              className={`relative flex h-9 w-9 items-center justify-center rounded-shape-sm transition-colors duration-fast ${
+              className={`relative flex h-8 w-8 items-center justify-center rounded-shape transition-colors duration-fast ${
                 active
-                  ? 'bg-accent-solid/15 text-accent'
-                  : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
+                  ? 'bg-nav-selected text-fg-strong'
+                  : 'text-fg-muted hover:bg-hover hover:text-fg'
               }`}
             >
-              <Icon className="h-4 w-4" />
+              <Icon className={active ? 'h-4 w-4 stroke-[2.25]' : 'h-4 w-4'} aria-hidden="true" />
               {item.id === 'tasks' && runningJobs > 0 ? (
                 <span
                   data-testid="sidebar-jobs-badge-collapsed"
@@ -423,10 +423,10 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
           aria-label={t('sidebar.pin')}
           aria-pressed={sidebarPinned}
           onClick={() => setSidebarPinned(!sidebarPinned)}
-          className={`mt-auto flex h-9 w-9 items-center justify-center rounded-shape-sm ${
+          className={`mt-auto flex h-8 w-8 items-center justify-center rounded-shape ${
             sidebarPinned
-              ? 'bg-accent-solid/15 text-accent'
-              : 'text-fg-muted hover:bg-bg-tertiary hover:text-fg'
+              ? 'bg-nav-selected text-fg-strong'
+              : 'text-fg-muted hover:bg-hover hover:text-fg'
           }`}
         >
           <Pin className="h-4 w-4" />
@@ -436,7 +436,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
           title={t('common.settings')}
           aria-label={t('common.settings')}
           onClick={openSettings}
-          className="flex h-9 w-9 items-center justify-center rounded-shape-sm text-fg-muted hover:bg-bg-tertiary hover:text-fg"
+          className="flex h-8 w-8 items-center justify-center rounded-shape text-fg-muted hover:bg-hover hover:text-fg"
         >
           <Settings2 className="h-4 w-4" />
         </button>

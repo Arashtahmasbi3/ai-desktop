@@ -8,6 +8,7 @@
  * DecisionCard per decision, collapses, and stays bounded for long runs. A final
  * wiring test proves `ChatPanel` actually mounts it.
  */
+import { CHAT_MAX_WIDTH } from '../../src/renderer/src/lib/layout'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import i18n from '../../src/renderer/src/i18n'
@@ -186,7 +187,7 @@ describe('InlineTrace', () => {
 describe('ChatPanel wiring (Fix C)', () => {
   it('keeps the conversation within a readable measure (v2.6.3 T1)', () => {
     render(<ChatPanel />)
-    expect(screen.getByTestId('chat-measure').style.maxWidth).toBe('820px')
+    expect(screen.getByTestId('chat-measure').style.maxWidth).toBe(`${CHAT_MAX_WIDTH}px`)
   })
 
   it('mounts the inline trace inside the message flow once decisions exist', () => {
