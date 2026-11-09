@@ -161,7 +161,7 @@ export default function ToolResultCard(props: ToolCallView): JSX.Element {
         type="button"
         onClick={toggle}
         data-testid="tool-card-header"
-        className="flex w-full items-center gap-2 px-2.5 py-1 text-left"
+        className="flex h-8 w-full items-center gap-2 px-2.5 text-left"
         aria-expanded={open}
         aria-label={`${headline} ${statusLabel}`}
       >
