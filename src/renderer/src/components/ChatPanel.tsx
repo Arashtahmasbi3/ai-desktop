@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AlertTriangle, ArrowDown, Bot, Paperclip, Send, Square } from 'lucide-react'
+import { AlertTriangle, ArrowDown, Bot, Paperclip, Square, ArrowUp } from 'lucide-react'
 import { basename, useStore } from '../store'
 import { PROVIDERS } from '@shared/providers'
 import { buildContextPreview, type ContextPreview } from '@shared/context-preview'
@@ -724,24 +724,25 @@ export default function ChatPanel(): JSX.Element {
                 onClick={abort}
                 title={`${t('chat.stop')} (Shift+Esc)`}
                 aria-label={`${t('chat.stop')} (Shift+Esc)`}
-                className="ui-press flex h-8 w-8 items-center justify-center rounded-shape-pill bg-danger/20 text-danger hover:bg-danger/30"
+                className="ui-press flex h-9 w-9 items-center justify-center rounded-shape-pill bg-danger/20 text-danger hover:bg-danger/30"
               >
-                <Square className="h-4 w-4" />
+                <Square className="h-4 w-4 fill-current" />
               </button>
             ) : (
               <button
                 type="button"
                 onClick={submit}
+            data-testid="composer-send"
                 disabled={!input.trim() && attached.length === 0}
                 title={t('chat.send')}
                 aria-label={t('chat.send')}
-                className={`flex h-8 w-8 items-center justify-center rounded-shape-pill ${
+                className={`flex h-9 w-9 items-center justify-center rounded-shape-pill ${
                   input.trim() || attached.length > 0
                     ? 'ui-press bg-accent-solid text-accent-fg hover:bg-accent-solid-hover'
                     : 'bg-bg-tertiary text-fg-muted'
                 } disabled:cursor-not-allowed`}
               >
-                <Send className="h-4 w-4" />
+                <ArrowUp className="h-4 w-4" />
               </button>
             )}
           </div>
