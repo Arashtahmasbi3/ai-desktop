@@ -7,6 +7,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.3.8] - 2026-11-09
+
+The interface moved from the brutalist language to a soft one, and the numbers came from measurements rather than taste:
+a recreated Windows client profile that records the geometry of ChatGPT 26.1002.7124.0 (radius 8 on controls, 10 on the
+navigation tile, 12 on dialogs, 14 around the workspace shell, 16 on menus; row heights 32 dense, 31 conversation, 29
+menu; a 24px instrument line). Everything below is one stage of that pass, each with its own commit.
+
+### The design contract was replaced, not deleted
+
+`brutal-tokens.test.ts` asserted the old language — one 6px radius step, no shadow at all, 28px rows, motion capped at
+120ms — and it went red on five assertions the moment the tokens changed, which is what a contract is for. The honest
+move was to keep every check that still had a meaning and rewrite only the four that encoded the old geometry, shadow,
+row height and motion. The file is `soft-tokens.test.ts` now: a role-named radius scale that must stay ordered, shadows
+that must carry a real blur, rows at their measured heights, motion that tops out at 200ms, and the old guards for raw
+palette classes, micro-caps, one accent hue, the z-scale and reduced motion all intact. `theme-tokens.test.ts` still
+passes 6/6, so the WCAG contract survived the palette change.
+
+One collision the new palette created was fixed in the design rather than in the assertion: with the accent now the
+captured send-button blue, the `info` status dot was indistinguishable from a call to action, so `info` is teal.
+
+### Focus stopped being a coloured ring outside the control
+
+The old global rule drew a 2px violet outline with a positive offset, which in this language reads as a second visual
+system: every button wearing a halo. The indicator now sits inside the target with a neutral value. It is a fill, not a
+frame, and the layout does not move when it appears.
+
+### The layout numbers were wrong in a way that mattered
+
+`resolveLayout` decided every dock with a 372px sidebar while the component drew 256px — the plan and the screen
+disagreed, and the arithmetic described a layout nobody could see. Both containers now carry the measured widths, and
+`test/renderer/sidebar-width.test.ts` fails if a class stops matching the constant.
+
+The reading column also needed two numbers instead of one: `CHAT_MAX_WIDTH` is 1120 now (how wide the text grows) and
+`CHAT_DOCK_FLOOR` is 820 (the point below which a column floats instead of docking). Using the cap as the floor would
+have meant nothing ever docks beside a 372px sidebar.
+
+### The chrome
+
+A 44px title bar on the shell surface, 36px window controls with a quiet hover, a 52px rail with 32px tiles at radius
+10, and a selected destination carried by a filled tile with strong text instead of a tinted accent. The reference uses
+a filled icon for the selected item; this app has one outline icon per destination, so the icon is drawn heavier and the
+tile carries the surface — a documented substitution, not an accident.
+
+The composer's action is 36px with the reference's arrow-up, the stop square is filled, and the conversation row reads
+its own 31px token. The instrument strip is 24px, which took three attempts because `.ui-row` is declared outside any
+`@layer` and beats a Tailwind utility on both height and min-height.
+
+### What this release does not contain
+
+Three parts of the design brief are deliberately unfinished, and saying so is more useful than a checkbox: the composer
+has no permission pill yet (it needs `approvalMode` wired into the composer, not a label); the action glyph does not
+derive four states (the store has sending and stopping nowhere, and drawing rings the app cannot reach is decoration);
+menus and dialogs still carry their own radius and row values because there is no shared menu primitive to change once;
+and the tool row shows duration but not the run index, which needs a prop the transcript does not pass.
+
+### Proof
+
+Type-check clean, 381 files and 3627 tests green, and the geometry measured on the running app rather than asserted:
+`verify-ui --probe` reports a 44px title bar, a 372px sidebar, a 1120px cap on the conversation, a 36×36 send button at
+999px radius, a 830×54 composer whose textarea caps at 200px, and a 24px instrument strip, at a 1202×802 viewport with
+DPR 1.25.
+
+The screenshot gate earned a correction of its own: it compares compressed bytes per pixel, so a real layout change can
+pass under its 2% tolerance and be reported as unchanged — which is exactly what happened to the title bar and the
+sidebar. A density metric cannot settle a geometry question. `--probe` now can.
+
 ## [4.3.7] - 2026-11-08
 
 An external audit read v4.3.6 on a clean checkout. It was right about the things that mattered, and this release is the
