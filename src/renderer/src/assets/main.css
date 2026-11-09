@@ -121,6 +121,8 @@
     /** Measured row heights for the two dense lists. */
     --row-h-chat: 31px;
     --row-h-menu: 29px;
+    /** The instrument strip: 24px, the measured client's footer line. */
+    --row-h-status: 24px;
 
     /* A real scale, so overlays stop guessing with arbitrary z-[N] values. */
     --z-base: 0;
@@ -566,4 +568,15 @@
     transition-duration: 1ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/*
+ * The instrument strip. It must come AFTER .ui-row: both are unlayered, so the later rule wins on equal specificity,
+ * and .ui-row sets both height and min-height to the dense row token. The first attempt put this rule above .ui-row and
+ * the live measurement stayed at 32px.
+ */.ui-row-status {
+  display: flex;
+  align-items: center;
+  height: var(--row-h-status);
+  min-height: var(--row-h-status);
 }

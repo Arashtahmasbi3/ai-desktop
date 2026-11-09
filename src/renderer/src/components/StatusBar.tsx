@@ -133,7 +133,7 @@ export default function StatusBar(): JSX.Element {
   return (
     <footer
       data-testid="status-bar"
-      className="ui-row shrink-0 gap-2 border-t border-border bg-bg-secondary px-3 text-2xs text-fg-muted"
+      className="ui-row ui-row-status shrink-0 gap-2 border-t border-border bg-bg-secondary px-3 text-2xs text-fg-muted"
     >
       <span
         data-testid="status-item-agent"
