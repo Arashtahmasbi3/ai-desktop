@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AlertTriangle, ArrowDown, Bot, Paperclip, Square, ArrowUp } from 'lucide-react'
+import { AlertTriangle, ArrowDown, Bot, Paperclip, Square, ArrowUp, ShieldAlert } from 'lucide-react'
 import { basename, useStore } from '../store'
 import { PROVIDERS } from '@shared/providers'
 import { buildContextPreview, type ContextPreview } from '@shared/context-preview'
@@ -714,6 +714,21 @@ export default function ChatPanel(): JSX.Element {
               placeholder={t('chat.placeholder')}
               className="ui-inset max-h-[200px] min-h-[2.25rem] flex-1 resize-none rounded-shape-sm px-2 py-2 text-sm text-fg-strong outline-none placeholder:text-fg-subtle"
             />
+            {/*
+              S5b: an indicator, not a second control. v4.1 removed duplicated controls on purpose, and the approval mode
+              has exactly one place to change - the title bar menu. This appears only in full access, the one mode where the
+              agent can act without asking and a reminder next to the send button is worth the pixels.
+            */}
+            {settings?.approvalMode === 'full' ? (
+              <span
+                data-testid="composer-permission"
+                title={t('chat.fullAccessWarning')}
+                className="flex shrink-0 items-center gap-1 rounded-shape-pill px-2 py-0.5 text-2xs text-warning"
+              >
+                <ShieldAlert className="h-3 w-3" aria-hidden="true" />
+                {t('chat.fullAccess')}
+              </span>
+            ) : null}
             <span className="shrink-0">
               <ModelSwitcher />
             </span>
@@ -732,7 +747,7 @@ export default function ChatPanel(): JSX.Element {
               <button
                 type="button"
                 onClick={submit}
-            data-testid="composer-send"
+                data-testid="composer-send"
                 disabled={!input.trim() && attached.length === 0}
                 title={t('chat.send')}
                 aria-label={t('chat.send')}
