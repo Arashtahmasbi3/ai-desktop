@@ -3,7 +3,7 @@
  * v2.6.3 Topic 1 T1.3 - Codex-style single-column chat.
  *
  * jsdom cannot lay out pixels, so these assert the structure the conformance
- * requires: the chat is one centered column (no side timeline), a STATUS card
+ * requires: the chat is one centered column (no side timeline), a status card
  * always sits at the top with a localized fallback, the run timeline embeds in
  * that column when toggled, and the live "thinking" row is pinned bottom-right.
  */
@@ -58,7 +58,7 @@ describe('v2.6.3 T1.3 - status card', () => {
   it('1. is always visible, even before the first decision', () => {
     render(<ChatPanel />)
     const card = screen.getByTestId('run-status')
-    expect(card.textContent).toContain('STATUS')
+    expect(card.textContent).toContain('Status')
     expect(card.textContent).toContain('Idle')
   })
 
