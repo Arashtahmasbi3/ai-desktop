@@ -470,6 +470,13 @@
   }
 
   /** The dense row height, in one place. Plain CSS so the value is a token, not a utility guess. */
+  /* The conversation row: one pixel shorter than the dense default, from the measured client.
+   */
+  .ui-row-chat {
+    height: var(--row-h-chat);
+    min-height: var(--row-h-chat);
+  }
+
   .ui-row {
     display: flex;
     align-items: center;

@@ -301,7 +301,7 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
       <button
         type="button"
         onClick={() => void loadSession(chat.id)}
-        className={`ui-row flex min-w-0 flex-1 items-center gap-2 rounded-shape-sm px-2 text-left text-xs transition-colors duration-fast ${
+        className={`ui-row ui-row-chat flex min-w-0 flex-1 items-center gap-2 rounded-shape-sm px-2 text-left text-xs transition-colors duration-fast ${
           activeChatId === chat.id
             ? 'bg-accent-solid/15 text-fg-strong'
             : 'text-fg hover:bg-bg-tertiary'

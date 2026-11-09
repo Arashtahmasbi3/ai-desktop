@@ -86,7 +86,7 @@
     "runChangesTitle": "Edited {{count}} files",
     "changesEdits": "Written {{count}} times",
     "liveElapsed": "· {{seconds}}s",
-    "statusLabel": "STATUS",
+    "statusLabel": "Status",
     "statusIdle": "Idle",
     "statusUnknown": "No decision recorded yet",
     "liveReading": "Reading {{tool}}…",
