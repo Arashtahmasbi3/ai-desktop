@@ -70,7 +70,8 @@ if (flag('--help')) {
       '  --baseline   write today\u2019s captures as the new baseline (a deliberate act)',
     '  --allow-drift  report a capture drift without failing (local runs on another GPU driver)',
       '  --out <dir>  where the captures go, default docs/screenshots',
-      '  --root <dir> staging directory, default C:\\aidverify-verify on win32 and $TMP/aidverify-verify elsewhere'
+      '  --root <dir> staging directory, default C:\\aidverify-verify on win32 and $TMP/aidverify-verify elsewhere',
+  '  --probe <js> evaluate one expression in the live renderer, print it as JSON, and exit'
     ].join('\n')
   )
   process.exit(0)
@@ -81,6 +82,8 @@ const OUT_DIR = value('--out', 'docs/screenshots')
 const WRITE_BASELINE = flag('--baseline')
 const ALLOW_DRIFT = flag('--allow-drift')
 const STAGING_ROOT = value('--root', undefined)
+/** One expression to evaluate in the live renderer, then exit. Used to answer geometry questions with a measurement. */
+const PROBE = value('--probe', undefined)
 const LAUNCH_TIMEOUT_MS = 45_000
 const READY_TIMEOUT_MS = 30_000
 
@@ -393,6 +396,12 @@ async function main() {
     try {
       await page.send('Page.enable')
       await waitForShell(page, 'after launch')
+
+      if (PROBE !== undefined) {
+        const probed = await evaluate(page, PROBE)
+        log('probe: ' + JSON.stringify(probed, null, 2))
+        return
+      }
 
       const facts = await evaluate(page, DOM_QUERY)
       const queries = facts ?? {}
