@@ -85,7 +85,8 @@ export default function WorkspacePanel({ overlay }: WorkspacePanelProps = {}): J
         // U-7: logical properties, so the panel pins to the *end* edge and its
         // divider sits on the start side in RTL as well as LTR.
         overlay
-          ? 'absolute inset-y-0 end-0 z-40 flex w-[22rem] max-w-[90vw] shrink-0 flex-col border-s border-border bg-bg-secondary'
+          ? /* The overlay stops above the composer (measured: the composer strip is 78px at 1200, from its own padding plus the 54px composer) so its last strip is not painted behind it. */
+            'absolute bottom-[78px] top-0 end-0 z-40 flex w-[22rem] max-w-[90vw] shrink-0 flex-col border-s border-border bg-bg-secondary'
           : 'absolute inset-y-0 end-0 z-40 flex w-[22rem] max-w-[90vw] shrink-0 flex-col border-s border-border bg-bg-secondary xl:static xl:z-auto xl:shadow-none'
       }
     >
