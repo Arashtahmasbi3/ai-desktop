@@ -94,15 +94,28 @@ export default function Titlebar(): JSX.Element {
     return window.api.events.on('window:maximized', setMaximized)
   }, [])
 
-  // Escape closes the title-bar menu, and so does a click outside it.
+  /*
+   * Escape closes every title-bar overlay, not just the main menu.
+   *
+   * The workspace picker and the theme picker had no keyboard exit at all: once open, the only way out was to click. They
+   * are small dropdowns rather than dialogs, but a dropdown a keyboard user cannot dismiss is the same defect, and three
+   * of them lived one line apart.
+   *
+   * Focus returns to whatever opened the overlay, after a tick so the trigger exists again in the tree it was hidden in.
+   */
   useEffect(() => {
-    if (!menuOpen) return
+    if (!menuOpen && !workspacesOpen && !themeOpen) return
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
     const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') setMenuOpen(false)
+      if (event.key !== 'Escape') return
+      if (menuOpen) setMenuOpen(false)
+      if (workspacesOpen) setWorkspacesOpen(false)
+      if (themeOpen) setThemeOpen(false)
+      window.setTimeout(() => opener?.focus(), 0)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [menuOpen])
+  }, [menuOpen, workspacesOpen, themeOpen])
 
   const projects = settings?.projects ?? []
   const active = projects.find((project) => project.id === settings?.activeProjectId)
