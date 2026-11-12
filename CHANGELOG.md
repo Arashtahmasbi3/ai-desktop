@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.3.9] - 2026-11-12
+
+The keyboard audit, plus the composer's permission indicator. This release is a set of corrections rather than a new
+language: 4.3.8 moved the interface, and reading it closely found four places where a user with a keyboard could get
+stuck or read the wrong thing.
+
+### Every overlay now has a keyboard exit
+
+The project-switch dialog had no `Escape` handler and no focus restoration, so the only way out of a modal was to click
+one of its two buttons and focus was left nowhere. The title bar had three dropdowns and only the main menu closed on
+`Escape`; the workspace picker and the theme picker had no keyboard exit at all. The sidebar's chat and project menus
+had the same defect. All four now close on `Escape` and return focus to whatever opened them.
+
+One correction inside the correction: the first attempt claimed to move `role="dialog"` from the backdrop to the panel
+and did not. A render test written afterwards found it still on the backdrop — which matters twice, because a screen
+reader announced the backdrop as the dialog and the stylesheet rule that gives `[role=dialog]` the 12px step was landing
+on an element with no visible border. The role is on the panel now, and the test asserts *where* it is rather than that
+one exists.
+
+### The composer says when it can act without asking
+
+A permission indicator appears beside the send button, and only in full access — the one mode where the agent can run
+anything without a prompt. It is deliberately not a control: 4.1 removed duplicated controls on purpose and the approval
+mode has exactly one place to change, the title bar menu.
+
+### Overlay shape follows the role
+
+`[role=menu]` and `[role=listbox]` take the 16px step, `[role=dialog]` the 12px step, and menu rows read their own 29px
+token. There is no shared menu primitive in this codebase — six surfaces each carry their own classes — so stating the
+rule once against the roles is what keeps it from drifting the next time an overlay is added.
+
+### What is still not true
+
+Three keyboard fixes and the indicator are in the code and the suite is green, but **none of them has a render test that
+presses `Escape`**. Two attempts to observe the project-switch handler from jsdom failed, and rather than weaken the
+assertion until it passed for the wrong reason, the test says so in its header. The panel's overlay-versus-dock
+behaviour is also still unverified: the verification profile has no project, so the panel never enters the DOM there.
+
+### Proof
+
+Type-check clean, 381 files and 3632 tests green. Geometry measured on the running app at three widths: at 900 the
+sidebar is the 52px rail, at 1200 and 1440 it is 372, the title bar is 44 everywhere, the conversation caps at 1120, and
+no width produces horizontal overflow.
+
 ## [4.3.8] - 2026-11-09
 
 The interface moved from the brutalist language to a soft one, and the numbers came from measurements rather than taste:
