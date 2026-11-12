@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowRight, Link2, FolderInput, Plus, X } from 'lucide-react'
 import { useStore } from '../store'
@@ -28,6 +28,28 @@ export default function ProjectSwitchDialog(): JSX.Element | null {
   const complete = useStore((state) => state.completeProjectSwitch)
   const cancel = useStore((state) => state.cancelProjectSwitch)
   const [remember, setRemember] = useState(false)
+
+  /*
+   * S8: a dialog must be dismissible with Escape and must give focus back. It had neither - the only ways out were two
+   * buttons - and a modal that traps a keyboard user is a bug rather than a style. The opener is remembered so focus
+   * returns to whatever asked for the switch, and the handler stops propagation so an Escape here cannot also close the
+   * surface behind it.
+   */
+  const opener = useRef<HTMLElement | null>(null)
+  useEffect(() => {
+    if (!pending) return
+    opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return
+      event.stopPropagation()
+      cancel()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      opener.current?.focus()
+    }
+  }, [pending, cancel])
 
   const project = (settings?.projects ?? []).find((entry) => entry.id === pending)
   if (!pending || !project) return null
