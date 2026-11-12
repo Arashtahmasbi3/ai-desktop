@@ -73,7 +73,8 @@ if (flag('--help')) {
       '  --root <dir> staging directory, default C:\\aidverify-verify on win32 and $TMP/aidverify-verify elsewhere',
   '  --probe <js> evaluate one expression in the live renderer, print it as JSON, and exit',
   '  --viewport <w>x<h> override the CSS viewport (Emulation), so a probe can measure a width the window does not have',
-  '  --seed-project <dir> write a settings.json with one local project before launch, so surfaces that need a project exist'
+  '  --seed-project <dir> write a settings.json with one local project before launch, so surfaces that need a project exist',
+  '  --rtl set dir=rtl on the document before the probe, so the mirrored layout can be measured'
     ].join('\n')
   )
   process.exit(0)
@@ -96,6 +97,8 @@ const VIEWPORT = value('--viewport', undefined)
  * profile, which is exactly why this writes the file the app reads instead.
  */
 const SEED_PROJECT = value('--seed-project', undefined)
+/** Mirror the document before probing. An RTL layout claim should be a measurement, not a reading of the class names. */
+const RTL = process.argv.includes('--rtl')
 const LAUNCH_TIMEOUT_MS = 45_000
 const READY_TIMEOUT_MS = 30_000
 
@@ -447,6 +450,15 @@ async function main() {
         log('verify-ui: viewport overridden to ' + String(parts[0]) + 'x' + String(parts[1]))
       }
       await waitForShell(page, 'after launch')
+
+      if (RTL) {
+        await page.send('Runtime.evaluate', {
+          expression: "document.documentElement.dir = 'rtl'; document.documentElement.lang = 'fa'",
+          returnByValue: false
+        })
+        await new Promise((resolvePromise) => setTimeout(resolvePromise, 300))
+        log('verify-ui: document direction set to rtl')
+      }
 
       if (PROBE !== undefined) {
         const probed = await evaluate(page, PROBE)
