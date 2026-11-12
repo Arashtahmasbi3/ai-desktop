@@ -7,7 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [4.3.9] - 2026-11-12
+## [4.3.10] - 2026-11-13
+
+Three changes that came from measuring the interface instead of reading it, plus the instruments themselves.
+
+### The workspace panel no longer hides behind the composer
+
+The panel overlapped the composer's box by 12px. The composer is z-50 above the panel's z-40, so the invariant that mattered - the composer stays visible and usable - always held; what did not hold was the panel's last strip, painted behind it. The inset is 78px rather than the composer's 54px height, because the composer strip carries its own padding: at 1200 the composer box is 710..764, the strip around it is 698..776, and the panel now stops exactly at 698. Verified at 900, 1200 and 1440: no overlap, no horizontal overflow.
+
+### The harness can answer the questions it kept being asked
+
+--rtl mirrors the document before a probe runs, --viewport gives the app a width the window does not have, and --seed-project writes a profile with one project before launch. Between them an RTL claim, a width claim and a project-dependent surface become measurements rather than readings of class names. The RTL result at 1200 and 900: the sidebar moves to the right edge, the panel flips to the left edge while staying absolute and 352 wide, the composer and reading column take the remaining space, the divider lands on the start side, and no width overflows.
+
+### The dialog's Escape has a render test
+
+Three cases: the dialog role sits on the panel rather than the backdrop, focus returns to the opener, and Escape removes the dialog. The test failed twice before it passed and both failures were its own fault - no cleanup between cases, and an asynchronous store action asserted one microtask early - which is worth recording, because the temptation was to call the component broken.
+
+### Two earlier claims withdrawn
+
+The xl:static classes on the panel do not fight the layout plan: they live only in the branch the plan selects after it has already decided on docking. And the panel is not gated on tool output; it renders, it simply had no test id on the element under inspection. Both were asserted from a grep that did not read which branch the classes belonged to.
+
+### Still not true
+
+The composer's action has two glyphs, not four, because the store has no sending or stopping state. The tool row shows duration but not the run index, which needs a prop the transcript does not pass. The title bar's three overlays and the sidebar's two menus have Escape handling verified only by source.
+
+### Proof
+
+Type-check clean, 381 files and 3633 tests green. Geometry measured on the running app at three widths and in both directions: title bar 44, sidebar 52 at 900 and 372 above, conversation 848/828/1068 against a 1120 cap, composer 54, send action 36 at 999 radius, instrument strip 24, panel 352 as an overlay stopped above the composer.
+
+## [4.3.9]
+ - 2026-11-12
 
 The keyboard audit, plus the composer's permission indicator. This release is a set of corrections rather than a new
 language: 4.3.8 moved the interface, and reading it closely found four places where a user with a keyboard could get
