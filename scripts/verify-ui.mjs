@@ -72,7 +72,8 @@ if (flag('--help')) {
       '  --out <dir>  where the captures go, default docs/screenshots',
       '  --root <dir> staging directory, default C:\\aidverify-verify on win32 and $TMP/aidverify-verify elsewhere',
   '  --probe <js> evaluate one expression in the live renderer, print it as JSON, and exit',
-  '  --viewport <w>x<h> override the CSS viewport (Emulation), so a probe can measure a width the window does not have'
+  '  --viewport <w>x<h> override the CSS viewport (Emulation), so a probe can measure a width the window does not have',
+  '  --seed-project <dir> write a settings.json with one local project before launch, so surfaces that need a project exist'
     ].join('\n')
   )
   process.exit(0)
@@ -87,6 +88,14 @@ const STAGING_ROOT = value('--root', undefined)
 const PROBE = value('--probe', undefined)
 /** Optional CSS viewport override, so the same app can be measured at 900, 1200 and 1440 without rebuilding anything. */
 const VIEWPORT = value('--viewport', undefined)
+/**
+ * A folder to register as the only project before the app starts.
+ *
+ * Surfaces behind an open project - the workspace panel, the tool output tab - do not exist in the DOM without one, so a
+ * probe cannot measure them. Registering through window.api after launch does not survive the next run: staging rebuilds the
+ * profile, which is exactly why this writes the file the app reads instead.
+ */
+const SEED_PROJECT = value('--seed-project', undefined)
 const LAUNCH_TIMEOUT_MS = 45_000
 const READY_TIMEOUT_MS = 30_000
 
@@ -376,6 +385,28 @@ async function main() {
     repoRoot: REPO_ROOT,
     ...(STAGING_ROOT === undefined ? {} : { root: STAGING_ROOT })
   })
+
+  if (SEED_PROJECT !== undefined) {
+    // The same file the app resolves under its user-data directory; version 4 is SETTINGS_SCHEMA_VERSION in persistence.ts.
+    plan.profileFiles.push({
+      path: join(plan.appDataDir, 'settings.json'),
+      content:
+        JSON.stringify(
+          {
+            version: 4,
+            providers: {},
+            updatedAt: 1,
+            activeProjectId: 'seed-project',
+            projects: [
+              { id: 'seed-project', name: 'Seed', path: SEED_PROJECT, type: 'local' }
+            ]
+          },
+          null,
+          2
+        ) + '\n'
+    })
+    log('verify-ui: seeded one project at ' + SEED_PROJECT)
+  }
 
   if (!existsSync(join(REPO_ROOT, 'out', 'main', 'index.js'))) {
     throw new Error('out/main/index.js is missing — run `npm run build` first (this verifies the built app)')
