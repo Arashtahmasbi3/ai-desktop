@@ -397,6 +397,9 @@ async function main() {
             providers: {},
             updatedAt: 1,
             activeProjectId: 'seed-project',
+            // A fresh profile is unpinned and uncollapsed; without these the seeded app does not behave like a default one.
+            sidebarPinned: false,
+            sidebarCollapsed: false,
             projects: [
               { id: 'seed-project', name: 'Seed', path: SEED_PROJECT, type: 'local' }
             ]
