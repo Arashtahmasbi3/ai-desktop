@@ -57,11 +57,13 @@ export default function ProjectSwitchDialog(): JSX.Element | null {
   return (
     <div
       className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
       data-testid="project-switch-dialog"
     >
-      <div className="w-full max-w-md rounded-shape border border-border bg-bg-secondary p-4">
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="w-full max-w-md rounded-shape border border-border bg-bg-secondary p-4"
+      >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 className="text-sm font-semibold text-fg-strong">{t('projectSwitch.title')}</h2>
