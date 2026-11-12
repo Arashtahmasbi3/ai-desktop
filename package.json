@@ -1,6 +1,6 @@
 {
   "name": "ai-desktop",
-  "version": "4.3.9",
+  "version": "4.3.10",
   "private": true,
   "description": "AI Desktop - desktop AI assistant (DeepSeek, SSH/VPS, GitHub, local files)",
   "author": "Sepid_Com",
