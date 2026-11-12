@@ -155,6 +155,26 @@ export default function Sidebar({ rail }: SidebarProps = {}): JSX.Element {
   const [projectMenuFor, setProjectMenuFor] = useState<string | null>(null)
   const [collapsedProjects, setCollapsedProjects] = useState<string[]>([])
   const [searchingId, setSearchingId] = useState<string | null>(null)
+
+  /*
+   * Escape dismisses the chat and project menus, and focus returns to the button that opened one.
+   *
+   * These menus had no keyboard exit: a click on the row, or on the trigger again, were the only ways out, and the menus
+   * are rendered inside the scrolling list so focus was left wherever the pointer happened to be. The opener is captured
+   * when the menu opens and refocused after a tick, because the trigger is re-rendered when the menu closes.
+   */
+  useEffect(() => {
+    if (chatMenuFor === null && projectMenuFor === null) return
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return
+      setChatMenuFor(null)
+      setProjectMenuFor(null)
+      window.setTimeout(() => opener?.focus(), 0)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [chatMenuFor, projectMenuFor])
   const servers = useStore((state) => state.vpsServers)
   // v2.8.0: the connected *set*, so more than one project can show a live dot.
   const vpsConnectedServers = useStore((state) => state.vpsConnected)
