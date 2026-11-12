@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 import ProjectSwitchDialog from '../../src/renderer/src/components/ProjectSwitchDialog'
 import { useStore } from '../../src/renderer/src/store'
@@ -33,6 +33,8 @@ function seed(): void {
 
 describe('the project-switch dialog', () => {
   beforeEach(() => {
+    // RTL does not clean up on its own here, and a leftover dialog from the previous test makes the next query ambiguous.
+    cleanup()
     seed()
   })
 
@@ -57,5 +59,25 @@ describe('the project-switch dialog', () => {
     unmount()
     expect(document.activeElement).toBe(opener)
     opener.remove()
+  })
+  it('removes the dialog from the DOM on Escape', async () => {
+    // The behaviour a user sees, with the API a real window provides: cancelProjectSwitch reads the store and may touch
+    // the bridge, so a test without one fails for the wrong reason - which is exactly what the first attempt did.
+    ;(window as unknown as { api: unknown }).api = {
+      projects: { open: async () => null },
+      chats: { save: async () => ({ id: 'chat-1' }), linkProject: async () => null, list: async () => [] },
+      fs: { list: async () => [] },
+      agent: { goal: { list: async () => [], resolution: async () => null } }
+    }
+    useStore.setState({ pendingProjectSwitch: 'b' })
+    render(<ProjectSwitchDialog />)
+    expect(screen.getByTestId('project-switch-dialog')).toBeTruthy()
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      // The store action may be asynchronous; give its promise a turn before asserting the DOM.
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    expect(screen.queryByTestId('project-switch-dialog')).toBe(null)
   })
 })
