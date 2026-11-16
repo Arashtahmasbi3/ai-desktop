@@ -306,7 +306,16 @@ export function planRemoteRuntime(
   const enabledRequiresVps = enabledTools
     ? [...enabledV24ToolNames(enabledTools), ...enabledTools].some((tool) => requiresVps(tool))
     : false
-  const wants = VPS_KEYWORDS.test(task) || enabledRequiresVps
+  /*
+   * v4.3.11: a server the user picked in the chat header IS a request for a VPS.
+   *
+   * The test used to be the task text alone (plus an explicit tool list). For an English task that mentions a server that
+   * worked by accident; for a Persian task - or any wording without the keyword - the selection was silently dropped: no
+   * remote tool groups were built, the run fell back to the local sandbox, and the hint kept advertising tools that did not
+   * exist. The model then called remote_shell three times and the run died with "Unknown tool". A selection is an explicit
+   * instruction, so it counts as one.
+   */
+  const wants = VPS_KEYWORDS.test(task) || enabledRequiresVps || Boolean(vpsServerId)
 
   const resolution = resolveVpsForRun({
     ...(vpsServerId ? { explicitVpsId: vpsServerId } : {}),
