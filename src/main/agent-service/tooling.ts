@@ -22,7 +22,6 @@ import { StdioTransport } from '../mcp/transport'
 import {
   activeRemoteProjectHint,
   planRemoteRuntime,
-  withExtraRuntime,
   type RemoteHost,
   type RemoteRuntime
 } from './remote-runtime'
@@ -230,27 +229,29 @@ export class ToolingAssembler {
         }
       : {}
 
-    const hint = activeRemoteProjectHint(active, connectedServers)
-    if (hint) {
-      // B-11: never swap or lose the chat-header host silently.
-      const withWarning = [hint, runServer.warning].filter(Boolean).join(' ')
-      const extra = withExtraRuntime([mcpGroup, skillGroup])
-      return {
-        ...extra,
-        // R3: the run is still bound to the project's server even while that server is down, so a
-        // reconnect during the run cannot be reaped from under it.
-        ...(active?.vpsId ? { serverId: active.vpsId } : {}),
-        systemHint: [withWarning, extra.systemHint].filter(Boolean).join(' '),
-        ...routing
-      }
-    }
+    /*
+     * v4.3.11: the project hint is prompt text, not a substitute for the runtime.
+     *
+     * This used to return here whenever the active project had a server: the caller got a hint and the MCP/skills groups,
+     * and nothing else. No remote tool group was built, so `remote_shell` did not exist for the model; `serverId` was the
+     * project's server even when the chat header had picked another one; and the prompt still described remote work. Three
+     * consecutive attempts died on that single early return.
+     *
+     * Everything below now runs in both cases, so the tools exist whenever a server resolves, and the binding comes from the
+     * same runtime the tools use.
+     */
+    const projectHint = activeRemoteProjectHint(active, connectedServers)
 
     // Resolve the target explicitly: the user's chat-header choice wins, then the
     // active remote project's own VPS. Never inferred from the task text (P0-4).
     const resolved = resolveVpsForRun({
       ...(serverId ? { explicitVpsId: serverId } : {}),
       ...(active ? { project: active } : {}),
-      requiresVps: false
+      /*
+       * A chosen server or a remote project IS the request. The old `false` meant the resolution could quietly decline to
+       * resolve anything unless the task text matched an English keyword list - which a Persian task never does.
+       */
+      requiresVps: Boolean(serverId) || isRemote
     })
     const pinned = resolved.ok ? resolved.vpsId : undefined
     const runtime = planRemoteRuntime(
@@ -278,6 +279,9 @@ export class ToolingAssembler {
           .filter(Boolean)
           .join('\n\n')
       }
+    }
+    if (projectHint) {
+      runtime.systemHint = [runtime.systemHint, projectHint].filter(Boolean).join(' ')
     }
     return { ...runtime, ...routing }
   }
