@@ -544,8 +544,26 @@ export class SshManager {
         })
       }
       if (hostKeyReason) {
+        /*
+         * A changed key stays blocked, but its fingerprint joins the pending slot so an explicit approval can replace it.
+         * Before this, a reinstalled server left the user with no way in at all: approveFingerprint read an empty slot and
+         * answered "No fingerprint is awaiting approval" on every attempt. The rejection is still automatic and the
+         * replacement is still a deliberate, audited call - the escape hatch is the point, not a weaker check.
+         */
+        /*
+         * presented is empty on the rejection path (the verifier's value does not survive a refused handshake), so the
+         * replacement comes from the reason string, which is built from the key that was actually presented. Falling back
+         * to presented keeps the first-use path unchanged.
+         */
+        const changedTo = /got (SHA256:[^)]+)/.exec(hostKeyReason)?.[1] ?? presented
+        if (changedTo) this.pendingFingerprints.set(serverId, changedTo)
         await this.audit.record({ type: 'host_key', ok: false, serverId, detail: hostKeyReason })
-        return this.setState({ status: 'error', serverId, error: hostKeyReason })
+        return this.setState({
+          status: 'error',
+          serverId,
+          pendingFingerprint: changedTo,
+          error: hostKeyReason
+        })
       }
       const message = error instanceof Error ? error.message : String(error)
       await this.audit.record({ type: 'connect', ok: false, serverId, detail: message })

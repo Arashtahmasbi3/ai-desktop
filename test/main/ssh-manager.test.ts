@@ -150,7 +150,15 @@ describe('ssh manager', () => {
     const state = await manager.connect(server.id)
     expect(state.status).toBe('error')
     expect(state.error).toMatch(/Host key changed/)
-    expect(state.pendingFingerprint).toBeUndefined()
+    /*
+     * v4.3.11: the changed key is still rejected - nothing is pinned without a call - but its fingerprint joins the pending
+     * slot, so a reinstalled server can be trusted again instead of becoming permanently unreachable.
+     */
+    expect(state.pendingFingerprint).toBe(KEY_FINGERPRINT)
+
+    const approved = await manager.approveFingerprint(server.id)
+    expect(approved.status).toBe('disconnected')
+    expect((await manager.connect(server.id)).status).toBe('connected')
   })
 
   it('never sends a denied command to the connection', async () => {
