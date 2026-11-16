@@ -313,7 +313,7 @@ export class AppServices {
       jobs: this.jobs,
       requestApproval: async (runId, action, reason) =>
         this.approvals.request(runId, action, {
-          ...(await this.approvalContext()),
+          ...(await this.approvalContext(action)),
           ...(reason ? { reason } : {})
         }),
       cancelApprovals: () => this.approvals.cancelAll(),
@@ -429,16 +429,31 @@ export class AppServices {
     return this.settingsView()
   }
 
-  /** Working directory / server shown in the approval dialog. */
-  private async approvalContext(): Promise<{ workingDirectory?: string; server?: string }> {
+  /**
+   * Working directory / server shown in the approval dialog.
+   *
+   * v4.3.11: the server named by the ACTION wins. The dialog used to take its label from the active project only, so a run
+   * that targeted a server other than the project's showed the project's name - approving a write labelled "spmotor" while
+   * the command was bound for another host. A confirmation that names the wrong machine is worse than no label.
+   */
+  private async approvalContext(action?: {
+    arguments?: Record<string, unknown>
+  }): Promise<{ workingDirectory?: string; server?: string }> {
     const context: { workingDirectory?: string; server?: string } = {}
     const project = this.persistence.getActiveProject()
-    if (project) {
-      context.workingDirectory = project.path
-      if (project.type === 'remote' && project.vpsId) {
-        const server = (await this.vpsServers.list()).find((entry) => entry.id === project.vpsId)
-        if (server) context.server = `${server.name} (${server.host})`
-      }
+    if (project) context.workingDirectory = project.path
+
+    const servers = await this.vpsServers.list()
+    const named = action?.arguments?.server_id ?? action?.arguments?.serverId
+    const explicit = typeof named === 'string' ? servers.find((entry) => entry.id === named) : undefined
+    if (explicit) {
+      context.server = `${explicit.name} (${explicit.host})`
+      return context
+    }
+
+    if (project && project.type === 'remote' && project.vpsId) {
+      const server = servers.find((entry) => entry.id === project.vpsId)
+      if (server) context.server = `${server.name} (${server.host})`
     }
     return context
   }
