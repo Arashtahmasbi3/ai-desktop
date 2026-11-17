@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.3.13] - 2026-11-17
+
+### A failed run offers the action it is asking for
+
+When a run stopped because its server was not connected, the strip named the server, offered a connection test, and told the
+user to go to Settings. The test diagnoses; nothing did the thing. It now carries a Connect button for exactly that case,
+wired to the same manual connect the Servers page uses.
+
+### The containment wording was left alone, on purpose
+
+Renaming "Blocked by containment" was attempted here and reverted: seven tests assert that sentence, including the
+renderer's parser for the refused path. It is a user-facing contract, not a copy edit, and changing it belongs in a change
+that moves those tests deliberately. The three escapes it already lists remain the guidance, and the strip's "Add as a
+project" button already acts on the path it names.
+
+### Still not true
+
+The Connect button is gated on the message and covered by the suite, but no test renders the strip with such an error and
+clicks it. The composer's action still has two glyphs rather than four. And the rejected-path parser and the refusal headline
+still speak in the codebase's vocabulary rather than the user's.
 ## [4.3.12] - 2026-11-17
 
 Three refinements that came out of trying to verify 4.3.11 rather than from a report.
