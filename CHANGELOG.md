@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.3.11] - 2026-11-17
+
+Five defects that only appeared when the app was used for a real job: make a file on one server, move it to another. Each
+one is here because the previous one hid it.
+
+### The chat could not reach a server at all
+
+buildRemoteRuntime returned early whenever the active project had a server - a hint and the MCP/skills groups, nothing
+else. No remote tool group was built, so remote_shell did not exist for the model, the run was bound to the project's
+server even when the chat header had picked another, and the prompt still described remote work. Three attempts died on
+that single return, with three different messages.
+
+The hint is prompt text now and the runtime is always built from the resolved server. Whether a run wants a VPS also no
+longer depends on an English keyword in the task: a selected server or a remote project is the request, which is what made
+every Persian task fall back to the local sandbox.
+
+### A changed host key locked the user out for good
+
+A re-provisioned server presents a new key. The app rejected it - correct - but never queued the new fingerprint, so
+approveFingerprint answered "No fingerprint is awaiting approval" forever. The key is still rejected automatically; it is
+now offered for an explicit, audited replacement, and the connection succeeds afterwards.
+
+### The confirmation named the wrong machine
+
+The approval card took its server label from the active project and nothing else, so a run pinned elsewhere was confirmed
+as the project's server. The action's own ids win now, and a copy names both ends:
+server1 (212.16.86.86) -> server2 (171.22.27.29). A confirmation that names the wrong host is worse than no label.
+
+### A file could not be moved between two hosts
+
+The only route was rsync from source to target, which needs SSH key auth between two machines the user may never have
+introduced - exactly where a user gives up. remote_copy makes the app the courier: it reads from the source session and
+writes to the target session, both of which it already holds. Text files up to 2 MiB, stated rather than implied, because a
+binary-safe transfer needs a bytes channel this SFTP surface does not expose.
+
+### Proof
+
+The exercise, from the chat, on two real servers: /root/soheil.txt created on server1 at 09:31:10, copied to server2 at
+09:31:13, both hashing to e3b0c442...b855. The run passed through plan approval and five command approvals, all recorded in
+the audit log.
+
+### Still not true
+
+The containment message for a path outside the project root is opaque - the agent navigated its three options, a user would
+not. Full access still does not stick across a run. A command on a disconnected server still returns no reason. A surface
+that needs a server still offers no button to connect it. And none of these five fixes has an end-to-end test with a fake
+remote host; the next regression of this class will be found by hand again.
 ## [4.3.10] - 2026-11-13
 
 Three changes that came from measuring the interface instead of reading it, plus the instruments themselves.
