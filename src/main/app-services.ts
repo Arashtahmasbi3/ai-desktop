@@ -437,6 +437,7 @@ export class AppServices {
    * the command was bound for another host. A confirmation that names the wrong machine is worse than no label.
    */
   private async approvalContext(action?: {
+    name?: string
     arguments?: Record<string, unknown>
   }): Promise<{ workingDirectory?: string; server?: string }> {
     const context: { workingDirectory?: string; server?: string } = {}
@@ -444,10 +445,29 @@ export class AppServices {
     if (project) context.workingDirectory = project.path
 
     const servers = await this.vpsServers.list()
-    const named = action?.arguments?.server_id ?? action?.arguments?.serverId
-    const explicit = typeof named === 'string' ? servers.find((entry) => entry.id === named) : undefined
-    if (explicit) {
-      context.server = `${explicit.name} (${explicit.host})`
+    const label = (value: unknown): string | undefined => {
+      if (typeof value !== 'string') return undefined
+      const server = servers.find((entry) => entry.id === value)
+      return server ? `${server.name} (${server.host})` : undefined
+    }
+
+    const args = action?.arguments ?? {}
+    const sourceServer = label(args.source_server_id ?? args.server_id ?? args.serverId)
+    const targetServer = label(args.target_server_id)
+    /*
+     * A copy names two machines, and the confirmation must say both: "A -> B" is the only label a user can check against
+     * the command they are approving. One server reads as itself; nothing named falls back to the project below.
+     */
+    if (sourceServer && targetServer && sourceServer !== targetServer) {
+      context.server = `${sourceServer} -> ${targetServer}`
+      return context
+    }
+    if (sourceServer) {
+      context.server = sourceServer
+      return context
+    }
+    if (targetServer) {
+      context.server = targetServer
       return context
     }
 
