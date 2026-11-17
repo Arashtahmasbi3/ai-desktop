@@ -442,17 +442,29 @@ export class AppServices {
   }): Promise<{ workingDirectory?: string; server?: string }> {
     const context: { workingDirectory?: string; server?: string } = {}
     const project = this.persistence.getActiveProject()
-    if (project) context.workingDirectory = project.path
-
     const servers = await this.vpsServers.list()
+    const args = action?.arguments ?? {}
     const label = (value: unknown): string | undefined => {
       if (typeof value !== 'string') return undefined
       const server = servers.find((entry) => entry.id === value)
       return server ? `${server.name} (${server.host})` : undefined
     }
 
-    const args = action?.arguments ?? {}
     const sourceServer = label(args.source_server_id ?? args.server_id ?? args.serverId)
+    /*
+     * The project's path belongs to the project's machine. Showing it next to a command bound for another host names a
+     * directory that does not exist there - true only in the default case, which is the definition of a misleading label.
+     */
+    const projectServer =
+      project && project.type === 'remote' && project.vpsId
+        ? servers.find((entry) => entry.id === project.vpsId)
+        : undefined
+    const actionServerId = args.source_server_id ?? args.server_id ?? args.serverId
+    const runsOnProjectMachine =
+      actionServerId === undefined ||
+      projectServer === undefined ||
+      actionServerId === projectServer.id
+    if (project && runsOnProjectMachine) context.workingDirectory = project.path
     const targetServer = label(args.target_server_id)
     /*
      * A copy names two machines, and the confirmation must say both: "A -> B" is the only label a user can check against
