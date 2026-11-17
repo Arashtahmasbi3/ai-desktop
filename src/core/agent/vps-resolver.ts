@@ -69,6 +69,7 @@ export function resolveVpsForRun(ctx: VpsResolutionContext): VpsResolution {
  */
 export const VPS_REQUIRING_TOOLS: ReadonlySet<string> = new Set([
   'remote_shell',
+  'remote_copy',
   'remote_read_file',
   'remote_write_file',
   'remote_list_dir',

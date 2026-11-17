@@ -7,6 +7,8 @@ import { DiagnosticsToolExecutor, NAMED_DIAGNOSTIC_TOOLS } from '@core/tools/dia
 import { MIGRATE_PROJECT_TOOL, type MigrateProjectDeps } from '@core/tools/migrate-project-tool'
 import { MigrateProjectToolExecutor } from '@core/tools/migrate-project-executor'
 import { REMOTE_FS_TOOLS, type RemoteFsDeps } from '@core/tools/remote-fs-tools'
+import { REMOTE_COPY_TOOL } from '@core/tools/remote-copy-tool'
+import { RemoteCopyToolExecutor } from '@core/tools/remote-copy-executor'
 import { RemoteFsToolExecutor } from '@core/tools/remote-fs-executor'
 import { REMOTE_SHELL_TOOL, type RemoteJobRunner } from '@core/tools/remote-shell-tool'
 import { RemoteShellToolExecutor } from '@core/tools/remote-shell-executor'
@@ -381,6 +383,11 @@ export function planRemoteRuntime(
         ' — never ask the user for an id.'
       : '')
 
+  hint +=
+    ' To move a file between two servers, use "remote_copy" with source_server_id, source_path and target_server_id: the' +
+    ' app carries the content, so the two hosts do not need an SSH key between them. To move a whole project directory,' +
+    ' use "migrate_project".'
+
   // Remote file tools are only offered when the host exposes SFTP.
   if (typeof vps.readFile === 'function') {
     const fsDeps: RemoteFsDeps = {
@@ -401,6 +408,21 @@ export function planRemoteRuntime(
       description: `${tool.description} Target server: "${target}".`
     }))
     tools.add({ definitions: fsTools, executor: new RemoteFsToolExecutor(fsDeps, target) })
+    /*
+     * The cross-server copy rides on the same SFTP surface: read from the source session, write to the target session. It is
+     * pinned to this run's server on the reading side, so a run bound to one host can only ever copy FROM it.
+     */
+    tools.add({
+      definitions: [REMOTE_COPY_TOOL],
+      executor: new RemoteCopyToolExecutor(
+        {
+          connectedServers: () => vps.connectedServers(),
+          readFile: (serverId, path) => vps.readFile!(serverId, path),
+          writeFile: (serverId, path, content) => vps.writeFile!(serverId, path, content)
+        },
+        target
+      )
+    })
     hint +=
       ` You also have the remote file tools ${fsTools.map((tool) => tool.name).join(', ')} ` +
       'for reading, writing, listing, grepping and checking git status on that server.'
