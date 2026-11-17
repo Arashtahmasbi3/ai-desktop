@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { AlertTriangle, FolderPlus, X } from 'lucide-react'
+import { AlertTriangle, FolderPlus, PlugZap, X } from 'lucide-react'
 import { useStore } from '../store'
 import { serverForConnectionFailure } from '../lib/connection-test'
 import { refusedPathFromMessage } from '../lib/add-project-from-refusal'
@@ -47,6 +47,12 @@ export default function ErrorBanner(): JSX.Element | null {
     ...(project?.path ? { activePath: project.path } : {})
   })
   const refusedServerId = project?.type === 'remote' ? project.vpsId : selectedServerId
+  /*
+   * F6: the message names a server that is not connected, so the strip offers the action it is asking for. The test button
+   * beside it diagnoses; this one does the thing.
+   */
+  const serverDown =
+    failureServerId !== undefined && /not connected|isn't connected|متصل نیست/i.test(error)
 
   return (
     <div
@@ -77,6 +83,20 @@ export default function ErrorBanner(): JSX.Element | null {
       ) : null}
       {failureServerId ? (
         <ConnectionTestButton serverId={failureServerId} testId="error-connection-test" />
+      ) : null}
+      {serverDown ? (
+        <button
+          type="button"
+          data-testid="error-connect"
+          title={t('chat.connectServerTitle', { defaultValue: 'Connect this server and try again' })}
+          onClick={() => {
+            void window.api.vps.connect(failureServerId, 'manual')
+          }}
+          className="flex shrink-0 items-center gap-1 rounded border border-danger/50 px-2 py-0.5 text-3xs hover:bg-danger/15"
+        >
+          <PlugZap className="h-3 w-3" />
+          {t('chat.connectServer', { defaultValue: 'Connect' })}
+        </button>
       ) : null}
       <button
         type="button"

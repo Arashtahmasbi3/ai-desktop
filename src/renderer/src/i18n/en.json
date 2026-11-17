@@ -177,6 +177,8 @@
     "approvalShowDetails": "Show details",
     "approvalHideDetails": "Hide details",
     "fullAccess": "Full access",
+    "connectServer": "Connect",
+    "connectServerTitle": "Connect this server and try again",
     "fullAccessAsk": "Ask before actions",
     "fullAccessAuto": "Auto-approve safe tools",
     "fullAccessFull": "Full access (wider scope)",

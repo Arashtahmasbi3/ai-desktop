@@ -177,6 +177,8 @@
     "approvalShowDetails": "نمایش جزئیات",
     "approvalHideDetails": "پنهان کردن جزئیات",
     "fullAccess": "دسترسی کامل",
+    "connectServer": "اتصال",
+    "connectServerTitle": "این سرور را وصل کن و دوباره امتحان کن",
     "fullAccessAsk": "قبل از کارها بپرس",
     "fullAccessAuto": "تأیید خودکار ابزارهای امن",
     "fullAccessFull": "دسترسی کامل (دامنهٔ گسترده)",
