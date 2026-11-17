@@ -51,6 +51,14 @@ class FakeConnection implements SshConnection {
   async sftpWrite(): Promise<void> {
     return undefined
   }
+  private readonly closeHandlers: Array<() => void> = []
+  onClose(handler: () => void): void {
+    this.closeHandlers.push(handler)
+  }
+  /** Simulates the transport dropping: the network, a restart, an idle NAT. */
+  triggerClose(): void {
+    for (const handler of this.closeHandlers) handler()
+  }
   end(): void {
     return undefined
   }
@@ -158,6 +166,31 @@ describe('ssh manager', () => {
 
     const approved = await manager.approveFingerprint(server.id)
     expect(approved.status).toBe('disconnected')
+    expect((await manager.connect(server.id)).status).toBe('connected')
+  })
+
+  it('drops a session whose transport closed instead of reporting it connected', async () => {
+    const server = await store.save({
+      name: 'live',
+      host: 'example.com',
+      username: 'root',
+      authType: 'key',
+      privateKeyPath: '/k',
+      trustFingerprint: KEY_FINGERPRINT
+    })
+    expect((await manager.connect(server.id)).status).toBe('connected')
+    expect(manager.connectedServers()).toContain(server.id)
+
+    backend.lastConnection?.triggerClose()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    /*
+     * The whole point: before this, the entry stayed in the map and connectedServers() answered "connected" while every
+     * exec failed with ssh2's own "Not connected". The list is now the same thing as "a session exists".
+     */
+    expect(manager.connectedServers()).not.toContain(server.id)
+
+    // And the entry was removed cleanly, so the server can be connected again.
     expect((await manager.connect(server.id)).status).toBe('connected')
   })
 

@@ -43,6 +43,13 @@ export interface SshConnection {
   sftpList(path: string): Promise<SftpEntry[]>
   sftpRead(path: string): Promise<string>
   sftpWrite(path: string, content: string): Promise<void>
+  /**
+   * Report the transport closing on its own - a dropped network, a restarted server, an idle NAT that forgot the flow.
+   *
+   * Optional so a backend that cannot observe it still works, but a backend that CAN must call it: without this the manager
+   * has no way to tell a live session from a corpse, and "connected" becomes a claim rather than a fact.
+   */
+  onClose?(handler: () => void): void
   end(): void
 }
 

@@ -208,6 +208,19 @@ export class Ssh2Connection implements SshConnection {
     })
   }
 
+  onClose(handler: () => void): void {
+    /*
+     * Both events matter: 'close' is the socket ending, 'end' is the peer closing cleanly first.
+     *
+     * ssh2's `on` carries one overload per event, and a zero-argument listener does not satisfy the narrowest of them.
+     * Casting the METHOD rather than the client keeps this to a single cast - the project budgets double casts, and one
+     * added here would be a build failure for a two-line feature.
+     */
+    const on = this.client.on.bind(this.client) as (event: string, listener: () => void) => void
+    on('close', handler)
+    on('end', handler)
+  }
+
   end(): void {
     this.client.end()
   }

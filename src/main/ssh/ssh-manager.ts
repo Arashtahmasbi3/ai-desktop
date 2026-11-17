@@ -506,6 +506,13 @@ export class SshManager {
         hostVerifier
       })
       this.connections.set(serverId, { connection, lastActivity: this.now() })
+      /*
+       * The transport is the only thing that knows a session died. Attaching here, at the moment the entry exists, is what
+       * keeps the map honest: no path can add an entry that has no way of being removed.
+       */
+      connection.onClose?.(() => {
+        void this.sessionClosed(serverId)
+      })
       this.pendingFingerprints.delete(serverId)
       await this.store.touchConnected(serverId)
       await this.audit.record({
@@ -585,6 +592,28 @@ export class SshManager {
     this.pendingFingerprints.delete(serverId)
     await this.audit.record({ type: 'host_key', ok: true, serverId, detail: fingerprint })
     return this.setState({ status: 'disconnected', serverId })
+  }
+
+  /**
+   * The transport closed by itself.
+   *
+   * Before this, the entry stayed in the map: `connectedServers()` answered "connected" while every exec failed with
+   * ssh2's own "Not connected", and a run's server resolution trusted the same lie. The state now says what happened and
+   * carries a sentence the UI can act on, instead of a green dot over a dead socket.
+   */
+  private async sessionClosed(serverId: string): Promise<void> {
+    const entry = this.connections.get(serverId)
+    if (!entry) return
+    entry.terminal?.close()
+    this.connections.delete(serverId)
+    await this.audit
+      .record({ type: 'disconnect', ok: true, serverId, detail: 'transport closed' })
+      .catch(() => undefined)
+    this.setState({
+      status: 'error',
+      serverId,
+      error: 'The SSH session closed. Reconnect to continue.'
+    })
   }
 
   async disconnect(serverId: string, reason = 'user'): Promise<VpsConnectionState> {
