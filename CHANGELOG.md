@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.3.12] - 2026-11-17
+
+Three refinements that came out of trying to verify 4.3.11 rather than from a report.
+
+### A session that dies stops being reported as connected
+
+connected() was the connection map's keys, and nothing removed a key when the transport died - the interface the manager
+talks to had no way to report a close at all. A dropped session survived as a green server while every exec failed with
+ssh2's own "Not connected", and a run's server resolution trusted the same lie. The transport now reports its own death,
+the entry leaves the map with it, and the state says "The SSH session closed. Reconnect to continue."
+
+This one came first because every measurement in this project trusted connected(): a state that lies about liveness makes
+each later conclusion suspect.
+
+### The toolset composition has an end-to-end test
+
+Seven defects lived in the seam between the project, the selected server and the toolset, and every unit passed while the
+seams were wrong. The new test drives the real assembler with a real settings file and a fake host, and asserts four
+situations: a project on one server with another connected one selected, a Persian task with no selection, a selection
+that is down, and nothing connected at all.
+
+### Full access no longer promises something the gate does not do
+
+A correction first: "full access does not stick" was wrong. setApprovalMode('full') grants a temporary elevation on the
+session profile and settings.approvalMode deliberately keeps saying 'ask'. The copy was the bug - "Full access (no
+prompts)" while a run with the grant still asked for approval on remote_shell, because shell and write tools were made
+non-rememberable in v2.5. Both strings now say what elevation does and does not do, in English and Farsi.
+
+### The approval card stops naming another machine's directory
+
+The working directory came from the active project even when the command was bound elsewhere. It is now shown only when
+the command will run on the project's own machine.
+
+### Still not true
+
+A surface that needs a server still offers no button to connect it: the message names the server and asks the user to go to
+Settings. The containment refusal for a path outside the project root still reads like a wall of options. And the composer's
+action still has two glyphs rather than four.
 ## [4.3.11] - 2026-11-17
 
 Five defects that only appeared when the app was used for a real job: make a file on one server, move it to another. Each
