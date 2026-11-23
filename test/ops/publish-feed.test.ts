@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
+import { DEFAULT_UPDATE_REPO } from '../../src/main/updater'
 import {
   FEED_REPO,
   feedAssets,
@@ -16,7 +17,13 @@ import {
  */
 describe('the feed publication step', () => {
   it('targets the repository the updater actually reads', () => {
-    expect(FEED_REPO).toBe('Arashtahmasbi3/ai-desktop-releases')
+    /*
+     * v4.3.17 (TST-7): this compared the script's constant with a literal copy of itself, so it would have passed
+     * while the updater read somewhere else. The truth lives in `DEFAULT_UPDATE_REPO`; compare against that.
+     */
+    expect(FEED_REPO).toBe(DEFAULT_UPDATE_REPO)
+    // Current value, kept as documentation: Arashtahmasbi3/ai-desktop-releases.
+    expect(DEFAULT_UPDATE_REPO).toContain('/ai-desktop-releases')
   })
 
   it('demands the installer, the portable build and the checksums', () => {

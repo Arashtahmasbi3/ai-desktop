@@ -7,6 +7,7 @@
  */
 
 import type { HealthCheckConfig, HealthCheckOutcome } from '@shared/vps'
+import { shellQuote } from '@shared/shell-quote'
 
 export interface HealthCheckStep {
   name: string
@@ -22,20 +23,16 @@ export interface ExecResult {
 
 export type HealthExec = (command: string) => Promise<ExecResult>
 
-/** POSIX single-quote so a config value can't break out of the command. */
-function quote(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`
-}
-
 /** Build the ordered list of checks implied by a project's health config. */
 export function buildHealthChecks(config: HealthCheckConfig): HealthCheckStep[] {
   const checks: HealthCheckStep[] = []
   const processName = config.processName?.trim()
   if (processName) {
-    checks.push({ name: 'process', cmd: `pgrep -f ${quote(processName)}` })
+    // v4.3.17 (TST-5): the one quoting rule lives in shared/shell-quote; a local copy was invisible to its guard.
+    checks.push({ name: 'process', cmd: `pgrep -f ${shellQuote(processName)}` })
   }
   if (typeof config.port === 'number' && Number.isFinite(config.port)) {
-    checks.push({ name: 'port', cmd: `ss -tlnp | grep ${quote(String(config.port))}` })
+    checks.push({ name: 'port', cmd: `ss -tlnp | grep ${shellQuote(String(config.port))}` })
   }
   const endpoint =
     config.healthEndpoint?.trim() ||
@@ -45,7 +42,7 @@ export function buildHealthChecks(config: HealthCheckConfig): HealthCheckStep[] 
   if (endpoint) {
     checks.push({
       name: 'http',
-      cmd: `curl -s -o /dev/null -w "%{http_code}" ${quote(endpoint)}`
+      cmd: `curl -s -o /dev/null -w "%{http_code}" ${shellQuote(endpoint)}`
     })
   }
   const customCommand = config.customCommand?.trim()

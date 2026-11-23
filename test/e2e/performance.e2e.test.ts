@@ -91,7 +91,12 @@ describe('Performance: agent loop and resources', () => {
 
     expect(manager.listSandboxes()).toHaveLength(0)
     expect(heapGrowth).toBeLessThan(80 * 1024 * 1024)
-    expect(elapsed).toBeLessThan(20_000)
+    /*
+     * v4.3.17 (TST-4): `elapsed < 20_000` inside a suite whose per-test timeout is 20 s could never be the thing that
+     * fails — either the assertion holds or vitest killed the test first. The budget that matters is the timeout; the
+     * leak evidence is the sandbox count and the heap growth above.
+     */
+    expect(elapsed).toBeGreaterThan(0)
     await manager.dispose()
   })
 

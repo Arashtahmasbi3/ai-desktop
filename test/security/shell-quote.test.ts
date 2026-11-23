@@ -102,18 +102,27 @@ describe.skipIf(shell === undefined)('shellQuote round-trips through a real shel
 })
 
 describe('there is exactly one implementation', () => {
-  it('no module other than shared/shell-quote defines it', () => {
-    const files = spawnSync('git', ['ls-files', '*.ts', '*.tsx'], { encoding: 'utf8' })
-      .stdout.split('\n')
-      .filter(Boolean)
+  /*
+   * v4.3.17 (TST-5, TST-6). The guard used to look for the *name* `shellQuote`, so the two renamed copies that
+   * survived (`quote` in health-check.ts, `quotePath` in workspace-detect.ts) were invisible. And when `git ls-files`
+   * failed — the suite run from outside the repository — it scanned nothing and passed: a green test proving nothing.
+   *
+   * The scan is by idiom now, proves it read the tree, and fails if git is unavailable.
+   */
+  it('no module other than shared/shell-quote implements the escaping idiom', () => {
+    const listing = spawnSync('git', ['ls-files', '*.ts', '*.tsx'], { encoding: 'utf8' })
+    expect(listing.status, 'git ls-files must succeed; a vacuous scan is not a passing scan').toBe(0)
+    const files = listing.stdout.split('\n').filter(Boolean)
+    expect(files.length).toBeGreaterThan(100)
 
     const definers = files.filter((file) => {
       if (file === 'src/shared/shell-quote.ts') return false
       const text = readFileSync(file, 'utf8')
-      return /(?:^|\n)(?:export )?function shellQuote\s*\(/.test(text)
+      // The rule itself: wrap in single quotes and escape each one by closing, escaping, reopening.
+      return /replace\(\/'\/g/.test(text)
     })
 
-    // This is the audit finding, pinned: seven copies became one, and a seventh cannot come back quietly.
+    // This is the audit finding, pinned: the copies cannot come back quietly, under any name.
     expect(definers).toEqual([])
   })
 })

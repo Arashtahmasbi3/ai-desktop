@@ -7,6 +7,7 @@
  */
 
 import type { RemoteWorkspaceInfo } from '@shared/workspace-info'
+import { shellQuote } from '@shared/shell-quote'
 
 export interface WorkspaceExecResult {
   ok: boolean
@@ -17,10 +18,8 @@ export interface WorkspaceExecResult {
 
 export type WorkspaceExec = (command: string) => Promise<WorkspaceExecResult>
 
-/** POSIX single-quote so a path can't inject into a command. */
-export function quotePath(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`
-}
+/** v4.3.17 (TST-5): re-exported from the one implementation; a local copy was invisible to the quoting guard. */
+export const quotePath = shellQuote
 
 /** `yes`/`no` probe for a `.git` directory. */
 export function gitProbeCommand(path: string): string {
