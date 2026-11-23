@@ -276,6 +276,29 @@ describe('UpdateService (v3.0)', () => {
     expect(result.verified).toBe(false)
   })
 
+  /**
+   * v4.3.14 — UPD-1. `verified:false` used to be only a report field: `install()` checked that *something* had been
+   * downloaded and handed it to the OS. On an unsigned build the published digest is the only integrity check there
+   * is, so an unverified file must not be installed.
+   */
+  it('refuses to install an update that was never verified', async () => {
+    const { deps: d, ran } = deps({
+      fetchImpl: async (url: string) => {
+        if (url.endsWith('SHA256SUMS.txt')) return { ok: false, status: 404, text: async () => '' }
+        return { ok: true, status: 200, text: async () => JSON.stringify(releaseBody()) }
+      }
+    })
+    const service = new UpdateService(d)
+    await service.check()
+    expect((await service.download()).verified).toBe(false)
+
+    const result = await service.install()
+
+    expect(result.ok).toBe(false)
+    expect(result.error).toContain('not verified')
+    expect(ran).toEqual([])
+  })
+
   it('reports a failed download instead of throwing', async () => {
     const { deps: d } = deps({
       download: async () => {

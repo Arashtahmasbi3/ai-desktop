@@ -13,7 +13,22 @@ export function formatObservation(result: AgentToolResult): string {
     return `[ok] ${result.name}\n${result.output || '(no output)'}`
   }
   const guidance = guidanceForToolError(result.code, result.name)
-  return `[error:${result.code ?? 'unknown'}] ${result.name} failed: ${result.error ?? 'unknown error'}\n${guidance}`
+  /*
+   * v4.3.14: a failed tool call used to drop `output` on the floor, so `run_command` — whose failures the
+   * runner prints to **stdout** — reached the model as "Command exited with code 1" followed by "read the
+   * error output". The output it was told to read had never been sent. Keep it, capped, after the error.
+   */
+  const output = (result.output ?? '').trim()
+  const tail = output === '' ? '' : `\n${capObservation(output)}`
+  return `[error:${result.code ?? 'unknown'}] ${result.name} failed: ${result.error ?? 'unknown error'}${tail}\n${guidance}`
+}
+
+/** A failed call's own output is evidence, not context: bounded so one noisy failure cannot flood the prompt. */
+const MAX_OBSERVATION_OUTPUT = 4000
+
+function capObservation(output: string): string {
+  if (output.length <= MAX_OBSERVATION_OUTPUT) return output
+  return `${output.slice(0, MAX_OBSERVATION_OUTPUT)}\n[... ${output.length - MAX_OBSERVATION_OUTPUT} characters truncated ...]`
 }
 
 /** A tool call that did not run: refused, redirected, or cut short with the step. */

@@ -209,4 +209,35 @@ describe('the gate honours a server grant (v2.8.1)', () => {
       await rm(dir, { recursive: true, force: true })
     }
   })
+
+  /*
+   * v4.3.14 — SEC-2. A scoped grant (and a remembered approval) is consent for the agent's own tools on that server.
+   * It is not consent for a foreign process the user installed separately, which is what CHANGELOG 4.2.0 and the
+   * `mcp_tool` rule in `shouldRequireApproval` promise. The grant shortcut used to return before that rule was read.
+   */
+  it('still asks before a foreign (MCP) tool runs, even under an active grant', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'ai-desktop-gate-mcp-'))
+    try {
+      const store = new ApprovedCommands({ file: join(dir, 'approved-commands.json') })
+      await store.load()
+      await store.rememberServerGrant(VPS, PROJECT)
+
+      const asked = vi.fn(async () => ({ approved: false }))
+      const gate = createApprovalGate({
+        mode: 'full',
+        vpsId: VPS,
+        projectId: PROJECT,
+        approvedCommands: store,
+        requestApproval: asked
+      })
+
+      const approved = await gate(
+        action('mcp__filesystem__write_file', { path: '/home/u/.bashrc', content: 'x' })
+      )
+      expect(approved).toBe(false)
+      expect(asked).toHaveBeenCalledTimes(1)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
 })

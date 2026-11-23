@@ -7,12 +7,57 @@ import type { AppState } from './types'
 const FULL_ACCESS_TTL_MS = 30 * 60 * 1000
 let fullAccessTimer: ReturnType<typeof setTimeout> | null = null
 
+/**
+ * v4.3.14: the deadline used to live only in this module's timer, so a reload or a restart dropped it and
+ * "full access" stayed on for ever. The deadline is now persisted and re-armed at boot; walking past it
+ * downgrades the mode even if the renderer was closed the whole time.
+ */
+const FULL_ACCESS_KEY = 'ai-desktop:full-access-until'
+
+function readStoredFullAccessExpiry(): number | null {
+  try {
+    const raw = window.localStorage.getItem(FULL_ACCESS_KEY)
+    if (!raw) return null
+    const value = Number(raw)
+    return Number.isFinite(value) && value > 0 ? value : null
+  } catch {
+    return null
+  }
+}
+
+function writeStoredFullAccessExpiry(expiresAt: number | null): void {
+  try {
+    if (expiresAt === null) window.localStorage.removeItem(FULL_ACCESS_KEY)
+    else window.localStorage.setItem(FULL_ACCESS_KEY, String(expiresAt))
+  } catch {
+    // Storage can be unavailable (private mode, quota); the in-memory timer still runs.
+  }
+}
+
+function clearFullAccessTimer(): void {
+  if (fullAccessTimer) {
+    clearTimeout(fullAccessTimer)
+    fullAccessTimer = null
+  }
+}
+
+function armFullAccessTimer(expiresAt: number, get: StoreGet): void {
+  clearFullAccessTimer()
+  const remaining = Math.max(0, expiresAt - Date.now())
+  fullAccessTimer = setTimeout(() => {
+    void get().setApprovalMode('ask')
+    get().pushToast('warning', 'Full access turned off after 30 minutes of inactivity.')
+  }, remaining)
+  fullAccessTimer.unref?.()
+}
+
 export function approvalActions(
   set: StoreSet,
   get: StoreGet
 ): Pick<
   AppState,
   | 'setApprovalMode'
+  | 'applyStoredFullAccessExpiry'
   | 'setRememberApprovalMode'
   | 'setCheckpointMode'
   | 'setPlanModeDefault'
@@ -32,19 +77,30 @@ export function approvalActions(
       if (mode === 'full') {
         const expiresAt = Date.now() + FULL_ACCESS_TTL_MS
         set({ fullAccessExpiresAt: expiresAt })
-        if (fullAccessTimer) clearTimeout(fullAccessTimer)
-        fullAccessTimer = setTimeout(() => {
-          void get().setApprovalMode('ask')
-          get().pushToast('warning', 'Full access turned off after 30 minutes of inactivity.')
-        }, FULL_ACCESS_TTL_MS)
-        fullAccessTimer.unref?.()
+        writeStoredFullAccessExpiry(expiresAt)
+        armFullAccessTimer(expiresAt, get)
       } else {
         set({ fullAccessExpiresAt: null })
-        if (fullAccessTimer) {
-          clearTimeout(fullAccessTimer)
-          fullAccessTimer = null
-        }
+        writeStoredFullAccessExpiry(null)
+        clearFullAccessTimer()
       }
+    },
+
+    /**
+     * Re-arm the persisted deadline at boot. An expired one is downgraded here rather than trusted, so a
+     * restart cannot resurrect a grant the user gave hours ago.
+     */
+    applyStoredFullAccessExpiry() {
+      const expiresAt = readStoredFullAccessExpiry()
+      if (expiresAt === null) return
+      if (expiresAt <= Date.now()) {
+        writeStoredFullAccessExpiry(null)
+        set({ fullAccessExpiresAt: null })
+        void get().setApprovalMode('ask')
+        return
+      }
+      set({ fullAccessExpiresAt: expiresAt })
+      armFullAccessTimer(expiresAt, get)
     },
 
     async setRememberApprovalMode(enabled) {

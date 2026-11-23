@@ -140,6 +140,8 @@ let unsubscribe: (() => void) | null = null
 /** Wire main-process events into the store (idempotent). */
 export function subscribeToEvents(): void {
   if (unsubscribe) return
+  // v4.3.14: a persisted full-access deadline must expire even though no timer survived the restart.
+  useStore.getState().applyStoredFullAccessExpiry()
   const offAgent = window.api.events.on('agent:event', (event) => useStore.getState().applyEvent(event))
   const offWorker = window.api.events.on('worker:status', (worker) => useStore.setState({ worker }))
   const offRemote = window.api.events.on('remote:status', (remote) => useStore.setState({ remote }))

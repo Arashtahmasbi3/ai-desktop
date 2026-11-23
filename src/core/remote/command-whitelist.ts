@@ -181,6 +181,15 @@ function hasWriteIndicator(command: string): boolean {
 }
 
 /**
+ * The separators a POSIX shell treats as a statement boundary (v4.3.14).
+ *
+ * One exported list, because the read-only classifier and the write-path escalation must never disagree
+ * about where a command ends: `ls\nrm -rf /srv/x` was graded read-only while the write-path guard also
+ * short-circuited on that predicate, so one missing separator defeated two protections at once.
+ */
+export const STATEMENT_SEPARATORS = [';', '\n', '&&', '||', '&'] as const
+
+/**
  * Split a command on top-level separators, ignoring any separator inside quotes (v4.1).
  *
  * `ssh host 'a; b'` is ONE command whose argument happens to contain a semicolon. Splitting it blindly
@@ -209,9 +218,23 @@ export function splitTopLevel(command: string, separators: readonly string[]): s
       current += char
       continue
     }
+    /*
+     * v4.3.14: a bare `&` is a statement separator to every POSIX shell, so `ls & rm -rf /srv/x` is two
+     * commands. It is opt-in (the caller must list `&`), and it is never split when it is a redirection
+     * (`2>&1`, `1<&0`) or the first half of `&&` — the pair matcher below owns those.
+     */
+    if (separators.includes('&') && char === '&' && command[index + 1] !== '&') {
+      const previous = command[index - 1]
+      if (previous !== '>' && previous !== '<') {
+        parts.push(current)
+        current = ''
+        continue
+      }
+    }
     const pair = command.slice(index, index + 2)
+    // `&` is owned by the guarded branch above: matching it generically would split a redirection (`2>&1`).
     const matched = separators.find((candidate) =>
-      candidate.length === 2 ? pair === candidate : char === candidate
+      candidate === '&' ? false : candidate.length === 2 ? pair === candidate : char === candidate
     )
     if (matched !== undefined) {
       parts.push(current)
@@ -380,7 +403,13 @@ export function isReadOnlyShellCommand(command: string): boolean {
    */
   if (unwrapped !== undefined) return isReadOnlyShellCommand(stripOuterQuotes(unwrapped))
 
-  const segments = splitTopLevel(trimmed, [';', '&&', '||']).filter(Boolean)
+  /*
+   * v4.3.14: a newline is a statement separator, and so is a bare `&`. Splitting on `;`/`&&`/`||` alone
+   * made `ls\nrm -rf /srv/x` one segment whose first word was `ls`, so it graded as a read: no prompt,
+   * and `escapedWritePaths` short-circuits on this same predicate, so the off-root write skipped the
+   * escalation too. `STATEMENT_SEPARATORS` is the single list both classifiers use.
+   */
+  const segments = splitTopLevel(trimmed, STATEMENT_SEPARATORS).filter(Boolean)
   if (segments.length === 0) return false
 
   return segments.every((segment) =>

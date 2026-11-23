@@ -6,10 +6,19 @@ on:
   pull_request:
   workflow_dispatch:
 
-# The project shipped 8 tagged releases in 7 days with no gate at all: "typecheck
-# and build green" was a claim nobody checked, and 17 tests failed on Windows (the
-# app's primary target platform) while passing on the Linux box it was developed on.
-# Windows is therefore a first-class CI target, not an afterthought.
+# The project shipped 8 tagged releases in 7 days with no gate at all: "typecheck and build green" was a claim
+# nobody checked, and 17 tests failed on Windows (the app's primary target platform) while passing on the Linux box
+# it was developed on. Windows is therefore a first-class CI target, not an afterthought.
+#
+# v4.3.14 (CI-1, CI-2):
+#  * `npm ci || npm install` is gone. The fallback meant a lockfile that disagreed with package.json could never
+#    fail: CI silently reinstalled a different tree and went green. That class of drift is exactly what broke the
+#    suite on a second machine once already. A hardened runner that skips dependency scripts is covered by the
+#    explicit `node node_modules/electron/install.js` step below.
+#  * The Linux test leg was `continue-on-error`, so half the matrix could not fail and the board said nothing. It is
+#    now its own job: the required `verify` job runs the tests on Windows (the only platform this app ships on and
+#    the only one whose results have ever been trusted), and `linux-tests` reports Linux on its own line — a red
+#    row you can see, instead of a green one that means nothing.
 jobs:
   verify:
     name: typecheck + test + build (${{ matrix.os }})
@@ -27,28 +36,37 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Ensure the Electron binary is present
-        # Hardened npm setups (and new npm versions) skip dependency install
-        # scripts, which leaves Electron without its binary and breaks `build`.
+        # Hardened npm setups (and new npm versions) skip dependency install scripts, which leaves Electron without
+        # its binary and breaks `build`.
         run: node node_modules/electron/install.js
         continue-on-error: true
 
       - name: Typecheck
         run: npm run typecheck
 
-      # DECISION (P1.3, 2026-10-22): this leg has been red on `ubuntu-latest` since v4.0.1 and nobody watched it, which
-      # is worse than either alternative. Windows stays the gate — it is the target runtime and the only platform this
-      # repository has ever run the real app on. Linux keeps its typecheck and its build as required steps (both are
-      # genuinely platform-independent and green), and its test run is a REPORTING leg until the first green run. The
-      # differences are named, not guessed: `test/sandbox/docker-integration.test.ts` runs for real there because
-      # `ubuntu-latest` ships a working Docker daemon (it self-skips on Windows), and the 20s per-test timeout is tight
-      # under a loaded runner. When a Linux run is green, delete the `continue-on-error` below and this comment with it.
-      # Deleting Linux coverage would also have produced a green board — and it is the option that teaches nothing.
-      - name: Test
-        continue-on-error: ${{ runner.os == 'Linux' }}
+      - name: Test (Windows is the gate)
+        if: runner.os == 'Windows'
         run: npm test
 
       - name: Build
         run: npm run build
+
+  linux-tests:
+    name: test (ubuntu-latest, reported separately)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: node node_modules/electron/install.js
+        continue-on-error: true
+      # Docker is genuinely available here, so `test/sandbox/docker-integration.test.ts` runs for real instead of
+      # self-skipping. This leg is NOT hidden: a failure is a red row, kept out of the required `verify` job only so
+      # that a platform the app does not ship on cannot block a release while the differences are worked through.
+      - run: npm test

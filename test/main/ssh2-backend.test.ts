@@ -192,6 +192,59 @@ describe('Ssh2Connection.exec', () => {
   })
 })
 
+/**
+ * v4.3.14 — SSH-1.
+ *
+ * The deadline was armed inside the `client.exec` callback, so it only existed once the channel had opened. A
+ * half-open socket (the peer is gone but never sent a FIN) never calls that callback: no timer, no settle. The
+ * liveness probe's 2 s deadline, every vps IPC exec and every JobManager call could hang for ever.
+ */
+class NeverOpensClient {
+  ended = false
+  exec(): void {
+    /* the channel never opens, so the callback is never invoked */
+  }
+  end(): void {
+    this.ended = true
+  }
+}
+
+describe('Ssh2Connection.exec deadline (v4.3.14)', () => {
+  it('times out even when the channel never opens, and drops the socket', async () => {
+    vi.useFakeTimers()
+    try {
+      const client = new NeverOpensClient()
+      const conn = new Ssh2Connection(client as never)
+      const promise = conn.exec('true', 2000)
+
+      await vi.advanceTimersByTimeAsync(2000)
+      const result = await promise
+
+      expect(result.timedOut).toBe(true)
+      expect(result.exitCode).toBe(124)
+      // A socket that could not open a channel must not be reused.
+      expect(client.ended).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('settles only once when a late channel arrives after the deadline', async () => {
+    vi.useFakeTimers()
+    try {
+      const client = new NeverOpensClient() as NeverOpensClient & {
+        late?: { close: () => void }
+      }
+      const conn = new Ssh2Connection(client as never)
+      const promise = conn.exec('true', 100)
+      await vi.advanceTimersByTimeAsync(100)
+      expect((await promise).timedOut).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
 describe('Ssh2Connection.shell', () => {
   it('forwards terminal data and close events and maps resize to setWindow', async () => {
     const { connection: conn, client } = connection()

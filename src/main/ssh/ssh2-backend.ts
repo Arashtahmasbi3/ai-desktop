@@ -87,36 +87,67 @@ export class Ssh2Connection implements SshConnection {
 
   exec(command: string, timeoutMs?: number): Promise<SshExecResult> {
     return new Promise((resolve, reject) => {
-      this.client.exec(command, (error, stream) => {
-        if (error) {
-          reject(error)
-          return
-        }
-        let stdout = ''
-        let stderr = ''
-        let settled = false
-        let timer: ReturnType<typeof setTimeout> | undefined
+      let stdout = ''
+      let stderr = ''
+      let settled = false
+      let timer: ReturnType<typeof setTimeout> | undefined
+      let stream: Ssh2Stream | undefined
 
-        const finish = (result: SshExecResult | Error): void => {
-          if (settled) return
-          settled = true
-          if (timer) clearTimeout(timer)
-          result instanceof Error ? reject(result) : resolve(result)
-        }
+      const finish = (result: SshExecResult | Error): void => {
+        if (settled) return
+        settled = true
+        if (timer) clearTimeout(timer)
+        result instanceof Error ? reject(result) : resolve(result)
+      }
 
-        if (timeoutMs && timeoutMs > 0) {
-          timer = setTimeout(() => {
-            // Ask the remote shell to terminate, then settle as timed out so the
-            // caller never waits forever on a hung command (v2.3.2, A.4).
+      /*
+       * v4.3.14: the deadline used to be armed inside the `client.exec` callback, i.e. only once the channel
+       * had opened. On a socket whose peer is gone but which was never reset — the exact case the liveness
+       * probe exists for — the callback never fires, so no timer existed and the promise never settled:
+       * `probeLiveness`'s documented 2 s deadline, every vps IPC exec and JobManager's calls could hang for
+       * ever. Arm it first and settle either way.
+       */
+      if (timeoutMs && timeoutMs > 0) {
+        timer = setTimeout(() => {
+          if (stream) {
+            // Ask the remote shell to terminate, then settle as timed out (v2.3.2, A.4).
             try {
               stream.signal('KILL')
             } catch {
               // The stream may already be gone; the timeout still applies.
             }
-            stream.close()
-            finish({ stdout, stderr, exitCode: 124, timedOut: true })
-          }, timeoutMs)
+            try {
+              stream.close()
+            } catch {
+              // Same: the deadline is the point, not a clean channel.
+            }
+          } else {
+            // The channel never opened. Drop the half-open socket instead of reusing it.
+            try {
+              this.client.end()
+            } catch {
+              // Nothing left to close.
+            }
+          }
+          finish({ stdout, stderr, exitCode: 124, timedOut: true })
+        }, timeoutMs)
+      }
+
+      this.client.exec(command, (error, opened) => {
+        if (settled) {
+          // A late channel after the deadline: close it rather than leaking it.
+          try {
+            opened?.close()
+          } catch {
+            // Already gone.
+          }
+          return
         }
+        if (error) {
+          finish(error)
+          return
+        }
+        stream = opened
 
         stream.on('data', (chunk) => {
           stdout += chunk.toString()
@@ -125,7 +156,7 @@ export class Ssh2Connection implements SshConnection {
           stderr += chunk.toString()
         })
         stream.on('close', (code) => {
-          stream.end()
+          stream?.end()
           finish({ stdout, stderr, exitCode: typeof code === 'number' ? code : 0 })
         })
         stream.on('error', (streamError) => finish(streamError))
@@ -251,7 +282,13 @@ export class Ssh2Backend implements SshBackend {
         ...(config.passphrase ? { passphrase: config.passphrase } : {}),
         ...(config.password ? { password: config.password } : {}),
         hostVerifier: (key: Buffer) => config.hostVerifier(key),
-        readyTimeout: 20_000
+        readyTimeout: 20_000,
+        /*
+         * v4.3.14: without keepalive a peer that vanished without a FIN stayed "connected" until the next
+         * exec failed — and, with the exec deadline bug, that exec could hang instead of failing.
+         */
+        keepaliveInterval: 15_000,
+        keepaliveCountMax: 3
       })
     })
   }

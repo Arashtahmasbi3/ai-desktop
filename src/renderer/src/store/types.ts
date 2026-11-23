@@ -349,6 +349,8 @@ export interface AppState {
   ensureVpsConnected: (serverId: string) => Promise<void>
   setPlanMode: (value: boolean) => void
   setApprovalMode: (mode: ApprovalMode) => Promise<void>
+  /** Re-arm the persisted 30-minute full-access deadline (v4.3.14); called once at boot. */
+  applyStoredFullAccessExpiry: () => void
   setPlanModeDefault: (value: boolean) => Promise<void>
   respondApproval: (answer: boolean | ApprovalOutcome) => void
   respondPlan: (decision: PlanDecision) => void

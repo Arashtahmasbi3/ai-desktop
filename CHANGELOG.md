@@ -7,6 +7,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.3.14] - 2026-11-23
+
+### A newline is a separator, and so is a bare `&`
+
+The read-only classifier split a command on `;`, `&&` and `||` only. Every POSIX shell also ends a statement at a
+newline and at a bare `&`, so `ls\nrm -rf /srv/other-project` was **one** segment whose first word was `ls`: it graded
+as a read, `shouldRequireApproval` answered `read_only_shell`, and the destructive line ran with no dialog. Worse, the
+S1.3 guard — "a write outside the project root is an explicit consent, even in `full` mode" — short-circuits on the
+same predicate, so `escapedWritePaths` never fired either.
+
+There was a second half to the same bug: `stripRemotePayloads` flattened the command with `replace(/\s+/g, ' ')`, so the
+newline became a space *before* the classifiers saw it and even a correct separator list would have been laundered back
+into one line. It now collapses horizontal whitespace only.
+
+Both classifiers share one `STATEMENT_SEPARATORS` list, and a redirection (`2>&1`) is still one statement.
+
+### A grant is not consent for a foreign tool
+
+A 30-minute "every command on this server" grant returned `true` from the approval gate before `shouldRequireApproval`
+was ever consulted, so an `mcp__…` tool — a process the user installed separately, which may not even run on that
+server — skipped its dialog. CHANGELOG 4.2.0 and the `mcp_tool` rule both promise the opposite. Foreign tools are now
+excluded from every shortcut that belongs to the agent's own tools, so they can only leave the gate through
+`requestApproval`.
+
+### A failed tool call shows the model what failed
+
+`formatObservation` dropped `output` on failure and kept only `error`. A non-zero `run_command` puts its diagnostics
+(test failures, type errors) on **stdout**, so the model received "Command exited with code 1" followed by the guidance
+"read the error output, fix the command" — and the output it was told to read had never been sent. It is now appended,
+capped at 4,000 characters with an explicit `[... N characters truncated ...]` marker.
+
+### The SSH deadline is armed before the channel opens
+
+`Ssh2Connection.exec` created its timeout inside the `client.exec` callback, i.e. only once the channel had opened. On a
+half-open socket the callback never fires and no timer existed: `probeLiveness`'s documented 2 s deadline, the vps IPC
+execs and every JobManager call could hang for ever. The timer is now armed first, it destroys the client when no
+channel ever opened, and `keepaliveInterval`/`keepaliveCountMax` make a vanished peer surface as an error instead of
+silence.
+
+### Full access expires across a restart
+
+The 30-minute auto-revert lived only in a renderer timer, so a reload or a restart dropped it and the grant stayed on.
+The deadline is persisted, re-armed at boot, and an expired one is downgraded rather than trusted.
+
+### An unverified installer is not installed
+
+The updater's header promises the installer is verified "and only then" handed to the OS, but `verified:false` was only
+a report field: `install()` checked that *something* had been downloaded. A release with no checksum asset — or a
+checksum fetch that failed — still produced an installable path, on a build this project cannot sign yet. `install()`
+now refuses an unverified file and says why.
+
+### CI: `npm ci` only, and Linux is reported instead of hidden
+
+`npm ci || npm install` meant a lockfile that disagreed with `package.json` could never fail: CI reinstalled a different
+tree and went green. The fallback is gone. The Linux test leg — `continue-on-error` since v4.0.1, so half the matrix
+could not fail — is now its own job, visible as a red row rather than a green one nobody earned; the required `verify`
+job runs the tests on Windows, the only platform the app ships on.
+
+### Still not true
+
+Wave 1 of the 2026-11-22 audit is what shipped here. The rest is recorded, not fixed: `evaluateHostPolicy` still admits
+a read-only prefix followed by an unseen statement; custom-provider headers and an MCP server's `env` block are still
+persisted in cleartext; a corrupt `vps-servers.json` is still silently replaced by an empty list; the app's own remote
+editor still saves over SFTP with no backup; the 120 s "no progress" clock is still refreshed only by six tool names;
+`contextWindowTokens` is still sized from the first provider while the same prompt is sent to every fallback; and the
+release path still skips the live-app gate and can still be retried only by hand after a failed checksum step. Code
+signing is still absent, so every install keeps the SmartScreen warning.
+
 ## [4.3.13] - 2026-11-17
 
 ### A failed run offers the action it is asking for

@@ -77,6 +77,8 @@ export class UpdateService {
   private readonly repo: string
   private manifest?: UpdateManifest
   private downloadedPath?: string
+  /** v4.3.14: whether the file at `downloadedPath` matched a published SHA-256. `install` refuses otherwise. */
+  private verified = false
 
   constructor(deps: UpdateServiceDeps) {
     this.deps = deps
@@ -147,6 +149,7 @@ export class UpdateService {
     const dir = this.deps.downloadDir ?? tmpdir()
     const fileName = decodeURIComponent(manifest.url.split('/').pop() ?? '')
     const destination = join(dir, fileName || `ai-desktop-setup-${manifest.version}.exe`)
+    this.verified = false
 
     try {
       await this.deps.download(manifest.url, destination, (progress) =>
@@ -172,16 +175,32 @@ export class UpdateService {
         }
       }
       this.downloadedPath = destination
+      this.verified = true
       return { ok: true, path: destination, bytes: manifest.size, verified: true }
     }
 
     this.downloadedPath = destination
+    this.verified = false
     return { ok: true, path: destination, bytes: manifest.size, verified: false }
   }
 
-  /** Run the downloaded installer. The caller is responsible for quitting the app after. */
+  /**
+   * Run the downloaded installer. The caller is responsible for quitting the app after.
+   *
+   * v4.3.14: the module header promises the installer is verified "and only then" handed to the OS, but
+   * `verified:false` was only a report field — a release without a checksum asset (or a checksum fetch that
+   * failed) still produced an installable path. This build is unsigned, so a digest is the only integrity
+   * check the updater has: refuse to run an unverified file and say why.
+   */
   async install(): Promise<{ ok: boolean; error?: string }> {
     if (!this.downloadedPath) return { ok: false, error: 'Nothing has been downloaded yet.' }
+    if (!this.verified) {
+      return {
+        ok: false,
+        error:
+          'The installer was not verified against a published checksum; refusing to run it. Download the update again from the releases page.'
+      }
+    }
     try {
       await this.deps.runInstaller(this.downloadedPath)
       return { ok: true }

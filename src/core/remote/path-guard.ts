@@ -304,7 +304,13 @@ export function stripRemotePayloads(command: string): string {
   for (const [from, to] of cuts.sort((left, right) => right[0] - left[0])) {
     stripped = stripped.slice(0, from) + stripped.slice(to)
   }
-  return stripped.replace(/\s+/g, ' ').trim()
+  /*
+   * v4.3.14: collapse horizontal whitespace only. `replace(/\s+/g, ' ')` also collapsed newlines, which
+   * turned `ls\nrm -rf /srv/x` into one space-separated line — the classifiers that run on the stripped
+   * text then saw a single `ls …` statement and graded the whole thing a read, so the off-root write never
+   * escalated even though the raw command was two statements.
+   */
+  return stripped.replace(/[ \t]+/g, ' ').replace(/\n{2,}/g, '\n').trim()
 }
 
 /**

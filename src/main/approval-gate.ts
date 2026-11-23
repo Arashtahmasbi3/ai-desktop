@@ -241,7 +241,15 @@ export function createApprovalGate(
             .catch(() => undefined)
         : undefined
 
-    if (!denyListed && !escalated) {
+    /*
+     * v4.3.14: a foreign tool (MCP) may only ever leave this gate through `requestApproval`. The shortcuts
+     * below belong to the agent's own tools; a remembered approval or a scoped "this server for 30 minutes"
+     * grant is not consent for a process the user installed separately — which is what CHANGELOG 4.2.0 and
+     * `shouldRequireApproval`'s `mcp_tool` rule already promise.
+     */
+    const foreignTool = action.name.startsWith('mcp__')
+
+    if (!denyListed && !escalated && !foreignTool) {
       if (approvedCommands?.isApproved(action.name, action.arguments, sessionId, scope)) {
         /*
          * A remembered approval covers an ordinary change, but not something that cannot be undone.
