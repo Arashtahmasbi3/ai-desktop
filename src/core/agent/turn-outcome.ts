@@ -211,6 +211,8 @@ export function finishRun(
     finalAnswer,
     message,
     sandboxId: ctx.sandboxId,
+    // v4.3.17 (AGT-11): which provider actually answered, so usage is priced against the model that ran.
+    ...(ctx.provider ? { provider: ctx.provider } : {}),
     warnings,
     ...(stop ? { stop } : {}),
     ...(usage ? { usage } : {}),

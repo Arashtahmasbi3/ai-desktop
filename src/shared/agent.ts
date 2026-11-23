@@ -240,6 +240,8 @@ export interface AgentRunResult {
   warnings: LoopWarning[]
   /** Set when the run stopped early because it looked stuck. */
   stop?: LoopStopInfo
+  /** v4.3.17 (AGT-11): the provider that answered the last planning call (fallback-aware). */
+  provider?: ProviderId
   usage?: Usage
   startedAt: number
   finishedAt: number

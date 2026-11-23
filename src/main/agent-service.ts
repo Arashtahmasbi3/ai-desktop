@@ -542,6 +542,12 @@ export class AgentService {
     const orchestrator = new AgentOrchestrator({
       sandbox: this.sandbox,
       providers,
+      /*
+       * v4.3.17 (AGT-7): the orchestrator minted its own id from its own counter, so every run's internal id was
+       * `run-1` while the trace, the tool results and `run:end` were keyed by this service's `run-N`. One run, two
+       * ids: `decisionsForRun` and the trace panel could not join them.
+       */
+      runIdFactory: () => runId,
       logger: new EmittingLogger(this.emit, this.traceStore, onDecision),
       sessionStore: this.sessionStore,
       enforceSuccessVerification: true,
@@ -621,10 +627,21 @@ export class AgentService {
     this.emit({ type: 'run:start', runId, task: request.task, at: this.now() })
 
     try {
-      const result = await orchestrator.run(request.task, {
+      /*
+       * v4.3.17 (AGT-5): the attachment block names the staged files, and the model only ever sees the text it is
+       * handed here. `request.task` was used, so a staged (non-inline) attachment was copied into the workspace and
+       * then never mentioned in the prompt: the model could not open what it had just been given.
+       */
+      const result = await orchestrator.run(task, {
         signal: controller.signal,
         ...(request.resumeSessionId ? { resumeSessionId: request.resumeSessionId } : {})
       })
+      /*
+       * v4.3.17 (AGT-11): usage used to be booked against the first configured provider even when the run had fallen
+       * back to another one, so the spend line priced somebody else's tokens. The orchestrator now reports which
+       * provider answered.
+       */
+      const used = providers.find((entry) => entry.provider === result.provider) ?? providers[0]
       this.emit({
         type: 'run:end',
         runId: result.runId,
@@ -633,8 +650,8 @@ export class AgentService {
         message: result.message,
         warnings: result.warnings,
         ...(result.stop ? { stop: result.stop } : {}),
-        provider: providers[0].provider,
-        model: providers[0].config.model,
+        provider: used.provider,
+        model: used.config.model,
         ...(result.usage ? { usage: result.usage } : {}),
         at: this.now()
       })
