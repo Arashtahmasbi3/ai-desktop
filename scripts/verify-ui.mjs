@@ -40,6 +40,7 @@ import {
   debugUrl,
   electronArgs,
   launchEnv,
+  runtimeDepsFromBuilderConfig,
   stagePlan
 } from './lib/verify-ui-core.mjs'
 import {
@@ -384,9 +385,21 @@ async function capture(page, theme, outDir) {
 }
 
 async function main() {
+  /*
+   * v4.3.17 (REL-2): stage exactly the runtime dependencies the installer ships, read from electron-builder.yml.
+   * A hand-written list could drift from packaging while the gate kept passing on a layout the real app never has.
+   */
+  let runtimeDeps
+  try {
+    const builderConfig = await readFile(join(REPO_ROOT, 'electron-builder.yml'), 'utf8')
+    runtimeDeps = runtimeDepsFromBuilderConfig(builderConfig)
+  } catch {
+    runtimeDeps = undefined
+  }
   const plan = stagePlan({
     repoRoot: REPO_ROOT,
-    ...(STAGING_ROOT === undefined ? {} : { root: STAGING_ROOT })
+    ...(STAGING_ROOT === undefined ? {} : { root: STAGING_ROOT }),
+    ...(runtimeDeps && runtimeDeps.length > 0 ? { runtimeDeps } : {})
   })
 
   if (SEED_PROJECT !== undefined) {

@@ -81,7 +81,7 @@ export function usage() {
  * @returns {ReleaseArgs}
  */
 export function parseArgs(argv) {
-  const flags = { help: false, dryRun: false, commit: false, push: false }
+  const flags = { help: false, dryRun: false, commit: false, push: false, requireSignature: false }
   /** @type {string[]} */
   const positional = []
 
@@ -90,13 +90,14 @@ export function parseArgs(argv) {
     else if (arg === '--dry-run') flags.dryRun = true
     else if (arg === '--commit') flags.commit = true
     else if (arg === '--push') flags.push = true
+    else if (arg === '--require-signature') flags.requireSignature = true
     else if (arg.startsWith('-')) {
       throw new ReleaseError(`unknown option "${arg}" (try --help)`, 'unknown-option')
     } else positional.push(arg)
   }
 
   if (flags.help) {
-    return { help: true, dryRun: false, commit: false, push: false, version: null }
+    return { help: true, dryRun: false, commit: false, push: false, requireSignature: false, version: null }
   }
   if (positional.length === 0) {
     throw new ReleaseError('missing version argument (e.g. 4.2.0); try --help', 'missing-version')
@@ -116,6 +117,7 @@ export function parseArgs(argv) {
     dryRun: flags.dryRun,
     commit: flags.commit,
     push: flags.push,
+    requireSignature: flags.requireSignature,
     version: positional[0]
   }
 }
@@ -347,6 +349,28 @@ export function checkPreflight(snapshot) {
  * }} options
  * @returns {{ id: string, title: string, detail: string }[]}
  */
+/**
+ * v4.3.17 (REL-7): what the release says about signing, as data.
+ *
+ * The build is unsigned unless `CSC_LINK` (or an OS certificate) is present, and nothing in the pipeline said so: the
+ * artifacts shipped, every install showed SmartScreen, and a release could be cut believing otherwise. A release that
+ * is required to be signed now refuses to run without a certificate; otherwise the status is announced in the plan.
+ */
+export function signingPlan(options = {}) {
+  const configured = Boolean(options.cscLink)
+  const required = Boolean(options.requireSignature)
+  return {
+    configured,
+    required,
+    blocked: required && !configured,
+    message: configured
+      ? 'A code-signing certificate is configured; the artifacts will be signed.'
+      : required
+        ? 'This release requires a signature, but no certificate is configured (CSC_LINK). Refusing to build unsigned artifacts.'
+        : 'No code-signing certificate is configured: the artifacts will be unsigned and every install shows the SmartScreen warning.'
+  }
+}
+
 export function buildPlan(options) {
   const { currentVersion, targetVersion, bump, commit, push } = options
   const steps = [

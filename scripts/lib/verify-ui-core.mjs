@@ -32,6 +32,22 @@ export const APP_DATA_DIR_NAME = 'AI Desktop'
  */
 export const RUNTIME_DEPS = Object.freeze(['ssh2', 'asn1', 'bcrypt-pbkdf', 'tweetnacl', 'safer-buffer'])
 
+/**
+ * v4.3.17 (REL-2): the runtime dependencies, read from `electron-builder.yml` instead of restated here.
+ *
+ * The staged layout used to be assembled from a hand-written list that could drift from what the installer actually
+ * ships — the worst kind of drift, because the gate would keep passing on an app that is missing a module the real
+ * package includes (or stage one it does not).
+ */
+export function runtimeDepsFromBuilderConfig(yamlText) {
+  const names = new Set()
+  for (const line of String(yamlText ?? '').split(/\r?\n/)) {
+    const match = /^\s*-\s*['"]?node_modules\/([^/*'"]+)\//.exec(line)
+    if (match) names.add(match[1])
+  }
+  return [...names]
+}
+
 /** Name of the one capture this script takes: the live window, in each theme. */
 export const LIVE_SHOT = 'live-shell'
 
@@ -90,6 +106,8 @@ export function stagePlan(options) {
   const platform = options.platform ?? process.platform
   const path = pathFor(platform)
   const root = stagingRoot({ ...options, platform })
+  // v4.3.17 (REL-2): the caller may pass the list it read from electron-builder.yml; the constant is only a fallback.
+  const runtimeDeps = Array.isArray(options.runtimeDeps) ? options.runtimeDeps : RUNTIME_DEPS
 
   const appDir = path.join(root, 'app')
   const electronDir = path.join(root, 'electron')
@@ -108,7 +126,7 @@ export function stagePlan(options) {
       to: path.join(appDir, 'package.json'),
       note: '"main" must resolve to out/main/index.js'
     },
-    ...RUNTIME_DEPS.map((name) => ({
+    ...runtimeDeps.map((name) => ({
       from: path.join(repoRoot, 'node_modules', name),
       to: path.join(appDir, 'node_modules', name),
       note: 'a runtime dependency the packaged app ships'

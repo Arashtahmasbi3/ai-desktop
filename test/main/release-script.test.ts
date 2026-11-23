@@ -39,7 +39,19 @@ const HEX_B = 'b'.repeat(64)
 
 describe('parseArgs', () => {
   it('takes the version as the only positional argument', () => {
-    expect(parseArgs(['4.2.0'])).toEqual({ help: false, dryRun: false, commit: false, push: false, version: '4.2.0' })
+    expect(parseArgs(['4.2.0'])).toEqual({
+      help: false,
+      dryRun: false,
+      commit: false,
+      push: false,
+      requireSignature: false,
+      version: '4.2.0'
+    })
+  })
+
+  it('reads --require-signature (v4.3.17, REL-7)', () => {
+    expect(parseArgs(['4.2.0', '--require-signature'])).toMatchObject({ requireSignature: true })
+    expect(parseArgs(['4.2.0'])).toMatchObject({ requireSignature: false })
   })
 
   it('accepts the flags in any order, with the version anywhere', () => {
@@ -421,6 +433,27 @@ describe('isPathInside / checkBuildDirectory (the Defender trap)', () => {
   })
 })
 
+describe('signing is stated, and can be required (v4.3.17, REL-7)', () => {
+  it('says the build will be unsigned when no certificate is configured', () => {
+    const plan = core.signingPlan({})
+    expect(plan.configured).toBe(false)
+    expect(plan.blocked).toBe(false)
+    expect(plan.message).toContain('SmartScreen')
+  })
+
+  it('recognises a configured certificate', () => {
+    const plan = core.signingPlan({ cscLink: 'cert.pfx' })
+    expect(plan.configured).toBe(true)
+    expect(plan.message).toContain('signed')
+  })
+
+  it('refuses a release that requires a signature when none is configured', () => {
+    const plan = core.signingPlan({ requireSignature: true })
+    expect(plan.blocked).toBe(true)
+    expect(plan.message).toContain('Refusing')
+  })
+})
+
 describe('the declaration file matches the implementation', () => {
   it('exports everything release-core.d.mts promises', () => {
     const expected = [
@@ -444,6 +477,7 @@ describe('the declaration file matches the implementation', () => {
       'parseSums',
       'parseVersion',
       'sha256SumsContent',
+      'signingPlan',
       'usage',
       'validateTarget'
     ]

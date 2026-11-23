@@ -62,6 +62,7 @@ import {
   formatPlan,
   parseArgs,
   sha256SumsContent,
+  signingPlan,
   usage,
   validateTarget
 } from './lib/release-core.mjs'
@@ -248,6 +249,20 @@ async function main() {
     process.exit(1)
   }
   out('  result             ok')
+
+  /*
+   * v4.3.17 (REL-7): say out loud whether the artifacts will be signed. Nothing in the pipeline did, so a release
+   * could be cut believing it was signed while every install still showed SmartScreen.
+   */
+  const signing = signingPlan({
+    cscLink: process.env.CSC_LINK,
+    requireSignature: args.requireSignature
+  })
+  out(`[release] signing: ${signing.message}`)
+  if (signing.blocked) {
+    process.stderr.write(`\n[release] REFUSING (unsigned): ${signing.message}\n`)
+    process.exit(1)
+  }
 
   if (args.dryRun) {
     out('')

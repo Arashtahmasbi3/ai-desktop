@@ -28,10 +28,20 @@ export interface ReleaseArgs {
   readonly dryRun: boolean
   readonly commit: boolean
   readonly push: boolean
+  /** v4.3.17 (REL-7): refuse to build when no signing certificate is configured. */
+  readonly requireSignature: boolean
   readonly version: string | null
 }
 
 export function parseArgs(argv: readonly string[]): ReleaseArgs
+
+/** v4.3.17 (REL-7): whether this build is signed, required to be, and what to tell the user. */
+export function signingPlan(options?: { cscLink?: string; requireSignature?: boolean }): {
+  configured: boolean
+  required: boolean
+  blocked: boolean
+  message: string
+}
 
 export interface ParsedVersion {
   readonly major: number

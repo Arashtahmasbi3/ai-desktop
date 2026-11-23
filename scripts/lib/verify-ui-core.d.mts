@@ -18,7 +18,12 @@ export interface StageRootOptions {
 
 export interface StagePlanOptions extends StageRootOptions {
   repoRoot: string
+  /** The runtime dependencies the installer ships, read from electron-builder.yml (v4.3.17, REL-2). */
+  runtimeDeps?: string[]
 }
+
+/** Package names the installer ships under `node_modules/`, read from its `files:` globs. */
+export declare function runtimeDepsFromBuilderConfig(yamlText: string): string[]
 
 export interface StagedCopy {
   from: string
