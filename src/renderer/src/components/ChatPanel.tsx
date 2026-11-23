@@ -265,12 +265,17 @@ export default function ChatPanel(): JSX.Element {
     setContextCard({ preview, body, willSend, attachmentNames })
   }
 
-  const doSend = (body: string, attachments: string[] = []): void => {
+  const doSend = async (body: string, attachments: string[] = []): Promise<void> => {
     if ((!body && attachments.length === 0) || running) return
+    /*
+     * v4.3.17 (UI-2): clear the composer only once the run was accepted. A send refused by the spend cap used to
+     * empty the box — and its attachments — while nothing ran.
+     */
+    const accepted = await send(body, attachments)
+    if (!accepted) return
     setInput('')
     setAttached([])
     setAtBottom(true)
-    void send(body, attachments)
   }
 
   const submit = (): void => {

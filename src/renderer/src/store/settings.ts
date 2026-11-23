@@ -11,6 +11,17 @@ import { VPS_RECONNECT_KEY } from '../lib/vps-state'
 import type { VpsConnectionState } from '@shared/vps'
 import { newId, basename } from './helpers'
 import type { StoreSet, StoreGet } from './helpers'
+
+/**
+ * v4.3.17 (UI-5): every goal action used to have `finally` and no `catch`, so a failure in main became an unhandled
+ * rejection and the user saw the spinner stop with no explanation. Report it the way the approval actions do.
+ */
+function reportGoalError(get: StoreGet, error: unknown): void {
+  get().pushToast(
+    'error',
+    `${i18n.t('toast.actionFailed')} ${error instanceof Error ? error.message : String(error)}`
+  )
+}
 import { rememberChatId } from './prefs'
 import type { AppState } from './types'
 
@@ -354,6 +365,8 @@ export function settingsActions(
           title: trimmed,
           ...(criteria && criteria.length > 0 ? { criteria } : {})
         })
+      } catch (error) {
+        reportGoalError(get, error)
       } finally {
         set({ goalsBusy: false })
         await get().refreshGoals()
@@ -366,6 +379,8 @@ export function settingsActions(
       set({ goalsBusy: true })
       try {
         await window.api.agent.goal.update(goalId, { title: trimmed })
+      } catch (error) {
+        reportGoalError(get, error)
       } finally {
         set({ goalsBusy: false })
         await get().refreshGoals()
@@ -376,6 +391,8 @@ export function settingsActions(
       set({ goalsBusy: true })
       try {
         await window.api.agent.goal.setCriterion(goalId, criterionId, met)
+      } catch (error) {
+        reportGoalError(get, error)
       } finally {
         set({ goalsBusy: false })
         await get().refreshGoals()
@@ -386,6 +403,8 @@ export function settingsActions(
       set({ goalsBusy: true })
       try {
         await window.api.agent.goal.setActive(goalId)
+      } catch (error) {
+        reportGoalError(get, error)
       } finally {
         set({ goalsBusy: false })
         await get().refreshGoals()
@@ -396,6 +415,8 @@ export function settingsActions(
       set({ goalsBusy: true })
       try {
         await window.api.agent.goal.achieve(goalId)
+      } catch (error) {
+        reportGoalError(get, error)
       } finally {
         set({ goalsBusy: false })
         await get().refreshGoals()
@@ -406,6 +427,8 @@ export function settingsActions(
       set({ goalsBusy: true })
       try {
         await window.api.agent.goal.abandon(goalId, note)
+      } catch (error) {
+        reportGoalError(get, error)
       } finally {
         set({ goalsBusy: false })
         await get().refreshGoals()
@@ -416,6 +439,8 @@ export function settingsActions(
       set({ goalsBusy: true })
       try {
         await window.api.agent.goal.remove(goalId)
+      } catch (error) {
+        reportGoalError(get, error)
       } finally {
         set({ goalsBusy: false })
         await get().refreshGoals()

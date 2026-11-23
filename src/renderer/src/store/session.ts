@@ -6,6 +6,9 @@ import type { StoreSet, StoreGet } from './helpers'
 import { readLastChatId, rememberChatId } from './prefs'
 import type { AppState } from './types'
 
+/** v4.3.17 (UI-4): the newest chat load wins; an older answer that settles later is dropped. */
+let loadToken = 0
+
 export function sessionActions(
   set: StoreSet,
   get: StoreGet
@@ -182,6 +185,12 @@ export function sessionActions(
         approvalSuggestion: null,
         queuedExplain: null,
         fileChanges: [],
+        /*
+         * v4.3.17 (UI-3): the run-changes card and the per-step reasoning belong to the chat that produced them.
+         * They were not reset here, so a new chat (or a loaded one) showed "Edited N files" for the previous chat.
+         */
+        changedFiles: [],
+        reasoningByStep: {},
         // v3.0: a declared output belongs to the run it was declared for, so a new
         // chat starts with an empty Sources/Outputs panel.
         runOutputs: [],
@@ -210,7 +219,13 @@ export function sessionActions(
     },
 
     async loadSession(id) {
+      /*
+       * v4.3.17 (UI-4): two loads can settle out of order — click chat A, then B, and A's slower answer lands last,
+       * replacing the conversation the user is looking at. Only the newest request may write to the store.
+       */
+      const token = ++loadToken
       const record = await window.api.chats.load(id)
+      if (token !== loadToken) return
       if (!record) return
       rememberChatId(id)
       set({

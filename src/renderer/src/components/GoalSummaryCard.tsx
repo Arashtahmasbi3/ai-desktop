@@ -32,7 +32,8 @@ export default function GoalSummaryCard(): JSX.Element | null {
       className="ui-card mx-4 mb-1 flex items-center gap-2 border border-accent/40 bg-accent-solid/10 px-2.5 py-1.5"
     >
       <Target className="h-3.5 w-3.5 shrink-0 text-accent" />
-      <span className="shrink-0 text-3xs font-medium text-fg-muted">{t('goal.summaryTitle')}</span>
+      {/* v4.3.17 (UI-8): the key is `goalSummaryTitle` in both locales; `goal.summaryTitle` never existed. */}
+      <span className="shrink-0 text-3xs font-medium text-fg-muted">{t('goalSummaryTitle')}</span>
       <span className="min-w-0 flex-1 truncate text-xs text-fg" title={goal.title}>
         {goal.title}
       </span>

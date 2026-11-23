@@ -100,13 +100,21 @@ export default function StatusBar(): JSX.Element {
    * `defaultValue` keeps the sentence honest until they are merged, and `formatSpend` is the one
    * place the wording (and the arithmetic) lives.
    */
-  const unpriced = session.total.cost === null || session.total.costUnknown
-  const spendText = unpriced
-    ? t(session.total.cost === null ? 'statusBar.spendUnpriced' : 'statusBar.spendLowerBound', {
-        cost: session.total.cost === null ? '' : formatCost(session.total.cost),
-        defaultValue: formatSpend(session.total.cost, true)
-      })
-    : formatSpend(session.total.cost, false)
+  /*
+   * v4.3.17 (UI-7): before the first call there is no cost to be a "lower bound" of, so the bar used to announce
+   * "unpriced model" for a session that had spent nothing. The claim is only about a call that happened.
+   */
+  const unpriced = session.total.calls > 0 && (session.total.cost === null || session.total.costUnknown)
+  const spendText =
+    session.total.calls === 0
+      ? // v4.3.17 (UI-7): a session that has not called anything spent $0.00, not "an unpriced model".
+        formatCost(0)
+      : unpriced
+        ? t(session.total.cost === null ? 'statusBar.spendUnpriced' : 'statusBar.spendLowerBound', {
+            cost: session.total.cost === null ? '' : formatCost(session.total.cost),
+            defaultValue: formatSpend(session.total.cost, true)
+          })
+        : formatSpend(session.total.cost, false)
 
   // v2.7.0: `worker` is null until the background worker reports in. Defaulting to
   // "online" made the bar claim "Agent: running" before anything had reported — three

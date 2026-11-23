@@ -29,8 +29,8 @@ export default function ChatTree({ mode, onClose }: ChatTreeProps): JSX.Element 
         aria-label="Workspace"
         className={
           mode === 'static'
-            ? 'hidden w-64 shrink-0 border-r border-border md:flex'
-            : 'absolute inset-y-0 left-0 z-40 flex w-64 max-w-[90vw] flex-col border-r border-border bg-bg-secondary'
+            ? 'hidden w-64 shrink-0 border-e border-border md:flex'
+            : 'absolute inset-y-0 start-0 z-40 flex w-64 max-w-[90vw] flex-col border-e border-border bg-bg-secondary'
         }
       >
         <FileExplorer onClose={mode === 'overlay' ? onClose : undefined} />

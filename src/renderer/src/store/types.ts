@@ -448,7 +448,7 @@ export interface AppState {
    * run's workspace and tells the model where they are — the renderer never reads the
    * file and never sends a desktop path.
    */
-  send: (text: string, attachments?: string[]) => Promise<void>
+  send: (text: string, attachments?: string[]) => Promise<boolean>
   abort: () => void
   newSession: () => void
   /** v2.6.2 T5.1: archive the current chat and start a fresh context. */

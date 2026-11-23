@@ -6,6 +6,9 @@ import { applyTheme, storeTheme } from '../lib/theme'
 import { setUiMode as persistUiMode } from '../lib/ui-mode'
 import { newId } from './helpers'
 import type { StoreSet, StoreGet } from './helpers'
+
+/** v4.3.17 (UI-6): the newest code search wins; an older answer that settles later is dropped. */
+let searchToken = 0
 import {
   CONTEXT_SETTINGS_KEY,
   RAW_TOOL_ROWS_KEY,
@@ -128,9 +131,17 @@ export function uiActions(
         set({ searchResults: [] })
         return
       }
+      /*
+       * v4.3.17 (UI-6): a slow answer for an older query used to replace the results of the newer one. Only the
+       * newest query may write.
+       */
+      const token = ++searchToken
       try {
-        set({ searchResults: await window.api.search.code(trimmed) })
+        const results = await window.api.search.code(trimmed)
+        if (token !== searchToken) return
+        set({ searchResults: results })
       } catch {
+        if (token !== searchToken) return
         set({ searchResults: [] })
       }
     },

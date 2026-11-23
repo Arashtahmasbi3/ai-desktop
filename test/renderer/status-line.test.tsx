@@ -171,6 +171,19 @@ describe('v4.3 — the status line', () => {
     expect(spend.textContent ?? '').not.toMatch(/unknown/i)
   })
 
+  /*
+   * v4.3.17 (UI-7): the "lower bound" claim is about a call that happened. With no calls yet, the bar used to
+   * announce an unpriced model for a session that had spent nothing.
+   */
+  it('8. a session with no calls is not described as unpriced', () => {
+    useStore.setState({ usageRecords: [], sessionStartedAt: Date.now() })
+    render(<StatusBar />)
+
+    const spend = screen.getByTestId('status-spend').textContent ?? ''
+    expect(spend).not.toMatch(/unpriced|lower bound|unknown/i)
+    expect(spend).toMatch(/0\.00/)
+  })
+
   it('8. a partly priced session shows the number but states it is a lower bound', () => {
     const now = Date.now()
     useStore.setState({

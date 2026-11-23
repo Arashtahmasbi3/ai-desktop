@@ -361,7 +361,12 @@ export function runActions(
     async send(text, attachments) {
       const trimmed = text.trim()
       const files = (attachments ?? []).filter((id) => typeof id === 'string' && id !== '')
-      if ((!trimmed && files.length === 0) || get().running) return
+      /*
+       * v4.3.17 (UI-2): the return value says whether the run was accepted. The composer used to clear itself
+       * before calling this, so a send refused by the spend cap (or by `running`) destroyed the typed text and the
+       * attachments while the only feedback was a toast.
+       */
+      if ((!trimmed && files.length === 0) || get().running) return false
       /*
        * v3.1: the spend guard acts BEFORE the call. Checking afterwards would report a cost the
        * user already paid, which is the one thing a budget is supposed to prevent. The message
@@ -370,7 +375,7 @@ export function runActions(
       const budget = budgetState(get().usageRecords, readBudget(), Date.now())
       if (budget.blocks) {
         get().pushToast('warning', budgetBlockMessage(budget))
-        return
+        return false
       }
       /**
        * v3.0: the Sources/Outputs panel declares intent, and that intent is prompt
@@ -428,6 +433,7 @@ export function runActions(
         set({ running: false, error: message })
         get().pushToast('error', message)
       }
+      return true
     },
 
     abort() {
