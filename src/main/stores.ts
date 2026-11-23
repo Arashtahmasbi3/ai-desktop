@@ -75,9 +75,9 @@ export function createAuditLog(dir = appDataDir()): AuditLog {
 }
 
 /**
- * Configured MCP servers (F0-2d). One small JSON file, same as the other stores; the environment
- * block it can hold never leaves main, so no cipher is needed for the file itself.
+ * Configured MCP servers (F0-2d). One small JSON file, same as the other stores. The environment block it can hold
+ * never leaves main, and since v4.3.17 its values are encrypted at rest like every other credential.
  */
 export function createMcpServerStore(dir = appDataDir()): McpServerStore {
-  return new McpServerStore({ baseDir: dir })
+  return new McpServerStore({ baseDir: dir, cipher: createSafeStorageCipher() })
 }

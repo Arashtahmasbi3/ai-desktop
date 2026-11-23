@@ -90,8 +90,56 @@ describe('CustomProviderStore', () => {
     expect(decrypted?.headers).toEqual({ 'X-Title': 'AI Desktop' })
   })
 
-  it('keeps the stored key when an update omits apiKey', async () => {
+  /*
+   * SEC-4 (v4.3.17): the natural way to authenticate an OpenAI-compatible gateway is `Authorization: Bearer …` or
+   * `api-key: …` in the extra-headers field, and those values were written in cleartext beside the encrypted API key.
+   */
+  it('never writes a header value in cleartext', async () => {
     const store = makeStore()
+    await store.save({
+      label: 'Gateway',
+      baseUrl: 'https://gw.example.com/v1',
+      model: 'm',
+      apiKey: 'k',
+      headers: { Authorization: 'Bearer super-secret-token' }
+    })
+
+    const raw = await fs.readFile(file, 'utf8')
+    expect(raw).not.toContain('super-secret-token')
+    expect(raw).toContain('headersEnc')
+
+    expect((await store.getDecrypted('cp-1'))?.headers).toEqual({
+      Authorization: 'Bearer super-secret-token'
+    })
+    expect(store.list()[0]?.headerCount).toBe(1)
+  })
+
+  it('encrypts a header value written by an older build', async () => {
+    const legacy = {
+      version: CUSTOM_PROVIDERS_SCHEMA_VERSION,
+      providers: [
+        {
+          id: 'old',
+          label: 'Old',
+          baseUrl: 'https://old.example.com/v1',
+          model: 'm',
+          createdAt: 1,
+          updatedAt: 1,
+          headers: { 'api-key': 'legacy-secret' }
+        }
+      ]
+    }
+    await fs.writeFile(file, JSON.stringify(legacy), 'utf8')
+
+    const store = makeStore()
+    await store.load()
+
+    const raw = await fs.readFile(file, 'utf8')
+    expect(raw).not.toContain('legacy-secret')
+    expect((await store.getDecrypted('old'))?.headers).toEqual({ 'api-key': 'legacy-secret' })
+  })
+
+  it('keeps the stored key when an update omits apiKey', async () => {    const store = makeStore()
     await store.save({ label: 'A', baseUrl: 'https://a/v1', model: 'm1', apiKey: 'keep-me' })
     await store.save({ id: 'cp-1', label: 'A2', baseUrl: 'https://a/v1', model: 'm2' })
     const decrypted = await store.getDecrypted('cp-1')

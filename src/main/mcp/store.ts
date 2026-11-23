@@ -1,5 +1,6 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import type { SecretCipher } from '@core/agent/persistence'
 import type { McpServerConfig, McpServerInput, McpServerView } from '@shared/mcp'
 
 /**
@@ -9,15 +10,21 @@ import type { McpServerConfig, McpServerInput, McpServerView } from '@shared/mcp
  * so a crash cannot leave a half file), and unknown records dropped on read rather than crashing the app. The
  * environment block is kept out of `McpServerView` on purpose: it is where a token would live, and the renderer has
  * no business seeing it.
+ *
+ * v4.3.17 (SEC-5): the file used to hold that environment — the token itself — in cleartext while every other
+ * credential in the app went through `SecretCipher`. When a cipher is supplied the values are stored as `envEnc`;
+ * a file written before this change is re-encrypted on the first read, the same way provider keys are scrubbed.
  */
 export interface McpServerStoreOptions {
   baseDir: string
   now?: () => number
+  /** Encrypts environment values. Absent in tests that only exercise the file shape. */
+  cipher?: SecretCipher
 }
 
 interface StoredFile {
   version: number
-  servers: McpServerConfig[]
+  servers: Array<Record<string, unknown>>
 }
 
 const FILE = 'mcp.json'
@@ -31,30 +38,13 @@ function readString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() !== '' ? value : undefined
 }
 
-/** A record that cannot be turned into a usable server is dropped, not guessed at. */
-function toConfig(value: unknown): McpServerConfig | undefined {
+function stringRecord(value: unknown): Record<string, string> | undefined {
   if (!isRecord(value)) return undefined
-  const id = readString(value.id)
-  const name = readString(value.name)
-  const command = readString(value.command)
-  if (id === undefined || name === undefined || command === undefined) return undefined
-  const args = Array.isArray(value.args)
-    ? value.args.filter((argument): argument is string => typeof argument === 'string')
-    : []
-  const env = isRecord(value.env)
-    ? Object.fromEntries(
-        Object.entries(value.env).filter((entry): entry is [string, string] => typeof entry[1] === 'string')
-      )
-    : undefined
-  return {
-    id,
-    name,
-    command,
-    args,
-    ...(env && Object.keys(env).length > 0 ? { env } : {}),
-    enabled: value.enabled !== false,
-    createdAt: typeof value.createdAt === 'number' ? value.createdAt : 0
+  const out: Record<string, string> = {}
+  for (const [key, entry] of Object.entries(value)) {
+    if (typeof entry === 'string') out[key] = entry
   }
+  return Object.keys(out).length > 0 ? out : undefined
 }
 
 /** A short, honest description of how the server starts — never the full environment. */
@@ -77,22 +67,33 @@ export function toView(config: McpServerConfig): McpServerView {
 export class McpServerStore {
   private readonly file: string
   private readonly now: () => number
+  private readonly cipher?: SecretCipher
 
   constructor(options: McpServerStoreOptions) {
     this.file = join(options.baseDir, FILE)
     this.now = options.now ?? Date.now
+    if (options.cipher) this.cipher = options.cipher
   }
 
   async list(): Promise<McpServerConfig[]> {
+    let parsed: unknown
     try {
-      const raw = await readFile(this.file, 'utf8')
-      const parsed: unknown = JSON.parse(raw)
-      const servers = isRecord(parsed) && Array.isArray(parsed.servers) ? parsed.servers : []
-      return servers.map(toConfig).filter((entry): entry is McpServerConfig => entry !== undefined)
+      parsed = JSON.parse(await readFile(this.file, 'utf8'))
     } catch {
       // No file yet (or an unreadable one) is an empty list, never a crash: MCP is optional.
       return []
     }
+    const records = isRecord(parsed) && Array.isArray(parsed.servers) ? parsed.servers : []
+    const servers: McpServerConfig[] = []
+    let legacyPlaintext = false
+    for (const record of records) {
+      const result = await this.toConfig(record)
+      if (result === undefined) continue
+      if (result.legacy) legacyPlaintext = true
+      servers.push(result.config)
+    }
+    if (legacyPlaintext && this.cipher) await this.write(servers)
+    return servers
   }
 
   async save(input: McpServerInput): Promise<McpServerConfig> {
@@ -130,9 +131,73 @@ export class McpServerStore {
     return true
   }
 
+  /** Decrypt one stored record; `legacy` says it carried a plaintext environment that should be rewritten. */
+  private async toConfig(
+    value: unknown
+  ): Promise<{ config: McpServerConfig; legacy: boolean } | undefined> {
+    if (!isRecord(value)) return undefined
+    const id = readString(value.id)
+    const name = readString(value.name)
+    const command = readString(value.command)
+    if (id === undefined || name === undefined || command === undefined) return undefined
+    const args = Array.isArray(value.args)
+      ? value.args.filter((argument): argument is string => typeof argument === 'string')
+      : []
+
+    let env: Record<string, string> | undefined
+    let legacy = false
+    if (this.cipher && isRecord(value.envEnc)) {
+      const decrypted: Record<string, string> = {}
+      for (const [key, entry] of Object.entries(value.envEnc)) {
+        if (typeof entry !== 'string') continue
+        try {
+          decrypted[key] = await this.cipher.decrypt(entry)
+        } catch {
+          // A value this build cannot decrypt is dropped rather than reported as the token.
+        }
+      }
+      if (Object.keys(decrypted).length > 0) env = decrypted
+    } else {
+      env = stringRecord(value.env)
+      if (env && this.cipher) legacy = true
+    }
+
+    return {
+      config: {
+        id,
+        name,
+        command,
+        args,
+        ...(env && Object.keys(env).length > 0 ? { env } : {}),
+        enabled: value.enabled !== false,
+        createdAt: typeof value.createdAt === 'number' ? value.createdAt : 0
+      },
+      legacy
+    }
+  }
+
+  private async stored(config: McpServerConfig): Promise<Record<string, unknown>> {
+    const base: Record<string, unknown> = {
+      id: config.id,
+      name: config.name,
+      command: config.command,
+      args: config.args,
+      enabled: config.enabled,
+      createdAt: config.createdAt
+    }
+    const env = config.env
+    if (!env || Object.keys(env).length === 0) return base
+    if (!this.cipher) return { ...base, env }
+    const envEnc: Record<string, string> = {}
+    for (const [key, value] of Object.entries(env)) envEnc[key] = await this.cipher.encrypt(value)
+    return { ...base, envEnc }
+  }
+
   private async write(servers: McpServerConfig[]): Promise<void> {
     await mkdir(join(this.file, '..'), { recursive: true })
-    const payload: StoredFile = { version: VERSION, servers }
+    const stored = []
+    for (const server of servers) stored.push(await this.stored(server))
+    const payload: StoredFile = { version: VERSION, servers: stored }
     const temporary = `${this.file}.tmp`
     await writeFile(temporary, `${JSON.stringify(payload, null, 2)}\n`, 'utf8')
     await rename(temporary, this.file)

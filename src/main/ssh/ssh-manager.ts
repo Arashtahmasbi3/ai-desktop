@@ -3,7 +3,7 @@ import { AuditLog, type AuditEntry } from '@core/agent/audit-log'
 import { checkDenyList } from '@core/agent/deny-list'
 import { RateLimiter } from '@core/agent/rate-limiter'
 import { evaluateHostPolicy } from '@core/remote/host-policy'
-import { parseBackupPath, restoreCommandFor } from '@core/remote/backup'
+import { backupPathFor, parseBackupPath, restoreCommandFor } from '@core/remote/backup'
 import { runHealthCheck } from '@core/remote/health-check'
 import { shellQuote } from '@shared/shell-quote'
 import { getCommandTimeout } from '@core/tools/remote-shell-tool'
@@ -931,6 +931,37 @@ export class SshManager {
     this.connections.get(serverId)?.terminal?.resize(cols, rows)
   }
 
+  /**
+   * Copy an existing remote file to `<path>.backup-<ts>` before overwriting it (v4.3.17, SSH-6).
+   *
+   * One POSIX round trip: it copies only when the target exists, and it prints a marker so "there was nothing to back
+   * up" stays distinguishable from "the copy failed" — the second one aborts the write.
+   */
+  private async backUpBeforeWrite(
+    serverId: string,
+    connection: SshConnection,
+    path: string
+  ): Promise<void> {
+    const quoted = shellQuote(path)
+    const backup = backupPathFor(path, this.now())
+    const marker = 'ai-desktop-backup-ok'
+    const command = `if [ -e ${quoted} ]; then cp -p -- ${quoted} ${shellQuote(backup)} && echo ${marker}; fi`
+    const result = await connection.exec(command, getCommandTimeout(command))
+    if (result.timedOut || result.exitCode !== 0) {
+      throw new Error(`Could not back up ${path} before writing it.`)
+    }
+    if (!result.stdout.includes(marker)) return
+    await this.audit
+      .record({
+        type: 'backup_created',
+        ok: true,
+        serverId,
+        command: `sftp:backup ${path}`,
+        detail: backup
+      })
+      .catch(() => undefined)
+  }
+
   async listFiles(serverId: string, path: string): Promise<RemoteFileEntry[]> {
     const entry = this.connections.get(serverId)
     if (!entry) throw new Error('Not connected')
@@ -956,6 +987,12 @@ export class SshManager {
     const entry = this.connections.get(serverId)
     if (!entry) throw new Error('Not connected')
     this.touch(serverId)
+    /*
+     * v4.3.17 (SSH-6): the app's own editor used to truncate and rewrite a remote file with nothing kept, while the
+     * agent's `remote_write_file` copied it first and refused to write if the copy failed — so a half-loaded buffer or
+     * an accidental Ctrl+S lost the server-side file and the Restore button had nothing to offer. Same rule here.
+     */
+    await this.backUpBeforeWrite(serverId, entry.connection, path)
     await entry.connection.sftpWrite(path, content)
     await this.audit.record({ type: 'exec', ok: true, serverId, command: `sftp:write ${path}` })
   }

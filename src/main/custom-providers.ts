@@ -15,6 +15,12 @@ export const CUSTOM_PROVIDERS_SCHEMA_VERSION = 1
 /** On-disk shape: a {@link CustomProvider} plus the encrypted key. */
 interface StoredCustomProvider extends CustomProvider {
   apiKeyEnc?: string
+  /**
+   * v4.3.17 (SEC-4): header *values* are ciphertext, because the natural way to authenticate an OpenAI-compatible
+   * gateway is `Authorization: Bearer …` or `api-key: …` — a credential that used to be written in cleartext while
+   * the API key beside it was encrypted. `headers` survives only for files written before this change.
+   */
+  headersEnc?: Record<string, string>
 }
 
 interface CustomProvidersFile {
@@ -37,6 +43,12 @@ function asHeaders(value: unknown): Record<string, string> | undefined {
     if (typeof entry === 'string') headers[key] = entry
   }
   return Object.keys(headers).length > 0 ? headers : undefined
+}
+
+/** How many headers a provider carries, whichever representation the file uses. */
+function headerCountOf(provider: StoredCustomProvider): number {
+  if (provider.headersEnc) return Object.keys(provider.headersEnc).length
+  return provider.headers ? Object.keys(provider.headers).length : 0
 }
 
 /** Remove a trailing slash so we can append `/chat/completions` predictably. */
@@ -118,6 +130,36 @@ export class CustomProviderStore {
     this.providers = migrateCustomProviders(raw, this.now())
     this.loaded = true
     if (migrate) await this.persist()
+    /*
+     * v4.3.17 (SEC-4): a file written before header encryption carries the values in clear. Re-encrypt them once, at
+     * load, so an upgrade scrubs the old plaintext instead of leaving it on disk for ever.
+     */
+    if (this.providers.some((provider) => provider.headers !== undefined)) {
+      for (const provider of this.providers) {
+        if (provider.headers === undefined) continue
+        provider.headersEnc = await this.encryptHeaders(provider.headers)
+        delete provider.headers
+      }
+      await this.persist()
+    }
+  }
+
+  private async encryptHeaders(headers: Record<string, string>): Promise<Record<string, string>> {
+    const out: Record<string, string> = {}
+    for (const [name, value] of Object.entries(headers)) {
+      out[name] = await this.cipher.encrypt(value)
+    }
+    return out
+  }
+
+  private async decryptHeaders(provider: StoredCustomProvider): Promise<Record<string, string> | undefined> {
+    if (provider.headers) return provider.headers
+    if (!provider.headersEnc) return undefined
+    const out: Record<string, string> = {}
+    for (const [name, value] of Object.entries(provider.headersEnc)) {
+      out[name] = await this.cipher.decrypt(value)
+    }
+    return out
   }
 
   private async persist(): Promise<void> {
@@ -136,7 +178,7 @@ export class CustomProviderStore {
       baseUrl: provider.baseUrl,
       model: provider.model,
       hasApiKey: typeof provider.apiKeyEnc === 'string' && provider.apiKeyEnc !== '',
-      headerCount: provider.headers ? Object.keys(provider.headers).length : 0
+      headerCount: headerCountOf(provider)
     }))
   }
 
@@ -151,6 +193,7 @@ export class CustomProviderStore {
 
     const existing = input.id ? this.providers.find((entry) => entry.id === input.id) : undefined
     const headers = asHeaders(input.headers)
+    const headersEnc = headers ? await this.encryptHeaders(headers) : undefined
     const apiKey = input.apiKey?.trim()
 
     let id: string
@@ -160,8 +203,13 @@ export class CustomProviderStore {
       existing.baseUrl = baseUrl
       existing.model = model
       existing.updatedAt = this.now()
-      if (headers) existing.headers = headers
-      else delete existing.headers
+      if (headersEnc) {
+        existing.headersEnc = headersEnc
+        delete existing.headers
+      } else {
+        delete existing.headersEnc
+        delete existing.headers
+      }
       if (apiKey) existing.apiKeyEnc = await this.cipher.encrypt(apiKey)
     } else {
       id = this.idFactory()
@@ -173,7 +221,7 @@ export class CustomProviderStore {
         createdAt: this.now(),
         updatedAt: this.now()
       }
-      if (headers) created.headers = headers
+      if (headersEnc) created.headersEnc = headersEnc
       if (apiKey) created.apiKeyEnc = await this.cipher.encrypt(apiKey)
       this.providers.push(created)
     }
@@ -203,12 +251,13 @@ export class CustomProviderStore {
     const provider = this.providers.find((entry) => entry.id === id)
     if (!provider) return null
     const apiKey = provider.apiKeyEnc ? await this.cipher.decrypt(provider.apiKeyEnc) : ''
+    const headers = await this.decryptHeaders(provider)
     return {
       label: provider.label,
       baseUrl: provider.baseUrl,
       model: provider.model,
       apiKey,
-      ...(provider.headers ? { headers: provider.headers } : {})
+      ...(headers ? { headers } : {})
     }
   }
 
