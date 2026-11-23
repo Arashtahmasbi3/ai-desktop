@@ -26,10 +26,10 @@ DeepSeek API, VPS servers (SSH), GitHub (Git), and your local files.
 > POSIX shell on Windows (Git for Windows' `bash.exe`). Without one it falls back to `cmd.exe`,
 > where those commands cannot run — install Git for Windows or use Docker.
 >
-> **Updates:** the app ships without an auto-updater (`publish: null`, no `electron-updater`
-> dependency), so a new version means downloading a fresh installer from the Releases page.
-> Enabling in-app updates needs an update server (or a GitHub Releases publish provider) and a
-> signed build first — see `KNOWN_ISSUES.md`.
+> **Updates:** the app updates itself. It reads a dedicated public feed repository
+> (`Arashtahmasbi3/ai-desktop-releases`), verifies the installer against the release's published SHA-256, and only
+> then offers an Install button — never without a click. The build is unsigned, so Windows still shows the SmartScreen
+> warning; see `docs/SECURITY-ADVISORIES.md` and `docs/CAPABILITY_MATRIX.md` for the current state.
 >
 > v2.3 adds a Codex-style workspace (redesigned sidebar, composer and Settings), an approval
 > system that learns (remembered tools, inline full-access toggle), a file-changes panel with

@@ -20,14 +20,15 @@ document exists because claims rot.
 | The verdict names one of 12 causes + a next step | real | automatic | `test/core/verdict-patterns.test.ts` |
 | Context compaction at a token budget | real | provider capability | `test/agent/context-manager.test.ts` |
 | Run resumption from a stored session | real | Sessions | `test/agent/session-store.test.ts` |
-| Plan mode (approve before acting) | real | Settings → run mode | `test/agent/plan-mode.test.ts` |
-| Decision checkpoints | partial | off by default | `test/agent/decision-gate.test.ts` — a decision is logged and can pause a run, but it is **not reviewable after the fact**: there is no queue, so a user cannot revisit one (B2-4, needs an explicit product decision) |
+| Plan mode (approve before acting) | real | Settings → run mode | `test/core/plan-mode.test.ts` |
+| Decision checkpoints | partial | off by default | `test/shared/decision-checkpoint.test.ts`, `test/core/trace-decision.test.ts` — a decision is logged and can pause a run, but it is **not reviewable after the fact**: there is no queue, so a user cannot revisit one (B2-4, needs an explicit product decision) |
 
 ## Tools the model can be offered
 
 | capability | state | configured where | proven by |
 |---|---|---|---|
-| File tools (`read_file`, `write_file`, `list_dir`, `search_files`) | real | automatic | `test/agent/tools.test.ts` |
+| File tools (`read_file`, `write_file`, `list_dir`) | real | automatic | `test/agent/tools.test.ts` |
+| Project tooling (`scaffold_project`, `worktree_create`, `worktree_remove`, `project_user_create`, `project_user_remove`, `remote_copy`, `migrate_docker`, `migrate_database`) | real | per run | `test/core/worktree*.test.ts`, `test/core/db-migrate-flow.test.ts` |
 | `run_command` in a sandbox | real | automatic | `test/agent/orchestrator.test.ts` |
 | `ask_user` with 1–6 suggested answers, continuing the same run | real | automatic | `test/core/ask-user-options.test.ts` |
 | `use_skill` — load a `SKILL.md` body on demand | real | `skills/` on disk | `test/main/skills-run.test.ts` |
@@ -40,10 +41,10 @@ document exists because claims rot.
 |---|---|---|---|
 | SSH with host-key verification | real | Settings → Connections | `test/main/ssh-manager.test.ts` |
 | `remote_shell` on a connected server | real | per run | `test/main/remote-runtime*.test.ts` |
-| Remote file tools over SFTP: `remote_read_file`, `remote_write_file`, `remote_list_dir`, `remote_exists`, `remote_grep`, `remote_git_status` | real | per run | `test/main/agent-service-remote-fs*.test.ts` |
+| Remote file tools over SFTP: `remote_read_file`, `remote_write_file`, `remote_list_dir`, `remote_exists`, `remote_grep`, `remote_git_status` | real | per run | `test/core/remote-fs-tools.test.ts` |
 | `worktree_list` — read-only worktree inspection | real | per run | `test/core/worktree*.test.ts` |
 | `diagnose_crash` and the named diagnostics (`get_service_logs`, `get_disk_usage`, `get_system_health`, `get_process_list`) | real | per run | `test/core/diagnostics-*.test.ts` |
-| `list_servers`, and server references by id, name or host | real | automatic | `test/core/server-ref*.test.ts` |
+| `list_servers`, and server references by id, name or host | real | automatic | `test/core/server-roster.test.ts` |
 | `migrate_project` between two servers | real | per run | `test/core/migrate-project*.test.ts` |
 | Migration form: route chosen by preflight (direct / relay) | real | per run | `test/core/migrate-project-flow.test.ts`, `test/core/migrate-argv.test.ts`; **not proven against a live pair of servers** |
 | Target bring-up checklist (env, build, PM2, nginx, certbot) | real | per run | `test/core/bring-up-flow.test.ts`, `test/renderer/bring-up-checklist.test.tsx`; every command injected, none executed |
@@ -52,7 +53,7 @@ document exists because claims rot.
 | Refusal surface: rule named, alternative offered, one-shot allow | real | per run | `test/security/refusal-clarity-s2.test.ts`, `test/security/path-allow-once-s2-3.test.ts` |
 | Transfer failure names its cause (127 / 126 / filtered) | real | per run | `test/core/verdict-patterns.test.ts` |
 | Live UI verification (`scripts/verify-ui.mjs`) | partial | manual | runs the real app and asserts six invariants on this machine; **not proven on a CI runner** |
-| Per-host command policy (read-only / staging / production) | real | Settings → Connections | `test/core/host-policy.test.ts` |
+| Per-host command policy (read-only / staging / production) | real | Settings → Connections | `test/security/policy-engine.test.ts` |
 | Connection test, offered where a failure is felt | real | sidebar / status bar | `test/renderer/connection-test-reachability.test.tsx` |
 
 ## Approvals and safety
@@ -72,10 +73,10 @@ document exists because claims rot.
 
 | capability | state | configured where | proven by |
 |---|---|---|---|
-| Daily spend cap that refuses before the call | real | Settings → usage | `test/main/spend*.test.ts` |
-| An unpriced model reported as a lower bound | real | — | `test/main/spend*.test.ts` |
+| Daily spend cap that refuses before the call | real | Settings → usage | `test/renderer/budget-guard.test.tsx`, `test/renderer/budget.test.ts` |
+| An unpriced model reported as a lower bound | real | — | `test/renderer/status-line.test.tsx`, `test/renderer/usage.test.tsx` |
 | Usage dashboard (days, providers, models) | real | Settings → usage | `test/renderer/*usage*.test.tsx` |
-| Project fact ledger with validity windows | real | Settings → memory | `test/core/facts*.test.ts` |
+| Project fact ledger with validity windows | real | Settings → memory | `test/main/fact-store.test.ts`, `test/shared/memory-facts.test.ts` |
 
 ## Interface
 

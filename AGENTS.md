@@ -73,7 +73,10 @@ neither mistake was visible in a diff), and on top of it **MCP** and **`SKILL.md
 a configured server or a folder on disk. MCP tools are foreign by construction (`mcp__<server>__<tool>`) and get
 shell semantics in the approval gate, because "auto-approve writes" was a choice about the agent's own tools, not
 about a process the user just installed. `store.ts` 2243 → 193, `agent-service.ts` 1967 → 744,
-`agent-orchestrator.ts` 2072 → 785, with no file in `src/` over 800 and **no importer changed**. A stopped run now
+`agent-orchestrator.ts` 2072 → 785, and **no importer changed**. (The "no file over 800 lines" rule of that sprint
+still holds as an intention, not as a fact: since v4.3.17 the largest file in `src/` is
+`src/main/ssh/ssh-manager.ts` at 1012 lines, and `test/ops/file-size.test.ts` enforces a 1200-line ceiling so the
+number cannot grow unnoticed again.) A stopped run now
 names one of twelve causes from a table — the old chain reported a *refused* connection as a timeout — and the card
 actually renders it. The network policy covers the ways a command really reaches a host, `ask_user` stopped silently
 repairing a model's options, and three process rules became build failures: a settings switch nothing reads, a new

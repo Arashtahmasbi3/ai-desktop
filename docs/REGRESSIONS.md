@@ -23,7 +23,7 @@ does, because the guard is a test that fails on the *behaviour*, not on the vers
 | `Cost unknown` for an unpriced model | — | 4.3.0 | `test/renderer/status-line.test.tsx` `7. an unpriced model renders a lower bound, never "Cost unknown"` |
 | the `Remote: … (connected)` banner | claimed removed in 4.3.0 | still there in 4.3.1 | `test/renderer/project-status.test.ts` `remote project with a connected VPS shows no banner at all (R6)` |
 | a tool card rendering ok for a non-zero exit | — | — | `test/renderer/tool-card-outcome.test.tsx` `3. the logged bug: ok with a failed exit is not a success card` |
-| one quoting rule, seven copies | — | — | `test/security/shell-quote.test.ts` `no module other than shared/shell-quote defines it` |
+| one quoting rule, seven copies | — | — | `test/security/shell-quote.test.ts` `no module other than shared/shell-quote implements the escaping idiom` |
 | a disconnected remote project reported as "Path not found" | v2.9.2 | — | `test/renderer/project-status.test.ts` `remote project never reports a missing path while the VPS is connected` |
 | one verdict for "connected" re-derived by every surface (the header, the bar and the cards disagreeing) | v2.6.0 (D.1) | v4.3.0 | `test/renderer/connection-status.test.tsx` `7. (v2.6.4) a remote project stays connected while another host changed last` |
 | a destroyed sandbox deleting the user's own project folder | v2.9.1 | — | `test/sandbox/manager.test.ts` `keeps a caller-supplied workspace on destroy` |

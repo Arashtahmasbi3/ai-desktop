@@ -514,12 +514,26 @@ const writtenHere = (key: string): WriteSite[] =>
   }))
 
 /*
- * H5-3: a test that read "every written switch is registered here" lived at this point and was lost when the agent
- * writing this file was interrupted mid-run (its body was cut, leaving a dangling assertion). It is deliberately NOT
- * guessed back: an invented version of that scan could pass while checking nothing. The four invariants below still
- * fail the build on a dead switch — a registered entry nothing writes, a writer that does not write it, a consumer
- * that is only the settings page echoing the value, and the pinned known-unwired count.
+ * H5-3 was lost here when the agent writing this file was interrupted mid-run (its body was cut, leaving a dangling
+ * assertion), and it was deliberately not guessed back — an invented version of that scan could pass while checking
+ * nothing. It is rebuilt below (v4.3.17, TST-1) from the same `WRITES` scan the other invariants use, with one explicit
+ * list of preferences that are *not* capability switches and the reason each is not.
  */
+const NON_SWITCH_PREFS = new Set<string>([
+  /*
+   * A deadline, not a capability: `setApprovalMode('full')` persists when the 30-minute grant ends so a restart cannot
+   * resurrect it (v4.3.17, UI-1). It is read by `approvals.ts` and by nothing else on purpose.
+   */
+  'ai-desktop:full-access-until'
+])
+
+  it('1. every preference the renderer writes is registered here (a new switch cannot ship unnoticed)', () => {
+    const registered = new Set(SWITCHES.map((entry) => entry.key))
+    const unregistered = [...WRITES.keys()].filter(
+      (key) => !registered.has(key) && !NON_SWITCH_PREFS.has(key)
+    )
+    expect(unregistered).toEqual([])
+  })
 
   it('2. every registered switch is still written (a stale entry hides a real gap)', () => {
     const stale = SWITCHES.filter((entry) => writtenHere(entry.key).length === 0).map(
