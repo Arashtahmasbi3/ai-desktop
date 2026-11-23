@@ -382,7 +382,7 @@ export function buildPlan(options) {
     {
       id: 'version',
       title: `Bump ${currentVersion} to ${targetVersion} (${bump})`,
-      detail: `write ${MANIFEST_FILE}, then "npm install --package-lock-only --ignore-scripts" to sync ${LOCK_FILE}`
+      detail: `write ${MANIFEST_FILE}, then set the two version fields in ${LOCK_FILE} locally (v4.3.17: npm's lockfile resolver hung on a flaky registry during a release)`
     },
     {
       id: 'typecheck',

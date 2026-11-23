@@ -272,7 +272,20 @@ async function main() {
 
   announceStep(plan, 'version')
   writeFileSync(manifestPath, `${JSON.stringify({ ...manifest, version }, null, 2)}\n`, 'utf8')
-  runNpm(['install', '--package-lock-only', '--ignore-scripts'])
+  /*
+   * v4.3.17: the lockfile's two version fields are the only thing this bump changes, so they are written here instead
+   * of asking npm to resolve the whole tree. `npm install --package-lock-only` hung for twenty minutes on a flaky
+   * registry during this very release; a local rewrite cannot, and the check below is unchanged.
+   */
+  {
+    const lockPath = join(repoRoot, LOCK_FILE)
+    const lockManifest = readJson(lockPath)
+    lockManifest.version = version
+    if (lockManifest.packages && lockManifest.packages['']) {
+      lockManifest.packages[''].version = version
+    }
+    writeFileSync(lockPath, `${JSON.stringify(lockManifest, null, 2)}\n`, 'utf8')
+  }
   const lockPath = join(repoRoot, LOCK_FILE)
   const lock = readJson(lockPath)
   const lockRootVersion = lock.packages && lock.packages[''] ? lock.packages[''].version : undefined
