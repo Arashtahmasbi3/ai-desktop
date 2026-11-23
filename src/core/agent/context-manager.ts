@@ -21,6 +21,14 @@ export interface ContextManagerOptions {
   transformOldMessages?: (message: ChatMessage) => ChatMessage
   /** Number of most-recent messages left untouched by `transformOldMessages`. */
   keepRecent?: number
+  /**
+   * v4.3.17 (AGT-6): the largest a single message may contribute, in tokens.
+   *
+   * Compaction always keeps `minMessages` newest messages regardless of size, so one huge tool result could exceed the
+   * whole budget on its own and the prompt was over the window the budget promised. Default: a quarter of `maxTokens`
+   * when a token budget is set. The stored history is never changed — this caps the prompt copy.
+   */
+  maxMessageTokens?: number
 }
 
 export interface ToolResultInput {
@@ -148,6 +156,8 @@ export class ContextManager {
   private readonly compactionThreshold: number
   private readonly transformOldMessages?: (message: ChatMessage) => ChatMessage
   private readonly keepRecent: number
+  /** Character cap for one message in the prompt copy (undefined = no cap). */
+  private readonly maxMessageChars?: number
   private summary: string | null = null
   private droppedCount = 0
 
@@ -162,6 +172,33 @@ export class ContextManager {
     this.maxChars =
       options.maxChars ??
       (options.maxTokens !== undefined ? Number.POSITIVE_INFINITY : DEFAULT_CONTEXT_MAX_CHARS)
+    /*
+     * v4.3.17 (AGT-6): a quarter of the budget is already more than a healthy prompt can spare for one tool result.
+     * With no token budget there is no ratio to take, so the legacy character budget gets the same quarter.
+     */
+    const capTokens =
+      options.maxMessageTokens ??
+      (options.maxTokens !== undefined ? Math.max(2_048, Math.floor(options.maxTokens / 4)) : undefined)
+    this.maxMessageChars =
+      capTokens !== undefined
+        ? capTokens * CHARS_PER_TOKEN
+        : Number.isFinite(this.maxChars)
+          ? Math.max(8_000, Math.floor(this.maxChars / 4))
+          : undefined
+  }
+
+  /** The prompt copy of one message, capped so a single result cannot own the whole window. */
+  private capMessage(message: ChatMessage): ChatMessage {
+    const cap = this.maxMessageChars
+    if (cap === undefined || cap <= 0 || message.role === 'system') return message
+    const content = message.content
+    // Truncating a short message would grow it: the marker is longer than what it replaces.
+    if (typeof content !== 'string' || content.length <= cap + 200) return message
+    const dropped = content.length - cap
+    return {
+      ...message,
+      content: `${content.slice(0, cap)}\n[... ${dropped} characters truncated to keep the prompt within budget ...]`
+    }
   }
 
   get system(): string {
@@ -299,7 +336,7 @@ export class ContextManager {
     const kept: ChatMessage[] = []
     let keptTokens = 0
     for (let i = this.history.length - 1; i >= 0; i--) {
-      const sizeTokens = messageTokens(this.history[i])
+      const sizeTokens = messageTokens(this.capMessage(this.history[i]))
       if (kept.length >= this.minMessages && keptTokens + sizeTokens > target) break
       kept.unshift(this.history[i])
       keptTokens += sizeTokens
@@ -372,7 +409,8 @@ export class ContextManager {
     const kept: ChatMessage[] = []
     for (let i = this.history.length - 1; i >= 0; i--) {
       const message = this.history[i]
-      const size = messageChars(message)
+      // v4.3.17 (AGT-6): a message counts at the size it will actually be sent at.
+      const size = messageChars(this.capMessage(message))
       const withinMinimum = kept.length < this.minMessages
       if (!withinMinimum && chars + size > budget) break
       kept.unshift(message)
@@ -389,9 +427,11 @@ export class ContextManager {
     if (missingPinned.length > 0) kept.unshift(...missingPinned)
 
     const transform = this.transformOldMessages
-    if (!transform || kept.length <= this.keepRecent) return kept
+    if (!transform || kept.length <= this.keepRecent) return kept.map((message) => this.capMessage(message))
     const recentStart = kept.length - this.keepRecent
-    return kept.map((message, index) => (index < recentStart ? transform(message) : message))
+    return kept.map((message, index) =>
+      this.capMessage(index < recentStart ? transform(message) : message)
+    )
   }
 
   /** The full message list for the next LLM call. */

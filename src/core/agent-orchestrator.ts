@@ -172,8 +172,15 @@ export class AgentOrchestrator {
     this.sandboxOptions = options.sandboxOptions ?? {}
     this.onSandboxReady = options.onSandboxReady
     this.initialUserParts = options.initialUserParts
+    /*
+     * v4.3.17 (AGT-4): the prompt is built once and sent to every provider in the fallback chain, so the budget has
+     * to fit the *smallest* window in that chain. Sizing it from providers[0] meant a 20k-token history was nowhere
+     * near compaction for a 64k primary and then arrived, unchanged, at a 16k fallback — a 400 at exactly the moment
+     * the fallback was needed.
+     */
     this.contextWindowTokens =
-      options.contextWindowTokens ?? defaultContextTokens(this.providers[0])
+      options.contextWindowTokens ??
+      Math.min(...this.providers.map((entry) => defaultContextTokens(entry)))
     this.compactionThreshold = options.compactionThreshold ?? 0.8
     this.compressContext = options.compressContext ?? true
     this.compressOptions = options.compressOptions ?? {}
@@ -200,6 +207,11 @@ export class AgentOrchestrator {
     this.now = options.now ?? (() => Date.now())
     this.runCounter = 0
     this.runIdFactory = options.runIdFactory ?? (() => `run-${++this.runCounter}`)
+  }
+
+  /** The prompt budget this run uses: the smallest window in the provider chain, unless one was given (v4.3.17). */
+  get contextBudgetTokens(): number {
+    return this.contextWindowTokens
   }
 
   /**
@@ -670,6 +682,24 @@ export class AgentOrchestrator {
         }
 
         if (guardStop) {
+          /*
+           * v4.3.17 (AGT-3): the step that triggered the guard was never recorded — `summarizeStep` runs below, after
+           * this branch. The card was therefore built from the previous step, `stop.steps` was one short, and on the
+           * first step it carried no evidence at all: "no cause was recorded" became the answer to a stop whose cause
+           * had just run. Record the partial step first; the transcript is already consistent because
+           * `settlePendingToolCalls` answered the calls this step skipped.
+           */
+          const partial = summarizeStep({
+            index,
+            startedAt: startedStepAt,
+            now: this.now,
+            assistantText,
+            ...(stepReasoning ? { stepReasoning } : {}),
+            actions,
+            observations,
+            observedSignatures
+          })
+          steps.push(partial.step)
           const guardReason = (guardStop.reason ?? 'repeated_action') as LoopStopInfo['reason']
           stopInfo = buildStopInfo(guardReason, steps)
           if (guardStop.message) stopInfo.message = guardStop.message
