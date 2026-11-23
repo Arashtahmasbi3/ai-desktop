@@ -277,7 +277,9 @@ export class AgentOrchestrator {
         : this.tools
     // Per-run state so sequential or concurrent `run()` calls never share loop state.
     const loopDetector = new LoopDetector(this.loopPolicy, {
-      findAlternative: (toolName, args, error) => findAlternatives(toolName, args, error)
+      findAlternative: (toolName, args, error) => findAlternatives(toolName, args, error),
+      // v4.3.16 (AGT-2): the guard's own clock is the orchestrator's, so a test can drive it deterministically.
+      now: this.now
     })
     const observedSignatures = new Set<string>()
     // X6: diagnoses already offered to the model in this run, so a deliberate retest is not wedged.
@@ -369,6 +371,8 @@ export class AgentOrchestrator {
 
         // ---- Planning: ask the model (with provider fallback) ----
         const outcome = await callLlm(this.llmDeps, context, runId, index, options, tools)
+        // v4.3.16 (AGT-2): the model answering is activity, however long the provider took.
+        loopDetector.noteActivity()
         providerUsed = outcome.provider
         usage = addUsage(usage, outcome.response.usage)
         const assistantText = outcome.response.content
@@ -433,10 +437,7 @@ export class AgentOrchestrator {
         })
 
         const observations: AgentToolResult[] = []
-        // A successful call to any of these means the run advanced, so the loop
-        // guard starts a fresh window. Shell commands count too: `npm test`,
-        // `git status` and friends are real work, and without this a long script
-        // of distinct-but-successful commands could still exhaust the window.
+        // A successful call to any of these means the run advanced, so the loop guard starts a fresh window.
         const progressTools = new Set([
           'write_file',
           'read_file',
@@ -477,6 +478,11 @@ export class AgentOrchestrator {
           planCancelled = gated.cancelled
           stepNotes.push(...gated.notes)
           observations.push(...gated.observations)
+          /*
+           * v4.3.16 (AGT-2): a human reading the plan is not a stalled run. The gate can wait for minutes, and the
+           * first approved action used to hit the 120 s guard before it ever ran.
+           */
+          loopDetector.noteActivity()
         }
 
         for (let actionIndex = 0; actionIndex < actions.length; actionIndex++) {
@@ -595,7 +601,6 @@ export class AgentOrchestrator {
             },
             action.arguments
           )
-          if (result.ok && progressTools.has(action.name)) loopDetector.markProgress()
           if (result.ok && before !== null) {
             this.onFileWritten?.({
               path: String(action.arguments.path ?? ''),
@@ -603,6 +608,14 @@ export class AgentOrchestrator {
               after: String(action.arguments.content ?? '')
             })
           }
+          /*
+           * v4.3.16 (AGT-2): the 120 s "no progress" clock used to be refreshed by six tool names only, so a
+           * productive run built from list_dir / remote_grep / list_servers — or a user reading a plan for two
+           * minutes — was stopped with the Persian "2 minutes without progress" verdict. Any call that actually
+           * executed is activity; only a successful one of the six is *progress* (it clears the repeat window too).
+           */
+          if (result.ok && progressTools.has(action.name)) loopDetector.markProgress()
+          else if (result.blocked !== true && result.code !== 'blocked') loopDetector.noteActivity()
           observations.push(result)
           recentToolCalls.push({
             toolName: action.name,

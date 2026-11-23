@@ -511,7 +511,9 @@ export class SshManager {
        * keeps the map honest: no path can add an entry that has no way of being removed.
        */
       connection.onClose?.(() => {
-        void this.sessionClosed(serverId)
+        // v4.3.16 (SSH-3): identify the session by the transport that closed, not by server id alone, so a late
+        // close from a replaced client cannot delete the live connection that replaced it.
+        void this.sessionClosed(serverId, connection)
       })
       this.pendingFingerprints.delete(serverId)
       await this.store.touchConnected(serverId)
@@ -601,9 +603,15 @@ export class SshManager {
    * ssh2's own "Not connected", and a run's server resolution trusted the same lie. The state now says what happened and
    * carries a sentence the UI can act on, instead of a green dot over a dead socket.
    */
-  private async sessionClosed(serverId: string): Promise<void> {
+  private async sessionClosed(serverId: string, closed?: SshConnection): Promise<void> {
     const entry = this.connections.get(serverId)
     if (!entry) return
+    /*
+     * v4.3.16 (SSH-3): a replaced client can emit 'close' after its replacement is registered. Acting on it closed the
+     * new terminal, deleted the new entry and told the user the session had ended, while the new socket stayed open
+     * but untracked. Only the transport that is still in the map may end it.
+     */
+    if (closed !== undefined && entry.connection !== closed) return
     entry.terminal?.close()
     this.connections.delete(serverId)
     await this.audit
@@ -630,7 +638,13 @@ export class SshManager {
       entry.terminal?.close()
       entry.connection.end()
       this.connections.delete(serverId)
-      await this.audit.record({ type: 'disconnect', ok: true, serverId, detail: reason })
+      /*
+       * v4.3.16 (SSH-5): one unreadable audit file must not abort the sweep and leave the rest of the idle servers
+       * connected. `sessionClosed` already treats its own audit write as best-effort; this path did not.
+       */
+      await this.audit
+        .record({ type: 'disconnect', ok: true, serverId, detail: reason })
+        .catch(() => undefined)
     }
     /*
      * R3: an explicit disconnect ends the UI's claim, so its lease is dropped here rather than
@@ -1009,7 +1023,12 @@ export class SshManager {
 
   private ensureWatchdog(): void {
     if (this.watchdog) return
-    this.watchdog = setInterval(() => void this.checkIdle(), 60_000)
+    this.watchdog = setInterval(() => {
+      // v4.3.16 (SSH-5): the sweep's promise used to be dropped into `void`, so a rejection was unhandled in main.
+      void this.checkIdle().catch((error) => {
+        console.error('[vps] idle sweep failed', error)
+      })
+    }, 60_000)
     this.watchdog.unref?.()
   }
 }

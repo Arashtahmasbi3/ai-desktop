@@ -694,6 +694,17 @@ export class LoopDetector {
     this.blockedTools.clear()
   }
 
+  /**
+   * v4.3.16 (AGT-2): the run is alive — refresh the wall-clock "no progress" timer only.
+   *
+   * `markProgress()` also clears the repeat window and the per-call failure budget, which are the evidence a redirect
+   * is built from; calling it after every executed call would erase a genuine loop. This one changes nothing except
+   * the clock.
+   */
+  noteActivity(): void {
+    this.lastProgressAt = this.now()
+  }
+
   // ---------------------------------------------------------------------------
   // Per-step analyzer (shared with the orchestrator)
   // ---------------------------------------------------------------------------

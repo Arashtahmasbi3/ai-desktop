@@ -7,6 +7,7 @@
  * the renderer and tests.
  */
 import type { HostApprovalRequirement, HostPolicy, HostPolicyMode } from '@shared/vps'
+import { STATEMENT_SEPARATORS, splitTopLevel } from './command-whitelist'
 
 export type CommandIntent = 'read' | 'write' | 'destructive'
 
@@ -229,6 +230,64 @@ function hasContextLists(policy: HostPolicy): boolean {
 }
 
 /**
+ * v4.3.16 (SEC-3): a tool prefixes a remote shell with `cd '<project root>' && ` so the command runs in the project.
+ * That prefix is a working directory, not the command being judged: leaving it in made every read on a read-only host
+ * classify as a write and get refused, while a bare `ls; …` line was admitted by the first word alone.
+ */
+function stripWorkingDirectoryPrefix(command: string): string {
+  return command.replace(/^\s*cd\s+(?:'[^']*'|"[^"]*"|[^\s;&|]+)\s*(?:&&|;)\s*/, '')
+}
+
+/**
+ * Redirection, command substitution, or a write to a real path cannot be proven to be a read.
+ *
+ * `2>&1` and `2>/dev/null` are the two shapes every probe uses and must stay reads; anything writing to a named path
+ * is not. (v4.3.16, SEC-3)
+ */
+function hasUnsafeRedirection(statement: string): boolean {
+  let quote: '"' | "'" | null = null
+  for (let index = 0; index < statement.length; index += 1) {
+    const char = statement[index]!
+    if (quote !== null) {
+      if (char === quote) quote = null
+      continue
+    }
+    if (char === '"' || char === "'") {
+      quote = char
+      continue
+    }
+    if (char === '`' || (char === '$' && statement[index + 1] === '(')) return true
+    if (char !== '>' && char !== '<') continue
+    let cursor = index + 1
+    if (statement[cursor] === '&') continue
+    if (statement[cursor] === '>') cursor += 1
+    while (statement[cursor] === ' ') cursor += 1
+    const target = /^[^\s;|&]+/.exec(statement.slice(cursor))?.[0] ?? ''
+    if (/^\/dev\/(null|stdout|stderr)$/.test(target)) continue
+    return true
+  }
+  return false
+}
+
+/**
+ * v4.3.16 (SEC-3): a read-only prefix must cover **every** statement, not just the first word of the line.
+ *
+ * `echo hi; systemctl restart nginx` used to be admitted by the `echo` prefix on the whole string, and
+ * `echo x > /srv/app/config` by the same prefix on a line that writes a file. Each statement (and each pipeline
+ * stage) has to match the policy's own read-only list and to carry no redirection.
+ */
+function everyStatementReadOnly(policy: HostPolicy, command: string): boolean {
+  const statements = splitTopLevel(command, STATEMENT_SEPARATORS).filter(Boolean)
+  if (statements.length === 0) return false
+  return statements.every((statement) => {
+    if (hasUnsafeRedirection(statement)) return false
+    const stages = splitTopLevel(statement, ['|']).filter(Boolean)
+    if (stages.length === 0) return false
+    return stages.every((stage) => matchesPrefixList(policy.readOnlyCommands, stage))
+  })
+}
+
+/**
  * Evaluate a command against a host policy. Precedence:
  *   denyCommands → allowedPaths → read-only allow → read-only/production mode
  *   gate → explicit allowlist → write/unknown.
@@ -265,9 +324,15 @@ export function evaluateHostPolicy(policy: HostPolicy, command: string): PolicyD
   }
 
   const contextAware = hasContextLists(policy)
-  const readAllowed =
-    matchesPrefixList(policy.readOnlyCommands, command) ||
-    (!contextAware && intent === 'read')
+  const scoped = stripWorkingDirectoryPrefix(command)
+  /*
+   * v4.3.16 (SEC-3): with context lists, every statement has to be provably read — a read-only prefix on the first
+   * word of a line admitted whatever followed it. Without the lists (a legacy policy) the intent classifier decides,
+   * exactly as before.
+   */
+  const readAllowed = contextAware
+    ? intent !== 'destructive' && everyStatementReadOnly(policy, scoped)
+    : matchesPrefixList(policy.readOnlyCommands, command) || intent === 'read'
 
   if (readAllowed) {
     const needsApproval = policy.requireApproval === 'always'

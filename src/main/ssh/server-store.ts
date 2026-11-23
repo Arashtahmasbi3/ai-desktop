@@ -44,6 +44,8 @@ export class VpsServerStore {
   private readonly idFactory: () => string
   private servers: StoredVpsServer[] = []
   private loaded = false
+  /** Set when an unreadable file was moved aside instead of being overwritten (v4.3.16, SSH-4). */
+  private recoveredFrom?: string
 
   constructor(options: VpsServerStoreOptions) {
     this.file = options.file
@@ -54,39 +56,94 @@ export class VpsServerStore {
 
   async load(): Promise<void> {
     if (this.loaded) return
+    let text: string
     try {
-      const raw = JSON.parse(await fs.readFile(this.file, 'utf8')) as unknown
-      if (isRecord(raw) && Array.isArray(raw.servers)) {
-        this.servers = raw.servers.filter(isRecord).map((entry) => {
-          const id = String(entry.id ?? '')
-          const policy = coerceHostPolicy(entry.policy, id)
-          return {
-            id,
-            name: String(entry.name ?? ''),
-            host: String(entry.host ?? ''),
-            port: Number(entry.port ?? 22),
-            username: String(entry.username ?? ''),
-            authType: entry.authType === 'password' ? 'password' : 'key',
-            createdAt: Number(entry.createdAt ?? this.now()),
-            updatedAt: Number(entry.updatedAt ?? this.now()),
-            ...(asString(entry.privateKeyPath) ? { privateKeyPath: entry.privateKeyPath as string } : {}),
-            ...(asString(entry.trustedFingerprint)
-              ? { trustedFingerprint: entry.trustedFingerprint as string }
-              : {}),
-            ...(typeof entry.lastConnectedAt === 'number'
-              ? { lastConnectedAt: entry.lastConnectedAt }
-              : {}),
-            ...(policy ? { policy } : {}),
-            ...(asString(entry.passwordEnc) ? { passwordEnc: entry.passwordEnc as string } : {}),
-            ...(asString(entry.passphraseEnc) ? { passphraseEnc: entry.passphraseEnc as string } : {})
-          }
-        })
-      }
+      text = await fs.readFile(this.file, 'utf8')
     } catch (error) {
       const code = (error as NodeJS.ErrnoException).code
-      if (code !== 'ENOENT' && !(error instanceof SyntaxError)) throw error
+      if (code === 'ENOENT') {
+        this.loaded = true
+        return
+      }
+      /*
+       * v4.3.16 (SSH-4): a locked or permission-denied file used to be swallowed like a missing one, and the next
+       * save wrote the empty in-memory list over every server. Refuse instead; the same rule the goal store uses.
+       */
+      throw new Error(
+        `Could not read the saved servers (${code ?? 'unknown error'}). Refusing to continue so they are not overwritten.`
+      )
     }
+
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(text)
+    } catch {
+      await this.quarantine()
+      this.loaded = true
+      return
+    }
+    const record = isRecord(parsed) ? parsed : undefined
+    const usable =
+      record !== undefined &&
+      Array.isArray(record.servers) &&
+      !(typeof record.version === 'number' && record.version > VPS_SCHEMA_VERSION)
+    if (!usable) {
+      /*
+       * An unrecognised shape, or a file written by a newer build, used to leave an empty list that the next save
+       * persisted over the original — every server and its encrypted password gone, with no copy left. Move it aside
+       * first, the way the goal store and the diagnosis ledger already do.
+       */
+      await this.quarantine()
+      this.loaded = true
+      return
+    }
+
+    this.servers = (record.servers as unknown[]).filter(isRecord).map((entry) => {
+      const id = String(entry.id ?? '')
+      const policy = coerceHostPolicy(entry.policy, id)
+      return {
+        id,
+        name: String(entry.name ?? ''),
+        host: String(entry.host ?? ''),
+        port: Number(entry.port ?? 22),
+        username: String(entry.username ?? ''),
+        authType: entry.authType === 'password' ? 'password' : 'key',
+        createdAt: Number(entry.createdAt ?? this.now()),
+        updatedAt: Number(entry.updatedAt ?? this.now()),
+        ...(asString(entry.privateKeyPath) ? { privateKeyPath: entry.privateKeyPath as string } : {}),
+        ...(asString(entry.trustedFingerprint)
+          ? { trustedFingerprint: entry.trustedFingerprint as string }
+          : {}),
+        ...(typeof entry.lastConnectedAt === 'number'
+          ? { lastConnectedAt: entry.lastConnectedAt }
+          : {}),
+        ...(policy ? { policy } : {}),
+        ...(asString(entry.passwordEnc) ? { passwordEnc: entry.passwordEnc as string } : {}),
+        ...(asString(entry.passphraseEnc) ? { passphraseEnc: entry.passphraseEnc as string } : {})
+      }
+    })
     this.loaded = true
+  }
+
+  /**
+   * Move the unreadable file aside so nothing is lost and the next save cannot destroy it. The path is kept on the
+   * instance so the caller can tell the user where their servers went.
+   */
+  private async quarantine(): Promise<void> {
+    const target = `${this.file}.corrupt-${this.now()}`
+    try {
+      await fs.rename(this.file, target)
+      this.recoveredFrom = target
+    } catch {
+      // Renaming failed (a lock, a read-only folder): leave the original where it is and start clean. A save will
+      // overwrite it only because the file is as good as lost either way — the alternative is refusing to start.
+      this.recoveredFrom = undefined
+    }
+  }
+
+  /** The path an unreadable servers file was moved to during `load`, when that happened. */
+  recoveredFromPath(): string | undefined {
+    return this.recoveredFrom
   }
 
   private async persist(): Promise<void> {

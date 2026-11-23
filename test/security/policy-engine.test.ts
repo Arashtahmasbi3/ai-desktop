@@ -102,6 +102,34 @@ describe('evaluateHostPolicy (Task B.3)', () => {
   })
 })
 
+describe('a read-only prefix covers every statement (SEC-3, v4.3.16)', () => {
+  it('does not admit a write appended to a read-only word', () => {
+    const p = defaultHostPolicy('vps-1', 'read-only')
+    const decision = evaluateHostPolicy(p, 'echo hi; systemctl restart nginx')
+    expect(decision.category).not.toBe('read-only')
+    expect(decision.allowed).toBe(false)
+  })
+
+  it('does not admit a redirection behind a read-only word', () => {
+    const p = defaultHostPolicy('vps-1', 'read-only')
+    expect(evaluateHostPolicy(p, 'echo x > /srv/app/config').allowed).toBe(false)
+  })
+
+  it('still allows the read the tool prefixes with its working directory', () => {
+    const p = defaultHostPolicy('vps-1', 'read-only')
+    const decision = evaluateHostPolicy(p, "cd '/srv/app' && ls -la")
+    expect(decision.category).toBe('read-only')
+    expect(decision.allowed).toBe(true)
+  })
+
+  it('still allows a pipeline of reads and the two shapes every probe uses', () => {
+    const p = defaultHostPolicy('vps-1', 'read-only')
+    expect(evaluateHostPolicy(p, 'ls -la /srv | grep app').allowed).toBe(true)
+    expect(evaluateHostPolicy(p, 'df -h 2>&1').allowed).toBe(true)
+    expect(evaluateHostPolicy(p, 'ls -la /srv 2>/dev/null').allowed).toBe(true)
+  })
+})
+
 describe('coerceHostPolicy', () => {
   it('round-trips a valid policy and rejects malformed ones', () => {
     const valid = policy({ mode: 'production', requireApproval: 'always' })

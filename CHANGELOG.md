@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.3.16] - 2026-11-23
+
+### A read-only prefix covers every statement
+
+`evaluateHostPolicy` matched the policy's read-only list against the **whole line**, before the mode check and without
+looking at the intent. On a read-only or production host, `echo hi; systemctl restart nginx` was admitted as
+category `read-only` with no approval — the `echo` prefix decided for the rest of the line — while `echo x >
+/srv/app/config` was admitted by the same prefix. The mirror image was just as wrong: a remote tool prefixes every
+command with `cd '<project root>' && `, so no read-only entry matched and **every read** on a read-only host was refused
+as "mutations are blocked". Each statement (and each pipeline stage) is now judged on its own, a leading `cd … &&` is
+stripped, and a redirection to a real path disqualifies a statement — while `2>&1` and `2>/dev/null`, the two shapes
+every probe uses, stay reads.
+
+### A corrupt servers file is preserved instead of overwritten
+
+`load()` swallowed a parse error (or a shape it did not recognise) and left an empty list behind. The next save then
+persisted that empty list over the file: every saved server, and its encrypted password/passphrase, gone with no copy.
+A locked or permission-denied file was treated like a missing one for the same reason. An unreadable file is now moved
+to `<file>.corrupt-<timestamp>` and the path is reported through `recoveredFromPath()`; a read that fails for any other
+reason is refused rather than started clean. A file written by a newer schema is quarantined the same way.
+
+### A slow provider or a long plan read is not a loop
+
+The loop guard's "no progress" clock was refreshed by six tool names only, and it started when the run did. A provider
+that took two minutes to answer, a user who read a plan for two minutes, or a productive sequence of `list_dir` /
+`remote_grep` / `list_servers` all looked like a stall: the next action hit `turn_timeout` and the run stopped with the
+Persian "2 minutes without progress" verdict. Any executed call, any model answer and any completed plan gate now
+refresh that clock (`noteActivity`), while genuine progress still clears the repeat window (`markProgress`) — the two
+were the same call before, which is why refreshing the clock erased a real loop's evidence.
+
+### A late close from a replaced transport leaves the live session alone
+
+The close handler captured only the server id, so a replaced client's `close` acted on whatever entry the map held: it
+closed the new terminal, deleted the new entry and told the user the session had ended, while the new socket stayed open
+and untracked. The handler now carries the transport and only the one still in the map may end its own session.
+
+### One unreadable audit file no longer aborts the idle sweep
+
+The watchdog dropped its promise into `void`, and `disconnect()` awaited its audit write unguarded: a locked
+`ssh-audit.json` rejected the sweep, left the remaining idle servers connected, and surfaced as an unhandled rejection
+in main. The interval catches and logs, and the audit write is best-effort like the one in `sessionClosed`.
+
+### Still not true
+
+Custom-provider headers and an MCP server's `env` block are still written in cleartext; the app's own remote editor
+still saves over SFTP with no backup; the prompt budget is still sized from the first provider while the same prompt
+reaches every fallback; the gate can still stop on a step that is never recorded; `context-manager` still keeps the
+six newest messages regardless of size; and code signing is still absent.
+
 ## [4.3.15] - 2026-11-23
 
 ### The release path launches what it is about to publish
