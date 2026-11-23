@@ -16,3 +16,19 @@ export function planCommands(
   notes: string,
   options?: { prerelease?: boolean }
 ): string[][]
+
+/** `sha256  name` pairs from a checksum file. */
+export function parseSumsText(text: string): Map<string, string>
+
+/**
+ * v4.3.15 (REL-3): recompute each asset's digest and refuse to publish anything that does not match the recorded
+ * checksum. The I/O is injected so the decision is testable without 230 MB on disk.
+ */
+export function verifyFeedAssets(
+  version: string,
+  sumsText: string,
+  io?: {
+    readFile?: (path: string) => Buffer | string
+    size?: (path: string) => number
+  }
+): { ok: boolean; problems: string[] }

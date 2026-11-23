@@ -287,6 +287,17 @@ async function main() {
   out('[release]  executing a new unsigned exe under a protected folder, ERROR_CANCELLED 1223)')
 
   runNpm(['run', 'build'])
+
+  /*
+   * v4.3.15 (REL-1): the release path used to stop at typecheck/test/build. `ui.yml` calls the live-app gate required,
+   * but a tag could still be cut from a build nobody launched — and 3196 green unit tests once sat behind a window
+   * that showed "connected" for a dead session. Launch the build that is about to be packaged and read its DOM.
+   */
+  announceStep(plan, 'live-gate')
+  out('[release] launching the freshly built app and reading what it renders')
+  run(process.execPath, [join(repoRoot, 'scripts', 'verify-ui.mjs'), '--port', '9222'])
+  run(process.execPath, [join(repoRoot, 'scripts', 'run-scenarios.mjs'), '--port', '9222'])
+
   const builderCli = join(repoRoot, 'node_modules', 'electron-builder', 'cli.js')
   if (!existsSync(builderCli)) fail('electron-builder is not installed; run "npm install" first.')
   run(process.execPath, [builderCli, '--win', `-c.directories.output=${buildDir}`])

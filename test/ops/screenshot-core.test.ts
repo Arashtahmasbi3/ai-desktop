@@ -4,6 +4,7 @@ import {
   THEMES,
   appTarget,
   compareShot,
+  duplicateSurfaces,
   pngSize,
   shotPath,
   summarize,
@@ -134,5 +135,33 @@ describe('a baseline captured at another scale is still useful', () => {
   it('still refuses a different shape', () => {
     const tall = { width: 1000, height: 1280, bytes: 1000 }
     expect(compareShot(wide, tall).status).toBe('size-changed')
+  })
+})
+
+/*
+ * REL-5 (v4.3.15). The four "surfaces" were captured without navigating between them, so the run could photograph one
+ * window four times and print four `ok` rows. Identical bytes are the proof that no navigation happened.
+ */
+describe('the same window captured twice is not two surfaces', () => {
+  it('names the pair that is byte-identical within a theme', () => {
+    const duplicates = duplicateSurfaces([
+      { theme: 'light', name: 'chat-empty', sha256: 'aaa' },
+      { theme: 'light', name: 'settings', sha256: 'aaa' },
+      { theme: 'light', name: 'trace', sha256: 'bbb' }
+    ])
+    expect(duplicates).toEqual([{ theme: 'light', names: ['chat-empty', 'settings'] }])
+  })
+
+  it('does not compare across themes, where the same layout legitimately differs', () => {
+    expect(
+      duplicateSurfaces([
+        { theme: 'light', name: 'settings', sha256: 'aaa' },
+        { theme: 'dark', name: 'settings', sha256: 'aaa' }
+      ])
+    ).toEqual([])
+  })
+
+  it('ignores entries without a hash', () => {
+    expect(duplicateSurfaces([{ theme: 'light', name: 'a' }])).toEqual([])
   })
 })

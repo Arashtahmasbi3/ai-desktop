@@ -14,12 +14,14 @@
  */
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { dirname } from 'node:path'
 import {
   SHOTS,
   THEMES,
   appTarget,
   compareShot,
+  duplicateSurfaces,
   pngSize,
   shotPath,
   summarize,
@@ -103,15 +105,16 @@ async function main() {
         const baselinePath = `${path}.baseline`
         const size = pngSize(png)
         const current = { ...size, bytes: png.length }
+        const sha256 = createHash('sha256').update(png).digest('hex')
         if (WRITE_BASELINE) {
           await writeFile(baselinePath, JSON.stringify(current))
-          results.push({ theme, name: shot.name, status: 'ok' })
+          results.push({ theme, name: shot.name, status: 'ok', sha256 })
           continue
         }
         const baseline = existsSync(baselinePath)
           ? JSON.parse(await readFile(baselinePath, 'utf8'))
           : undefined
-        results.push({ theme, name: shot.name, ...compareShot(baseline, current) })
+        results.push({ theme, name: shot.name, sha256, ...compareShot(baseline, current) })
       }
     }
   } finally {
@@ -122,6 +125,18 @@ async function main() {
   console.log(summary.line)
   for (const entry of [...summary.changed, ...summary.missing]) {
     console.log(`  ${entry.status}: ${entry.theme}/${entry.name}${entry.detail ? ` (${entry.detail})` : ''}`)
+  }
+  /*
+   * v4.3.15 (REL-5): four "surfaces" that are byte-identical are one window photographed four times. The script does
+   * not navigate between captures today, so this is the difference between a check and a ritual.
+   */
+  const duplicates = duplicateSurfaces(results)
+  if (duplicates.length > 0) {
+    console.log('\nthe same window was captured more than once — these are not distinct surfaces:')
+    for (const duplicate of duplicates) {
+      console.log(`  ${duplicate.theme}: ${duplicate.names.join(' and ')} are identical`)
+    }
+    process.exitCode = 1
   }
   if (!summary.ok) {
     console.log('\nOpen the artifacts and look. This check catches a changed window and a large drift, not a wrong pixel.')

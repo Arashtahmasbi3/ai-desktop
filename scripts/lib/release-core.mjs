@@ -299,10 +299,21 @@ export function checkPreflight(snapshot) {
 
   const alreadyBuilt = artifactsForVersionInSums(snapshot.sumsText, snapshot.targetVersion)
   if (alreadyBuilt.length > 0) {
-    blockers.push({
-      code: 'already-built',
-      message: `${RELEASE_DIR}/${SUMS_FILE} already records ${alreadyBuilt.join(' and ')}. Refusing to rebuild the same version.`
-    })
+    if (snapshot.tagExists) {
+      blockers.push({
+        code: 'already-built',
+        message: `${RELEASE_DIR}/${SUMS_FILE} already records ${alreadyBuilt.join(' and ')}. Refusing to rebuild the same version.`
+      })
+    } else {
+      /*
+       * v4.3.15 (REL-4): a run that failed after its checksum step left the sums behind with no tag, and the old
+       * blocker made that version unreleasable — the retry was refused for work the failed attempt had done. With no
+       * tag the release never happened, so the artifacts are rebuilt and the checksums overwritten.
+       */
+      warnings.push(
+        `${RELEASE_DIR}/${SUMS_FILE} records ${alreadyBuilt.join(' and ')} but tag v${snapshot.targetVersion} does not exist — a previous attempt stopped before tagging. The artifacts will be rebuilt and the checksums overwritten.`
+      )
+    }
   }
 
   if (!snapshot.changelogHasTarget) {
@@ -363,6 +374,11 @@ export function buildPlan(options) {
       id: 'build',
       title: 'Build the Windows artifacts',
       detail: 'npm run build, then electron-builder into a fresh temp directory outside this repository and outside Documents (Defender Controlled Folder Access blocks executing a new unsigned exe under a protected folder)'
+    },
+    {
+      id: 'live-gate',
+      title: 'Verify the interface that actually renders',
+      detail: 'node scripts/verify-ui.mjs and node scripts/run-scenarios.mjs against the freshly built out/ — the same gate ui.yml makes mandatory, run here so a tag cannot be cut on a build nobody launched'
     },
     {
       id: 'checksums',

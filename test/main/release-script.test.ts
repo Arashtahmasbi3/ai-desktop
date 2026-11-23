@@ -235,14 +235,31 @@ describe('checkPreflight', () => {
     expect(result.blockers[0]?.message).toContain('v4.2.0')
   })
 
-  it('refuses to run twice for the same version when the checksum file already records it', () => {
+  it('refuses to run twice for the same version when the checksum file already records it and it was tagged', () => {
     const result = checkPreflight({
       ...clean,
+      tagExists: true,
       sumsText: `${HEX_A}  AI Desktop Setup 4.2.0.exe\n${HEX_B}  AI Desktop 4.2.0 Portable.exe\n`,
       existingArtifactNames: ['AI Desktop Setup 4.2.0.exe', 'AI Desktop 4.2.0 Portable.exe']
     })
-    expect(result.blockers.map((b) => b.code)).toEqual(['already-built'])
-    expect(result.blockers[0]?.message).toContain(SUMS_FILE)
+    expect(result.blockers.map((b) => b.code).sort()).toEqual(['already-built', 'already-tagged'])
+    expect(result.blockers.find((b) => b.code === 'already-built')?.message).toContain(SUMS_FILE)
+  })
+
+  /*
+   * REL-4 (v4.3.15): a release that died after its checksum step used to be unreleasable — the sums recorded the
+   * artifacts, so the retry was refused for work the failed attempt had done, even though nothing was tagged.
+   */
+  it('lets a version that was never tagged be retried, and says what it will overwrite', () => {
+    const result = checkPreflight({
+      ...clean,
+      tagExists: false,
+      sumsText: `${HEX_A}  AI Desktop Setup 4.2.0.exe\n${HEX_B}  AI Desktop 4.2.0 Portable.exe\n`,
+      existingArtifactNames: ['AI Desktop Setup 4.2.0.exe', 'AI Desktop 4.2.0 Portable.exe']
+    })
+    expect(result.blockers).toEqual([])
+    expect(result.warnings.join(' ')).toContain('stopped before tagging')
+    expect(result.warnings.join(' ')).toContain('overwritten')
   })
 
   it('refuses when the CHANGELOG has no section for the target', () => {
@@ -299,9 +316,18 @@ describe('buildPlan / formatPlan', () => {
       'typecheck',
       'tests',
       'build',
+      'live-gate',
       'checksums',
       'stop'
     ])
+  })
+
+  it('runs the live gate between the build and the checksums, so no tag is cut on a window nobody launched', () => {
+    const ids = buildPlan({ ...options, commit: true }).map((step) => step.id)
+    expect(ids.indexOf('live-gate')).toBeGreaterThan(ids.indexOf('build'))
+    expect(ids.indexOf('live-gate')).toBeLessThan(ids.indexOf('checksums'))
+    const gate = buildPlan(options).find((step) => step.id === 'live-gate')
+    expect(gate?.detail).toContain('verify-ui.mjs')
   })
 
   it('replaces the stop with a commit when --commit is given, and adds the push only with --push', () => {
@@ -311,6 +337,7 @@ describe('buildPlan / formatPlan', () => {
       'typecheck',
       'tests',
       'build',
+      'live-gate',
       'checksums',
       'commit'
     ])

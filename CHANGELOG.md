@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.3.15] - 2026-11-23
+
+### The release path launches what it is about to publish
+
+`ui.yml` calls the live-app check mandatory, but `release.mjs` stopped at typecheck/test/build: a tag could be cut
+from a build nobody had opened, which is exactly how 3196 green unit tests once sat behind a window that reported a
+dead session as connected. The plan now has a `live-gate` step between the build and the checksums, and the script runs
+`verify-ui.mjs` and `run-scenarios.mjs` against the freshly built `out/` before packaging. A release that cannot pass
+the window check no longer produces artifacts.
+
+### The feed refuses an asset that does not match its checksum
+
+`publish-feed.mjs` uploaded whatever was in `release/` and published the checksum file beside it, without comparing the
+two. A stale installer — or a file a failed build half-overwrote — would reach every installed app with a checksum that
+does not describe it; before 4.3.14 that installed unverified, and since 4.3.14 it would simply fail. Each asset's
+SHA-256 is now recomputed before upload and a mismatch aborts the publication. `--dry-run` verifies too, so a rehearsal
+answers whether the folder is publishable.
+
+### A failed release can be retried
+
+A run that died after its checksum step left `release/SHA256SUMS.txt` recording the artifacts with no tag, and the
+preflight blocker then refused the retry for work the failed attempt had done — the version was unreleasable. Artifacts
+recorded without a matching tag are now a warning that says they will be rebuilt; the tag is still the proof that a
+release happened, and a tagged version is still refused.
+
+### Four screenshots that are one window are reported
+
+`scripts/screenshots.mjs` captures four "surfaces" without navigating between them, so the run photographed the same
+window four times and printed four `ok` rows. It now hashes each capture and fails when two shots in one theme are
+byte-identical, which is the difference between a check and a ritual.
+
+### Still not true
+
+The wave-2 and wave-3 findings from the 2026-11-22 audit are still open: `evaluateHostPolicy` still admits a read-only
+prefix followed by an unseen statement; custom-provider headers and MCP `env` blocks are still persisted in cleartext;
+a corrupt `vps-servers.json` is still replaced by an empty list; the app's own remote editor still saves with no
+backup; the 120 s no-progress clock is still refreshed by six tool names only; the prompt budget is still sized from
+the first provider; and code signing is still absent.
+
 ## [4.3.14] - 2026-11-23
 
 ### A newline is a separator, and so is a bare `&`

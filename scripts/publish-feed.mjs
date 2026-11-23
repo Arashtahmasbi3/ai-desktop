@@ -19,6 +19,62 @@
 /** The repository the app's updater reads. Kept in sync with `DEFAULT_UPDATE_REPO`. */
 export const FEED_REPO = 'Arashtahmasbi3/ai-desktop-releases'
 
+import { createHash } from 'node:crypto'
+import { readFileSync, statSync } from 'node:fs'
+
+/** `sha256  name` pairs, the same shape `release/SHA256SUMS.txt` uses. */
+export function parseSumsText(text) {
+  const entries = new Map()
+  for (const line of String(text ?? '').split(/\r?\n/)) {
+    const match = /^([0-9a-f]{64})\s{2}(.+)$/i.exec(line.trim())
+    if (match) entries.set(match[2].trim(), match[1].toLowerCase())
+  }
+  return entries
+}
+
+/**
+ * v4.3.15 (REL-3): the feed step uploaded whatever happened to sit in `release/` and published the checksum file
+ * beside it, without ever comparing the two. A stale installer from the previous version — or a file a failed build
+ * half-overwrote — would ship with a checksum that does not describe it, and every installed app would refuse the
+ * update (or, before v4.3.14, run it unverified). Recompute each digest here and refuse to publish a mismatch.
+ *
+ * The I/O is injected so this decision is testable without 230 MB on disk or a network.
+ */
+export function verifyFeedAssets(version, sumsText, io = {}) {
+  const read = io.readFile ?? ((path) => readFileSync(path))
+  const size = io.size ?? ((path) => statSync(path).size)
+  const problems = []
+  const recorded = parseSumsText(sumsText)
+  for (const asset of feedAssets(version)) {
+    if (/SHA256SUMS\.txt$/.test(asset)) continue
+    const name = asset.startsWith('release/') ? asset.slice('release/'.length) : asset
+    const expected = recorded.get(name)
+    if (!expected) {
+      problems.push(`SHA256SUMS.txt has no entry for ${name}`)
+      continue
+    }
+    let bytes
+    try {
+      bytes = read(asset)
+    } catch {
+      problems.push(`${asset} cannot be read (run the release first)`)
+      continue
+    }
+    const actual = createHash('sha256').update(bytes).digest('hex')
+    if (actual !== expected) {
+      problems.push(
+        `${name}: local sha256 ${actual.slice(0, 12)}… does not match the recorded ${expected.slice(0, 12)}…`
+      )
+    }
+    try {
+      if (size(asset) <= 0) problems.push(`${name} is empty`)
+    } catch {
+      problems.push(`${name} cannot be sized`)
+    }
+  }
+  return { ok: problems.length === 0, problems }
+}
+
 /** The assets a feed release must carry, in the order they are uploaded. */
 export function feedAssets(version) {
   return [
@@ -60,6 +116,26 @@ async function main() {
     process.exit(2)
   }
   const { version, dryRun, prerelease } = parsed
+
+  /*
+   * v4.3.15 (REL-3): prove the assets match the checksum file before anything reaches the feed. This runs for
+   * --dry-run too, so a rehearsal says whether the folder is publishable.
+   */
+  let sumsText
+  try {
+    sumsText = readFileSync('release/SHA256SUMS.txt', 'utf8')
+  } catch {
+    console.error('release/SHA256SUMS.txt cannot be read; run the release first.')
+    process.exit(1)
+  }
+  const verified = verifyFeedAssets(version, sumsText)
+  if (!verified.ok) {
+    console.error('refusing to publish: the artifacts do not match release/SHA256SUMS.txt')
+    for (const problem of verified.problems) console.error('  - ' + problem)
+    process.exit(1)
+  }
+  console.log('assets verified against release/SHA256SUMS.txt')
+
   const notes =
     'The updater feed. See the private repository Arashtahmasbi3/ai-desktop for the release notes of v' +
     version +

@@ -64,4 +64,8 @@ export declare function compareShot(
 ): CompareResult
 export declare function pngSize(buffer: Buffer): ShotSize | undefined
 export declare function shotPath(theme: string, name: string): string
+/** v4.3.15 (REL-5): two byte-identical captures in one theme are the same window, not two surfaces. */
+export declare function duplicateSurfaces(
+  entries: readonly { theme: string; name: string; sha256?: string }[]
+): { theme: string; names: [string, string] }[]
 export declare function summarize(results: readonly ShotResult[]): Summary

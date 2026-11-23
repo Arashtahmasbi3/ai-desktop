@@ -98,6 +98,24 @@ export function shotPath(theme, name) {
   return `docs/screenshots/${theme}/${name}.png`
 }
 
+/**
+ * v4.3.15 (REL-5): the four "surfaces" were captured without ever navigating between them, so the run photographed the
+ * same window four times and printed four `ok` rows — a check that could not fail. Two captures in one theme that are
+ * byte-identical are the same window; the driver reports that instead of counting it as four surfaces.
+ */
+export function duplicateSurfaces(entries) {
+  const seen = new Map()
+  const duplicates = []
+  for (const entry of entries ?? []) {
+    if (!entry || typeof entry.sha256 !== 'string' || entry.sha256 === '') continue
+    const key = `${entry.theme}:${entry.sha256}`
+    const first = seen.get(key)
+    if (first !== undefined) duplicates.push({ theme: entry.theme, names: [first, entry.name] })
+    else seen.set(key, entry.name)
+  }
+  return duplicates
+}
+
 /** The summary that goes in the job log and the artifacts. */
 export function summarize(results) {
   const changed = results.filter((entry) => entry.status !== 'ok' && entry.status !== 'missing-baseline')

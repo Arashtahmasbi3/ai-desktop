@@ -1,5 +1,12 @@
+import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import { FEED_REPO, feedAssets, parseArgs, planCommands } from '../../scripts/publish-feed.mjs'
+import {
+  FEED_REPO,
+  feedAssets,
+  parseArgs,
+  planCommands,
+  verifyFeedAssets
+} from '../../scripts/publish-feed.mjs'
 
 /*
  * P4.1 left a hole that cost seven releases: the updater reads a public feed repository and nothing published to it, so
@@ -50,5 +57,57 @@ describe('the feed publication step', () => {
     /* A build held back in the private repository must not be offered unlocked by the updater. */
     expect(planCommands('4.3.6', 'notes')[0]).not.toContain('--prerelease')
     expect(planCommands('4.3.6', 'notes', { prerelease: true })[0]).toContain('--prerelease')
+  })
+})
+
+/*
+ * REL-3 (v4.3.15). The step uploaded whatever sat in release/ and published the checksum file beside it without ever
+ * comparing the two, so a stale installer could ship with a checksum that does not describe it.
+ */
+describe('the feed verifies the assets before uploading anything', () => {
+  const setup = Buffer.from('setup-bytes')
+  const portable = Buffer.from('portable-bytes')
+  const digest = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex')
+  const sums = (overrides: { setup?: string; portable?: string } = {}) =>
+    `${overrides.setup ?? digest(setup)}  AI Desktop Setup 4.3.6.exe\n` +
+    `${overrides.portable ?? digest(portable)}  AI Desktop 4.3.6 Portable.exe\n`
+
+  function io(files: Record<string, Buffer | Error>) {
+    return {
+      readFile: (path: string) => {
+        const name = path.startsWith('release/') ? path.slice('release/'.length) : path
+        const entry = files[name]
+        if (entry === undefined || entry instanceof Error) throw entry ?? new Error('ENOENT')
+        return entry
+      },
+      size: () => 42
+    }
+  }
+
+  const files = {
+    'AI Desktop Setup 4.3.6.exe': setup,
+    'AI Desktop 4.3.6 Portable.exe': portable
+  }
+
+  it('accepts the pair the release just wrote', () => {
+    expect(verifyFeedAssets('4.3.6', sums(), io(files))).toEqual({ ok: true, problems: [] })
+  })
+
+  it('refuses a file whose digest does not match the recorded one', () => {
+    const result = verifyFeedAssets('4.3.6', sums({ portable: 'a'.repeat(64) }), io(files))
+    expect(result.ok).toBe(false)
+    expect(result.problems.join(' ')).toContain('does not match')
+  })
+
+  it('refuses a checksum file that does not name one of the assets', () => {
+    const result = verifyFeedAssets('4.3.6', `${digest(setup)}  AI Desktop Setup 4.3.6.exe\n`, io(files))
+    expect(result.ok).toBe(false)
+    expect(result.problems.join(' ')).toContain('has no entry')
+  })
+
+  it('refuses when the asset is missing, instead of publishing what is not there', () => {
+    const result = verifyFeedAssets('4.3.6', sums(), io({ ...files, 'AI Desktop 4.3.6 Portable.exe': new Error('ENOENT') }))
+    expect(result.ok).toBe(false)
+    expect(result.problems.join(' ')).toContain('cannot be read')
   })
 })
