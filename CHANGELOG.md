@@ -7,6 +7,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.3.17] - 2026-11-23
+
+Wave 2 and 3 of the 2026-11-22 audit: the rest of the checklist, in the order it was recorded.
+
+### Credentials that were on disk in clear
+
+A custom provider's extra headers (`Authorization: Bearer …`, `api-key: …`) were written in cleartext beside the
+encrypted API key, and an MCP server's `env` block — where the app's own comment says a token lives — was plain JSON.
+Both are encrypted now (`headersEnc`, `envEnc`) and both migrate a file written by an older build on first read, so the
+old plaintext does not survive the upgrade.
+
+### The app's own remote editor keeps a backup
+
+Saving from the editor overwrote the remote file over SFTP with nothing kept, while the agent's `remote_write_file`
+copied it first and refused to write when the copy failed. The editor's save now takes the same `<path>.backup-<ts>`
+copy, audits `backup_created`, and refuses to write when the copy fails.
+
+### Runs and messages that were quietly wrong
+
+- A staged attachment was copied into the workspace and never named in the prompt the model received.
+- The orchestrator minted its own run id, so every run's internal id was `run-1` while the trace and `run:end` were
+  keyed by `run-N`.
+- Usage was booked against the first configured provider even after the run fell back to another one.
+- A single message could exceed the whole prompt budget, because compaction always keeps the newest six regardless of
+  size; each message is capped at a quarter of the budget now, the stored history untouched.
+- The prompt budget was sized from the first provider while the same prompt reached every fallback; it is the smallest
+  window in the chain.
+- The 120 s no-progress clock was refreshed by six tool names only — a slow provider, a plan the user read, or a
+  diagnostic sequence stopped a productive run as a "loop". Any executed call, any model answer and every completed
+  plan gate refresh the clock; genuine progress still owns the repeat window.
+- A guard stop was recorded before the step that triggered it, so the card described the previous step.
+- The compaction summariser ignored Stop for its whole HTTP call.
+- A provider whose only key was cooling down vanished from the chain instead of making the call and reporting the
+  rate limit.
+- Two MCP tool names that sanitise to the same string collided and failed every run, leaking the spawned servers.
+
+### The interface stops losing what you typed
+
+A send refused by the spend cap emptied the composer; the run-changes card survived a chat switch; two chat loads
+could settle out of order; a failed goal action became an unhandled rejection; a slow code search could replace newer
+results; the status line called a session that had spent nothing "unpriced". All fixed, each with a test. The chat-tree
+drawer now follows the document direction, and the goal card uses a translation key that exists.
+
+### Release engineering
+
+The live-app gate runs inside `release.mjs` between the build and the checksums, so no tag is cut on a window nobody
+launched. `publish-feed.mjs` recomputes each asset's SHA-256 and refuses to publish a mismatch. A failed release can be
+retried. The staged verification layout reads its dependency list from `electron-builder.yml`. `engines.node` is
+`>=22.12.0` with a matching `.nvmrc`. The release now states whether the build is signed, and `--require-signature`
+refuses an uncertified release.
+
+### Guards that were proving nothing
+
+The "no interface without a capability" scan that was lost when an agent was interrupted is rebuilt from the same
+discovery the other invariants use. The capability matrix guard derives the write and v2.4 tool sets, checks that every
+`proven by` path exists, and that every tool it names is real — which removed eight phantom test paths and one phantom
+tool. The quoting guard scans the escaping idiom rather than a function name, fails when `git ls-files` cannot run, and
+the two renamed copies it could not see are gone. The feed guard compares against the updater's own constant. The
+performance test no longer asserts a budget equal to its own timeout.
+
+### Documents that described another version
+
+`README` claimed the app had no auto-updater; `KNOWN_ISSUES.md` still announced v1.0.0 and called the current release
+v2.6.4; `AGENTS.md` reported a file-size ceiling nothing enforced. All three now say what is true, and a test keeps the
+ceiling.
+
+### Still not true
+
+Code signing is still absent: every install shows SmartScreen until a certificate is provided. The review queue for
+consequential decisions is still a product decision (B2-4). The debug-port capture and the screenshot driver are still
+tested only in their pure halves on this machine.
+
 ## [4.3.16] - 2026-11-23
 
 ### A read-only prefix covers every statement
