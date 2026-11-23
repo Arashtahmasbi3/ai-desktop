@@ -348,7 +348,8 @@ export class AgentOrchestrator {
       estimatedTokens: context.estimateTokens()
     })
 
-    const summarizer = this.summarizer ?? createAdapterSummarizer(this.providers[0])
+    const summarizer =
+      this.summarizer ?? createAdapterSummarizer(this.providers[0], options.signal)
 
     let status: AgentStatus = 'max_steps'
     let finalAnswer: string | null = null

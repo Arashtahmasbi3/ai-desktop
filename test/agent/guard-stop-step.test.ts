@@ -49,7 +49,7 @@ describe('the step that trips the guard is on the card (v4.3.17)', () => {
     // The step that triggered the stop is counted…
     expect(result.stop?.steps).toBeGreaterThanOrEqual(1)
     // …and the failure that ran in it is evidence the card can name.
-    expect(result.stop?.recentFailures.length).toBeGreaterThan(0)
+    expect((result.stop?.recentFailures ?? []).length).toBeGreaterThan(0)
     await manager.dispose()
   })
 })

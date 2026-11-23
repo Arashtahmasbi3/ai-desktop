@@ -60,7 +60,10 @@ export function stripAttachmentParts(message: ChatMessage): ChatMessage {
  * Build a {@link ContextSummarizer} that asks the provider to compress dropped
  * history, falling back to a deterministic summary if the call fails.
  */
-export function createAdapterSummarizer(entry: ProviderEntry): ContextSummarizer {
+export function createAdapterSummarizer(
+  entry: ProviderEntry,
+  signal?: AbortSignal
+): ContextSummarizer {
   const instruction =
     'You compress an AI coding agent conversation. Summarize the transcript into ' +
     'a compact brief (max ~200 words) that preserves: the user goal, files created ' +
@@ -74,6 +77,11 @@ export function createAdapterSummarizer(entry: ProviderEntry): ContextSummarizer
         {
           model: entry.config.model,
           temperature: 0,
+          /*
+           * v4.3.17 (AGT-9): the summariser call is part of the run, so Stop has to reach it. Without the signal the
+           * user's Stop was inert for the whole HTTP budget of a compaction call that can take a minute.
+           */
+          ...(signal ? { signal } : {}),
           messages: [
             { role: 'system', content: instruction },
             {

@@ -165,3 +165,36 @@ describe('the snapshot is safe to log and to show (v3.1)', () => {
     expect(keys.snapshot()[0]).toEqual({ id: 'work', label: 'Work key', state: 'ready', failures: 0 })
   })
 })
+
+/*
+ * v4.3.17 (AGT-10). When every key is cooling, `next()` is `undefined` — and the provider builder read that as "this
+ * provider has nothing", so a single-provider setup failed with no attempt and no rate-limit message. A cooling key is
+ * still the best candidate there is.
+ */
+describe('a cooling key is still offered (v4.3.17)', () => {
+  it('reports the key that recovers soonest even when none is ready', () => {
+    let clock = NOW
+    const keys = new KeyPool(slots('a', 'b'), {
+      now: () => clock,
+      failureThreshold: 1,
+      cooldownMs: 30_000
+    })
+
+    keys.reportFailure('k1', { retryAfterMs: 20_000 })
+    clock += 5_000
+    keys.reportFailure('k2', { retryAfterMs: 10_000 })
+
+    expect(keys.hasReady()).toBe(false)
+    expect(keys.next()).toBeUndefined()
+    // k1 recovers at +20s, k2 at +15s: k2 is the one worth trying.
+    expect(keys.soonest()?.id).toBe('k2')
+  })
+
+  it('prefers a ready key through next(), and soonest() agrees with it', () => {
+    const { pool: keys, advance } = pool(slots('a', 'b'), { failureThreshold: 1 })
+    keys.reportFailure('k1')
+    expect(keys.next()?.id).toBe('k2')
+    advance(11_000)
+    expect(keys.soonest()).toBeDefined()
+  })
+})

@@ -70,6 +70,20 @@ function definitionOf(info: McpToolInfo, name: string): ToolDefinition {
   }
 }
 
+/**
+ * v4.3.17 (AGT-12): a name already taken gets `-2`, `-3`, … .
+ *
+ * Two servers can expose tools whose names sanitise to the same string, and a server can list a duplicate. The route
+ * map silently kept the last one, and the builder then refused the whole group — which failed every run and leaked
+ * the MCP processes because the throw happened before the caller could close them.
+ */
+function uniqueToolName(routes: Map<string, unknown>, base: string): string {
+  if (!routes.has(base)) return base
+  let suffix = 2
+  while (routes.has(`${base}-${suffix}`)) suffix += 1
+  return `${base}-${suffix}`
+}
+
 export async function registerMcpTools(options: McpBridgeOptions): Promise<McpBridgeResult> {
   const statuses: McpServerStatus[] = []
   const handles: McpServerHandle[] = []
@@ -103,7 +117,12 @@ export async function registerMcpTools(options: McpBridgeOptions): Promise<McpBr
         continue
       }
       for (const info of tools) {
-        const name = mcpToolName(config.id, info.name)
+        /*
+         * v4.3.17 (AGT-12): two tool names that sanitise to the same string (or a server that lists the same tool
+         * twice) collided in the route map and made the builder refuse the whole group — every run failed, and the
+         * spawned MCP processes leaked because the throw skipped `closeAll`. Colliding names get a numeric suffix.
+         */
+        const name = uniqueToolName(routes, mcpToolName(config.id, info.name))
         routes.set(name, { handle, toolName: info.name })
         allDefinitions.push(definitionOf(info, name))
       }
@@ -124,7 +143,15 @@ export async function registerMcpTools(options: McpBridgeOptions): Promise<McpBr
     allDefinitions.length === 0
       ? undefined
       : { definitions: allDefinitions, executor: new McpToolExecutor(routes) }
-  if (group !== undefined) options.builder.add(group)
+  if (group !== undefined) {
+    try {
+      options.builder.add(group)
+    } catch (error) {
+      // v4.3.17 (AGT-12): a refused group must not leave the servers it started running with nobody holding them.
+      await Promise.all(handles.map((handle) => handle.close().catch(() => undefined)))
+      throw error
+    }
+  }
 
   return {
     statuses,

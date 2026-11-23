@@ -225,6 +225,26 @@ describe('registerMcpTools', () => {
     await result.closeAll()
     expect(handles.map((handle) => handle.closed)).toEqual([true, true])
   })
+
+  /*
+   * v4.3.17 (AGT-12). Two tool names that sanitise to the same string used to collide in the route map, and the
+   * builder then refused the whole group: every run failed, and the spawned MCP processes leaked because the throw
+   * happened before the caller could close them.
+   */
+  it('keeps both tools when two names sanitise to the same string', async () => {
+    const builder = new ToolsetBuilder()
+    const result = await registerMcpTools({
+      builder,
+      servers: [server()],
+      connect: async (config) => fakeHandle(config, [tool('read.note'), tool('read_note')])
+    })
+
+    const names = builder.names()
+    expect(names).toHaveLength(2)
+    expect(new Set(names).size).toBe(2)
+    expect(result.statuses).toEqual([{ serverId: 'notes', state: 'connected', toolCount: 2 }])
+    await result.closeAll()
+  })
 })
 
 describe('McpServerStore', () => {

@@ -92,6 +92,22 @@ export class KeyPool {
   }
 
   /**
+   * v4.3.17 (AGT-10): the key that becomes usable soonest, even when every key is cooling down.
+   *
+   * `next()` returning `undefined` was read by the provider builder as "this provider has nothing", so a single
+   * provider whose only key sat in a 15 s cooldown produced an empty chain and the run failed with no attempt and no
+   * rate-limit message. A cooling key is still the best candidate there is; the attempt reports the real error.
+   */
+  soonest(): KeySlot | undefined {
+    if (this.entries.length === 0) return undefined
+    let best = this.entries[0]!
+    for (const entry of this.entries) {
+      if (entry.cooldownUntil < best.cooldownUntil) best = entry
+    }
+    return best.slot
+  }
+
+  /**
    * The next usable key, round-robin among the ready ones, or `undefined` when every key is
    * cooling down. Deliberately does not wait: a caller that wants to sit out a cooldown asks
    * `waitMs()` first, and a caller with other providers moves on instead.

@@ -100,6 +100,7 @@ export class ProviderFactory {
        * as well as providers — which is what a rate limit actually needs.
        */
       const pool = this.ensureKeyPool(id, keys)
+      let added = 0
       for (let slot = 0; slot < pool.size; slot += 1) {
         const next = pool.next()
         if (!next) break
@@ -111,6 +112,25 @@ export class ProviderFactory {
           ...(stored.model ? { model: stored.model } : {}),
           ...(stored.baseUrl ? { baseUrl: stored.baseUrl } : {})
         })
+        added += 1
+      }
+      /*
+       * v4.3.17 (AGT-10): every key cooling down used to remove the provider from the chain entirely, so a
+       * single-provider setup failed with "no provider" instead of attempting the call and reporting the rate limit.
+       * Offer the key that recovers soonest and let the real error be the answer.
+       */
+      if (added === 0) {
+        const cooling = pool.soonest()
+        if (cooling) {
+          candidates.push({
+            id,
+            apiKey: cooling.apiKey,
+            keyId: cooling.id,
+            pool,
+            ...(stored.model ? { model: stored.model } : {}),
+            ...(stored.baseUrl ? { baseUrl: stored.baseUrl } : {})
+          })
+        }
       }
     }
 
