@@ -25,6 +25,8 @@ import { buildDesign } from '../design-build/build'
 import { createDesignToolGroup } from '@core/tools/design-tools'
 import { createWebToolGroup } from '@core/tools/web-tools'
 import { createTodoToolGroup } from '@core/tools/todo-tool'
+import { createPresentToolGroup } from '@core/tools/present-tool'
+import { PresentedStore } from '../presented-store'
 import { TodoStore } from '../todo-store'
 import {
   activeRemoteProjectHint,
@@ -81,6 +83,8 @@ export class ToolingAssembler {
   private webGroup: ToolGroup | undefined
   /** T04: the checklist tool, bound to the same file the panel reads. */
   private todoGroup: ToolGroup | undefined
+  /** T11: the deliverables announcement, bound to the same file the panel reads. */
+  private presentedGroup: ToolGroup | undefined
   /** 30s cache of detected remote workspaces, keyed `${serverId}:${path}` (A.1). */
   private readonly workspaceCache = new Map<string, { info: RemoteWorkspaceInfo; at: number }>()
 
@@ -279,7 +283,8 @@ export class ToolingAssembler {
       skillGroup,
       this.designTools(),
       this.webTools(),
-      this.todoTools()
+      this.todoTools(),
+      this.presentedTools()
     )
     // B-11: the resolver's reconciliation (a stale chat-header VPS dropped in
     // favour of the project's server) must reach the agent prompt, not vanish.
@@ -300,6 +305,16 @@ export class ToolingAssembler {
       runtime.systemHint = [runtime.systemHint, projectHint].filter(Boolean).join(' ')
     }
     return { ...runtime, ...routing }
+  }
+
+  /**
+   * T11: the deliverables announcement, bound to `<userData>/presented.json` — the same file the Checklist view reads.
+   */
+  private presentedTools(): ToolGroup | undefined {
+    if (this.userDataDir === undefined) return undefined
+    if (this.presentedGroup !== undefined) return this.presentedGroup
+    this.presentedGroup = createPresentToolGroup(new PresentedStore({ dir: this.userDataDir }))
+    return this.presentedGroup
   }
 
   /**

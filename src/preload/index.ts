@@ -14,6 +14,7 @@ import type { DesignAnswers, DesignBuildResult, DesignProject, DesignSummary, De
 import type { DesignMemory, RememberInput, RememberResult } from '@shared/design-memory'
 import type { TodoList } from '@shared/todo'
 import type { DocumentPreview } from '@shared/document-preview'
+import type { PresentedList } from '@shared/deliverable'
 import type {
   AuditEntryView,
   HealthCheckConfig,
@@ -225,6 +226,11 @@ export const api = {
   },
 
   /** T04: the working checklist the agent writes with todo_write. */
+  /** T11: the deliverables the agent last presented. */
+  presented: {
+    list: (): Promise<PresentedList> => invoke('presented:list')
+  },
+
   todos: {
     list: (): Promise<TodoList> => invoke('todos:list')
   },

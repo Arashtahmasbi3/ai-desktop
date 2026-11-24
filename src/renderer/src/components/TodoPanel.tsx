@@ -11,11 +11,14 @@ import type { TodoStatus } from '@shared/todo'
  */
 export default function TodoPanel(): React.JSX.Element {
   const todos = useStore((state) => state.todos)
+  const presented = useStore((state) => state.presented)
   const refresh = useStore((state) => state.refreshTodos)
+  const refreshPresented = useStore((state) => state.refreshPresented)
 
   useEffect(() => {
     void refresh()
-  }, [refresh])
+    void refreshPresented()
+  }, [refresh, refreshPresented])
 
   const label = (status: TodoStatus): string =>
     status === 'completed'
@@ -74,6 +77,41 @@ export default function TodoPanel(): React.JSX.Element {
           ))}
         </ol>
       )}
+
+      {/* T11: what the agent presented as the result of the run. */}
+      <section className="mt-2">
+        <h3 className="mb-2 text-sm font-semibold text-fg-strong">{i18n.t('todos.deliverables')}</h3>
+        {presented.length === 0 ? (
+          <p className="rounded border border-dashed border-border px-4 py-4 text-center text-xs text-fg-muted">
+            {i18n.t('todos.noDeliverables')}
+          </p>
+        ) : (
+          <ul className="flex flex-col gap-2" data-testid="presented-list">
+            {presented.map((item) => (
+              <li
+                key={item.path}
+                className="flex items-start justify-between gap-3 rounded border border-border px-3 py-2"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-mono text-xs text-fg" dir="ltr">
+                    {item.path}
+                  </p>
+                  {item.description ? (
+                    <p className="text-3xs text-fg-muted">{item.description}</p>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void window.api.fs.reveal(item.path)}
+                  className="shrink-0 rounded border border-border px-2 py-0.5 text-3xs text-fg hover:bg-bg-tertiary"
+                >
+                  {i18n.t('todos.reveal')}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   )
 }

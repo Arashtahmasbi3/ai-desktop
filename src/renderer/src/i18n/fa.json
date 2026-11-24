@@ -1519,7 +1519,10 @@
     "refresh": "به‌روزرسانی",
     "pending": "در انتظار",
     "inProgress": "در جریان",
-    "completed": "تمام"
+    "completed": "تمام",
+    "deliverables": "تحویل‌دادنی‌ها",
+    "noDeliverables": "هنوز چیزی تحویل داده نشده. فایل‌ها وقتی می‌آیند که دستیار با present معرفی کند.",
+    "reveal": "نمایش در پوشه"
   },
   "documentPreview": {
     "readOnly": "پیش‌نمایش فقط‌خواندنی",

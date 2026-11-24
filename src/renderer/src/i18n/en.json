@@ -1519,7 +1519,10 @@
     "refresh": "Refresh",
     "pending": "pending",
     "inProgress": "in progress",
-    "completed": "done"
+    "completed": "done",
+    "deliverables": "Deliverables",
+    "noDeliverables": "Nothing presented yet. Files appear when the assistant hands them over with present.",
+    "reveal": "Show in folder"
   },
   "documentPreview": {
     "readOnly": "read-only preview",

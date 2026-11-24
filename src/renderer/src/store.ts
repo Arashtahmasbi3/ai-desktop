@@ -111,6 +111,7 @@ export const useStore = create<AppState>((set, get) => ({
   designBusy: false,
   todos: [],
   documentPreview: null,
+  presented: [],
   approvalSuggestion: null,
   queuedExplain: null,
   fileChanges: [],

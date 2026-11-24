@@ -147,6 +147,8 @@ export const READ_ONLY_TOOL_NAMES: ReadonlySet<string> = new Set([
   'design_list',
   'design_get',
   'design_history',
+  // T11: presenting a file announces it; it neither reads nor writes content, so it needs no prompt.
+  'present',
   'worktree_list',
   // F0-3 capability-as-data: `use_skill` reads one `SKILL.md` from a skills folder that was
   // discovered at run start (a name is a lookup key, never a path). It is a read, so it must

@@ -18,6 +18,8 @@ import { registerMcpIpc } from './mcp-ipc'
 import { registerDesignIpc } from './design-ipc'
 import { registerTodoIpc } from './todo-ipc'
 import { TodoStore } from './todo-store'
+import { registerPresentedIpc } from './presented-ipc'
+import { PresentedStore } from './presented-store'
 import { appDataDir, createDesignStore } from './stores'
 import { readFile } from 'node:fs/promises'
 import { previewDocument } from './office-preview'
@@ -683,6 +685,8 @@ export function registerIpc(
   const disposeDesign = registerDesignIpc(createDesignStore())
   // T04: the working checklist, read by the panel.
   const disposeTodos = registerTodoIpc(new TodoStore({ dir: appDataDir() }))
+  // T11: the deliverables the agent last presented.
+  const disposePresented = registerPresentedIpc(new PresentedStore({ dir: appDataDir() }))
 
 
   return () => {
@@ -690,6 +694,7 @@ export function registerIpc(
     disposeMcp()
     disposeDesign()
     disposeTodos()
+    disposePresented()
     for (const [channel] of handlers) ipcMain.removeHandler(channel)
     for (const [channel] of windowChannels) ipcMain.removeHandler(channel)
   }

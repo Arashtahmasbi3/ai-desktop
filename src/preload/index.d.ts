@@ -22,6 +22,7 @@ import type { DesignAnswers, DesignBuildResult, DesignProject, DesignSummary, De
 import type { DesignMemory, RememberInput, RememberResult } from '@shared/design-memory'
 import type { TodoList } from '@shared/todo'
 import type { DocumentPreview } from '@shared/document-preview'
+import type { PresentedList } from '@shared/deliverable'
 import type {
   AuditEntryView,
   HealthCheckConfig,
@@ -185,6 +186,10 @@ export interface Api {
     forget(id: string, recordId: string): Promise<DesignMemory>
   }
   /** T04: the working checklist. */
+  /** T11: deliverables. */
+  presented: {
+    list(): Promise<PresentedList>
+  }
   todos: {
     list(): Promise<TodoList>
   }
