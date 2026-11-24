@@ -7,6 +7,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.4.0] - 2026-11-24
+
+The Art Board: a design studio for people who have never built a website, plus the chat tools that edit the same
+document it edits.
+
+### The contract is one JSON file
+
+A design is `design.json` beside the document's own folder: pages with ids and paths, the modules on each page with
+their props and the user's notes, and the edges between pages. `validateDesign` refuses an unknown module type, a
+duplicate path, an edge to a missing page, an admin page nothing reaches and text over its cap — before a build, not
+after one.
+
+### Answer five questions, get a site
+
+The wizard asks kind, business type, needs, look and name. From those answers `suggestDesign` produces a valid
+starting document (a shop gets cart → checkout → order-success, "SMS login" gets an OTP page, "admin" gets a guarded
+page), so the board never opens empty.
+
+### The board
+
+Pages, tabs and a canvas, a palette of 47 module types in seven families, and an inspector for the title, the text,
+the button label and a free note for the assistant. Sections are added by dragging, by pressing Add, or by dropping
+them at an index; modules reorder by drag; every edit goes into a draft with a 50-step undo, and only Save writes.
+
+### Connections and reachability
+
+A page nobody can reach is a page the user built and will never see, so the Connections view creates and removes
+edges and answers, per page, whether a visitor can get there — with the same traversal the validator uses.
+
+### Build: a runnable project, a one-file preview, a zip
+
+`buildDesign` renders the document into a Vite + React project (one route per page), a single-file `preview.html` that
+opens without an install, and a stored-entry zip written by our own CRC-32 writer (no new runtime dependency). Output is
+a function of the document: two builds of one design are byte-identical, and user text is escaped in both artifacts.
+
+### Versions, a structural diff and restore
+
+`design.v1.json` is written once and never again. Every save adds a version and one line to `design-history.jsonl`
+saying, in one sentence, what changed. Restoring appends a new version equal to the old one, so history still shows
+that the user went back.
+
+### Memory with evidence
+
+The assistant remembers decisions the user stated — never a guess — with the sentence that produced them. A
+contradicting decision in the same scope supersedes the older one instead of deleting it, a secret is refused rather
+than stored, and the context a chat turn receives is budgeted: facts first, then the decisions that apply to the open
+page, then only high-confidence preferences.
+
+### Creative sections
+
+A custom section is a recipe over sixteen primitives, validated hard (depth ≤ 3, ≤ 12 items per level, known
+primitives only, no raw `style`/`class`). One sentence produces three arrangements offline; the inspector cycles them.
+
+### The chat edits the same document
+
+Eight tools — `design_list`, `design_get`, `design_history`, `design_add_module`, `design_update_page`,
+`design_compose_section`, `design_build`, `design_remember` — run in main against the design store, so a conversation
+and the board produce the same versions, with the same rules. The three reads are in the read-only set.
+
+### Still not true
+
+- The build produces a runnable project but does **not** run `npm install && npm run build` inside it. The preview and
+  the zip are real; "the generated site compiles" is checked by a person, not by the app.
+- There is no hosting, no domain and no payment integration. The output is files.
+- The chat tools are wired into a run's tool list, but the chat surface has no design-specific affordance beyond them:
+  the user still opens the board to see the result.
+- Memory only records what the user states; "inferred preferences" exist as a layer with tests but nothing writes to it
+  yet.
+- 47 module types is the whole catalogue; a type outside it is refused, not approximated.
+
 ## [4.3.17] - 2026-11-23
 
 Wave 2 and 3 of the 2026-11-22 audit: the rest of the checklist, in the order it was recorded.
