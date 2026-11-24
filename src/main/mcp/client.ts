@@ -1,6 +1,7 @@
 import type {
   McpCallResult,
   McpContentBlock,
+  McpResourceInfo,
   McpServerConfig,
   McpToolInfo
 } from '@shared/mcp'
@@ -26,6 +27,12 @@ export interface McpServerHandle {
   readonly serverName: string
   listTools(): Promise<McpToolInfo[]>
   callTool(name: string, args: Record<string, unknown>): Promise<McpCallResult>
+  /**
+   * T18: MCP resources, when the server publishes any. Optional so an older or simpler handle keeps working — a server
+   * without resources is not a broken server.
+   */
+  listResources?(): Promise<McpResourceInfo[]>
+  readResource?(uri: string): Promise<string>
   close(): Promise<void>
   stderr(): string
 }
@@ -61,7 +68,7 @@ export async function connectMcpServer(
 ): Promise<McpServerHandle> {
   await transport.request('initialize', {
     protocolVersion: PROTOCOL_VERSION,
-    capabilities: { tools: {} },
+    capabilities: { tools: {}, resources: {} },
     clientInfo: CLIENT_INFO
   })
   await transport.notify('notifications/initialized')
@@ -101,6 +108,35 @@ export async function connectMcpServer(
         content: toBlocks(result?.content),
         ...(result?.isError === true ? { isError: true } : {})
       }
+    },
+    async listResources(): Promise<McpResourceInfo[]> {
+      const result = (await transport.request('resources/list')) as { resources?: unknown }
+      const raw = Array.isArray(result?.resources) ? result.resources : []
+      const resources: McpResourceInfo[] = []
+      for (const entry of raw) {
+        if (typeof entry !== 'object' || entry === null) continue
+        const record = entry as Record<string, unknown>
+        if (typeof record.uri !== 'string' || record.uri === '') continue
+        resources.push({
+          serverId: config.id,
+          uri: record.uri,
+          name: typeof record.name === 'string' && record.name !== '' ? record.name : record.uri,
+          ...(typeof record.description === 'string' ? { description: record.description } : {}),
+          ...(typeof record.mimeType === 'string' ? { mimeType: record.mimeType } : {})
+        })
+      }
+      return resources
+    },
+    async readResource(uri: string): Promise<string> {
+      const result = (await transport.request('resources/read', { uri })) as { contents?: unknown }
+      const raw = Array.isArray(result?.contents) ? result.contents : []
+      const texts: string[] = []
+      for (const entry of raw) {
+        if (typeof entry !== 'object' || entry === null) continue
+        const text = (entry as Record<string, unknown>).text
+        if (typeof text === 'string') texts.push(text)
+      }
+      return texts.join('\\n')
     },
     close: () => transport.close(),
     stderr: () => transport.stderr()

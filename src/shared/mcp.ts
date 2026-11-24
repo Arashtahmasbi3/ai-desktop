@@ -57,6 +57,15 @@ export interface McpToolInfo {
   inputSchema: Record<string, unknown>
 }
 
+/** T18: one resource a server publishes. Resources are read-only content addressed by URI. */
+export interface McpResourceInfo {
+  serverId: string
+  uri: string
+  name: string
+  description?: string
+  mimeType?: string
+}
+
 export type McpConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error'
 
 export interface McpServerStatus {

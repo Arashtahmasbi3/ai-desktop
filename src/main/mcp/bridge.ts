@@ -2,7 +2,7 @@ import type { ToolDefinition } from '@shared/types'
 import type { AgentToolResult } from '@shared/agent'
 import type { ToolExecutor } from '@core/agent/tools'
 import type { ToolsetBuilder, ToolGroup } from '@core/tools/toolset'
-import type { McpServerConfig, McpServerStatus, McpToolInfo } from '@shared/mcp'
+import type { McpResourceInfo, McpServerConfig, McpServerStatus, McpToolInfo } from '@shared/mcp'
 import { mcpResultText, mcpToolName, type McpServerHandle } from './client'
 
 /**
@@ -36,11 +36,53 @@ export interface McpBridgeResult {
   closeAll(): Promise<void>
 }
 
-/** Routes a namespaced tool name to the server that published it. */
+/** Routes a namespaced tool name to the server that published it, or reads an advertised resource (T18). */
 class McpToolExecutor implements ToolExecutor {
-  constructor(private readonly routes: Map<string, { handle: McpServerHandle; toolName: string }>) {}
+  constructor(
+    private readonly routes: Map<string, { handle: McpServerHandle; toolName: string }>,
+    private readonly resources: Map<string, { handle: McpServerHandle; resources: McpResourceInfo[] }> = new Map()
+  ) {}
 
   async execute(action: { id: string; name: string; arguments: Record<string, unknown> }): Promise<AgentToolResult> {
+    const resourceRoute = this.resources.get(action.name)
+    if (resourceRoute !== undefined) {
+      const uri = typeof action.arguments.uri === 'string' ? action.arguments.uri.trim() : ''
+      const known = resourceRoute.resources.find((entry) => entry.uri === uri)
+      if (!known) {
+        return {
+          actionId: action.id,
+          name: action.name,
+          attempts: 1,
+          durationMs: 0,
+          ok: false,
+          output: '',
+          error: `"${uri}" is not a resource this server advertises`
+        }
+      }
+      try {
+        const text = await resourceRoute.handle.readResource!(uri)
+        return {
+          actionId: action.id,
+          name: action.name,
+          attempts: 1,
+          durationMs: 0,
+          ok: true,
+          output: text === '' ? '(the resource is empty)' : text
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        return {
+          actionId: action.id,
+          name: action.name,
+          attempts: 1,
+          durationMs: 0,
+          ok: false,
+          output: '',
+          error: `MCP server "${resourceRoute.handle.serverName}": ${message}`
+        }
+      }
+    }
+
     const route = this.routes.get(action.name)
     const base = { actionId: action.id, name: action.name, attempts: 1, durationMs: 0 }
     if (route === undefined) {
@@ -92,6 +134,7 @@ export async function registerMcpTools(options: McpBridgeOptions): Promise<McpBr
    * and a second executor closing over the same map would just be a copy of the first.
    */
   const routes = new Map<string, { handle: McpServerHandle; toolName: string }>()
+  const resourceRoutes = new Map<string, { handle: McpServerHandle; resources: McpResourceInfo[] }>()
   const allDefinitions: ToolDefinition[] = []
   const seenIds = new Set<string>()
 
@@ -112,7 +155,18 @@ export async function registerMcpTools(options: McpBridgeOptions): Promise<McpBr
       const handle = await options.connect(config)
       const tools = await handle.listTools()
       handles.push(handle)
-      if (tools.length === 0) {
+
+      /*
+       * T18: resources, when the server publishes any. One tool per server (`..._read_resource`) rather than one per
+       * resource: a server can advertise hundreds of files, and a hundred tools would crowd the model's tool list. The
+       * advertised URIs go into the description, and the executor refuses a URI that is not on that list.
+       */
+      let resources: McpResourceInfo[] = []
+      if (typeof handle.listResources === 'function') {
+        resources = await handle.listResources().catch(() => [])
+      }
+
+      if (tools.length === 0 && resources.length === 0) {
         statuses.push({ serverId: config.id, state: 'connected', toolCount: 0 })
         continue
       }
@@ -126,6 +180,28 @@ export async function registerMcpTools(options: McpBridgeOptions): Promise<McpBr
         routes.set(name, { handle, toolName: info.name })
         allDefinitions.push(definitionOf(info, name))
       }
+
+      if (resources.length > 0) {
+        const base = mcpToolName(config.id, 'read_resource')
+        const name = routes.has(base) || resourceRoutes.has(base) ? `${base}-resource` : base
+        const listed = resources
+          .slice(0, 10)
+          .map((entry) => `${entry.name} (${entry.uri})`)
+          .join(', ')
+        const more = resources.length > 10 ? `, and ${resources.length - 10} more` : ''
+        resourceRoutes.set(name, { handle, resources })
+        allDefinitions.push({
+          name,
+          description: `[${config.id}] Read a resource published by ${config.name}. Available: ${listed}${more}`,
+          parameters: {
+            type: 'object',
+            properties: { uri: { type: 'string', description: 'The resource URI as advertised' } },
+            required: ['uri'],
+            additionalProperties: false
+          }
+        })
+      }
+
       statuses.push({ serverId: config.id, state: 'connected', toolCount: tools.length })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -142,7 +218,7 @@ export async function registerMcpTools(options: McpBridgeOptions): Promise<McpBr
   const group: ToolGroup | undefined =
     allDefinitions.length === 0
       ? undefined
-      : { definitions: allDefinitions, executor: new McpToolExecutor(routes) }
+      : { definitions: allDefinitions, executor: new McpToolExecutor(routes, resourceRoutes) }
   if (group !== undefined) {
     try {
       options.builder.add(group)
