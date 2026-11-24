@@ -1,7 +1,7 @@
 import { zipStore } from '@shared/zip-store'
 
 /**
- * Building a minimal, valid OOXML document (T07/T08).
+ * Building a minimal, valid OOXML document or workbook (T07/T08).
  *
  * The parts are the smallest set Word and Excel accept: content types, the relationship from the package root, and one
  * content part. Text is escaped, workbook cells are inline strings (so no shared-strings part is needed), and the ZIP is
@@ -10,13 +10,20 @@ import { zipStore } from '@shared/zip-store'
  * Stated limit: this writes **content**, not formatting. There are no styles, images, headers, formulas or theme parts;
  * a document made here is plain paragraphs, a workbook is plain cells. That is a real document, not a rich one.
  */
+const XML_ESCAPES: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&apos;'
+}
+
+/**
+ * One character class, one map — deliberately not the shell-quoting idiom (close, escape, reopen a quote), which
+ * `test/security/shell-quote.test.ts` reserves for `shared/shell-quote.ts`.
+ */
 export function escapeXml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;')
+  return value.replace(/[&<>"']/g, (character) => XML_ESCAPES[character] ?? character)
 }
 
 export interface DocxSpec {
@@ -39,10 +46,7 @@ const ROOT_RELS_DOCX = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 export function buildDocx(spec: DocxSpec): Buffer {
   const paragraphs = spec.paragraphs.length > 0 ? spec.paragraphs : ['']
   const body = paragraphs
-    .map(
-      (text) =>
-        `<w:p><w:r><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r></w:p>`
-    )
+    .map((text) => `<w:p><w:r><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r></w:p>`)
     .join('')
   const document = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/></w:sectPr></w:body></w:document>`

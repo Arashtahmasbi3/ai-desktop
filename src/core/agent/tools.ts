@@ -8,6 +8,7 @@ import { SandboxError, normalizeSandboxPath } from '@core/sandbox'
 import { listCommandFor, resolveSandboxShell } from '@core/sandbox/shell'
 import { findSecretPathsInCommand, inspectSecretPath } from '@shared/secret-paths'
 import { buildDocx, buildXlsx } from '@core/office/ooxml'
+import { buildPptx } from '@core/office/ppt'
 import { refusalMessage } from '@shared/refusal'
 
 export interface ToolExecOptions {
@@ -252,6 +253,33 @@ export const SANDBOX_TOOLS: ToolDefinition[] = [
     }
   },
   {
+    /* T09: a presentation of title + bullets per slide. */
+    name: 'create_presentation',
+    description:
+      'Create a .pptx in the project workspace from slides of a title and bullet lines. Refuses more than 50 slides, 20 bullets per slide, or a line over 200 characters.',
+    parameters: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Workspace-relative .pptx path' },
+        slides: {
+          type: 'array',
+          description: 'Slides in order',
+          items: {
+            type: 'object',
+            properties: {
+              title: { type: 'string' },
+              bullets: { type: 'array', items: { type: 'string' } }
+            },
+            required: ['title'],
+            additionalProperties: false
+          }
+        }
+      },
+      required: ['path', 'slides'],
+      additionalProperties: false
+    }
+  },
+  {
     name: 'list_dir',
     description: 'List the entries of a directory in the project workspace.',
     parameters: {
@@ -419,6 +447,8 @@ export class SandboxToolExecutor implements ToolExecutor {
           return await this.createDocument(action, startedAt)
         case 'create_spreadsheet':
           return await this.createSpreadsheet(action, startedAt)
+        case 'create_presentation':
+          return await this.createPresentation(action, startedAt)
         case 'read_file':
           return await this.readFile(action, startedAt)
         case 'list_dir':
@@ -651,7 +681,7 @@ export class SandboxToolExecutor implements ToolExecutor {
   /** T07/T08: validate a path and an extension, then write bytes through the sandbox (path containment included). */
   private documentTarget(
     action: AgentAction,
-    extension: '.docx' | '.xlsx',
+    extension: '.docx' | '.xlsx' | '.pptx',
     startedAt: number
   ): { path: string } | AgentToolResult {
     const path = asString(action.arguments.path)?.trim()
@@ -732,6 +762,53 @@ export class SandboxToolExecutor implements ToolExecutor {
       name: action.name,
       ok: true,
       output: `Wrote ${buffer.length} bytes to ${target.path} (${rows.length} rows)`,
+      attempts: 1,
+      durationMs: Date.now() - startedAt,
+      path: target.path
+    }
+  }
+
+  private async createPresentation(action: AgentAction, startedAt: number): Promise<AgentToolResult> {
+    const target = this.documentTarget(action, '.pptx', startedAt)
+    if ('ok' in target) return target
+
+    const raw = action.arguments.slides
+    if (!Array.isArray(raw) || raw.length === 0) {
+      return failure(action, 'invalid_arguments', 'create_presentation needs at least one slide', startedAt)
+    }
+    if (raw.length > 50) {
+      return failure(action, 'invalid_arguments', 'create_presentation accepts at most 50 slides', startedAt)
+    }
+
+    const slides: Array<{ title: string; bullets: string[] }> = []
+    for (const [index, entry] of raw.entries()) {
+      if (typeof entry !== 'object' || entry === null) {
+        return failure(action, 'invalid_arguments', `slide ${index + 1} is not an object`, startedAt)
+      }
+      const record = entry as Record<string, unknown>
+      const title = typeof record.title === 'string' ? record.title : ''
+      if (title.trim() === '' || title.length > 200) {
+        return failure(action, 'invalid_arguments', `slide ${index + 1} needs a title of at most 200 characters`, startedAt)
+      }
+      const bullets = Array.isArray(record.bullets)
+        ? record.bullets.filter((line): line is string => typeof line === 'string')
+        : []
+      if (bullets.length > 20) {
+        return failure(action, 'invalid_arguments', `slide ${index + 1} has more than 20 bullets`, startedAt)
+      }
+      if (bullets.some((line) => line.length > 200)) {
+        return failure(action, 'invalid_arguments', `slide ${index + 1} has a bullet longer than 200 characters`, startedAt)
+      }
+      slides.push({ title, bullets })
+    }
+
+    const buffer = buildPptx({ slides })
+    await this.sandbox.writeFile(this.sandboxId, target.path, new Uint8Array(buffer))
+    return {
+      actionId: action.id,
+      name: action.name,
+      ok: true,
+      output: `Wrote ${buffer.length} bytes to ${target.path} (${slides.length} slides)`,
       attempts: 1,
       durationMs: Date.now() - startedAt,
       path: target.path

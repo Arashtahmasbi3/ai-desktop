@@ -141,6 +141,7 @@ describe('the sandbox tool contract (T02/T03)', () => {
       'grep',
       'create_document',
       'create_spreadsheet',
+      'create_presentation',
       'list_dir',
       'run_command'
     ])

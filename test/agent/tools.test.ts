@@ -56,6 +56,7 @@ describe('stableStringify / actionFromToolCall', () => {
       'grep',
       'create_document',
       'create_spreadsheet',
+      'create_presentation',
       'list_dir',
       'run_command'
     ])

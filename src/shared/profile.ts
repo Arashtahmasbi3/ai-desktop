@@ -190,6 +190,7 @@ export const WRITE_TOOL_NAMES: ReadonlySet<string> = new Set([
   // T07/T08: document builders write a file into the workspace.
   'create_document',
   'create_spreadsheet',
+  'create_presentation',
   // Art Board writes (phase 7): they change the saved design, so they are asked about like any write.
   'design_add_module',
   'design_update_page',
