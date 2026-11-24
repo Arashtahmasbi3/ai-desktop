@@ -105,6 +105,7 @@ export const useStore = create<AppState>((set, get) => ({
   designFuture: [],
   designDirty: false,
   designBuildResult: null,
+  designVersions: [],
   designBusy: false,
   approvalSuggestion: null,
   queuedExplain: null,

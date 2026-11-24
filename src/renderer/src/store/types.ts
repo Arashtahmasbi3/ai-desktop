@@ -44,7 +44,7 @@ import type { ChatTransferChoice, ChatTransferPreference } from '../lib/chat-tra
 import type { ThemePreference } from '../lib/theme'
 import type { UiMode } from '../lib/ui-mode'
 import type { UsageRecord } from '../lib/usage'
-import type { DesignAnswers, DesignBuildResult, DesignProject, DesignSummary } from '@shared/design'
+import type { DesignAnswers, DesignBuildResult, DesignProject, DesignSummary, DesignVersionSummary } from '@shared/design'
 
 export type ViewId = 'chat' | 'tasks' | 'files' | 'browser' | 'github' | 'vps' | 'goals' | 'design'
 
@@ -236,6 +236,8 @@ export interface AppState {
   designDirty: boolean
   /** The last build of the open design (phase 3), or null before the first build. */
   designBuildResult: DesignBuildResult | null
+  /** The version timeline of the open design, newest first (phase 4). */
+  designVersions: DesignVersionSummary[]
   /** A design mutation is in flight. */
   designBusy: boolean
   /** A tool approved 3+ times; the UI suggests remembering it (v2.3, B.3). */
@@ -491,6 +493,10 @@ export interface AppState {
   buildActiveDesign: () => Promise<boolean>
   /** Art Board: open a path the build produced (preview file or site folder). */
   openDesignPath: (path: string) => Promise<void>
+  /** Art Board (phase 4): load the version timeline. */
+  loadDesignVersions: (id: string) => Promise<void>
+  /** Art Board: restore an old version as a new one. */
+  restoreDesignVersion: (id: string, version: number) => Promise<void>
   /** Create a goal for the active project; the first one becomes active. */
   createGoal: (title: string, criteria?: string[]) => Promise<void>
   updateGoalTitle: (goalId: string, title: string) => Promise<void>

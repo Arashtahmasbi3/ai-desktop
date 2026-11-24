@@ -1478,6 +1478,16 @@
     "buildingSite": "Building…",
     "buildReady": "Built {{count}} files. Open the preview to see the site.",
     "preview": "Preview",
-    "folder": "Open folder"
+    "folder": "Open folder",
+    "versions": "Versions",
+    "versionN": "Version {{version}}",
+    "current": "current",
+    "restore": "Restore this version",
+    "restored": "Restored version {{version}} as a new version.",
+    "noVersions": "No versions yet — press Save to record the first one.",
+    "byWizard": "created by the wizard",
+    "byBoard": "edited on the board",
+    "byChat": "edited in chat",
+    "byRestore": "restored"
   }
 }

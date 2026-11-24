@@ -83,14 +83,22 @@ const BRAND_COLORS: Record<string, string> = Object.fromEntries(
   BRAND_OPTIONS.map((option) => [option.id, option.color])
 )
 
-/** JSX/HTML-escaped text. Props are user content and are never interpolated raw. */
+/**
+ * JSX/HTML-escaped text. Props are user content and are never interpolated raw.
+ *
+ * One character class, one map: this is deliberately *not* the shell-quoting idiom (closing, escaping and reopening a
+ * quote), which `test/security/shell-quote.test.ts` reserves for `shared/shell-quote.ts`.
+ */
+const ENTITIES: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;'
+}
+
 export function escapeText(value: unknown): string {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
+  return String(value ?? '').replace(/[&<>"']/g, (character) => ENTITIES[character] ?? character)
 }
 
 function str(value: unknown, fallback = ''): string {

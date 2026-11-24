@@ -1,6 +1,6 @@
 import { ipcMain, shell } from 'electron'
 import { isAbsolute, join, normalize, sep } from 'node:path'
-import type { DesignAnswers, DesignProject, DesignSummary } from '@shared/design'
+import type { DesignAnswers, DesignProject, DesignSummary, DesignVersionSummary } from '@shared/design'
 import type { DesignStore } from './design-store'
 import { buildDesign, type BuildResult } from './design-build/build'
 
@@ -27,6 +27,9 @@ export function registerDesignIpc(store: DesignStore): () => void {
     ['design:get', (id: string): Promise<DesignProject | null> => store.get(id)],
     ['design:save', (design: DesignProject): Promise<DesignProject> => store.save(design)],
     ['design:remove', (id: string): Promise<boolean> => store.remove(id)],
+    ['design:versions', (id: string): Promise<DesignVersionSummary[]> => store.versions(id)],
+    ['design:version', (id: string, version: number): Promise<DesignProject | null> => store.version(id, version)],
+    ['design:restore', (id: string, version: number): Promise<DesignProject> => store.restore(id, version)],
     [
       'design:build',
       async (design: DesignProject): Promise<BuildResult> => {

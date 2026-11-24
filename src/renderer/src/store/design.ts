@@ -72,6 +72,8 @@ export function designActions(
   | 'saveDesignDraft'
   | 'buildActiveDesign'
   | 'openDesignPath'
+  | 'loadDesignVersions'
+  | 'restoreDesignVersion'
 > {
   /** Record the current draft in the undo stack and install `next`. */
   const commit = (next: DesignProject): void => {
@@ -354,6 +356,34 @@ export function designActions(
         await window.api.design.openPath(path)
       } catch (error) {
         get().pushToast('error', `${i18n.t('toast.actionFailed')} ${messageOf(error)}`)
+      }
+    },
+
+    async loadDesignVersions(id) {
+      try {
+        set({ designVersions: await window.api.design.versions(id) })
+      } catch (error) {
+        get().pushToast('error', `${i18n.t('toast.actionFailed')} ${messageOf(error)}`)
+      }
+    },
+
+    async restoreDesignVersion(id, version) {
+      set({ designBusy: true })
+      try {
+        const restored = await window.api.design.restore(id, version)
+        set({
+          activeDesign: restored,
+          designDraft: clone(restored),
+          designPast: [],
+          designFuture: [],
+          designDirty: false,
+          designVersions: await window.api.design.versions(id)
+        })
+        get().pushToast('success', i18n.t('design.restored', { version }))
+      } catch (error) {
+        get().pushToast('error', `${i18n.t('toast.actionFailed')} ${messageOf(error)}`)
+      } finally {
+        set({ designBusy: false })
       }
     }
   }

@@ -103,6 +103,14 @@ export interface DesignBuildResult {
   files: string[]
 }
 
+/** One row of the version timeline (phase 4). `by` is a VersionAuthor string kept loose for the IPC boundary. */
+export interface DesignVersionSummary {
+  version: number
+  at: number
+  by: string
+  summary: string
+}
+
 export interface ModuleDefinition {
   label: string
   family: ModuleFamily

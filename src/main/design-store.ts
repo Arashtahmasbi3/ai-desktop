@@ -6,8 +6,10 @@ import {
   validateDesign,
   type DesignAnswers,
   type DesignProject,
-  type DesignSummary
+  type DesignSummary,
+  type DesignVersionSummary
 } from '@shared/design'
+import { listVersions, readVersion, writeVersion, type VersionAuthor } from './design-versions'
 
 /**
  * Where Art Board projects live (phase 0).
@@ -101,6 +103,8 @@ export class DesignStore {
     const validation = validateDesign(design)
     if (!validation.ok) throw new Error(validation.problems.join(' '))
     await this.write(design)
+    // Phase 4: the first document becomes v1, the immutable baseline.
+    await writeVersion(this.dirFor(design.id), design, { by: 'wizard' })
     return design
   }
 
@@ -116,12 +120,37 @@ export class DesignStore {
     }
   }
 
-  async save(design: DesignProject): Promise<DesignProject> {
+  async save(design: DesignProject, by: VersionAuthor = 'board'): Promise<DesignProject> {
     const updated: DesignProject = { ...design, updatedAt: this.now() }
     const validation = validateDesign(updated)
     if (!validation.ok) throw new Error(validation.problems.join(' '))
     await this.write(updated)
+    await writeVersion(this.dirFor(updated.id), updated, { by })
     return updated
+  }
+
+  /** The timeline, newest first. */
+  async versions(id: string): Promise<DesignVersionSummary[]> {
+    return listVersions(this.dirFor(id))
+  }
+
+  /** One stored document, for a diff or a preview of an old version. */
+  async version(id: string, version: number): Promise<DesignProject | null> {
+    return readVersion(this.dirFor(id), version)
+  }
+
+  /**
+   * Restore is an append: the old content becomes a *new* version, so the history still shows that the user went back.
+   */
+  async restore(id: string, version: number): Promise<DesignProject> {
+    const target = await this.version(id, version)
+    if (!target) throw new Error(`نسخهٔ ${version} پیدا نشد.`)
+    const restored: DesignProject = { ...target, id, updatedAt: this.now() }
+    const validation = validateDesign(restored)
+    if (!validation.ok) throw new Error(validation.problems.join(' '))
+    await this.write(restored)
+    await writeVersion(this.dirFor(id), restored, { by: 'restore' })
+    return restored
   }
 
   async remove(id: string): Promise<boolean> {
@@ -131,6 +160,12 @@ export class DesignStore {
     } catch {
       return false
     }
+  }
+
+  private dirFor(id: string): string {
+    // Reuse the file validation: an id that cannot be a file name cannot be a directory either.
+    this.fileFor(id)
+    return join(this.dir, id)
   }
 
   private async write(design: DesignProject): Promise<void> {

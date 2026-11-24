@@ -5,6 +5,7 @@ import i18n from '../../i18n'
 import ModulePalette from './ModulePalette'
 import ModuleInspector from './ModuleInspector'
 import ConnectionsPanel from './ConnectionsPanel'
+import VersionsPanel from './VersionsPanel'
 
 /**
  * The board (phase 1).
@@ -37,7 +38,7 @@ export default function DesignBoard({
   const openPath = useStore((state) => state.openDesignPath)
   const busy = useStore((state) => state.designBusy)
 
-  const [view, setView] = useState<'board' | 'graph'>('board')
+  const [view, setView] = useState<'board' | 'graph' | 'versions'>('board')
 
   const [openTabs, setOpenTabs] = useState<string[]>(design.pages[0] ? [design.pages[0].id] : [])
   const [activeTab, setActiveTab] = useState<string | null>(design.pages[0]?.id ?? null)
@@ -111,6 +112,16 @@ export default function DesignBoard({
             >
               {i18n.t('design.connections')}
             </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === 'versions'}
+              onClick={() => setView('versions')}
+              data-testid="design-tab-versions"
+              className={`px-3 py-1 text-3xs ${view === 'versions' ? 'text-fg-strong' : 'text-fg-muted'}`}
+            >
+              {i18n.t('design.versions')}
+            </button>
           </div>
           <button
             type="button"
@@ -182,6 +193,8 @@ export default function DesignBoard({
           onAdd={(from, to, trigger: EdgeTrigger) => addEdge(from, to, trigger)}
           onRemove={removeEdge}
         />
+      ) : view === 'versions' ? (
+        <VersionsPanel designId={design.id} />
       ) : (
         <div className="flex min-h-0 flex-1">
           <nav className="w-48 shrink-0 border-e border-border p-2" data-testid="design-pages">

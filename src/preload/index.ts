@@ -10,7 +10,7 @@ import type { PlanDecision } from '@shared/plan'
 import type { PreflightChoice } from '@shared/preflight'
 import type { ChatSaveInput, ChatSummary, StoredChat } from '@shared/chat'
 import type { McpServerInput, McpServerStatus, McpServerView } from '@shared/mcp'
-import type { DesignAnswers, DesignBuildResult, DesignProject, DesignSummary } from '@shared/design'
+import type { DesignAnswers, DesignBuildResult, DesignProject, DesignSummary, DesignVersionSummary } from '@shared/design'
 import type {
   AuditEntryView,
   HealthCheckConfig,
@@ -210,7 +210,11 @@ export const api = {
     save: (design: DesignProject): Promise<DesignProject> => invoke('design:save', design),
     remove: (id: string): Promise<boolean> => invoke('design:remove', id),
     build: (design: DesignProject): Promise<DesignBuildResult> => invoke('design:build', design),
-    openPath: (path: string): Promise<string> => invoke('design:openPath', path)
+    openPath: (path: string): Promise<string> => invoke('design:openPath', path),
+    versions: (id: string): Promise<DesignVersionSummary[]> => invoke('design:versions', id),
+    getVersion: (id: string, version: number): Promise<DesignProject | null> =>
+      invoke('design:version', id, version),
+    restore: (id: string, version: number): Promise<DesignProject> => invoke('design:restore', id, version)
   },
 
   github: {
