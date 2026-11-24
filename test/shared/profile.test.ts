@@ -294,6 +294,8 @@ describe('read-only tool allowlist', () => {
 
   it('classifies every mutating tool as a write and never as read-only', () => {
     expect([...WRITE_TOOL_NAMES].sort()).toEqual([
+      'create_document',
+      'create_spreadsheet',
       'design_add_module',
       'design_build',
       'design_compose_section',

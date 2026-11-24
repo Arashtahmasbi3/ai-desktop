@@ -7,6 +7,7 @@ import type { AgentAction, AgentToolResult, ToolErrorCode } from '@shared/agent'
 import { SandboxError, normalizeSandboxPath } from '@core/sandbox'
 import { listCommandFor, resolveSandboxShell } from '@core/sandbox/shell'
 import { findSecretPathsInCommand, inspectSecretPath } from '@shared/secret-paths'
+import { buildDocx, buildXlsx } from '@core/office/ooxml'
 import { refusalMessage } from '@shared/refusal'
 
 export interface ToolExecOptions {
@@ -211,6 +212,46 @@ export const SANDBOX_TOOLS: ToolDefinition[] = [
     }
   },
   {
+    /* T07: a Word document made from plain paragraphs — content, not formatting. */
+    name: 'create_document',
+    description:
+      'Create a .docx in the project workspace from plain paragraphs (one string per paragraph). Refuses more than 500 paragraphs or a paragraph over 2,000 characters.',
+    parameters: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Workspace-relative .docx path' },
+        title: { type: 'string', description: 'Optional document title, kept in the file name only' },
+        paragraphs: {
+          type: 'array',
+          description: 'One string per paragraph',
+          items: { type: 'string' }
+        }
+      },
+      required: ['path', 'paragraphs'],
+      additionalProperties: false
+    }
+  },
+  {
+    /* T08: a workbook made from a grid of strings. */
+    name: 'create_spreadsheet',
+    description:
+      'Create an .xlsx in the project workspace from rows of cell values. Refuses more than 1,000 rows or 100 columns.',
+    parameters: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Workspace-relative .xlsx path' },
+        sheet_name: { type: 'string', description: 'Worksheet name (default "Sheet1")' },
+        rows: {
+          type: 'array',
+          description: 'Rows of cell values',
+          items: { type: 'array', items: { type: 'string' } }
+        }
+      },
+      required: ['path', 'rows'],
+      additionalProperties: false
+    }
+  },
+  {
     name: 'list_dir',
     description: 'List the entries of a directory in the project workspace.',
     parameters: {
@@ -374,6 +415,10 @@ export class SandboxToolExecutor implements ToolExecutor {
           return await this.globFiles(action, startedAt)
         case 'grep':
           return await this.grepFiles(action, startedAt)
+        case 'create_document':
+          return await this.createDocument(action, startedAt)
+        case 'create_spreadsheet':
+          return await this.createSpreadsheet(action, startedAt)
         case 'read_file':
           return await this.readFile(action, startedAt)
         case 'list_dir':
@@ -600,6 +645,96 @@ export class SandboxToolExecutor implements ToolExecutor {
       output: results.length === 0 ? 'موردی پیدا نشد.' : results.join('\n'),
       attempts: 1,
       durationMs: Date.now() - startedAt
+    }
+  }
+
+  /** T07/T08: validate a path and an extension, then write bytes through the sandbox (path containment included). */
+  private documentTarget(
+    action: AgentAction,
+    extension: '.docx' | '.xlsx',
+    startedAt: number
+  ): { path: string } | AgentToolResult {
+    const path = asString(action.arguments.path)?.trim()
+    if (!path) {
+      return failure(action, 'invalid_arguments', 'a destination "path" is required', startedAt)
+    }
+    let normalized: string
+    try {
+      normalized = normalizeSandboxPath(path)
+    } catch (error) {
+      return failure(action, 'invalid_arguments', messageOf(error), startedAt)
+    }
+    if (!normalized.toLowerCase().endsWith(extension)) {
+      return failure(action, 'invalid_arguments', `path must end with ${extension}: ${path}`, startedAt)
+    }
+    return { path: normalized }
+  }
+
+  private async createDocument(action: AgentAction, startedAt: number): Promise<AgentToolResult> {
+    const target = this.documentTarget(action, '.docx', startedAt)
+    if ('ok' in target) return target
+
+    const raw = action.arguments.paragraphs
+    if (!Array.isArray(raw) || raw.length === 0) {
+      return failure(action, 'invalid_arguments', 'create_document needs at least one paragraph', startedAt)
+    }
+    if (raw.length > 500) {
+      return failure(action, 'invalid_arguments', 'create_document accepts at most 500 paragraphs', startedAt)
+    }
+    const paragraphs: string[] = []
+    for (const entry of raw) {
+      if (typeof entry !== 'string') {
+        return failure(action, 'invalid_arguments', 'every paragraph must be a string', startedAt)
+      }
+      if (entry.length > 2_000) {
+        return failure(action, 'invalid_arguments', 'a paragraph is longer than 2,000 characters', startedAt)
+      }
+      paragraphs.push(entry)
+    }
+
+    const buffer = buildDocx({ paragraphs })
+    await this.sandbox.writeFile(this.sandboxId, target.path, new Uint8Array(buffer))
+    return {
+      actionId: action.id,
+      name: action.name,
+      ok: true,
+      output: `Wrote ${buffer.length} bytes to ${target.path} (${paragraphs.length} paragraphs)`,
+      attempts: 1,
+      durationMs: Date.now() - startedAt,
+      path: target.path
+    }
+  }
+
+  private async createSpreadsheet(action: AgentAction, startedAt: number): Promise<AgentToolResult> {
+    const target = this.documentTarget(action, '.xlsx', startedAt)
+    if ('ok' in target) return target
+
+    const raw = action.arguments.rows
+    if (!Array.isArray(raw) || raw.length === 0) {
+      return failure(action, 'invalid_arguments', 'create_spreadsheet needs at least one row', startedAt)
+    }
+    if (raw.length > 1_000) {
+      return failure(action, 'invalid_arguments', 'create_spreadsheet accepts at most 1,000 rows', startedAt)
+    }
+    const rows: string[][] = []
+    for (const row of raw) {
+      if (!Array.isArray(row) || row.length > 100) {
+        return failure(action, 'invalid_arguments', 'each row must be an array of at most 100 cells', startedAt)
+      }
+      rows.push(row.map((cell) => (typeof cell === 'string' ? cell : String(cell ?? ''))))
+    }
+
+    const sheetName = asString(action.arguments.sheet_name)
+    const buffer = buildXlsx({ rows, ...(sheetName ? { sheetName } : {}) })
+    await this.sandbox.writeFile(this.sandboxId, target.path, new Uint8Array(buffer))
+    return {
+      actionId: action.id,
+      name: action.name,
+      ok: true,
+      output: `Wrote ${buffer.length} bytes to ${target.path} (${rows.length} rows)`,
+      attempts: 1,
+      durationMs: Date.now() - startedAt,
+      path: target.path
     }
   }
 

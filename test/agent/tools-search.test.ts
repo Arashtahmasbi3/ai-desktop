@@ -133,6 +133,16 @@ describe('grep (T03)', () => {
 describe('the sandbox tool contract (T02/T03)', () => {
   it('offers glob and grep next to the file tools', () => {
     const names = SANDBOX_TOOLS.map((tool) => tool.name)
-    expect(names).toEqual(['write_file', 'read_file', 'edit', 'glob', 'grep', 'list_dir', 'run_command'])
+    expect(names).toEqual([
+      'write_file',
+      'read_file',
+      'edit',
+      'glob',
+      'grep',
+      'create_document',
+      'create_spreadsheet',
+      'list_dir',
+      'run_command'
+    ])
   })
 })
