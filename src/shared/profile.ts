@@ -184,6 +184,7 @@ export const WRITE_TOOL_NAMES: ReadonlySet<string> = new Set([
   'design_remember',
   // Local sandbox.
   'write_file',
+  'edit',
   'run_command',
   // Remote host.
   'remote_write_file',

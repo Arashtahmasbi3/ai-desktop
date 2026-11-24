@@ -57,6 +57,29 @@ export const SANDBOX_TOOLS: ToolDefinition[] = [
     }
   },
   {
+    /*
+     * T01: an exact-string edit, so changing one line does not mean rewriting the whole file.
+     *
+     * The failure modes are the feature: text that is missing, or that appears more than once without
+     * `replace_all`, is refused instead of guessed at. A wrong edit silently applied is worse than a
+     * refused one the model can re-read the file for.
+     */
+    name: 'edit',
+    description:
+      'Replace an exact string in a UTF-8 text file inside the project workspace. Refuses when the text is absent, or appears more than once without replace_all.',
+    parameters: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Workspace-relative file path' },
+        old_string: { type: 'string', description: 'The exact text to find (must not be empty)' },
+        new_string: { type: 'string', description: 'The replacement text' },
+        replace_all: { type: 'boolean', description: 'Replace every occurrence (default false)' }
+      },
+      required: ['path', 'old_string', 'new_string'],
+      additionalProperties: false
+    }
+  },
+  {
     name: 'list_dir',
     description: 'List the entries of a directory in the project workspace.',
     parameters: {
@@ -214,6 +237,8 @@ export class SandboxToolExecutor implements ToolExecutor {
       switch (action.name) {
         case 'write_file':
           return await this.writeFile(action, startedAt)
+        case 'edit':
+          return await this.editFile(action, startedAt)
         case 'read_file':
           return await this.readFile(action, startedAt)
         case 'list_dir':
@@ -241,6 +266,58 @@ export class SandboxToolExecutor implements ToolExecutor {
       name: action.name,
       ok: true,
       output: `Wrote ${content.length} characters to ${path}`,
+      attempts: 1,
+      durationMs: Date.now() - startedAt,
+      path
+    }
+  }
+
+  /**
+   * T01: an exact-string edit inside the workspace.
+   *
+   * Written with `indexOf`/`split` rather than `String.replace(pattern, string)` on purpose: in a replacement string
+   * `$&` and `$1` are patterns, so a user editing a regex or a shell script would have their text silently rewritten.
+   * This version treats both halves as literal text, which is what "replace exactly this" has to mean.
+   */
+  private async editFile(action: AgentAction, startedAt: number): Promise<AgentToolResult> {
+    const path = asString(action.arguments.path)
+    const oldString = asString(action.arguments.old_string)
+    const newString = asString(action.arguments.new_string)
+    const replaceAll = action.arguments.replace_all === true
+    if (!path || oldString === undefined || newString === undefined) {
+      return failure(action, 'invalid_arguments', 'edit requires "path", "old_string" and "new_string"', startedAt)
+    }
+    if (oldString === '') {
+      return failure(action, 'invalid_arguments', 'edit refuses an empty "old_string"', startedAt)
+    }
+
+    const content = await this.sandbox.readFile(this.sandboxId, path)
+    const occurrences = content.split(oldString).length - 1
+    if (occurrences === 0) {
+      return failure(action, 'not_found', `edit found no occurrence of the given text in ${path}`, startedAt)
+    }
+    if (occurrences > 1 && !replaceAll) {
+      return failure(
+        action,
+        'invalid_arguments',
+        `edit found ${occurrences} occurrences in ${path}; pass a longer old_string or replace_all`,
+        startedAt
+      )
+    }
+
+    const next = replaceAll
+      ? content.split(oldString).join(newString)
+      : content.slice(0, content.indexOf(oldString)) +
+        newString +
+        content.slice(content.indexOf(oldString) + oldString.length)
+
+    await this.sandbox.writeFile(this.sandboxId, path, next)
+    const replaced = replaceAll ? occurrences : 1
+    return {
+      actionId: action.id,
+      name: action.name,
+      ok: true,
+      output: `Replaced ${replaced} occurrence${replaced === 1 ? '' : 's'} in ${path}`,
       attempts: 1,
       durationMs: Date.now() - startedAt,
       path

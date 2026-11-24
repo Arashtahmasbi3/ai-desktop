@@ -28,6 +28,7 @@ document exists because claims rot.
 | capability | state | configured where | proven by |
 |---|---|---|---|
 | File tools (`read_file`, `write_file`, `list_dir`) | real | automatic | `test/agent/tools.test.ts` |
+| `edit` — exact-string replacement in a workspace file | real | automatic | `test/agent/tools-edit.test.ts` — refuses a missing or ambiguous match instead of guessing, and treats the replacement as literal text (`$&` survives) |
 | Art Board tools (`design_list`, `design_get`, `design_history`, `design_add_module`, `design_update_page`, `design_compose_section`, `design_build`, `design_remember`) | real | automatic when a design store exists | `test/main/design-tools.test.ts` — the chat edits the same document the board does, and the three reads are in the read-only set |
 | Project tooling (`scaffold_project`, `worktree_create`, `worktree_remove`, `project_user_create`, `project_user_remove`, `remote_copy`, `migrate_docker`, `migrate_database`) | real | per run | `test/core/worktree*.test.ts`, `test/core/db-migrate-flow.test.ts` |
 | `run_command` in a sandbox | real | automatic | `test/agent/orchestrator.test.ts` |

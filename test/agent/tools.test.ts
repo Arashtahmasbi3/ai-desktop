@@ -47,10 +47,11 @@ describe('stableStringify / actionFromToolCall', () => {
     expect(action.signature).toContain('raw:')
   })
 
-  it('exposes the four sandbox tools', () => {
+  it('exposes the five sandbox tools', () => {
     expect(SANDBOX_TOOLS.map((tool) => tool.name)).toEqual([
       'write_file',
       'read_file',
+      'edit',
       'list_dir',
       'run_command'
     ])

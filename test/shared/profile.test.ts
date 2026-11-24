@@ -299,6 +299,7 @@ describe('read-only tool allowlist', () => {
       'design_compose_section',
       'design_remember',
       'design_update_page',
+      'edit',
       'migrate_database',
       'migrate_docker',
       'migrate_project',
