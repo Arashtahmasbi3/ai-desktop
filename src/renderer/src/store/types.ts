@@ -475,6 +475,10 @@ export interface AppState {
   ) => void
   /** Art Board: add an empty public page. */
   addDesignPage: (name: string) => void
+  /** Art Board (phase 2): connect two pages. */
+  addDesignEdge: (from: string, to: string, trigger: 'click' | 'submit' | 'redirect') => void
+  /** Art Board: remove a connection. */
+  removeDesignEdge: (edgeId: string) => void
   /** Art Board: undo the last board edit. */
   undoDesign: () => void
   /** Art Board: redo the last undone edit. */

@@ -1459,6 +1459,20 @@
     "dropHere": "Drop a section here, or use the Add button.",
     "closeTab": "Close tab",
     "pickPage": "Pick a page on the left.",
-    "pageNamePlaceholder": "New page name"
+    "pageNamePlaceholder": "New page name",
+    "board": "Board",
+    "connections": "Connections",
+    "from": "From",
+    "to": "To",
+    "trigger": "When",
+    "addEdge": "Connect two pages",
+    "deleteEdge": "Remove",
+    "pageStatus": "Can a visitor reach it?",
+    "reachable": "Yes",
+    "unreachable": "No path",
+    "noEdges": "No connections yet.",
+    "triggerClick": "on click",
+    "triggerSubmit": "on submit",
+    "triggerRedirect": "automatic"
   }
 }

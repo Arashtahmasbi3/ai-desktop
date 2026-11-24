@@ -1459,6 +1459,20 @@
     "dropHere": "یک بخش را اینجا رها کن، یا از دکمهٔ افزودن استفاده کن.",
     "closeTab": "بستن تب",
     "pickPage": "از سمت راست یک صفحه انتخاب کن.",
-    "pageNamePlaceholder": "نام صفحهٔ تازه"
+    "pageNamePlaceholder": "نام صفحهٔ تازه",
+    "board": "بوم",
+    "connections": "اتصال‌ها",
+    "from": "از",
+    "to": "به",
+    "trigger": "چه وقت",
+    "addEdge": "دو صفحه را وصل کن",
+    "deleteEdge": "حذف",
+    "pageStatus": "آیا بازدیدکننده می‌تواند به آن برسد؟",
+    "reachable": "بله",
+    "unreachable": "مسیری ندارد",
+    "noEdges": "هنوز اتصالی نیست.",
+    "triggerClick": "با کلیک",
+    "triggerSubmit": "با ارسال فرم",
+    "triggerRedirect": "خودکار"
   }
 }

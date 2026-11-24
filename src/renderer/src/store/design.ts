@@ -21,6 +21,7 @@ import type { AppState } from './types'
  */
 const MAX_HISTORY = 50
 let moduleSeq = 0
+let edgeSeq = 0
 
 function clone(design: DesignProject): DesignProject {
   return structuredClone(design)
@@ -63,6 +64,8 @@ export function designActions(
   | 'removeDesignModule'
   | 'updateDesignModule'
   | 'addDesignPage'
+  | 'addDesignEdge'
+  | 'removeDesignEdge'
   | 'undoDesign'
   | 'redoDesign'
   | 'saveDesignDraft'
@@ -260,6 +263,29 @@ export function designActions(
         ]
       }
       commit(next)
+    },
+
+    addDesignEdge(from, to, trigger) {
+      const draft = get().designDraft
+      if (!draft || from === to) return
+      if (!draft.pages.some((page) => page.id === from) || !draft.pages.some((page) => page.id === to)) {
+        return
+      }
+      // A second edge between the same pair with the same trigger is a duplicate, not a feature.
+      if (draft.edges.some((edge) => edge.from === from && edge.to === to && edge.trigger === trigger)) {
+        return
+      }
+      edgeSeq += 1
+      commit({
+        ...draft,
+        edges: [...draft.edges, { id: `e-new-${edgeSeq}`, from, to, trigger }]
+      })
+    },
+
+    removeDesignEdge(edgeId) {
+      const draft = get().designDraft
+      if (!draft) return
+      commit({ ...draft, edges: draft.edges.filter((edge) => edge.id !== edgeId) })
     },
 
     undoDesign() {

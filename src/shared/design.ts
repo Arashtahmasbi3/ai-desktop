@@ -191,6 +191,31 @@ function hasLongText(value: unknown): boolean {
 }
 
 /**
+ * Pages a user can actually walk to from the home page, following edges. The 404 and maintenance pages are exempt:
+ * nothing links to them, the router shows them, so "unreachable" there is correct and not a mistake.
+ */
+export function reachablePages(design: DesignProject): Set<string> {
+  const adjacency = new Map<string, string[]>()
+  for (const edge of design.edges) {
+    adjacency.set(edge.from, [...(adjacency.get(edge.from) ?? []), edge.to])
+  }
+  const seen = new Set<string>()
+  const queue = ['home']
+  while (queue.length > 0) {
+    const id = queue.shift()!
+    if (seen.has(id) || !design.pages.some((page) => page.id === id)) continue
+    seen.add(id)
+    for (const next of adjacency.get(id) ?? []) queue.push(next)
+  }
+  return seen
+}
+
+/** True for a page the router serves without a link: the not-found page and the maintenance page. */
+export function isSystemOnlyPage(page: DesignPage): boolean {
+  return page.path === '/404' || page.modules.some((module) => module.type === 'page_404' || module.type === 'maintenance')
+}
+
+/**
  * Everything that can be wrong without a browser. Returned as a list of user-facing sentences (the UI shows them as-is;
  * the build refuses to run on a non-empty list).
  */
@@ -241,6 +266,16 @@ export function validateDesign(design: DesignProject): DesignValidation {
     if (!design.pages.some((entry) => entry.role === 'auth')) {
       problems.push('صفحهٔ مدیریتی بدون صفحهٔ ورود وجود دارد.')
     }
+  }
+
+  /*
+   * Phase 2: a page nobody can reach is a page the user built and will never see. The 404 and maintenance pages are
+   * exempt — the router serves them, nothing links to them.
+   */
+  const reachable = reachablePages(design)
+  for (const page of design.pages) {
+    if (page.id === 'home' || isSystemOnlyPage(page)) continue
+    if (!reachable.has(page.id)) problems.push(`صفحهٔ «${page.name}» از هیچ صفحه‌ای قابل دسترس نیست.`)
   }
 
   return { ok: problems.length === 0, problems }

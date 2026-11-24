@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   MODULE_TYPE_NAMES,
+  reachablePages,
   suggestDesign,
   validateDesign,
   type DesignAnswers,
@@ -124,5 +125,32 @@ describe('validateDesign refuses what the builder cannot render', () => {
       entry.pages[0]!.modules[0]!.props.title = 'x'.repeat(500)
     })
     expect(validateDesign(design).problems.some((problem) => problem.includes('بیش از'))).toBe(true)
+  })
+
+  /*
+   * Phase 2: a page nobody can reach is a page the user built and will never see. The 404 page is the exception — the
+   * router serves it, nothing links to it — so it must not be reported.
+   */
+  it('reports a page no edge can reach', () => {
+    const design = mutate((entry) => {
+      entry.pages.push({ id: 'ghost', name: 'صفحهٔ یتیم', path: '/ghost', role: 'public', modules: [] })
+    })
+    expect(validateDesign(design).problems).toContain('صفحهٔ «صفحهٔ یتیم» از هیچ صفحه‌ای قابل دسترس نیست.')
+  })
+
+  it('does not report the 404 page, which is served without a link', () => {
+    const design = build()
+    const notFound = design.pages.find((page) => page.path === '/404')
+    expect(notFound).toBeDefined()
+    expect(validateDesign(design).ok).toBe(true)
+  })
+
+  it('counts a page reachable through a chain, not only a direct edge', () => {
+    const design = mutate((entry) => {
+      entry.pages.push({ id: 'deep', name: 'عمیق', path: '/deep', role: 'public', modules: [] })
+      entry.edges.push({ id: 'e-deep', from: 'contact', to: 'deep', trigger: 'click' })
+    })
+    expect(reachablePages(design).has('deep')).toBe(true)
+    expect(validateDesign(design).ok).toBe(true)
   })
 })

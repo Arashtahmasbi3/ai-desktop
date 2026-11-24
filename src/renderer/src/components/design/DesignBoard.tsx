@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
-import { MODULE_TYPES, type DesignProject } from '@shared/design'
+import { MODULE_TYPES, type DesignProject, type EdgeTrigger } from '@shared/design'
 import { useStore } from '../../store'
 import i18n from '../../i18n'
 import ModulePalette from './ModulePalette'
 import ModuleInspector from './ModuleInspector'
+import ConnectionsPanel from './ConnectionsPanel'
 
 /**
  * The board (phase 1).
@@ -26,9 +27,13 @@ export default function DesignBoard({
   const addModule = useStore((state) => state.addDesignModule)
   const moveModule = useStore((state) => state.moveDesignModule)
   const addPage = useStore((state) => state.addDesignPage)
+  const addEdge = useStore((state) => state.addDesignEdge)
+  const removeEdge = useStore((state) => state.removeDesignEdge)
   const undo = useStore((state) => state.undoDesign)
   const redo = useStore((state) => state.redoDesign)
   const save = useStore((state) => state.saveDesignDraft)
+
+  const [view, setView] = useState<'board' | 'graph'>('board')
 
   const [openTabs, setOpenTabs] = useState<string[]>(design.pages[0] ? [design.pages[0].id] : [])
   const [activeTab, setActiveTab] = useState<string | null>(design.pages[0]?.id ?? null)
@@ -81,6 +86,28 @@ export default function DesignBoard({
           ) : null}
         </div>
         <div className="flex items-center gap-2">
+          <div className="flex rounded border border-border" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === 'board'}
+              onClick={() => setView('board')}
+              data-testid="design-tab-board"
+              className={`px-3 py-1 text-3xs ${view === 'board' ? 'text-fg-strong' : 'text-fg-muted'}`}
+            >
+              {i18n.t('design.board')}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === 'graph'}
+              onClick={() => setView('graph')}
+              data-testid="design-tab-graph"
+              className={`px-3 py-1 text-3xs ${view === 'graph' ? 'text-fg-strong' : 'text-fg-muted'}`}
+            >
+              {i18n.t('design.connections')}
+            </button>
+          </div>
           <button
             type="button"
             disabled={!canUndo}
@@ -109,8 +136,15 @@ export default function DesignBoard({
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1">
-        <nav className="w-48 shrink-0 border-e border-border p-2" data-testid="design-pages">
+      {view === 'graph' ? (
+        <ConnectionsPanel
+          design={design}
+          onAdd={(from, to, trigger: EdgeTrigger) => addEdge(from, to, trigger)}
+          onRemove={removeEdge}
+        />
+      ) : (
+        <div className="flex min-h-0 flex-1">
+          <nav className="w-48 shrink-0 border-e border-border p-2" data-testid="design-pages">
           <p className="px-1 pb-2 text-3xs text-fg-muted">{i18n.t('design.pages')}</p>
           <ul className="flex flex-col gap-1">
             {design.pages.map((entry) => (
@@ -251,7 +285,8 @@ export default function DesignBoard({
           }}
         />
         <ModuleInspector pageId={page?.id ?? ''} module={selected} />
-      </div>
+        </div>
+      )}
     </div>
   )
 }
