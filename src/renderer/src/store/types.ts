@@ -45,6 +45,7 @@ import type { ThemePreference } from '../lib/theme'
 import type { UiMode } from '../lib/ui-mode'
 import type { UsageRecord } from '../lib/usage'
 import type { DesignAnswers, DesignBuildResult, DesignProject, DesignSummary, DesignVersionSummary } from '@shared/design'
+import type { DesignMemory } from '@shared/design-memory'
 
 export type ViewId = 'chat' | 'tasks' | 'files' | 'browser' | 'github' | 'vps' | 'goals' | 'design'
 
@@ -238,6 +239,8 @@ export interface AppState {
   designBuildResult: DesignBuildResult | null
   /** The version timeline of the open design, newest first (phase 4). */
   designVersions: DesignVersionSummary[]
+  /** The open design's AI memory (phase 5). */
+  designMemory: DesignMemory
   /** A design mutation is in flight. */
   designBusy: boolean
   /** A tool approved 3+ times; the UI suggests remembering it (v2.3, B.3). */
@@ -497,6 +500,10 @@ export interface AppState {
   loadDesignVersions: (id: string) => Promise<void>
   /** Art Board: restore an old version as a new one. */
   restoreDesignVersion: (id: string, version: number) => Promise<void>
+  /** Art Board (phase 5): load the memory. */
+  loadDesignMemory: (id: string) => Promise<void>
+  /** Art Board: forget one memory record. */
+  forgetDesignMemory: (id: string, recordId: string) => Promise<void>
   /** Create a goal for the active project; the first one becomes active. */
   createGoal: (title: string, criteria?: string[]) => Promise<void>
   updateGoalTitle: (goalId: string, title: string) => Promise<void>

@@ -1488,6 +1488,14 @@
     "byWizard": "created by the wizard",
     "byBoard": "edited on the board",
     "byChat": "edited in chat",
-    "byRestore": "restored"
+    "byRestore": "restored",
+    "memory": "Memory",
+    "memoryHint": "What the assistant remembers about this design, and the sentence it learned it from.",
+    "memoryEmpty": "Nothing remembered yet. Decisions are recorded when you ask for one in chat.",
+    "memoryDecision": "decision",
+    "memoryPreference": "preference",
+    "memoryForget": "Forget",
+    "memoryScopeGlobal": "everywhere",
+    "memorySuperseded": "{{count}} older decision(s) kept in history."
   }
 }

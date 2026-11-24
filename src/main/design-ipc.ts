@@ -1,7 +1,9 @@
 import { ipcMain, shell } from 'electron'
 import { isAbsolute, join, normalize, sep } from 'node:path'
 import type { DesignAnswers, DesignProject, DesignSummary, DesignVersionSummary } from '@shared/design'
+import type { DesignMemory, RememberInput, RememberResult } from '@shared/design-memory'
 import type { DesignStore } from './design-store'
+import { DesignMemoryStore } from './design-memory-store'
 import { buildDesign, type BuildResult } from './design-build/build'
 
 /**
@@ -12,6 +14,7 @@ import { buildDesign, type BuildResult } from './design-build/build'
  * store itself owns — the renderer cannot ask the app to open an arbitrary file.
  */
 export function registerDesignIpc(store: DesignStore): () => void {
+  const memory = new DesignMemoryStore({ root: store.root })
   const insideRoot = (path: string): string => {
     const root = normalize(store.root)
     const absolute = isAbsolute(path) ? normalize(path) : normalize(join(root, path))
@@ -30,6 +33,9 @@ export function registerDesignIpc(store: DesignStore): () => void {
     ['design:versions', (id: string): Promise<DesignVersionSummary[]> => store.versions(id)],
     ['design:version', (id: string, version: number): Promise<DesignProject | null> => store.version(id, version)],
     ['design:restore', (id: string, version: number): Promise<DesignProject> => store.restore(id, version)],
+    ['design:memory', (id: string): Promise<DesignMemory> => memory.read(id)],
+    ['design:remember', (id: string, input: RememberInput): Promise<RememberResult> => memory.remember(id, input)],
+    ['design:forget', (id: string, recordId: string): Promise<DesignMemory> => memory.forget(id, recordId)],
     [
       'design:build',
       async (design: DesignProject): Promise<BuildResult> => {

@@ -74,6 +74,8 @@ export function designActions(
   | 'openDesignPath'
   | 'loadDesignVersions'
   | 'restoreDesignVersion'
+  | 'loadDesignMemory'
+  | 'forgetDesignMemory'
 > {
   /** Record the current draft in the undo stack and install `next`. */
   const commit = (next: DesignProject): void => {
@@ -384,6 +386,22 @@ export function designActions(
         get().pushToast('error', `${i18n.t('toast.actionFailed')} ${messageOf(error)}`)
       } finally {
         set({ designBusy: false })
+      }
+    },
+
+    async loadDesignMemory(id) {
+      try {
+        set({ designMemory: await window.api.design.memory(id) })
+      } catch (error) {
+        get().pushToast('error', `${i18n.t('toast.actionFailed')} ${messageOf(error)}`)
+      }
+    },
+
+    async forgetDesignMemory(id, recordId) {
+      try {
+        set({ designMemory: await window.api.design.forget(id, recordId) })
+      } catch (error) {
+        get().pushToast('error', `${i18n.t('toast.actionFailed')} ${messageOf(error)}`)
       }
     }
   }

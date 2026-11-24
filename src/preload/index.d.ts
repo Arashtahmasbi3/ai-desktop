@@ -19,6 +19,7 @@ import type { PreflightChoice } from '@shared/preflight'
 import type { ChatSaveInput, ChatSummary, StoredChat } from '@shared/chat'
 import type { McpServerInput, McpServerStatus, McpServerView } from '@shared/mcp'
 import type { DesignAnswers, DesignBuildResult, DesignProject, DesignSummary, DesignVersionSummary } from '@shared/design'
+import type { DesignMemory, RememberInput, RememberResult } from '@shared/design-memory'
 import type {
   AuditEntryView,
   HealthCheckConfig,
@@ -177,6 +178,9 @@ export interface Api {
     versions(id: string): Promise<DesignVersionSummary[]>
     getVersion(id: string, version: number): Promise<DesignProject | null>
     restore(id: string, version: number): Promise<DesignProject>
+    memory(id: string): Promise<DesignMemory>
+    remember(id: string, input: RememberInput): Promise<RememberResult>
+    forget(id: string, recordId: string): Promise<DesignMemory>
   }
   github: {
     status(): Promise<GitHubAuthStatus>
