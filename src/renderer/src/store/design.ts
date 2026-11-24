@@ -1,4 +1,5 @@
 import i18n from '../i18n'
+import { validateRecipe, varyRecipe, type DesignRecipe } from '@shared/design-recipe'
 import {
   MODULE_TYPES,
   validateDesign,
@@ -26,6 +27,11 @@ let building = false
 
 function clone(design: DesignProject): DesignProject {
   return structuredClone(design)
+}
+
+function nextModuleId(): string {
+  moduleSeq += 1
+  return `m-new-${moduleSeq}`
 }
 
 function newModule(type: string): DesignModule {
@@ -76,6 +82,8 @@ export function designActions(
   | 'restoreDesignVersion'
   | 'loadDesignMemory'
   | 'forgetDesignMemory'
+  | 'addDesignRecipe'
+  | 'varyDesignModule'
 > {
   /** Record the current draft in the undo stack and install `next`. */
   const commit = (next: DesignProject): void => {
@@ -403,6 +411,45 @@ export function designActions(
       } catch (error) {
         get().pushToast('error', `${i18n.t('toast.actionFailed')} ${messageOf(error)}`)
       }
+    },
+
+    addDesignRecipe(pageId, recipe, title) {
+      const problems = validateRecipe(recipe)
+      if (problems.length > 0) {
+        get().pushToast('error', problems[0] ?? i18n.t('toast.actionFailed'))
+        return
+      }
+      const draft = draftPage(pageId)
+      if (!draft) return
+      const next = withPage(draft, pageId, (page) => ({
+        ...page,
+        modules: [
+          ...page.modules,
+          {
+            id: nextModuleId(),
+            type: 'custom_section',
+            props: { title: title.trim() || i18n.t('design.creativeDefaultTitle'), recipe }
+          }
+        ]
+      }))
+      commit(next)
+      get().pushToast('success', i18n.t('design.creativeAdded'))
+    },
+
+    varyDesignModule(pageId, moduleId) {
+      const draft = draftPage(pageId)
+      if (!draft) return
+      const next = withPage(draft, pageId, (page) => ({
+        ...page,
+        modules: page.modules.map((module) => {
+          if (module.id !== moduleId || module.type !== 'custom_section') return module
+          const recipe = module.props.recipe
+          if (typeof recipe !== 'object' || recipe === null) return module
+          return { ...module, props: { ...module.props, recipe: varyRecipe(recipe as DesignRecipe) } }
+        })
+      }))
+      if (next === draft) return
+      commit(next)
     }
   }
 }

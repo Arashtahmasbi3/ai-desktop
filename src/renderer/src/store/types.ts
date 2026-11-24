@@ -46,6 +46,7 @@ import type { UiMode } from '../lib/ui-mode'
 import type { UsageRecord } from '../lib/usage'
 import type { DesignAnswers, DesignBuildResult, DesignProject, DesignSummary, DesignVersionSummary } from '@shared/design'
 import type { DesignMemory } from '@shared/design-memory'
+import type { DesignRecipe } from '@shared/design-recipe'
 
 export type ViewId = 'chat' | 'tasks' | 'files' | 'browser' | 'github' | 'vps' | 'goals' | 'design'
 
@@ -504,6 +505,10 @@ export interface AppState {
   loadDesignMemory: (id: string) => Promise<void>
   /** Art Board: forget one memory record. */
   forgetDesignMemory: (id: string, recordId: string) => Promise<void>
+  /** Art Board (phase 6): add a validated recipe as a custom section. */
+  addDesignRecipe: (pageId: string, recipe: DesignRecipe, title: string) => void
+  /** Art Board: cycle a custom section through its layouts. */
+  varyDesignModule: (pageId: string, moduleId: string) => void
   /** Create a goal for the active project; the first one becomes active. */
   createGoal: (title: string, criteria?: string[]) => Promise<void>
   updateGoalTitle: (goalId: string, title: string) => Promise<void>

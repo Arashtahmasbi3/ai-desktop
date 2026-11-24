@@ -7,6 +7,7 @@ import ModuleInspector from './ModuleInspector'
 import ConnectionsPanel from './ConnectionsPanel'
 import VersionsPanel from './VersionsPanel'
 import MemoryPanel from './MemoryPanel'
+import CreativePanel from './CreativePanel'
 
 /**
  * The board (phase 1).
@@ -39,7 +40,7 @@ export default function DesignBoard({
   const openPath = useStore((state) => state.openDesignPath)
   const busy = useStore((state) => state.designBusy)
 
-  const [view, setView] = useState<'board' | 'graph' | 'versions' | 'memory'>('board')
+  const [view, setView] = useState<'board' | 'graph' | 'versions' | 'memory' | 'creative'>('board')
 
   const [openTabs, setOpenTabs] = useState<string[]>(design.pages[0] ? [design.pages[0].id] : [])
   const [activeTab, setActiveTab] = useState<string | null>(design.pages[0]?.id ?? null)
@@ -133,6 +134,16 @@ export default function DesignBoard({
             >
               {i18n.t('design.memory')}
             </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === 'creative'}
+              onClick={() => setView('creative')}
+              data-testid="design-tab-creative"
+              className={`px-3 py-1 text-3xs ${view === 'creative' ? 'text-fg-strong' : 'text-fg-muted'}`}
+            >
+              {i18n.t('design.creative')}
+            </button>
           </div>
           <button
             type="button"
@@ -208,6 +219,8 @@ export default function DesignBoard({
         <VersionsPanel designId={design.id} />
       ) : view === 'memory' ? (
         <MemoryPanel designId={design.id} />
+      ) : view === 'creative' ? (
+        <CreativePanel pageId={page?.id ?? design.pages[0]?.id ?? ''} pageName={page?.name ?? ''} />
       ) : (
         <div className="flex min-h-0 flex-1">
           <nav className="w-48 shrink-0 border-e border-border p-2" data-testid="design-pages">

@@ -1496,6 +1496,19 @@
     "memoryPreference": "preference",
     "memoryForget": "Forget",
     "memoryScopeGlobal": "everywhere",
-    "memorySuperseded": "{{count}} older decision(s) kept in history."
+    "memorySuperseded": "{{count}} older decision(s) kept in history.",
+    "creative": "Create a section",
+    "creativeHint": "Describe the section in one sentence; you get three arrangements you can add.",
+    "creativePlaceholder": "e.g. a team section with four photos and job titles",
+    "creativeMake": "Suggest three",
+    "creativeAdd": "Add to {{page}}",
+    "creativeItemCount": "{{count}} parts",
+    "creativeLayoutStack": "one under another",
+    "creativeLayout2": "two columns",
+    "creativeLayout3": "three columns",
+    "creativeAdded": "Section added.",
+    "creativeDefaultTitle": "بخش سفارشی",
+    "creativeVary": "Three other arrangements",
+    "customSection": "Custom section"
   }
 }

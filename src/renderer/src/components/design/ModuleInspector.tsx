@@ -18,6 +18,8 @@ export default function ModuleInspector({
 }): React.JSX.Element {
   const update = useStore((state) => state.updateDesignModule)
   const remove = useStore((state) => state.removeDesignModule)
+  const vary = useStore((state) => state.varyDesignModule)
+  const isCustom = module?.type === 'custom_section'
 
   if (!module) {
     return (
@@ -87,6 +89,16 @@ export default function ModuleInspector({
       >
         {i18n.t('design.removeModule')}
       </button>
+      {isCustom ? (
+        <button
+          type="button"
+          onClick={() => vary(pageId, module.id)}
+          data-testid="design-vary"
+          className="rounded border border-border px-3 py-1.5 text-xs text-fg hover:bg-bg-tertiary"
+        >
+          {i18n.t('design.creativeVary')}
+        </button>
+      ) : null}
     </aside>
   )
 }

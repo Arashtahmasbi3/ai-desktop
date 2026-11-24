@@ -9,6 +9,8 @@
  * without a browser is checked here, so the wizard, the store, the builder and the chat tools all fail the same way.
  */
 
+import { validateRecipe } from './design-recipe'
+
 export type DesignKind = 'website' | 'app'
 export type DesignSiteType = 'shop' | 'corporate' | 'personal' | 'education' | 'clinic' | 'restaurant'
 export type DesignLocale = 'fa' | 'en'
@@ -128,6 +130,12 @@ export const MODULE_TYPES: Record<string, ModuleDefinition> = {
   breadcrumb: { label: 'مسیر راهنما', family: 'layout', defaults: { items: ['خانه'] } },
   sidebar_admin: { label: 'منوی مدیریت', family: 'layout', defaults: { items: ['داشبورد', 'محتوا', 'تنظیمات'] } },
   section_container: { label: 'بخش‌بندی', family: 'layout', defaults: { title: 'بخش تازه', columns: 2 } },
+  // A section the user built with the assistant (phase 6): a validated recipe, not free-form markup.
+  custom_section: {
+    label: 'بخش سفارشی',
+    family: 'content',
+    defaults: { title: 'بخش سفارشی', recipe: { layout: 'stack', gap: 'md', items: [] } }
+  },
   // Content (12)
   hero: { label: 'بخش اصلی', family: 'content', defaults: { title: 'به سایت ما خوش آمدید', subtitle: 'یک توضیح کوتاه', cta: 'شروع کنید' } },
   features: { label: 'ویژگی‌ها', family: 'content', defaults: { title: 'چرا ما؟', items: ['سریع', 'ساده', 'مطمئن'] } },
@@ -262,6 +270,10 @@ export function validateDesign(design: DesignProject): DesignValidation {
       }
       if (hasLongText(module.props)) {
         problems.push(`متن یکی از بخش‌های «${page.name}» بیش از ${MAX_TEXT} کاراکتر است.`)
+      }
+      // Phase 6: a custom section is a recipe, and a recipe that does not validate would not build.
+      if (module.type === 'custom_section') {
+        problems.push(...validateRecipe(module.props.recipe))
       }
     }
   }

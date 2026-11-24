@@ -1496,6 +1496,19 @@
     "memoryPreference": "ترجیح",
     "memoryForget": "فراموش کن",
     "memoryScopeGlobal": "همه‌جا",
-    "memorySuperseded": "{{count}} تصمیم قدیمی‌تر در تاریخچه نگه داشته شده است."
+    "memorySuperseded": "{{count}} تصمیم قدیمی‌تر در تاریخچه نگه داشته شده است.",
+    "creative": "ساخت بخش",
+    "creativeHint": "بخش را در یک جمله توصیف کن؛ سه چیدمان می‌گیری که می‌توانی اضافه کنی.",
+    "creativePlaceholder": "مثلاً بخش معرفی تیم با چهار عکس و سمت",
+    "creativeMake": "سه پیشنهاد بساز",
+    "creativeAdd": "افزودن به {{page}}",
+    "creativeItemCount": "{{count}} جزء",
+    "creativeLayoutStack": "زیر هم",
+    "creativeLayout2": "دو ستون",
+    "creativeLayout3": "سه ستون",
+    "creativeAdded": "بخش اضافه شد.",
+    "creativeDefaultTitle": "بخش سفارشی",
+    "creativeVary": "سه چیدمان دیگر",
+    "customSection": "بخش سفارشی"
   }
 }

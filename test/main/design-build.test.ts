@@ -134,4 +134,35 @@ describe('buildDesign (phase 3)', () => {
     await expect(buildDesign(broken, { root })).rejects.toThrow(/نوع بخش ناشناخته/)
     await expect(stat(join(root, 'site'))).rejects.toThrow()
   })
+
+  it('renders a custom section from its recipe in both artifacts', async () => {
+    const entry = design()
+    entry.pages[0]!.modules.push({
+      id: 'custom-1',
+      type: 'custom_section',
+      props: {
+        title: 'تیم ما',
+        recipe: {
+          layout: 'grid-2',
+          gap: 'md',
+          items: [
+            { primitive: 'heading', props: { text: 'با تیم آشنا شوید', level: 2 } },
+            { primitive: 'text', props: { text: 'چهار نفر با تجربه' } },
+            { primitive: 'image', props: { src: 'assets/team.jpg', alt: 'عکس تیم' } }
+          ]
+        }
+      }
+    })
+
+    const result = await buildDesign(entry, { root })
+    const preview = await readFile(result.previewPath, 'utf8')
+    const app = await readFile(join(root, 'site', 'src', 'App.tsx'), 'utf8')
+
+    for (const artifact of [preview, app]) {
+      expect(artifact).toContain('با تیم آشنا شوید')
+      expect(artifact).toContain('چهار نفر با تجربه')
+      expect(artifact).toContain('assets/team.jpg')
+      expect(artifact).toContain('recipe-grid-2')
+    }
+  })
 })

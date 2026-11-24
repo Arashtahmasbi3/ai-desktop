@@ -1,4 +1,5 @@
 import { BRAND_OPTIONS, MODULE_TYPES, type DesignModule, type DesignProject } from '@shared/design'
+import type { DesignRecipe, RecipeItem } from '@shared/design-recipe'
 
 /**
  * The deterministic site generator (phase 3).
@@ -26,6 +27,7 @@ export type ShapeId =
   | 'media'
   | 'faq'
   | 'pricing'
+  | 'custom'
   | 'system'
 
 /** Every module type of the catalogue, mapped to the shape that renders it. */
@@ -35,6 +37,7 @@ export const SHAPES: Readonly<Record<string, ShapeId>> = {
   breadcrumb: 'text',
   sidebar_admin: 'list',
   section_container: 'text',
+  custom_section: 'custom',
   hero: 'hero',
   features: 'list',
   about: 'text',
@@ -153,6 +156,11 @@ export function renderModuleHtml(module: DesignModule): string {
       return `<section class="block"><h2>${title}</h2><table><thead><tr><th>#</th><th>عنوان</th><th>وضعیت</th></tr></thead><tbody><tr><td>۱</td><td>نمونه</td><td>فعال</td></tr></tbody></table></section>`
     case 'media':
       return `<section class="block"><h2>${title}</h2><div class="gallery"><div class="thumb"></div><div class="thumb"></div><div class="thumb"></div></div></section>`
+    case 'custom': {
+      const recipe = readRecipe(module)
+      const items = recipe ? renderRecipeHtml(recipe.items) : ''
+      return `<section class="block recipe-${recipe?.layout ?? 'stack'}"><h2>${title}</h2>${items}${note}</section>`
+    }
     case 'system':
       return `<section class="system"><strong>${title}</strong><p>${text}</p></section>`
     case 'text':
@@ -163,6 +171,104 @@ export function renderModuleHtml(module: DesignModule): string {
 
 function pageBody(page: DesignProject['pages'][number]): string {
   return page.modules.map(renderModuleHtml).join('\n')
+}
+
+/** The recipe behind a custom section, or null when the props are not one (the validator refuses this, the renderer survives it). */
+function readRecipe(module: DesignModule): DesignRecipe | null {
+  const raw = module.props.recipe
+  if (typeof raw !== 'object' || raw === null) return null
+  const recipe = raw as DesignRecipe
+  return Array.isArray(recipe.items) ? recipe : null
+}
+
+function renderRecipeHtml(items: RecipeItem[]): string {
+  return items
+    .map((item) => {
+      const props = item.props ?? {}
+      const text = escapeText(props.text ?? '')
+      const label = escapeText(props.label ?? '')
+      const children = item.items ? renderRecipeHtml(item.items) : ''
+      switch (item.primitive) {
+        case 'heading': {
+          const level = Number(props.level) === 3 ? 3 : 2
+          return `<h${level}>${text}</h${level}>`
+        }
+        case 'text':
+          return `<p>${text}</p>`
+        case 'image':
+        case 'avatar':
+          return `<img class="recipe-image${item.primitive === 'avatar' ? ' avatar' : ''}" src="${escapeText(props.src ?? '')}" alt="${escapeText(props.alt ?? '')}" />`
+        case 'button':
+          return `<button class="btn">${label || text}</button>`
+        case 'link':
+          return `<a href="${escapeText(props.to ?? '#')}">${label || text}</a>`
+        case 'list':
+          return `<ul>${children}</ul>`
+        case 'grid':
+        case 'stack':
+        case 'card':
+          return `<div class="${item.primitive === 'card' ? 'card' : item.primitive}">${children}</div>`
+        case 'divider':
+          return '<hr />'
+        case 'spacer':
+          return '<div class="spacer"></div>'
+        case 'badge':
+          return `<span class="badge">${text}</span>`
+        case 'form_field':
+          return `<label class="field">${escapeText(props.label ?? '')}<input type="${escapeText(props.type ?? 'text')}" placeholder="${escapeText(props.placeholder ?? '')}" /></label>`
+        case 'embed':
+          return `<div class="thumb" data-embed="${escapeText(props.src ?? '')}"></div>`
+        case 'icon':
+        default:
+          return '<span class="icon" aria-hidden="true">•</span>'
+      }
+    })
+    .join('\n')
+}
+
+function renderRecipeJsx(items: RecipeItem[]): string {
+  return items
+    .map((item) => {
+      const props = item.props ?? {}
+      const text = jsxText(props.text ?? '')
+      const label = jsxText(props.label ?? '')
+      const children = item.items ? renderRecipeJsx(item.items) : ''
+      switch (item.primitive) {
+        case 'heading': {
+          const level = Number(props.level) === 3 ? 3 : 2
+          return `<h${level}>${text}</h${level}>`
+        }
+        case 'text':
+          return `<p>${text}</p>`
+        case 'image':
+        case 'avatar':
+          return `<img className="recipe-image${item.primitive === 'avatar' ? ' avatar' : ''}" src="${jsxText(props.src ?? '')}" alt="${jsxText(props.alt ?? '')}" />`
+        case 'button':
+          return `<button className="btn">${label || text}</button>`
+        case 'link':
+          return `<a href="${jsxText(props.to ?? '#')}">${label || text}</a>`
+        case 'list':
+          return `<ul>${children}</ul>`
+        case 'grid':
+        case 'stack':
+        case 'card':
+          return `<div className="${item.primitive === 'card' ? 'card' : item.primitive}">${children}</div>`
+        case 'divider':
+          return '<hr />'
+        case 'spacer':
+          return '<div className="spacer" />'
+        case 'badge':
+          return `<span className="badge">${text}</span>`
+        case 'form_field':
+          return `<label className="field">${jsxText(props.label ?? '')}<input type="${jsxText(props.type ?? 'text')}" placeholder="${jsxText(props.placeholder ?? '')}" /></label>`
+        case 'embed':
+          return `<div className="thumb" data-embed="${jsxText(props.src ?? '')}" />`
+        case 'icon':
+        default:
+          return '<span className="icon" aria-hidden="true">•</span>'
+      }
+    })
+    .join('\n')
 }
 
 function css(design: DesignProject): string {
@@ -189,6 +295,15 @@ table{width:100%;border-collapse:collapse}
 th,td{border-bottom:1px solid var(--line);padding:8px;text-align:start}
 .gallery{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .thumb{aspect-ratio:4/3;background:var(--surface);border:1px dashed var(--line);border-radius:8px}
+.stack{display:flex;flex-direction:column;gap:12px}
+.grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.recipe-image{max-width:100%;border-radius:8px}
+.avatar{width:56px;height:56px;border-radius:999px;object-fit:cover}
+.badge{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:2px 8px;font-size:.75rem}
+.field{display:flex;flex-direction:column;gap:4px}
+.field input{border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit}
+.spacer{height:16px}
 .note{color:var(--muted);font-size:.8rem}
 .system{padding:16px 24px;background:var(--surface)}
 .footer{padding:24px;border-top:1px solid var(--line);color:var(--muted);text-align:center}`
@@ -258,6 +373,11 @@ function jsxModule(module: DesignModule): string {
       return `<section className="block"><h2>${title}</h2><table><thead><tr><th>#</th><th>عنوان</th><th>وضعیت</th></tr></thead><tbody><tr><td>۱</td><td>نمونه</td><td>فعال</td></tr></tbody></table></section>`
     case 'media':
       return `<section className="block"><h2>${title}</h2><div className="gallery"><div className="thumb"></div><div className="thumb"></div><div className="thumb"></div></div></section>`
+    case 'custom': {
+      const recipe = readRecipe(module)
+      const items = recipe ? renderRecipeJsx(recipe.items) : ''
+      return `<section className="block recipe-${recipe?.layout ?? 'stack'}"><h2>${title}</h2>${items}${note}</section>`
+    }
     case 'system':
       return `<section className="system"><strong>${title}</strong><p>${text}</p></section>`
     case 'text':
