@@ -41,6 +41,9 @@ import { ChangeRecorder, type ProjectFiles } from './agent-service/changes'
 import { MemoryService } from './agent-service/memory'
 import { ProviderFactory, type ProviderSelection } from './agent-service/providers'
 import type { RemoteHost } from './agent-service/remote-runtime'
+import { CompositeToolExecutor } from '@core/tools/composite-executor'
+import { createSubagentToolGroup } from '@core/tools/subagent-tool'
+import { DEFAULT_SUBAGENT_LIMITS, SubagentLimiter } from '@core/agent/subagent'
 import { RunGateFactory } from './agent-service/run-gates'
 import {
   clearSessionMemory,
@@ -212,6 +215,8 @@ export interface AgentServiceOptions {
  * entries from the encrypted settings, streams events, and supports abort.
  */
 export class AgentService {
+  /** T14: at most two children at once, for the whole app. */
+  private readonly subagentLimiter = new SubagentLimiter(DEFAULT_SUBAGENT_LIMITS.maxConcurrent)
   private readonly sandbox: SandboxManager
   private readonly persistence: Persistence
   private readonly sessionStore: SessionStore
@@ -415,6 +420,50 @@ export class AgentService {
      * it, and the pin is released in the same `finally` whether the run finishes, aborts or throws.
      */
     const { serverId: runServerId, ...remoteOptions } = remote
+
+    /*
+     * T14: the child run. Offered only at depth 0; the spawn re-enters run() with a depth marker, which is what keeps a
+     * child from being offered the tool again. The child's usage is emitted as its own run:end instead of being folded
+     * into the parent's numbers, so the transcript shows two runs and neither one lies about its cost.
+     */
+    const subagentDepth = request.subagentDepth ?? 0
+    const subagentGroup =
+      subagentDepth === 0
+        ? createSubagentToolGroup({
+            depth: 1,
+            limiter: this.subagentLimiter,
+            spawn: async (child, childSignal) => {
+              const { sessionId: parentSession, resumeSessionId: parentResume, ...rest } = request
+              void parentSession
+              void parentResume
+              const result = await this.run({ ...rest, task: child.task, subagentDepth: 1 }, childSignal)
+              return {
+                ok: result.status === 'completed',
+                answer: result.finalAnswer ?? result.message ?? '',
+                steps: result.steps.length,
+                usageTokens: result.usage?.totalTokens ?? 0,
+                ...(result.status === 'completed' ? {} : { error: result.message ?? result.status })
+              }
+            }
+          })
+        : undefined
+    const mergedRemote = subagentGroup
+      ? {
+          ...remoteOptions,
+          extraTools: [...(remoteOptions.extraTools ?? []), ...subagentGroup.definitions],
+          extraExecutor: new CompositeToolExecutor([
+            ...(remoteOptions.extraExecutor
+              ? [
+                  {
+                    names: new Set((remoteOptions.extraTools ?? []).map((tool) => tool.name)),
+                    executor: remoteOptions.extraExecutor
+                  }
+                ]
+              : []),
+            { names: new Set(subagentGroup.definitions.map((tool) => tool.name)), executor: subagentGroup.executor! }
+          ])
+        }
+      : remoteOptions
     const memory = await this.projectMemory.projectMemoryHint()
     const factLedger = await this.projectMemory.factLedgerHint(activeProject?.id)
     /*
@@ -556,7 +605,7 @@ export class AgentService {
       // survives a restart and resumes auto-approving in the same chat.
       sessionMetadata: () => this.planTrust.metadataFor(sessionKey),
       // R3: `serverId` was split out of `remote` above; these are the orchestrator's own options.
-      ...remoteOptions,
+      ...mergedRemote,
       ...(effectiveSystemHint ? { systemHint: effectiveSystemHint } : {}),
       // X6: the run's diagnosis memory, scoped to the active project. No project, no ledger — a
       // diagnosis that could cross projects would be worse than having none.

@@ -209,6 +209,8 @@ export const WRITE_TOOL_NAMES: ReadonlySet<string> = new Set([
   'migrate_database',
   'migrate_docker',
   'scaffold_project',
+  // T14: a child run is work the user is paying for, so it is asked about like any write.
+  'subagent',
   // T04: the working checklist is a write to app data.
   'todo_write',
   'project_user_create',
