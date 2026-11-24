@@ -1520,5 +1520,11 @@
     "pending": "pending",
     "inProgress": "in progress",
     "completed": "done"
+  },
+  "documentPreview": {
+    "readOnly": "read-only preview",
+    "unsupported": "This file cannot be previewed",
+    "emptyDocument": "The document has no text.",
+    "emptySheet": "The sheet is empty."
   }
 }

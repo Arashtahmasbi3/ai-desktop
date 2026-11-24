@@ -19,6 +19,9 @@ import { registerDesignIpc } from './design-ipc'
 import { registerTodoIpc } from './todo-ipc'
 import { TodoStore } from './todo-store'
 import { appDataDir, createDesignStore } from './stores'
+import { readFile } from 'node:fs/promises'
+import { previewDocument } from './office-preview'
+import type { DocumentPreview } from '@shared/document-preview'
 import { runLocalCommand } from './local-shell'
 import { observeServerReachability } from './reachability'
 import {
@@ -357,6 +360,14 @@ export function registerIpc(
 
     ['files:list', (path: string | undefined) => services.files.list(path ?? '.')],
     ['files:read', (path: string) => services.files.read(path)],
+    [
+      'files:preview',
+      async (path: string): Promise<DocumentPreview> => {
+        const safe = services.files.resolveSafe(path)
+        const buffer = await readFile(safe)
+        return previewDocument(safe, buffer)
+      }
+    ],
     [
       'files:write',
       async (path: string, content: string) => {

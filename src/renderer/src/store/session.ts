@@ -1,4 +1,5 @@
 import i18n from '../i18n'
+import { documentKind } from '@shared/document-preview'
 import type { StoredMessage } from '@shared/chat'
 import { resolveSelection } from '@shared/selection'
 import { newId, startAutosave } from './helpers'
@@ -309,8 +310,15 @@ export function sessionActions(
 
     async openFile(path) {
       try {
+        // T10: an Office document is previewed by main (it is a zip of XML, not text), so the editor never receives
+        // bytes it would render as mojibake.
+        if (documentKind(path) !== null) {
+          const documentPreview = await window.api.fs.preview(path)
+          set({ selectedFile: path, documentPreview, fileContent: '', draft: null, view: 'files' })
+          return
+        }
         const fileContent = await window.api.fs.read(path)
-        set({ selectedFile: path, fileContent, draft: null, view: 'files' })
+        set({ selectedFile: path, fileContent, draft: null, documentPreview: null, view: 'files' })
       } catch (error) {
         set({ error: error instanceof Error ? error.message : String(error) })
       }

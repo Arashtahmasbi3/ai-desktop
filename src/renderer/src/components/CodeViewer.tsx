@@ -20,6 +20,7 @@ import { useStore } from '../store'
 import DiffViewer from './DiffViewer'
 import HighlightedLine from './Highlighted'
 import PreviewPane, { previewKind } from './PreviewPane'
+import DocumentPreviewPane from './DocumentPreviewPane'
 
 /** Case-insensitive match ranges within a line. */
 function matchRanges(line: string, query: string): Array<[number, number]> {
@@ -38,6 +39,7 @@ function matchRanges(line: string, query: string): Array<[number, number]> {
 export default function CodeViewer(): JSX.Element {
   const { t } = useTranslation()
   const selectedFile = useStore((state) => state.selectedFile)
+  const documentPreview = useStore((state) => state.documentPreview)
   const fileContent = useStore((state) => state.fileContent)
   const draft = useStore((state) => state.draft)
   const saving = useStore((state) => state.saving)
@@ -96,6 +98,11 @@ export default function CodeViewer(): JSX.Element {
         <p className="text-xs">{t('codeViewer.empty')}</p>
       </div>
     )
+  }
+
+  // T10: Word, Excel and CSV files are previewed from main's parser instead of the text editor.
+  if (documentPreview) {
+    return <DocumentPreviewPane path={selectedFile} data={documentPreview} />
   }
 
   const jump = (delta: number): void => {

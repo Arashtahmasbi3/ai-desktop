@@ -13,6 +13,7 @@ import type { McpServerInput, McpServerStatus, McpServerView } from '@shared/mcp
 import type { DesignAnswers, DesignBuildResult, DesignProject, DesignSummary, DesignVersionSummary } from '@shared/design'
 import type { DesignMemory, RememberInput, RememberResult } from '@shared/design-memory'
 import type { TodoList } from '@shared/todo'
+import type { DocumentPreview } from '@shared/document-preview'
 import type {
   AuditEntryView,
   HealthCheckConfig,
@@ -317,6 +318,7 @@ export const api = {
   fs: {
     list: (path?: string): Promise<unknown> => invoke('files:list', path),
     read: (path: string): Promise<string> => invoke('files:read', path),
+    preview: (path: string): Promise<DocumentPreview> => invoke('files:preview', path),
     write: (path: string, content: string): Promise<void> => invoke('files:write', path, content),
     create: (path: string, type: 'file' | 'dir'): Promise<void> =>
       invoke('files:create', path, type),

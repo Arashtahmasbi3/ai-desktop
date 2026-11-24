@@ -21,6 +21,7 @@ import type { McpServerInput, McpServerStatus, McpServerView } from '@shared/mcp
 import type { DesignAnswers, DesignBuildResult, DesignProject, DesignSummary, DesignVersionSummary } from '@shared/design'
 import type { DesignMemory, RememberInput, RememberResult } from '@shared/design-memory'
 import type { TodoList } from '@shared/todo'
+import type { DocumentPreview } from '@shared/document-preview'
 import type {
   AuditEntryView,
   HealthCheckConfig,
@@ -254,6 +255,7 @@ export interface Api {
   fs: {
     list(path?: string): Promise<FileEntry[]>
     read(path: string): Promise<string>
+    preview(path: string): Promise<DocumentPreview>
     write(path: string, content: string): Promise<void>
     create(path: string, type: 'file' | 'dir'): Promise<void>
     remove(path: string): Promise<void>

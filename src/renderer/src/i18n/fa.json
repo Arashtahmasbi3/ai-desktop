@@ -1520,5 +1520,11 @@
     "pending": "در انتظار",
     "inProgress": "در جریان",
     "completed": "تمام"
+  },
+  "documentPreview": {
+    "readOnly": "پیش‌نمایش فقط‌خواندنی",
+    "unsupported": "این فایل پیش‌نمایش ندارد",
+    "emptyDocument": "این سند متنی ندارد.",
+    "emptySheet": "این برگه خالی است."
   }
 }
