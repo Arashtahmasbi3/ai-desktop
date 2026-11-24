@@ -74,7 +74,8 @@
     "newChatInProject": "New chat in this project",
     "chatsInProject": "{{count}} chats",
     "openProject": "Open project",
-    "navDesign": "Design"
+    "navDesign": "Design",
+    "navTodos": "Checklist"
   },
   "chat": {
     "placeholder": "Do anything",
@@ -1510,5 +1511,14 @@
     "creativeDefaultTitle": "بخش سفارشی",
     "creativeVary": "Three other arrangements",
     "customSection": "Custom section"
+  },
+  "todos": {
+    "title": "Checklist",
+    "subtitle": "What the assistant is working on, in the order it wrote it.",
+    "empty": "Nothing on the list yet. It appears when the assistant writes one with todo_write.",
+    "refresh": "Refresh",
+    "pending": "pending",
+    "inProgress": "in progress",
+    "completed": "done"
   }
 }

@@ -201,6 +201,8 @@ export const WRITE_TOOL_NAMES: ReadonlySet<string> = new Set([
   'migrate_database',
   'migrate_docker',
   'scaffold_project',
+  // T04: the working checklist is a write to app data.
+  'todo_write',
   'project_user_create',
   'project_user_remove',
   'worktree_create',

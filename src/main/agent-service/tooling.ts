@@ -24,6 +24,8 @@ import { DesignMemoryStore } from '../design-memory-store'
 import { buildDesign } from '../design-build/build'
 import { createDesignToolGroup } from '@core/tools/design-tools'
 import { createWebToolGroup } from '@core/tools/web-tools'
+import { createTodoToolGroup } from '@core/tools/todo-tool'
+import { TodoStore } from '../todo-store'
 import {
   activeRemoteProjectHint,
   planRemoteRuntime,
@@ -77,6 +79,8 @@ export class ToolingAssembler {
   private designGroup: ToolGroup | undefined
   /** T05/T06: the web tools, built once. */
   private webGroup: ToolGroup | undefined
+  /** T04: the checklist tool, bound to the same file the panel reads. */
+  private todoGroup: ToolGroup | undefined
   /** 30s cache of detected remote workspaces, keyed `${serverId}:${path}` (A.1). */
   private readonly workspaceCache = new Map<string, { info: RemoteWorkspaceInfo; at: number }>()
 
@@ -274,7 +278,8 @@ export class ToolingAssembler {
       mcpGroup,
       skillGroup,
       this.designTools(),
-      this.webTools()
+      this.webTools(),
+      this.todoTools()
     )
     // B-11: the resolver's reconciliation (a stale chat-header VPS dropped in
     // favour of the project's server) must reach the agent prompt, not vanish.
@@ -295,6 +300,17 @@ export class ToolingAssembler {
       runtime.systemHint = [runtime.systemHint, projectHint].filter(Boolean).join(' ')
     }
     return { ...runtime, ...routing }
+  }
+
+  /**
+   * T04: the checklist tool, bound to `<userData>/todos.json` — the same file the panel reads, so what the model wrote is
+   * what the user sees. Absent without a user-data directory, like the design tools.
+   */
+  private todoTools(): ToolGroup | undefined {
+    if (this.userDataDir === undefined) return undefined
+    if (this.todoGroup !== undefined) return this.todoGroup
+    this.todoGroup = createTodoToolGroup(new TodoStore({ dir: this.userDataDir }))
+    return this.todoGroup
   }
 
   /**

@@ -12,6 +12,7 @@ import type { ChatSaveInput, ChatSummary, StoredChat } from '@shared/chat'
 import type { McpServerInput, McpServerStatus, McpServerView } from '@shared/mcp'
 import type { DesignAnswers, DesignBuildResult, DesignProject, DesignSummary, DesignVersionSummary } from '@shared/design'
 import type { DesignMemory, RememberInput, RememberResult } from '@shared/design-memory'
+import type { TodoList } from '@shared/todo'
 import type {
   AuditEntryView,
   HealthCheckConfig,
@@ -220,6 +221,11 @@ export const api = {
     remember: (id: string, input: RememberInput): Promise<RememberResult> =>
       invoke('design:remember', id, input),
     forget: (id: string, recordId: string): Promise<DesignMemory> => invoke('design:forget', id, recordId)
+  },
+
+  /** T04: the working checklist the agent writes with todo_write. */
+  todos: {
+    list: (): Promise<TodoList> => invoke('todos:list')
   },
 
   github: {

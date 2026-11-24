@@ -20,6 +20,7 @@ import type { ChatSaveInput, ChatSummary, StoredChat } from '@shared/chat'
 import type { McpServerInput, McpServerStatus, McpServerView } from '@shared/mcp'
 import type { DesignAnswers, DesignBuildResult, DesignProject, DesignSummary, DesignVersionSummary } from '@shared/design'
 import type { DesignMemory, RememberInput, RememberResult } from '@shared/design-memory'
+import type { TodoList } from '@shared/todo'
 import type {
   AuditEntryView,
   HealthCheckConfig,
@@ -181,6 +182,10 @@ export interface Api {
     memory(id: string): Promise<DesignMemory>
     remember(id: string, input: RememberInput): Promise<RememberResult>
     forget(id: string, recordId: string): Promise<DesignMemory>
+  }
+  /** T04: the working checklist. */
+  todos: {
+    list(): Promise<TodoList>
   }
   github: {
     status(): Promise<GitHubAuthStatus>

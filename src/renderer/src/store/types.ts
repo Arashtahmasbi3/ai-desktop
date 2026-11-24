@@ -46,9 +46,10 @@ import type { UiMode } from '../lib/ui-mode'
 import type { UsageRecord } from '../lib/usage'
 import type { DesignAnswers, DesignBuildResult, DesignProject, DesignSummary, DesignVersionSummary } from '@shared/design'
 import type { DesignMemory } from '@shared/design-memory'
+import type { TodoItem } from '@shared/todo'
 import type { DesignRecipe } from '@shared/design-recipe'
 
-export type ViewId = 'chat' | 'tasks' | 'files' | 'browser' | 'github' | 'vps' | 'goals' | 'design'
+export type ViewId = 'chat' | 'tasks' | 'files' | 'browser' | 'github' | 'vps' | 'goals' | 'design' | 'todos'
 
 /** Tabs of the right-hand workspace column (v2.6.0, B.4). */
 export type WorkspacePanelTab = 'output' | 'sources'
@@ -244,6 +245,8 @@ export interface AppState {
   designMemory: DesignMemory
   /** A design mutation is in flight. */
   designBusy: boolean
+  /** The working checklist the agent wrote with todo_write (T04). */
+  todos: TodoItem[]
   /** A tool approved 3+ times; the UI suggests remembering it (v2.3, B.3). */
   approvalSuggestion: { tool: string; count: number } | null
   /** A "Deny & Explain" prompt to send once the current run settles. */
@@ -505,6 +508,8 @@ export interface AppState {
   loadDesignMemory: (id: string) => Promise<void>
   /** Art Board: forget one memory record. */
   forgetDesignMemory: (id: string, recordId: string) => Promise<void>
+  /** T04: reload the working checklist. */
+  refreshTodos: () => Promise<void>
   /** Art Board (phase 6): add a validated recipe as a custom section. */
   addDesignRecipe: (pageId: string, recipe: DesignRecipe, title: string) => void
   /** Art Board: cycle a custom section through its layouts. */

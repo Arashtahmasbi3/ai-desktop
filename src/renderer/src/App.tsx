@@ -13,6 +13,7 @@ import FileExplorer from './components/FileExplorer'
 import GitHubPanel from './components/GitHubPanel'
 import GoalPanel from './components/GoalPanel'
 import DesignPanel from './components/design/DesignPanel'
+import TodoPanel from './components/TodoPanel'
 import VpsPanel from './components/Vps/VpsPanel'
 import Onboarding from './components/Onboarding'
 import MigrationDialog from './components/MigrationDialog'
@@ -339,6 +340,7 @@ export default function App(): JSX.Element {
               {view === 'vps' ? <VpsPanel /> : null}
               {view === 'goals' ? <GoalPanel /> : null}
               {view === 'design' ? <DesignPanel /> : null}
+              {view === 'todos' ? <TodoPanel /> : null}
             </ErrorBoundary>
           )}
 

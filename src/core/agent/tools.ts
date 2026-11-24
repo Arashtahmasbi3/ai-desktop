@@ -48,6 +48,15 @@ const SKIP_DIRECTORIES = new Set([
 const MAX_WALK_FILES = 5_000
 const MAX_GREP_FILE_BYTES = 1_000_000
 
+/**
+ * T13: past this many characters, the command's output is written to `.ai-desktop/artifacts/` and the model receives the
+ * head, the tail and the path. Truncating silently loses the middle of a failing build log; spilling keeps every byte
+ * reachable with `read_file` while the transcript stays readable.
+ */
+const SPILL_THRESHOLD = 20_000
+const SPILL_HEAD = 2_000
+const SPILL_TAIL = 2_000
+
 /** `*` never crosses a separator, `**` does; `?` is one character. Anchored, because a glob is a whole-path match. */
 export function globToRegExp(pattern: string): RegExp {
   let out = ''
@@ -635,10 +644,35 @@ export class SandboxToolExecutor implements ToolExecutor {
       timeoutMs
     })
     return {
-      ...this.fromExecResult(action, result, startedAt),
+      ...this.fromExecResult(action, await this.spillIfLarge(result), startedAt),
       command,
       ...(cwd ? { cwd } : {})
     }
+  }
+
+  /**
+   * T13: keep a long output whole on disk and hand the model a readable excerpt plus the path. Best effort: if the
+   * artifact cannot be written (read-only workspace), the command's own result stands.
+   */
+  private async spillIfLarge<T extends { stdout: string; stderr: string }>(result: T): Promise<T> {
+    const combined = [result.stdout, result.stderr].filter((part) => part.length > 0).join('\n')
+    if (combined.length <= SPILL_THRESHOLD) return result
+    const path = `.ai-desktop/artifacts/cmd-${Date.now()}.log`
+    try {
+      await this.sandbox.writeFile(this.sandboxId, path, combined)
+    } catch {
+      return result
+    }
+    const excerpt = [
+      combined.slice(0, SPILL_HEAD),
+      '',
+      `[… ${combined.length - SPILL_HEAD - SPILL_TAIL} characters omitted …]`,
+      '',
+      combined.slice(-SPILL_TAIL),
+      '',
+      `[کل خروجی در ${path} ذخیره شد — با read_file بخوانش.]`
+    ].join('\n')
+    return { ...result, stdout: excerpt, stderr: '' }
   }
 
   private fromExecResult(

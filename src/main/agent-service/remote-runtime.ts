@@ -246,7 +246,9 @@ export function planRemoteRuntime(
    * T05/T06: the two web tools. Registered here for the same reason: a local run with no VPS is exactly the run that
    * needs them, and every early return below happens after this builder.
    */
-  web?: ToolGroup
+  web?: ToolGroup,
+  /** T04: the working checklist. */
+  todo?: ToolGroup
 ): RemoteRuntime {
   /*
    * F0-2c / F0-3: both groups go into the builder **before** anything else, and their composed
@@ -259,7 +261,8 @@ export function planRemoteRuntime(
   if (skills) tools.add(skills)
   if (design) tools.add(design)
   if (web) tools.add(web)
-  const extras = composeGroupExecutors([mcp, skills, design, web])
+  if (todo) tools.add(todo)
+  const extras = composeGroupExecutors([mcp, skills, design, web, todo])
   if (!vps) return tools.build({ executor: extras })
   const connected = vps.connectedServers()
 

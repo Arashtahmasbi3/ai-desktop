@@ -16,7 +16,9 @@ import type { AppServices } from './app-services'
 import { registerVpsIpc } from './vps-ipc'
 import { registerMcpIpc } from './mcp-ipc'
 import { registerDesignIpc } from './design-ipc'
-import { createDesignStore } from './stores'
+import { registerTodoIpc } from './todo-ipc'
+import { TodoStore } from './todo-store'
+import { appDataDir, createDesignStore } from './stores'
 import { runLocalCommand } from './local-shell'
 import { observeServerReachability } from './reachability'
 import {
@@ -668,11 +670,15 @@ export function registerIpc(
   const disposeMcp = registerMcpIpc(services)
   // Art Board (phase 0): design projects live in their own store, never in settings.json.
   const disposeDesign = registerDesignIpc(createDesignStore())
+  // T04: the working checklist, read by the panel.
+  const disposeTodos = registerTodoIpc(new TodoStore({ dir: appDataDir() }))
+
 
   return () => {
     disposeVps()
     disposeMcp()
     disposeDesign()
+    disposeTodos()
     for (const [channel] of handlers) ipcMain.removeHandler(channel)
     for (const [channel] of windowChannels) ipcMain.removeHandler(channel)
   }

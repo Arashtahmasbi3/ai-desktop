@@ -309,6 +309,7 @@ describe('read-only tool allowlist', () => {
       'remote_write_file',
       'run_command',
       'scaffold_project',
+      'todo_write',
       'web_fetch',
       'web_search',
       'worktree_create',

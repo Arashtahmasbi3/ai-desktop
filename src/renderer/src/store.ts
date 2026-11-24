@@ -22,6 +22,7 @@ import { runActions } from './store/run'
 import { settingsActions } from './store/settings'
 import { approvalActions } from './store/approvals'
 import { designActions } from './store/design'
+import { todoActions } from './store/todos'
 import { uiActions } from './store/ui'
 
 /**
@@ -108,6 +109,7 @@ export const useStore = create<AppState>((set, get) => ({
   designVersions: [],
   designMemory: { version: 1, records: [] },
   designBusy: false,
+  todos: [],
   approvalSuggestion: null,
   queuedExplain: null,
   fileChanges: [],
@@ -144,6 +146,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...settingsActions(set, get),
   ...approvalActions(set, get),
   ...designActions(set, get),
+  ...todoActions(set, get),
   ...uiActions(set, get),
 }))
 

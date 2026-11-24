@@ -74,7 +74,8 @@
     "newChatInProject": "چت جدید در این پروژه",
     "chatsInProject": "{{count}} چت",
     "openProject": "باز کردن پروژه",
-    "navDesign": "طراحی"
+    "navDesign": "طراحی",
+    "navTodos": "چک‌لیست"
   },
   "chat": {
     "placeholder": "هر کاری انجام بده",
@@ -1510,5 +1511,14 @@
     "creativeDefaultTitle": "بخش سفارشی",
     "creativeVary": "سه چیدمان دیگر",
     "customSection": "بخش سفارشی"
+  },
+  "todos": {
+    "title": "چک‌لیست",
+    "subtitle": "کاری که دستیار روی آن است، به همان ترتیبی که خودش نوشته است.",
+    "empty": "هنوز چیزی در فهرست نیست. وقتی دستیار با todo_write بنویسد، اینجا می‌آید.",
+    "refresh": "به‌روزرسانی",
+    "pending": "در انتظار",
+    "inProgress": "در جریان",
+    "completed": "تمام"
   }
 }
