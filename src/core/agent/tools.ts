@@ -1,4 +1,6 @@
-import { existsSync } from 'node:fs'
+import { existsSync, type Dirent } from 'node:fs'
+import { promises as fsp } from 'node:fs'
+import { resolve, sep } from 'node:path'
 import type { SandboxManager } from '@shared/sandbox'
 import type { ToolCall, ToolDefinition } from '@shared/types'
 import type { AgentAction, AgentToolResult, ToolErrorCode } from '@shared/agent'
@@ -27,6 +29,93 @@ const DEFAULT_COMMAND_TIMEOUT_MS = 60_000
 const LOCAL_LIST_COMMAND = listCommandFor(
   resolveSandboxShell(process.platform, process.env, existsSync)
 )
+
+/**
+ * T02/T03: the directories a code search must never descend into, and the caps that keep a search from becoming a
+ * denial of service on the user's own machine.
+ */
+const SKIP_DIRECTORIES = new Set([
+  'node_modules',
+  '.git',
+  'out',
+  'dist',
+  'release',
+  'coverage',
+  '.vite',
+  '.next',
+  'build'
+])
+const MAX_WALK_FILES = 5_000
+const MAX_GREP_FILE_BYTES = 1_000_000
+
+/** `*` never crosses a separator, `**` does; `?` is one character. Anchored, because a glob is a whole-path match. */
+export function globToRegExp(pattern: string): RegExp {
+  let out = ''
+  for (let index = 0; index < pattern.length; index += 1) {
+    const character = pattern[index]!
+    if (character === '*') {
+      if (pattern[index + 1] === '*') {
+        if (pattern[index + 2] === '/') {
+          out += '(?:.*/)?'
+          index += 2
+        } else {
+          out += '.*'
+          index += 1
+        }
+      } else {
+        out += '[^/]*'
+      }
+    } else if (character === '?') {
+      out += '[^/]'
+    } else {
+      out += character.replace(/[.+^${}()|[\]\\]/g, '\\$&')
+    }
+  }
+  return new RegExp(`^${out}$`)
+}
+
+interface WalkedFile {
+  /** Workspace-relative path with forward slashes. */
+  rel: string
+  abs: string
+}
+
+async function walkFiles(root: string, limit: number): Promise<WalkedFile[]> {
+  const files: WalkedFile[] = []
+  const walk = async (dir: string): Promise<void> => {
+    if (files.length >= limit) return
+    let entries: Dirent[]
+    try {
+      entries = await fsp.readdir(dir, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const entry of entries) {
+      if (files.length >= limit) return
+      const abs = resolve(dir, entry.name)
+      if (entry.isDirectory()) {
+        if (SKIP_DIRECTORIES.has(entry.name)) continue
+        await walk(abs)
+      } else if (entry.isFile()) {
+        const rel = abs.slice(root.length + 1).split(sep).join('/')
+        files.push({ rel, abs })
+      }
+    }
+  }
+  await walk(root)
+  return files
+}
+
+/** A count the model asked for, kept inside a range a search can actually afford. */
+function clampCount(value: number, cap: number): number {
+  const rounded = Math.floor(value)
+  if (!Number.isFinite(rounded) || rounded < 1) return 1
+  return Math.min(rounded, cap)
+}
+
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
 
 /** Tools exposed to the model. They map 1:1 onto SandboxManager capabilities. */
 export const SANDBOX_TOOLS: ToolDefinition[] = [
@@ -76,6 +165,39 @@ export const SANDBOX_TOOLS: ToolDefinition[] = [
         replace_all: { type: 'boolean', description: 'Replace every occurrence (default false)' }
       },
       required: ['path', 'old_string', 'new_string'],
+      additionalProperties: false
+    }
+  },
+  {
+    /* T02: find files by pattern without asking the model to guess shell syntax or a platform. */
+    name: 'glob',
+    description:
+      'Find files in the project workspace by glob pattern (supports *, ? and **). Returns workspace-relative paths, sorted, capped by max_results.',
+    parameters: {
+      type: 'object',
+      properties: {
+        pattern: { type: 'string', description: 'Glob pattern, e.g. "**/*.ts" or "src/*.tsx"' },
+        path: { type: 'string', description: 'Directory to search from (default ".")' },
+        max_results: { type: 'number', description: 'Maximum paths to return (default 200, cap 500)' }
+      },
+      required: ['pattern'],
+      additionalProperties: false
+    }
+  },
+  {
+    /* T03: a local grep, so a search does not require a shell command that only works on one OS. */
+    name: 'grep',
+    description:
+      'Search the text files of the workspace with a regular expression. Returns "path:line:text" matches, capped by max_results.',
+    parameters: {
+      type: 'object',
+      properties: {
+        pattern: { type: 'string', description: 'JavaScript regular expression' },
+        path: { type: 'string', description: 'Directory to search from (default ".")' },
+        glob: { type: 'string', description: 'Restrict to files matching this glob, e.g. "**/*.ts"' },
+        max_results: { type: 'number', description: 'Maximum matches to return (default 100, cap 500)' }
+      },
+      required: ['pattern'],
       additionalProperties: false
     }
   },
@@ -239,6 +361,10 @@ export class SandboxToolExecutor implements ToolExecutor {
           return await this.writeFile(action, startedAt)
         case 'edit':
           return await this.editFile(action, startedAt)
+        case 'glob':
+          return await this.globFiles(action, startedAt)
+        case 'grep':
+          return await this.grepFiles(action, startedAt)
         case 'read_file':
           return await this.readFile(action, startedAt)
         case 'list_dir':
@@ -338,6 +464,133 @@ export class SandboxToolExecutor implements ToolExecutor {
       attempts: 1,
       durationMs: Date.now() - startedAt,
       path
+    }
+  }
+
+  /**
+   * The directory a search starts from: the workspace root for "." or nothing, and a contained subdirectory otherwise.
+   * `normalizeSandboxPath` deliberately refuses "." (it is a file-path helper), so the dir case is handled here — the
+   * same split `list_dir` makes.
+   */
+  private searchRoot(root: string, raw: string | undefined): string | { message: string } {
+    if (raw === undefined || raw === '' || raw === '.') return root
+    try {
+      const from = normalizeSandboxPath(raw)
+      const start = resolve(root, from)
+      if (start !== root && !start.startsWith(root + sep)) throw new Error('path escapes the workspace')
+      return start
+    } catch (error) {
+      return { message: messageOf(error) }
+    }
+  }
+
+  /**
+   * T02: find files by pattern.
+   *
+   * Reads the host workspace directly rather than shelling out to `find`/`dir`, so the same code works whichever shell
+   * the sandbox runs. A sandbox without a host workspace (the Docker provider) gets a sentence saying so, never a
+   * silently empty result.
+   */
+  private async globFiles(action: AgentAction, startedAt: number): Promise<AgentToolResult> {
+    const pattern = asString(action.arguments.pattern)
+    if (!pattern) return failure(action, 'invalid_arguments', 'glob requires "pattern"', startedAt)
+    const root = this.sandbox.getSandbox(this.sandboxId)?.workspaceRoot
+    if (!root) {
+      return failure(action, 'invalid_arguments', 'glob needs a host workspace; this sandbox has none.', startedAt)
+    }
+
+    const start = this.searchRoot(root, asString(action.arguments.path))
+    if (typeof start !== 'string') {
+      return failure(action, 'invalid_arguments', start.message, startedAt)
+    }
+
+    const max = clampCount(asNumber(action.arguments.max_results) ?? 200, 500)
+    const matcher = globToRegExp(pattern)
+    const prefix = start === root ? '' : `${start.slice(root.length + 1).split(sep).join('/')}/`
+
+    const files = await walkFiles(start, MAX_WALK_FILES)
+    const matches = files
+      .filter((file) => matcher.test(file.rel))
+      .map((file) => `${prefix}${file.rel}`)
+      .sort()
+
+    const capped = matches.slice(0, max)
+    return {
+      actionId: action.id,
+      name: action.name,
+      ok: true,
+      output:
+        capped.length === 0
+          ? 'موردی پیدا نشد.'
+          : `${capped.join('\n')}\n${matches.length > capped.length ? `(${matches.length - capped.length} more)` : ''}`.trim(),
+      attempts: 1,
+      durationMs: Date.now() - startedAt
+    }
+  }
+
+  /** T03: a regex search over the text files of the workspace, capped in files, bytes and matches. */
+  private async grepFiles(action: AgentAction, startedAt: number): Promise<AgentToolResult> {
+    const pattern = asString(action.arguments.pattern)
+    if (!pattern) return failure(action, 'invalid_arguments', 'grep requires "pattern"', startedAt)
+    const root = this.sandbox.getSandbox(this.sandboxId)?.workspaceRoot
+    if (!root) {
+      return failure(action, 'invalid_arguments', 'grep needs a host workspace; this sandbox has none.', startedAt)
+    }
+
+    let matcher: RegExp
+    try {
+      matcher = new RegExp(pattern)
+    } catch (error) {
+      return failure(action, 'invalid_arguments', `invalid regular expression: ${messageOf(error)}`, startedAt)
+    }
+
+    const start = this.searchRoot(root, asString(action.arguments.path))
+    if (typeof start !== 'string') {
+      return failure(action, 'invalid_arguments', start.message, startedAt)
+    }
+
+    const globFilter = asString(action.arguments.glob)
+    const fileMatcher = globFilter ? globToRegExp(globFilter) : undefined
+    const max = clampCount(asNumber(action.arguments.max_results) ?? 100, 500)
+    const prefix = start === root ? '' : `${start.slice(root.length + 1).split(sep).join('/')}/`
+
+    const results: string[] = []
+    for (const file of await walkFiles(start, MAX_WALK_FILES)) {
+      if (results.length >= max) break
+      if (fileMatcher && !fileMatcher.test(file.rel)) continue
+      let size = 0
+      try {
+        size = (await fsp.stat(file.abs)).size
+      } catch {
+        continue
+      }
+      if (size > MAX_GREP_FILE_BYTES) continue
+
+      let content: string
+      try {
+        content = await fsp.readFile(file.abs, 'utf8')
+      } catch {
+        continue
+      }
+      // A NUL byte in the first kilobyte means binary; searching it would return noise as text.
+      if (content.slice(0, 1024).includes('\u0000')) continue
+
+      const lines = content.split('\n')
+      const path = `${prefix}${file.rel}`
+      for (let index = 0; index < lines.length && results.length < max; index += 1) {
+        const line = lines[index]!
+        if (!matcher.test(line)) continue
+        results.push(`${path}:${index + 1}:${line.trim().slice(0, 200)}`)
+      }
+    }
+
+    return {
+      actionId: action.id,
+      name: action.name,
+      ok: true,
+      output: results.length === 0 ? 'موردی پیدا نشد.' : results.join('\n'),
+      attempts: 1,
+      durationMs: Date.now() - startedAt
     }
   }
 

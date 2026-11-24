@@ -133,6 +133,9 @@ export const READ_ONLY_TOOL_NAMES: ReadonlySet<string> = new Set([
   // Local sandbox reads.
   'read_file',
   'list_dir',
+  // T02/T03: searching the workspace reads files; neither writes anything.
+  'glob',
+  'grep',
   // Remote project reads (P0-2 contained; secret guard always applied).
   'remote_read_file',
   'remote_list_dir',

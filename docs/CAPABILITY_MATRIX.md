@@ -29,6 +29,9 @@ document exists because claims rot.
 |---|---|---|---|
 | File tools (`read_file`, `write_file`, `list_dir`) | real | automatic | `test/agent/tools.test.ts` |
 | `edit` — exact-string replacement in a workspace file | real | automatic | `test/agent/tools-edit.test.ts` — refuses a missing or ambiguous match instead of guessing, and treats the replacement as literal text (`$&` survives) |
+| `glob` — find files by pattern | real | automatic | `test/agent/tools-search.test.ts` — `**` crosses separators, `*` does not, node_modules/.git/out are skipped, results capped |
+| `grep` — regex search over workspace text files | real | automatic | `test/agent/tools-search.test.ts` — `path:line:text`, glob filter, binary and >1 MB files skipped, an invalid regex refused |
+| `glob`/`grep` on a Docker sandbox | absent | — | Both read the host workspace directly, so a sandbox with no host folder (Docker) answers "needs a host workspace" rather than searching nothing |
 | Art Board tools (`design_list`, `design_get`, `design_history`, `design_add_module`, `design_update_page`, `design_compose_section`, `design_build`, `design_remember`) | real | automatic when a design store exists | `test/main/design-tools.test.ts` — the chat edits the same document the board does, and the three reads are in the read-only set |
 | Project tooling (`scaffold_project`, `worktree_create`, `worktree_remove`, `project_user_create`, `project_user_remove`, `remote_copy`, `migrate_docker`, `migrate_database`) | real | per run | `test/core/worktree*.test.ts`, `test/core/db-migrate-flow.test.ts` |
 | `run_command` in a sandbox | real | automatic | `test/agent/orchestrator.test.ts` |
