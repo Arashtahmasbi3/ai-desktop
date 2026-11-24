@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.7.0] - 2026-11-24
+
+Batch F: the agent can write a Word document, a workbook and a presentation — and the app can already read the first two
+back.
+
+### Three builders, no Office library
+
+`create_document`, `create_spreadsheet` and `create_presentation` build OOXML packages from parts and write them through
+the sandbox, so path containment and the workspace rules are exactly those of `write_file`. The ZIP writer moved to
+`@shared/zip-store` so `core/office` can use it without importing from main, and no runtime dependency was added.
+
+The presentation carries a slide master, a layout and a theme, because PowerPoint needs all three before it will show a
+slide — a zip that merely unzips is not a presentation.
+
+### What the tests can prove
+
+The document and the workbook are proven by a round trip: the tool writes the file and the *separate* preview parser
+reads the paragraphs and the cells back. The presentation cannot be round-tripped without PowerPoint, so the test proves
+the strongest structural claim available: every relationship target in every `.rels` part resolves to a part that exists.
+
+Validation is uniform: the extension must match, paths outside the workspace are refused before anything is written,
+and the caps are explicit (500 paragraphs of 2 000 characters; 1 000 × 100 cells; 50 slides of 20 bullets).
+
+### Still not true
+
+- These are content, not formatting: no styles, images, headers, formulas, multiple sheets, transitions or notes.
+- "Opens in PowerPoint" is not verified in this repository — only the package structure is.
+- The builders write into the project workspace; they do not convert an existing file or merge into one.
+- T14 onward (subagents, workflow, scheduling, telemetry) is still open in the checklist.
+
 ## [4.6.0] - 2026-11-24
 
 Batches D and E: a document preview, a way for a run to hand over what it produced, and a search over past
