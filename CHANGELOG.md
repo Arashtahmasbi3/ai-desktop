@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.6.0] - 2026-11-24
+
+Batches D and E: a document preview, a way for a run to hand over what it produced, and a search over past
+conversations.
+
+### Word, Excel and CSV get a preview
+
+A `.docx` and an `.xlsx` are ZIP archives of XML, so the app now reads the archive itself — central directory, stored and
+deflated entries, via `zlib` — and shows the part that carries the visible content: paragraphs for a document, shared
+strings plus the first worksheet for a workbook, a table for CSV/TSV. No new dependency, which keeps the packaging rule
+("Vite bundles everything, only `ssh2` ships") intact.
+
+The preview is honest about its limits: text and cells only — no formatting, images or formulas — a sheet capped at 200
+rows × 20 columns, and a file it cannot read says so with the reason instead of showing an empty pane.
+
+### `present` — a run can hand over its files
+
+`present` takes a short list of workspace-relative files with one line each. An absolute path, a drive path, a `..`
+traversal, an empty path, a list over 20 or a description over 200 is refused with the item number, and nothing is stored
+when it refuses: "here is your file" must never mean "here is `/etc`". The latest list persists beside the other app data
+and appears in the Checklist view with a reveal action.
+
+### `search_sessions` — the agent can look through earlier conversations
+
+A bounded scan of the chat folder (2 000 files, 5 MB each, 50 hits), title matches first, then the most recently updated
+conversation, with a snippet around the match rather than a whole transcript. Corrupt files are skipped, the app's own
+system messages never match, and a blank query is refused instead of matching everything.
+
+### Still not true
+
+- The document preview reads text and cells only; it does not render formatting, images or computed formulas.
+- Deliverables are listed in the Checklist view, not yet as a card inside the transcript.
+- Session search has no index: every call scans, and there is no in-app search box yet — the tool is the only entry point.
+- The document tools of the checklist itself (writing a `.docx`/`.xlsx`/`.pptx`) are **not** in this release; only the
+  preview is.
+
 ## [4.5.1] - 2026-11-24
 
 Batches B and C of the 24-item checklist: the agent can read the web, keep a checklist, and hand a long command's
