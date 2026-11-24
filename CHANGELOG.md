@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.5.1] - 2026-11-24
+
+Batches B and C of the 24-item checklist: the agent can read the web, keep a checklist, and hand a long command's
+output to a file instead of losing the middle of it.
+
+### The web, with the refusals first
+
+`web_fetch` reads a public http(s) URL and returns text. It refuses a non-web scheme, credentials in the URL, and private,
+loopback, link-local or unique-local addresses — checked on the URL and again on **every redirect hop**, because "a public
+URL that redirects to 169.254.169.254" is the classic way past a naive check. Non-text content types are refused, the
+body is capped at 2 MB and a request is cut at 20 s.
+
+`web_search` speaks the Brave web-search shape with an injectable endpoint and key. Without a key it **fails closed** with
+a sentence saying it is not configured; a refused key and an exhausted quota each name themselves instead of both
+reading as "no results". The key comes from `AI_DESKTOP_SEARCH_KEY` — a Settings field and its encrypted store are not
+part of this release, and the capability matrix says so.
+
+Both tools are in the write set on purpose: they reach the network at the model's choosing, so the default approval mode
+asks instead of letting egress pass as a read.
+
+### A checklist the user can see
+
+`todo_write` replaces the working checklist (`text` + `pending|in_progress|completed`). It is replaced, never patched: a
+delta ("mark item 3 done") eventually marks the wrong item, while resending the whole list is idempotent. Validation
+refuses a bad status, a duplicate id, an empty or over-long item and a list over 50 — and writes nothing when it refuses.
+The list persists at `<userData>/todos.json` and a new **Checklist** view shows exactly what the model wrote.
+
+### Output that spills instead of vanishing
+
+Past 20,000 characters a command's output is written to `.ai-desktop/artifacts/cmd-<ts>.log`, and the model receives the
+head, the tail and the path — so the lines that say why a build failed are still reachable with `read_file`, while the
+transcript stays readable. Small outputs are untouched, and spilling is best effort on a read-only workspace.
+
+### Still not true
+
+- `web_search` has one provider and an environment-variable key; there is no Settings field, no key rotation and no
+  per-provider quota handling.
+- `web_fetch` resolves DNS once, before the request: that narrows a rebinding attack rather than eliminating it, and there
+  is no domain allow-list.
+- The Checklist panel reads when it opens; there is no push event, so a list written mid-run appears on the next open.
+- `[AUTO-DECISION]` Batches B and C shipped together as one release instead of 4.5.x and 4.6.0, to keep the release count
+  down; the code and the tests are unaffected by the numbering.
+
 ## [4.5.0] - 2026-11-24
 
 Batch A of the 24-item gap checklist: the three code tools the agent was missing, so changing one line no longer means
