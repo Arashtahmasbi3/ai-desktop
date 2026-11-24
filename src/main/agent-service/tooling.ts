@@ -19,6 +19,10 @@ import type { McpServerStore } from '../mcp/store'
 import { loadSkills, type SkillRoot } from '../skills/loader'
 import { USE_SKILL_TOOL, UseSkillToolExecutor } from '../skills/tool'
 import { StdioTransport } from '../mcp/transport'
+import { DesignStore } from '../design-store'
+import { DesignMemoryStore } from '../design-memory-store'
+import { buildDesign } from '../design-build/build'
+import { createDesignToolGroup } from '@core/tools/design-tools'
 import {
   activeRemoteProjectHint,
   planRemoteRuntime,
@@ -68,6 +72,8 @@ export class ToolingAssembler {
   private readonly mcpServers?: McpServerStore
   private readonly mcpConnect: (config: McpServerConfig) => Promise<McpServerHandle>
   private mcpStatus: McpServerStatus[] = []
+  /** Art Board tools (phase 7), built once per assembler because the store is one directory. */
+  private designGroup: ToolGroup | undefined
   /** 30s cache of detected remote workspaces, keyed `${serverId}:${path}` (A.1). */
   private readonly workspaceCache = new Map<string, { info: RemoteWorkspaceInfo; at: number }>()
 
@@ -263,7 +269,8 @@ export class ToolingAssembler {
       isRemote ? active?.path : undefined,
       diagnostic,
       mcpGroup,
-      skillGroup
+      skillGroup,
+      this.designTools()
     )
     // B-11: the resolver's reconciliation (a stale chat-header VPS dropped in
     // favour of the project's server) must reach the agent prompt, not vanish.
@@ -284,6 +291,26 @@ export class ToolingAssembler {
       runtime.systemHint = [runtime.systemHint, projectHint].filter(Boolean).join(' ')
     }
     return { ...runtime, ...routing }
+  }
+
+  /**
+   * Art Board tools (phase 7).
+   *
+   * `undefined` when the assembler was built without a user-data directory (tests, headless), so the chat simply has no
+   * design tools rather than the tools failing at call time. Design projects live in that directory; the tool group and
+   * the board therefore share one store.
+   */
+  private designTools(): ToolGroup | undefined {
+    if (this.userDataDir === undefined) return undefined
+    if (this.designGroup !== undefined) return this.designGroup
+    const store = new DesignStore({ dir: join(this.userDataDir, 'designs') })
+    const memory = new DesignMemoryStore({ root: store.root })
+    this.designGroup = createDesignToolGroup({
+      store,
+      memory,
+      build: (design) => buildDesign(design, { root: join(store.root, design.id) })
+    })
+    return this.designGroup
   }
 
   /**

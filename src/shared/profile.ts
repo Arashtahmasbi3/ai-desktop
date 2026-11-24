@@ -140,6 +140,10 @@ export const READ_ONLY_TOOL_NAMES: ReadonlySet<string> = new Set([
   'remote_grep',
   'remote_git_status',
   // Read-only git/worktree inspection.
+  // Art Board reads (phase 7): the chat may look before it edits.
+  'design_list',
+  'design_get',
+  'design_history',
   'worktree_list',
   // F0-3 capability-as-data: `use_skill` reads one `SKILL.md` from a skills folder that was
   // discovered at run start (a name is a lookup key, never a path). It is a read, so it must
@@ -172,6 +176,12 @@ export const NAMED_DIAGNOSTIC_TOOL_NAMES: ReadonlySet<string> = new Set([
  * the "never expose these in Investigate" rule is auditable in one place (T2.1).
  */
 export const WRITE_TOOL_NAMES: ReadonlySet<string> = new Set([
+  // Art Board writes (phase 7): they change the saved design, so they are asked about like any write.
+  'design_add_module',
+  'design_update_page',
+  'design_compose_section',
+  'design_build',
+  'design_remember',
   // Local sandbox.
   'write_file',
   'run_command',

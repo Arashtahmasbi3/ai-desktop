@@ -236,7 +236,12 @@ export function planRemoteRuntime(
    * and before every early return for the same reason: a local run with no VPS is exactly the run
    * whose only extra tool is `use_skill`.
    */
-  skills?: ToolGroup
+  skills?: ToolGroup,
+  /**
+   * Phase 7: the Art Board tools. A local run needs them as much as a remote one, and they are built before every early
+   * return below for the same reason `use_skill` is.
+   */
+  design?: ToolGroup
 ): RemoteRuntime {
   /*
    * F0-2c / F0-3: both groups go into the builder **before** anything else, and their composed
@@ -247,7 +252,8 @@ export function planRemoteRuntime(
   const tools = new ToolsetBuilder()
   if (mcp) tools.add(mcp)
   if (skills) tools.add(skills)
-  const extras = composeGroupExecutors([mcp, skills])
+  if (design) tools.add(design)
+  const extras = composeGroupExecutors([mcp, skills, design])
   if (!vps) return tools.build({ executor: extras })
   const connected = vps.connectedServers()
 
