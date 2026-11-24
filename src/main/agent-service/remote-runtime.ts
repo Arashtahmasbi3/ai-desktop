@@ -250,7 +250,9 @@ export function planRemoteRuntime(
   /** T04: the working checklist. */
   todo?: ToolGroup,
   /** T11: the deliverables announcement. */
-  presented?: ToolGroup
+  presented?: ToolGroup,
+  /** T12: searching past conversations. */
+  sessions?: ToolGroup
 ): RemoteRuntime {
   /*
    * F0-2c / F0-3: both groups go into the builder **before** anything else, and their composed
@@ -265,7 +267,8 @@ export function planRemoteRuntime(
   if (web) tools.add(web)
   if (todo) tools.add(todo)
   if (presented) tools.add(presented)
-  const extras = composeGroupExecutors([mcp, skills, design, web, todo, presented])
+  if (sessions) tools.add(sessions)
+  const extras = composeGroupExecutors([mcp, skills, design, web, todo, presented, sessions])
   if (!vps) return tools.build({ executor: extras })
   const connected = vps.connectedServers()
 

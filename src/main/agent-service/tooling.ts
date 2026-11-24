@@ -27,6 +27,8 @@ import { createWebToolGroup } from '@core/tools/web-tools'
 import { createTodoToolGroup } from '@core/tools/todo-tool'
 import { createPresentToolGroup } from '@core/tools/present-tool'
 import { PresentedStore } from '../presented-store'
+import { createSessionSearchToolGroup } from '@core/tools/session-search-tool'
+import { searchSessions } from '../session-search'
 import { TodoStore } from '../todo-store'
 import {
   activeRemoteProjectHint,
@@ -85,6 +87,8 @@ export class ToolingAssembler {
   private todoGroup: ToolGroup | undefined
   /** T11: the deliverables announcement, bound to the same file the panel reads. */
   private presentedGroup: ToolGroup | undefined
+  /** T12: searching past conversations, bound to the chat store's folder. */
+  private sessionGroup: ToolGroup | undefined
   /** 30s cache of detected remote workspaces, keyed `${serverId}:${path}` (A.1). */
   private readonly workspaceCache = new Map<string, { info: RemoteWorkspaceInfo; at: number }>()
 
@@ -284,7 +288,8 @@ export class ToolingAssembler {
       this.designTools(),
       this.webTools(),
       this.todoTools(),
-      this.presentedTools()
+      this.presentedTools(),
+      this.sessionTools()
     )
     // B-11: the resolver's reconciliation (a stale chat-header VPS dropped in
     // favour of the project's server) must reach the agent prompt, not vanish.
@@ -305,6 +310,19 @@ export class ToolingAssembler {
       runtime.systemHint = [runtime.systemHint, projectHint].filter(Boolean).join(' ')
     }
     return { ...runtime, ...routing }
+  }
+
+  /**
+   * T12: searching past conversations, bound to the same `<userData>/chats` the sidebar lists.
+   */
+  private sessionTools(): ToolGroup | undefined {
+    if (this.userDataDir === undefined) return undefined
+    if (this.sessionGroup !== undefined) return this.sessionGroup
+    const dir = this.userDataDir
+    this.sessionGroup = createSessionSearchToolGroup({
+      search: (query, options) => searchSessions(dir, query, options)
+    })
+    return this.sessionGroup
   }
 
   /**
