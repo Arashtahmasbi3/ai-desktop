@@ -1441,6 +1441,24 @@
     "pagesCount": "{{count}} صفحه",
     "pages": "صفحه‌ها",
     "modulesCount": "{{count}} بخش",
-    "boardSoon": "جابه‌جایی با کشیدن، در گام بعد"
+    "boardSoon": "جابه‌جایی با کشیدن، در گام بعد",
+    "save": "ذخیره",
+    "undo": "برگردان",
+    "redo": "از نو",
+    "unsaved": "تغییر ذخیره‌نشده",
+    "searchModules": "جست‌وجوی بخش…",
+    "add": "افزودن",
+    "addModuleAria": "افزودن {{name}}",
+    "selectModule": "یک بخش روی صفحه را انتخاب کن تا ویرایش شود.",
+    "fieldTitle": "عنوان",
+    "fieldText": "متن",
+    "fieldCta": "متن دکمه",
+    "fieldNotes": "یادداشت برای دستیار",
+    "notesPlaceholder": "مثلاً کد ۶ رقمی پیامکی، انقضا ۲ دقیقه",
+    "removeModule": "حذف این بخش",
+    "dropHere": "یک بخش را اینجا رها کن، یا از دکمهٔ افزودن استفاده کن.",
+    "closeTab": "بستن تب",
+    "pickPage": "از سمت راست یک صفحه انتخاب کن.",
+    "pageNamePlaceholder": "نام صفحهٔ تازه"
   }
 }

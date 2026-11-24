@@ -1441,6 +1441,24 @@
     "pagesCount": "{{count}} pages",
     "pages": "Pages",
     "modulesCount": "{{count}} sections",
-    "boardSoon": "Drag and drop arrives next"
+    "boardSoon": "Drag and drop arrives next",
+    "save": "Save",
+    "undo": "Undo",
+    "redo": "Redo",
+    "unsaved": "Unsaved changes",
+    "searchModules": "Search sections…",
+    "add": "Add",
+    "addModuleAria": "Add {{name}}",
+    "selectModule": "Select a section on the page to edit it.",
+    "fieldTitle": "Title",
+    "fieldText": "Text",
+    "fieldCta": "Button label",
+    "fieldNotes": "Note for the assistant",
+    "notesPlaceholder": "e.g. use a six-digit SMS code, expires in 2 minutes",
+    "removeModule": "Remove this section",
+    "dropHere": "Drop a section here, or use the Add button.",
+    "closeTab": "Close tab",
+    "pickPage": "Pick a page on the left.",
+    "pageNamePlaceholder": "New page name"
   }
 }

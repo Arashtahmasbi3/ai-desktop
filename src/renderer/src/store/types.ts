@@ -226,6 +226,14 @@ export interface AppState {
   designProjects: DesignSummary[]
   /** The open design, or null while the list/wizard is showing. */
   activeDesign: DesignProject | null
+  /** The working copy the board edits (phase 1); the saved document is `activeDesign`. */
+  designDraft: DesignProject | null
+  /** Undo stack of board snapshots; the newest change is at the end. */
+  designPast: DesignProject[]
+  /** Redo stack, cleared by any new edit. */
+  designFuture: DesignProject[]
+  /** True when the draft differs from the saved document. */
+  designDirty: boolean
   /** A design mutation is in flight. */
   designBusy: boolean
   /** A tool approved 3+ times; the UI suggests remembering it (v2.3, B.3). */
@@ -451,6 +459,28 @@ export interface AppState {
   closeDesign: () => void
   /** Art Board: delete a design. */
   removeDesign: (id: string) => Promise<void>
+  /** Art Board (phase 1): start editing a saved design. */
+  beginDesignEdit: () => void
+  /** Art Board: add a module to a page at an optional index. */
+  addDesignModule: (pageId: string, type: string, index?: number) => void
+  /** Art Board: move a module within its page. */
+  moveDesignModule: (pageId: string, from: number, to: number) => void
+  /** Art Board: remove one module. */
+  removeDesignModule: (pageId: string, moduleId: string) => void
+  /** Art Board: change a module's text fields or its note. */
+  updateDesignModule: (
+    pageId: string,
+    moduleId: string,
+    patch: { title?: string; text?: string; cta?: string; notes?: string }
+  ) => void
+  /** Art Board: add an empty public page. */
+  addDesignPage: (name: string) => void
+  /** Art Board: undo the last board edit. */
+  undoDesign: () => void
+  /** Art Board: redo the last undone edit. */
+  redoDesign: () => void
+  /** Art Board: persist the draft; returns false when the document is invalid (and says why). */
+  saveDesignDraft: () => Promise<boolean>
   /** Create a goal for the active project; the first one becomes active. */
   createGoal: (title: string, criteria?: string[]) => Promise<void>
   updateGoalTitle: (goalId: string, title: string) => Promise<void>
