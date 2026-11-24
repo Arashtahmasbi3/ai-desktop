@@ -12,6 +12,7 @@ import ErrorBoundary from './components/ErrorBoundary'
 import FileExplorer from './components/FileExplorer'
 import GitHubPanel from './components/GitHubPanel'
 import GoalPanel from './components/GoalPanel'
+import DesignPanel from './components/design/DesignPanel'
 import VpsPanel from './components/Vps/VpsPanel'
 import Onboarding from './components/Onboarding'
 import MigrationDialog from './components/MigrationDialog'
@@ -337,6 +338,7 @@ export default function App(): JSX.Element {
               {view === 'github' ? <GitHubPanel /> : null}
               {view === 'vps' ? <VpsPanel /> : null}
               {view === 'goals' ? <GoalPanel /> : null}
+              {view === 'design' ? <DesignPanel /> : null}
             </ErrorBoundary>
           )}
 

@@ -18,6 +18,7 @@ import type { PlanDecision } from '@shared/plan'
 import type { PreflightChoice } from '@shared/preflight'
 import type { ChatSaveInput, ChatSummary, StoredChat } from '@shared/chat'
 import type { McpServerInput, McpServerStatus, McpServerView } from '@shared/mcp'
+import type { DesignAnswers, DesignProject, DesignSummary } from '@shared/design'
 import type {
   AuditEntryView,
   HealthCheckConfig,
@@ -163,6 +164,14 @@ export interface Api {
     remove(id: string): Promise<McpServerView[]>
     setEnabled(id: string, enabled: boolean): Promise<McpServerView[]>
     status(): Promise<McpServerStatus[]>
+  }
+  /** Art Board (phase 0): design projects, one document each. */
+  design: {
+    list(): Promise<DesignSummary[]>
+    create(answers: DesignAnswers): Promise<DesignProject>
+    get(id: string): Promise<DesignProject | null>
+    save(design: DesignProject): Promise<DesignProject>
+    remove(id: string): Promise<boolean>
   }
   github: {
     status(): Promise<GitHubAuthStatus>

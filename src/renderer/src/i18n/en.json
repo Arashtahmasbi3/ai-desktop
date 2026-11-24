@@ -73,7 +73,8 @@
     "navGoals": "Goals",
     "newChatInProject": "New chat in this project",
     "chatsInProject": "{{count}} chats",
-    "openProject": "Open project"
+    "openProject": "Open project",
+    "navDesign": "Design"
   },
   "chat": {
     "placeholder": "Do anything",
@@ -1416,5 +1417,30 @@
     "present": "present",
     "missing": "missing",
     "passed": "{{count}} step(s) passed so far"
+  },
+  "design": {
+    "title": "Design studio",
+    "subtitle": "Answer five short questions and get a website with pages that make sense for your business.",
+    "newSite": "Create a new site",
+    "empty": "No design yet. Start with a few questions; the pages are prepared for you.",
+    "summary": "{{pages}} pages · updated {{date}}",
+    "open": "Open",
+    "delete": "Delete",
+    "wizardStep": "Step {{current}} of {{total}}",
+    "cancel": "Cancel",
+    "back": "Back",
+    "next": "Next",
+    "buildAndShow": "Build and show me",
+    "building": "Building…",
+    "siteNameLabel": "Site name",
+    "siteNamePlaceholder": "e.g. Gol Shop",
+    "kindWebsite": "Website",
+    "kindApp": "App",
+    "created": "Your design is ready.",
+    "backToProjects": "Projects",
+    "pagesCount": "{{count}} pages",
+    "pages": "Pages",
+    "modulesCount": "{{count}} sections",
+    "boardSoon": "Drag and drop arrives next"
   }
 }

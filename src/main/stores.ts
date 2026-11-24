@@ -10,6 +10,7 @@ import { ChildProcessRunner } from '@core/sandbox/command-runner'
 import { VpsServerStore } from './ssh/server-store'
 import { AuditLog } from '@core/agent/audit-log'
 import { McpServerStore } from './mcp/store'
+import { DesignStore } from './design-store'
 
 /** App data directory (e.g. `%APPDATA%\AI Desktop` on Windows). */
 export function appDataDir(appName = 'AI Desktop'): string {
@@ -80,4 +81,12 @@ export function createAuditLog(dir = appDataDir()): AuditLog {
  */
 export function createMcpServerStore(dir = appDataDir()): McpServerStore {
   return new McpServerStore({ baseDir: dir, cipher: createSafeStorageCipher() })
+}
+
+/**
+ * Art Board projects (phase 0). One directory per design under `<appData>/designs`, so the document, its version
+ * history and its build output travel together and a design can be zipped without a database.
+ */
+export function createDesignStore(dir = appDataDir()): DesignStore {
+  return new DesignStore({ dir: join(dir, 'designs') })
 }

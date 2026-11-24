@@ -73,7 +73,8 @@
     "navGoals": "اهداف",
     "newChatInProject": "چت جدید در این پروژه",
     "chatsInProject": "{{count}} چت",
-    "openProject": "باز کردن پروژه"
+    "openProject": "باز کردن پروژه",
+    "navDesign": "طراحی"
   },
   "chat": {
     "placeholder": "هر کاری انجام بده",
@@ -1416,5 +1417,30 @@
     "present": "هست",
     "missing": "نیست",
     "passed": "تا اینجا {{count}} گام سبز شده"
+  },
+  "design": {
+    "title": "استودیوی طراحی",
+    "subtitle": "به پنج سؤال کوتاه جواب بده و سایتی بگیر که صفحه‌هایش به کار کسب‌وکار تو می‌آید.",
+    "newSite": "ساخت سایت تازه",
+    "empty": "هنوز طراحی نداری. با چند سؤال شروع کن؛ صفحه‌ها برایت آماده می‌شوند.",
+    "summary": "{{pages}} صفحه · آخرین تغییر {{date}}",
+    "open": "باز کن",
+    "delete": "حذف",
+    "wizardStep": "گام {{current}} از {{total}}",
+    "cancel": "انصراف",
+    "back": "قبلی",
+    "next": "بعدی",
+    "buildAndShow": "بساز و نشانم بده",
+    "building": "در حال ساخت…",
+    "siteNameLabel": "نام سایت",
+    "siteNamePlaceholder": "مثلاً فروشگاه گل",
+    "kindWebsite": "وب‌سایت",
+    "kindApp": "اپلیکیشن",
+    "created": "طراحی‌ات آماده است.",
+    "backToProjects": "پروژه‌ها",
+    "pagesCount": "{{count}} صفحه",
+    "pages": "صفحه‌ها",
+    "modulesCount": "{{count}} بخش",
+    "boardSoon": "جابه‌جایی با کشیدن، در گام بعد"
   }
 }

@@ -21,6 +21,7 @@ import { sessionActions } from './store/session'
 import { runActions } from './store/run'
 import { settingsActions } from './store/settings'
 import { approvalActions } from './store/approvals'
+import { designActions } from './store/design'
 import { uiActions } from './store/ui'
 
 /**
@@ -97,6 +98,9 @@ export const useStore = create<AppState>((set, get) => ({
   goals: [],
   goalResolution: null,
   goalsBusy: false,
+  designProjects: [],
+  activeDesign: null,
+  designBusy: false,
   approvalSuggestion: null,
   queuedExplain: null,
   fileChanges: [],
@@ -132,6 +136,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...runActions(set, get),
   ...settingsActions(set, get),
   ...approvalActions(set, get),
+  ...designActions(set, get),
   ...uiActions(set, get),
 }))
 

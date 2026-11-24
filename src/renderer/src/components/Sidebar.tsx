@@ -9,6 +9,7 @@ import {
   FolderTree,
   GitFork,
   Globe,
+  LayoutGrid,
   ListChecks,
   MapPin,
   MessageSquare,
@@ -39,7 +40,8 @@ const NAV: Array<{ id: ViewId; labelKey: string; icon: typeof MessageSquare }> =
   { id: 'browser', labelKey: 'sidebar.navBrowser', icon: Globe },
   { id: 'github', labelKey: 'sidebar.navGitHub', icon: GitFork },
   { id: 'vps', labelKey: 'sidebar.navVps', icon: Server },
-  { id: 'goals', labelKey: 'sidebar.navGoals', icon: Target }
+  { id: 'goals', labelKey: 'sidebar.navGoals', icon: Target },
+  { id: 'design', labelKey: 'sidebar.navDesign', icon: LayoutGrid }
 ]
 
 /**

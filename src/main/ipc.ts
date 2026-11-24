@@ -15,6 +15,8 @@ import type { BringUpRequest } from '@shared/bring-up'
 import type { AppServices } from './app-services'
 import { registerVpsIpc } from './vps-ipc'
 import { registerMcpIpc } from './mcp-ipc'
+import { registerDesignIpc } from './design-ipc'
+import { createDesignStore } from './stores'
 import { runLocalCommand } from './local-shell'
 import { observeServerReachability } from './reachability'
 import {
@@ -664,10 +666,13 @@ export function registerIpc(
   const disposeVps = registerVpsIpc(services)
   // F0-2d: MCP server settings (list/save/remove/toggle/status). Same registration shape as VPS.
   const disposeMcp = registerMcpIpc(services)
+  // Art Board (phase 0): design projects live in their own store, never in settings.json.
+  const disposeDesign = registerDesignIpc(createDesignStore())
 
   return () => {
     disposeVps()
     disposeMcp()
+    disposeDesign()
     for (const [channel] of handlers) ipcMain.removeHandler(channel)
     for (const [channel] of windowChannels) ipcMain.removeHandler(channel)
   }

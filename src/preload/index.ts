@@ -10,6 +10,7 @@ import type { PlanDecision } from '@shared/plan'
 import type { PreflightChoice } from '@shared/preflight'
 import type { ChatSaveInput, ChatSummary, StoredChat } from '@shared/chat'
 import type { McpServerInput, McpServerStatus, McpServerView } from '@shared/mcp'
+import type { DesignAnswers, DesignProject, DesignSummary } from '@shared/design'
 import type {
   AuditEntryView,
   HealthCheckConfig,
@@ -196,6 +197,18 @@ export const api = {
     setEnabled: (id: string, enabled: boolean): Promise<McpServerView[]> =>
       invoke('mcp:setEnabled', id, enabled),
     status: (): Promise<McpServerStatus[]> => invoke('mcp:status')
+  },
+
+  /**
+   * Art Board (phase 0): design projects. The renderer receives the whole `DesignProject` — it is not a secret — and
+   * every mutation returns the saved document, so the board renders one snapshot instead of guessing at the new state.
+   */
+  design: {
+    list: (): Promise<DesignSummary[]> => invoke('design:list'),
+    create: (answers: DesignAnswers): Promise<DesignProject> => invoke('design:create', answers),
+    get: (id: string): Promise<DesignProject | null> => invoke('design:get', id),
+    save: (design: DesignProject): Promise<DesignProject> => invoke('design:save', design),
+    remove: (id: string): Promise<boolean> => invoke('design:remove', id)
   },
 
   github: {

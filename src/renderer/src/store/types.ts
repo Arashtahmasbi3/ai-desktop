@@ -44,8 +44,9 @@ import type { ChatTransferChoice, ChatTransferPreference } from '../lib/chat-tra
 import type { ThemePreference } from '../lib/theme'
 import type { UiMode } from '../lib/ui-mode'
 import type { UsageRecord } from '../lib/usage'
+import type { DesignAnswers, DesignProject, DesignSummary } from '@shared/design'
 
-export type ViewId = 'chat' | 'tasks' | 'files' | 'browser' | 'github' | 'vps' | 'goals'
+export type ViewId = 'chat' | 'tasks' | 'files' | 'browser' | 'github' | 'vps' | 'goals' | 'design'
 
 /** Tabs of the right-hand workspace column (v2.6.0, B.4). */
 export type WorkspacePanelTab = 'output' | 'sources'
@@ -221,6 +222,12 @@ export interface AppState {
   goalResolution: ResolvedGoal | null
   /** A goal mutation is in flight; disables the panel's controls. */
   goalsBusy: boolean
+  /** Art Board project list (phase 0). */
+  designProjects: DesignSummary[]
+  /** The open design, or null while the list/wizard is showing. */
+  activeDesign: DesignProject | null
+  /** A design mutation is in flight. */
+  designBusy: boolean
   /** A tool approved 3+ times; the UI suggests remembering it (v2.3, B.3). */
   approvalSuggestion: { tool: string; count: number } | null
   /** A "Deny & Explain" prompt to send once the current run settles. */
@@ -432,6 +439,18 @@ export interface AppState {
   stopTaskPlan: () => void
   /** v2.6.2 T4.4: reload the active project's goals + goal resolution. */
   refreshGoals: () => Promise<void>
+  /** Art Board: reload the project list. */
+  refreshDesigns: () => Promise<void>
+  /** Art Board: create a project from the wizard answers and open it. */
+  createDesign: (answers: DesignAnswers) => Promise<DesignProject | null>
+  /** Art Board: open one design. */
+  openDesign: (id: string) => Promise<void>
+  /** Art Board: persist the open design; returns the saved document or null. */
+  saveDesign: (design: DesignProject) => Promise<DesignProject | null>
+  /** Art Board: close the board and return to the list. */
+  closeDesign: () => void
+  /** Art Board: delete a design. */
+  removeDesign: (id: string) => Promise<void>
   /** Create a goal for the active project; the first one becomes active. */
   createGoal: (title: string, criteria?: string[]) => Promise<void>
   updateGoalTitle: (goalId: string, title: string) => Promise<void>
