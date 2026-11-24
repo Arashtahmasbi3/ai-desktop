@@ -23,6 +23,7 @@ import { DesignStore } from '../design-store'
 import { DesignMemoryStore } from '../design-memory-store'
 import { buildDesign } from '../design-build/build'
 import { createDesignToolGroup } from '@core/tools/design-tools'
+import { createWebToolGroup } from '@core/tools/web-tools'
 import {
   activeRemoteProjectHint,
   planRemoteRuntime,
@@ -74,6 +75,8 @@ export class ToolingAssembler {
   private mcpStatus: McpServerStatus[] = []
   /** Art Board tools (phase 7), built once per assembler because the store is one directory. */
   private designGroup: ToolGroup | undefined
+  /** T05/T06: the web tools, built once. */
+  private webGroup: ToolGroup | undefined
   /** 30s cache of detected remote workspaces, keyed `${serverId}:${path}` (A.1). */
   private readonly workspaceCache = new Map<string, { info: RemoteWorkspaceInfo; at: number }>()
 
@@ -270,7 +273,8 @@ export class ToolingAssembler {
       diagnostic,
       mcpGroup,
       skillGroup,
-      this.designTools()
+      this.designTools(),
+      this.webTools()
     )
     // B-11: the resolver's reconciliation (a stale chat-header VPS dropped in
     // favour of the project's server) must reach the agent prompt, not vanish.
@@ -291,6 +295,20 @@ export class ToolingAssembler {
       runtime.systemHint = [runtime.systemHint, projectHint].filter(Boolean).join(' ')
     }
     return { ...runtime, ...routing }
+  }
+
+  /**
+   * T05/T06: the web tools, built once per assembler.
+   *
+   * No user-data directory is needed, so they exist in every run; the search key is read once here from the environment
+   * (`AI_DESKTOP_SEARCH_KEY`) until a Settings field lands, and an absent key makes `web_search` say "not configured"
+   * rather than fail with a network error.
+   */
+  private webTools(): ToolGroup {
+    if (this.webGroup !== undefined) return this.webGroup
+    const key = process.env.AI_DESKTOP_SEARCH_KEY
+    this.webGroup = createWebToolGroup(key ? { searchKey: key } : {})
+    return this.webGroup
   }
 
   /**

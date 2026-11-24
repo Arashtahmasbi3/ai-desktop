@@ -179,6 +179,10 @@ export const NAMED_DIAGNOSTIC_TOOL_NAMES: ReadonlySet<string> = new Set([
  * the "never expose these in Investigate" rule is auditable in one place (T2.1).
  */
 export const WRITE_TOOL_NAMES: ReadonlySet<string> = new Set([
+  // T05/T06: both reach the network at the model's choosing, so they are asked about like a write rather than
+  // slipping through as a read.
+  'web_fetch',
+  'web_search',
   // Art Board writes (phase 7): they change the saved design, so they are asked about like any write.
   'design_add_module',
   'design_update_page',
