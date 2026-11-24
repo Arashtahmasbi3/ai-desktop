@@ -59,7 +59,14 @@ beforeEach(() => {
       create: vi.fn(),
       get: vi.fn(async () => null),
       save,
-      remove: vi.fn(async () => true)
+      remove: vi.fn(async () => true),
+      build: vi.fn(async () => ({
+        siteDir: '/tmp/site',
+        previewPath: '/tmp/preview.html',
+        zipPath: '/tmp/design-site.zip',
+        files: ['index.html', 'src/App.tsx']
+      })),
+      openPath: vi.fn(async () => '')
     },
     settings: { setApprovalMode: vi.fn(async (mode: string) => ({ approvalMode: mode })) }
   }
@@ -160,5 +167,18 @@ describe('the board (phase 1)', () => {
 
     await vi.waitFor(() => expect(useStore.getState().toasts.some((toast) => toast.kind === 'error')).toBe(true))
     expect(save).not.toHaveBeenCalled()
+  })
+
+  it('builds the site on demand and shows what was produced', async () => {
+    seed()
+    render(<DesignPanel />)
+    // The list refresh on mount also sets `designBusy`; wait for it, as a user would.
+    await vi.waitFor(() => expect(useStore.getState().designBusy).toBe(false))
+
+    fireEvent.click(screen.getByTestId('design-build'))
+
+    await vi.waitFor(() => expect(screen.getByTestId('design-build-result')).toBeTruthy())
+    expect(useStore.getState().designBuildResult?.files).toHaveLength(2)
+    expect(useStore.getState().designDirty).toBe(false)
   })
 })

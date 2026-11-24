@@ -95,6 +95,14 @@ export interface DesignValidation {
   problems: string[]
 }
 
+/** What a build produced: the Vite project, the one-file preview, the zip, and the file list. */
+export interface DesignBuildResult {
+  siteDir: string
+  previewPath: string
+  zipPath: string
+  files: string[]
+}
+
 export interface ModuleDefinition {
   label: string
   family: ModuleFamily

@@ -18,7 +18,7 @@ import type { PlanDecision } from '@shared/plan'
 import type { PreflightChoice } from '@shared/preflight'
 import type { ChatSaveInput, ChatSummary, StoredChat } from '@shared/chat'
 import type { McpServerInput, McpServerStatus, McpServerView } from '@shared/mcp'
-import type { DesignAnswers, DesignProject, DesignSummary } from '@shared/design'
+import type { DesignAnswers, DesignBuildResult, DesignProject, DesignSummary } from '@shared/design'
 import type {
   AuditEntryView,
   HealthCheckConfig,
@@ -172,6 +172,8 @@ export interface Api {
     get(id: string): Promise<DesignProject | null>
     save(design: DesignProject): Promise<DesignProject>
     remove(id: string): Promise<boolean>
+    build(design: DesignProject): Promise<DesignBuildResult>
+    openPath(path: string): Promise<string>
   }
   github: {
     status(): Promise<GitHubAuthStatus>

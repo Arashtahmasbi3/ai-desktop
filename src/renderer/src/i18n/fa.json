@@ -1473,6 +1473,11 @@
     "noEdges": "هنوز اتصالی نیست.",
     "triggerClick": "با کلیک",
     "triggerSubmit": "با ارسال فرم",
-    "triggerRedirect": "خودکار"
+    "triggerRedirect": "خودکار",
+    "makeSite": "ساخت سایت",
+    "buildingSite": "در حال ساخت…",
+    "buildReady": "{{count}} فایل ساخته شد. برای دیدن سایت، پیش‌نمایش را باز کن.",
+    "preview": "پیش‌نمایش",
+    "folder": "پوشهٔ فایل‌ها"
   }
 }

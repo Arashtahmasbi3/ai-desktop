@@ -32,6 +32,10 @@ export default function DesignBoard({
   const undo = useStore((state) => state.undoDesign)
   const redo = useStore((state) => state.redoDesign)
   const save = useStore((state) => state.saveDesignDraft)
+  const build = useStore((state) => state.buildActiveDesign)
+  const buildResult = useStore((state) => state.designBuildResult)
+  const openPath = useStore((state) => state.openDesignPath)
+  const busy = useStore((state) => state.designBusy)
 
   const [view, setView] = useState<'board' | 'graph'>('board')
 
@@ -133,8 +137,44 @@ export default function DesignBoard({
           >
             {i18n.t('design.save')}
           </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void build()}
+            data-testid="design-build"
+            className="rounded bg-accent-solid px-4 py-1 text-xs text-white disabled:opacity-40"
+          >
+            {busy ? i18n.t('design.buildingSite') : i18n.t('design.makeSite')}
+          </button>
         </div>
       </header>
+
+      {buildResult ? (
+        <div
+          className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-bg-tertiary px-3 py-1.5"
+          data-testid="design-build-result"
+        >
+          <p className="text-3xs text-fg">
+            {i18n.t('design.buildReady', { count: buildResult.files.length })}
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => void openPath(buildResult.previewPath)}
+              className="rounded border border-border px-3 py-1 text-3xs text-fg hover:bg-bg-secondary"
+            >
+              {i18n.t('design.preview')}
+            </button>
+            <button
+              type="button"
+              onClick={() => void openPath(buildResult.siteDir)}
+              className="rounded border border-border px-3 py-1 text-3xs text-fg hover:bg-bg-secondary"
+            >
+              {i18n.t('design.folder')}
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {view === 'graph' ? (
         <ConnectionsPanel

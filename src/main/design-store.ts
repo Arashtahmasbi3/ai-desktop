@@ -54,6 +54,11 @@ export class DesignStore {
     this.idFactory = options.idFactory ?? (() => `d-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`)
   }
 
+  /** The directory every design lives under; the build writes beside the document. */
+  get root(): string {
+    return this.dir
+  }
+
   private fileFor(id: string): string {
     if (!/^[a-z0-9-]+$/i.test(id)) throw new Error(`شناسهٔ پروژهٔ نامعتبر: ${id}`)
     return join(this.dir, id, 'design.json')

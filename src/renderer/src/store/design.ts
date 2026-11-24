@@ -22,6 +22,7 @@ import type { AppState } from './types'
 const MAX_HISTORY = 50
 let moduleSeq = 0
 let edgeSeq = 0
+let building = false
 
 function clone(design: DesignProject): DesignProject {
   return structuredClone(design)
@@ -69,6 +70,8 @@ export function designActions(
   | 'undoDesign'
   | 'redoDesign'
   | 'saveDesignDraft'
+  | 'buildActiveDesign'
+  | 'openDesignPath'
 > {
   /** Record the current draft in the undo stack and install `next`. */
   const commit = (next: DesignProject): void => {
@@ -324,6 +327,34 @@ export function designActions(
       }
       const saved = await get().saveDesign(draft)
       return saved !== null
+    },
+
+    async buildActiveDesign() {
+      const draft = get().designDraft
+      if (!draft || building) return false
+      building = true
+      // The main process saves before it builds, so the files always come from the document on screen.
+      set({ designBusy: true })
+      try {
+        const result = await window.api.design.build(draft)
+        set({ designBuildResult: result, activeDesign: draft, designDirty: false })
+        get().pushToast('success', i18n.t('design.buildReady', { count: result.files.length }))
+        return true
+      } catch (error) {
+        get().pushToast('error', `${i18n.t('toast.actionFailed')} ${messageOf(error)}`)
+        return false
+      } finally {
+        building = false
+        set({ designBusy: false })
+      }
+    },
+
+    async openDesignPath(path) {
+      try {
+        await window.api.design.openPath(path)
+      } catch (error) {
+        get().pushToast('error', `${i18n.t('toast.actionFailed')} ${messageOf(error)}`)
+      }
     }
   }
 }

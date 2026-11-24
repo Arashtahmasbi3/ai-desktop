@@ -1473,6 +1473,11 @@
     "noEdges": "No connections yet.",
     "triggerClick": "on click",
     "triggerSubmit": "on submit",
-    "triggerRedirect": "automatic"
+    "triggerRedirect": "automatic",
+    "makeSite": "Build the site",
+    "buildingSite": "Building…",
+    "buildReady": "Built {{count}} files. Open the preview to see the site.",
+    "preview": "Preview",
+    "folder": "Open folder"
   }
 }
