@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.5.0] - 2026-11-24
+
+Batch A of the 24-item gap checklist: the three code tools the agent was missing, so changing one line no longer means
+rewriting a whole file and finding a symbol no longer means inventing a shell command.
+
+### `edit` — exact-string replacement that refuses to guess
+
+The agent could read and write whole files but not change one line. `edit` (path, old_string, new_string,
+replace_all) replaces exactly one occurrence; a missing match is `not_found` and an ambiguous one is
+`invalid_arguments`, and in both cases the file is untouched. The replacement is literal — written with
+`indexOf`/`split`, not `String.replace` — so `$&` and `$1` inside the user's own text survive as typed instead of being
+expanded.
+
+### `glob` — find files by pattern, offline
+
+`**` crosses separators, `*` and `?` do not; results are workspace-relative, sorted and capped (200 default, 500 hard).
+It walks the host workspace with Node rather than shelling out to `find`/`dir`, so the same code works whichever shell
+the sandbox runs. A sandbox without a host folder (the Docker provider) answers "needs a host workspace" instead of
+returning an empty list that reads as "no files".
+
+### `grep` — regex search over the workspace
+
+Returns `path:line:text`, supports a glob filter, skips binary files, files over 1 MB and the vendored/build directories
+(node_modules, .git, out, dist, release, coverage, .vite, .next, build), and refuses an invalid regular expression
+instead of reporting "no matches". Both search tools are read-only, so they never prompt for approval, and both refuse a
+path outside the workspace.
+
+### Still not true
+
+- `glob` and `grep` need a host workspace: on the Docker provider they answer "needs a host workspace" and do nothing
+  else. A container-aware walk is not implemented.
+- The search caps are fixed constants (5 000 files walked, 1 MB per file, 500 matches); there is no setting.
+- `edit` keeps no backup of the file it changes. The undo story for an agent edit is still git, not the app.
+- The rest of the 24-item checklist is not in this release: no web tools, no Office kit, no subagents, no scheduling.
+
 ## [4.4.0] - 2026-11-24
 
 The Art Board: a design studio for people who have never built a website, plus the chat tools that edit the same
