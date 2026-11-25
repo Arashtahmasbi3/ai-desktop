@@ -651,7 +651,14 @@
     "checkpointConfirm": "Ask before a change (and always before an irreversible one)",
     "noProviderKeyTitle": "No provider key saved yet",
     "noProviderKeyBody": "A send needs a key for the provider you use. Paste one into the provider you want below — it is encrypted before it is written and is never shown again.",
-    "prefilledFromRefusal": "Pre-filled from a refusal: {{path}}"
+    "prefilledFromRefusal": "Pre-filled from a refusal: {{path}}",
+    "presets": {
+      "title": "Permission preset",
+      "hint": "One click sets the session profile and the approval mode together.",
+      "read-only": "Read-only",
+      "standard": "Standard",
+      "auto": "Auto-approve writes"
+    }
   },
   "github": {
     "title": "GitHub",

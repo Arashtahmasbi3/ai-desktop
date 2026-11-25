@@ -1,5 +1,6 @@
 import i18n from '../i18n'
 import type { ApprovalOutcome } from '@shared/approval'
+import { resolvePermissionPreset, type PermissionPresetId } from '@shared/permission-presets'
 import type { StoreSet, StoreGet } from './helpers'
 import type { AppState } from './types'
 
@@ -58,6 +59,7 @@ export function approvalActions(
   AppState,
   | 'setApprovalMode'
   | 'applyStoredFullAccessExpiry'
+  | 'applyPermissionPreset'
   | 'setRememberApprovalMode'
   | 'setCheckpointMode'
   | 'setPlanModeDefault'
@@ -72,6 +74,13 @@ export function approvalActions(
   | 'rejectFileChange'
 > {
   return {
+    async applyPermissionPreset(id: PermissionPresetId) {
+      const preset = resolvePermissionPreset(id)
+      if (!preset) return
+      await window.api.session.setProfile(preset.profile)
+      await get().setApprovalMode(preset.approvalMode)
+    },
+
     async setApprovalMode(mode) {
       set({ settings: await window.api.settings.setApprovalMode(mode) })
       if (mode === 'full') {

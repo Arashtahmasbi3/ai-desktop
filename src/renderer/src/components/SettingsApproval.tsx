@@ -46,6 +46,7 @@ export default function SettingsApproval(): JSX.Element {
   const setApprovalMode = useStore((state) => state.setApprovalMode)
   const setRememberApprovalMode = useStore((state) => state.setRememberApprovalMode)
   const setCheckpointMode = useStore((state) => state.setCheckpointMode)
+  const applyPermissionPreset = useStore((state) => state.applyPermissionPreset)
 
   return (
     <section className="flex flex-col gap-3">
@@ -53,6 +54,27 @@ export default function SettingsApproval(): JSX.Element {
         <ShieldCheck className="h-3.5 w-3.5" />
         {t('settings.approvalMode')}
       </h3>
+
+      {/* T19: a preset is a named pair of settings (profile + approval mode), not a fourth policy layer. */}
+      <div className="ui-card flex flex-col gap-2 p-3" data-testid="permission-presets">
+        <div>
+          <p className="text-xs font-medium text-fg">{t('settings.presets.title')}</p>
+          <p className="mt-0.5 text-2xs text-fg-muted">{t('settings.presets.hint')}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {(['read-only', 'standard', 'auto'] as const).map((id) => (
+            <button
+              key={id}
+              type="button"
+              data-testid={`preset-${id}`}
+              onClick={() => void applyPermissionPreset(id)}
+              className="ui-tab border-border-strong px-2.5 py-1.5"
+            >
+              {t(`settings.presets.${id}`)}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div className="ui-card flex flex-col gap-2 p-3">
         <div>
