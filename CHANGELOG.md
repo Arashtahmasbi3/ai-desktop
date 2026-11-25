@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.8.0] - 2026-11-25
+
+Batch G and the scheduling engine: the agent can hand work to child agents, run a plan of them, read MCP resources, and
+the app knows when a recurring job is due.
+
+### Sub-agents with bounds
+
+`subagent` runs a self-contained task in a child agent. The bounds are the feature: a step budget the model cannot raise
+(12 max, default 6), one level of nesting, at most two children in flight, an abort signal that reaches the child, and a
+child error reported as a failed tool result. The child's tokens appear as their own `run:end` rather than being folded
+into the parent's usage line, so neither number lies.
+
+### Workflows as data
+
+`workflow` takes steps with ids, tasks and dependencies, runs everything that is ready (two at a time), hands each step
+its dependencies' answers, and skips only the branch under a failure. A cycle, an unknown dependency or a duplicate id is
+refused before any child starts.
+
+Deliberate deviation from the checklist's wording: the "script" is declared data, **not** JavaScript. Evaluating
+model-authored JS in the main process would be a security hole, and the declarative plan covers the parallel/dependency
+use case the item existed for.
+
+### MCP resources
+
+A server that publishes resources now gets one read tool (`mcp__<server>__read_resource`) listing its URIs, and the
+executor refuses a URI the server never advertised — the resource tool cannot become a file reader. A server whose
+`resources/list` throws is treated as having none.
+
+### Scheduling engine (not yet a scheduler)
+
+The recurrence engine (daily/weekly, interval, weekdays, `count`, `until`) and its store are in place, with a `tick(at)`
+that fires a due job **once** and skips a missed window to the next future occurrence instead of replaying the days the
+machine was asleep. Nothing runs automatically yet: there is no timer and no UI, because starting an agent run from a
+schedule is a product decision this release did not make.
+
+### Still not true
+
+- `subagent`, `workflow` and MCP resources have no dedicated UI: the tools work, the surface is the tool result.
+- Nothing is scheduled automatically; the engine stops at "this job is due".
+- Agent presets, permission presets and model routing (T17, T19, T20) are **not** in this release: each needs a product
+  surface (a picker) that does not exist yet, and shipping the policy without it would be dead code.
+- Telemetry, auto-review, headless/SDK, voice and LiveShare (T21–T24) remain open.
+
 ## [4.7.0] - 2026-11-24
 
 Batch F: the agent can write a Word document, a workbook and a presentation — and the app can already read the first two
