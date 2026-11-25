@@ -1,9 +1,12 @@
-import { app, shell, BrowserWindow } from 'electron'
+import { app, shell, BrowserWindow, dialog } from 'electron'
 import { appendFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { AppServices } from './app-services'
 import { registerIpc } from './ipc'
+import { ScheduleStore } from './scheduler'
+import { runDueJobs } from './schedule-runner'
+import { appDataDir } from './stores'
 import { installWebviewPolicy } from './webview-policy'
 import { isAllowedUrl, isAppWindowNavigationAllowed } from '@shared/url'
 import {
@@ -157,6 +160,35 @@ app.whenReady().then(async () => {
   )
 
   createWindow()
+
+  /*
+   * T16: the schedule loop. A due job is **offered** with a native dialog before anything runs — a schedule that starts
+   * an agent run on its own would spend the user's money while they are not looking. `unref` keeps the timer from holding
+   * the process open, and the loop is one tick a minute: the engine already advances a job past a missed window.
+   */
+  {
+    const scheduleStore = new ScheduleStore({ dir: appDataDir() })
+    const timer = setInterval(() => {
+      void runDueJobs({
+        store: scheduleStore,
+        confirm: async (job) => {
+          const { response } = await dialog.showMessageBox({
+            type: 'question',
+            buttons: ['اجرا', 'رد'],
+            defaultId: 1,
+            cancelId: 1,
+            message: `زمان کار «${job.title}» رسیده است.`,
+            detail: job.prompt
+          })
+          return response === 0
+        },
+        run: async (job) => {
+          await services?.agent.run({ task: job.prompt })
+        }
+      }).catch(() => undefined)
+    }, 60_000)
+    timer.unref?.()
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
