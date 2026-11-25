@@ -200,6 +200,8 @@ export const WRITE_TOOL_NAMES: ReadonlySet<string> = new Set([
   // Local sandbox.
   'write_file',
   'edit',
+  // T15: a workflow is several child runs, so it is asked about like the child it starts.
+  'workflow',
   'run_command',
   // Remote host.
   'remote_write_file',

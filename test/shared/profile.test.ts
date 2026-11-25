@@ -316,6 +316,7 @@ describe('read-only tool allowlist', () => {
       'todo_write',
       'web_fetch',
       'web_search',
+      'workflow',
       'worktree_create',
       'worktree_remove',
       'write_file'

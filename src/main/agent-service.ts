@@ -43,7 +43,8 @@ import { ProviderFactory, type ProviderSelection } from './agent-service/provide
 import type { RemoteHost } from './agent-service/remote-runtime'
 import { CompositeToolExecutor } from '@core/tools/composite-executor'
 import { createSubagentToolGroup } from '@core/tools/subagent-tool'
-import { DEFAULT_SUBAGENT_LIMITS, SubagentLimiter } from '@core/agent/subagent'
+import { createWorkflowToolGroup } from '@core/tools/workflow-tool'
+import { DEFAULT_SUBAGENT_LIMITS, SubagentLimiter, type SubagentRunner } from '@core/agent/subagent'
 import { RunGateFactory } from './agent-service/run-gates'
 import {
   clearSessionMemory,
@@ -427,43 +428,51 @@ export class AgentService {
      * into the parent's numbers, so the transcript shows two runs and neither one lies about its cost.
      */
     const subagentDepth = request.subagentDepth ?? 0
-    const subagentGroup =
+    /*
+     * The one child-run function both tools use: `subagent` for a single task and `workflow` for a plan of them. Keeping
+     * it in one place is what makes the two agree about the depth marker, the session and what a "completed" child means.
+     */
+    const childRunner: SubagentRunner = async (child, childSignal) => {
+      const { sessionId: parentSession, resumeSessionId: parentResume, ...rest } = request
+      void parentSession
+      void parentResume
+      const result = await this.run({ ...rest, task: child.task, subagentDepth: 1 }, childSignal)
+      return {
+        ok: result.status === 'completed',
+        answer: result.finalAnswer ?? result.message ?? '',
+        steps: result.steps.length,
+        usageTokens: result.usage?.totalTokens ?? 0,
+        ...(result.status === 'completed' ? {} : { error: result.message ?? result.status })
+      }
+    }
+    const childGroups =
       subagentDepth === 0
-        ? createSubagentToolGroup({
-            depth: 1,
-            limiter: this.subagentLimiter,
-            spawn: async (child, childSignal) => {
-              const { sessionId: parentSession, resumeSessionId: parentResume, ...rest } = request
-              void parentSession
-              void parentResume
-              const result = await this.run({ ...rest, task: child.task, subagentDepth: 1 }, childSignal)
-              return {
-                ok: result.status === 'completed',
-                answer: result.finalAnswer ?? result.message ?? '',
-                steps: result.steps.length,
-                usageTokens: result.usage?.totalTokens ?? 0,
-                ...(result.status === 'completed' ? {} : { error: result.message ?? result.status })
-              }
-            }
-          })
-        : undefined
-    const mergedRemote = subagentGroup
-      ? {
-          ...remoteOptions,
-          extraTools: [...(remoteOptions.extraTools ?? []), ...subagentGroup.definitions],
-          extraExecutor: new CompositeToolExecutor([
-            ...(remoteOptions.extraExecutor
-              ? [
-                  {
-                    names: new Set((remoteOptions.extraTools ?? []).map((tool) => tool.name)),
-                    executor: remoteOptions.extraExecutor
-                  }
-                ]
-              : []),
-            { names: new Set(subagentGroup.definitions.map((tool) => tool.name)), executor: subagentGroup.executor! }
-          ])
-        }
-      : remoteOptions
+        ? [
+            createSubagentToolGroup({ depth: 1, limiter: this.subagentLimiter, spawn: childRunner }),
+            createWorkflowToolGroup({ spawn: childRunner })
+          ]
+        : []
+    const mergedRemote =
+      childGroups.length > 0
+        ? {
+            ...remoteOptions,
+            extraTools: [...(remoteOptions.extraTools ?? []), ...childGroups.flatMap((group) => group.definitions)],
+            extraExecutor: new CompositeToolExecutor([
+              ...(remoteOptions.extraExecutor
+                ? [
+                    {
+                      names: new Set((remoteOptions.extraTools ?? []).map((tool) => tool.name)),
+                      executor: remoteOptions.extraExecutor
+                    }
+                  ]
+                : []),
+              ...childGroups.map((group) => ({
+                names: new Set(group.definitions.map((tool) => tool.name)),
+                executor: group.executor!
+              }))
+            ])
+          }
+        : remoteOptions
     const memory = await this.projectMemory.projectMemoryHint()
     const factLedger = await this.projectMemory.factLedgerHint(activeProject?.id)
     /*
