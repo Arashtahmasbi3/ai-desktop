@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.8.3] - 2026-11-25
+
+### Local diagnostics, opt-in and never uploaded (T21)
+
+Settings → Approval can now write a diagnostics file: one JSONL line per run with the run's id, status, provider, token
+counts, step count, warnings, duration and the **length** of the task — never its text. Off by default, redacted on the
+way in, rotated at 2 MB. There is no upload path; the file is for the user and for a support conversation, and
+`summarizeDiagnostics` turns it into one line.
+
+### Still not true
+
+- Diagnostics are local only. An upload path would be a product and privacy decision that has not been made.
+- Auto-review of risky tools (T22), headless/SDK (T23) and voice/LiveShare (T24) remain open.
+
 ## [4.8.2] - 2026-11-25
 
 A schedule that asks before it spends, and a model choice that is opt-in.
