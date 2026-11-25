@@ -20,6 +20,8 @@ import { registerTodoIpc } from './todo-ipc'
 import { TodoStore } from './todo-store'
 import { registerPresentedIpc } from './presented-ipc'
 import { PresentedStore } from './presented-store'
+import { registerScheduleIpc } from './schedule-ipc'
+import { ScheduleStore } from './scheduler'
 import { appDataDir, createDesignStore } from './stores'
 import { readFile } from 'node:fs/promises'
 import { previewDocument } from './office-preview'
@@ -687,6 +689,8 @@ export function registerIpc(
   const disposeTodos = registerTodoIpc(new TodoStore({ dir: appDataDir() }))
   // T11: the deliverables the agent last presented.
   const disposePresented = registerPresentedIpc(new PresentedStore({ dir: appDataDir() }))
+  // T16: scheduled jobs (list/save/remove). No timer yet: the engine is separate and tested.
+  const disposeSchedules = registerScheduleIpc(new ScheduleStore({ dir: appDataDir() }))
 
 
   return () => {
@@ -695,6 +699,7 @@ export function registerIpc(
     disposeDesign()
     disposeTodos()
     disposePresented()
+    disposeSchedules()
     for (const [channel] of handlers) ipcMain.removeHandler(channel)
     for (const [channel] of windowChannels) ipcMain.removeHandler(channel)
   }

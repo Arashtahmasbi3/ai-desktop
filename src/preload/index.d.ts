@@ -23,6 +23,7 @@ import type { DesignMemory, RememberInput, RememberResult } from '@shared/design
 import type { TodoList } from '@shared/todo'
 import type { DocumentPreview } from '@shared/document-preview'
 import type { PresentedList } from '@shared/deliverable'
+import type { ScheduleJob } from '@shared/schedule'
 import type {
   AuditEntryView,
   HealthCheckConfig,
@@ -186,6 +187,12 @@ export interface Api {
     forget(id: string, recordId: string): Promise<DesignMemory>
   }
   /** T04: the working checklist. */
+  /** T16: scheduled jobs. */
+  schedules: {
+    list(): Promise<ScheduleJob[]>
+    save(job: ScheduleJob): Promise<ScheduleJob[]>
+    remove(id: string): Promise<ScheduleJob[]>
+  }
   /** T11: deliverables. */
   presented: {
     list(): Promise<PresentedList>
