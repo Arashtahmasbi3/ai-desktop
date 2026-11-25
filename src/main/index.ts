@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { AppServices } from './app-services'
 import { registerIpc } from './ipc'
+import { runHeadless } from './headless-run'
 import { ScheduleStore } from './scheduler'
 import { runDueJobs } from './schedule-runner'
 import { appDataDir } from './stores'
@@ -151,6 +152,16 @@ app.whenReady().then(async () => {
   installWebviewPolicy(app)
   services = new AppServices()
   await services.init()
+
+  /*
+   * T23: headless mode. No window, no tray — one JSON line in, one out, until stdin closes. It is checked before any UI is
+   * created so a CI process never pays for a renderer it will not see.
+   */
+  if (process.argv.includes('--headless')) {
+    await runHeadless(services)
+    return
+  }
+
   registerIpc(
     services,
     () => mainWindow,
