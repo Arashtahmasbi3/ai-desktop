@@ -667,7 +667,11 @@
       "review": "Review (plan first)"
     },
     "autoRoute": "Pick the model for me",
-    "autoRouteHint": "Off by default. When on, a task is routed to the best-suited model in the active provider’s list."
+    "autoRouteHint": "Off by default. When on, a task is routed to the best-suited model in the active provider’s list.",
+    "telemetry": "Diagnostics",
+    "telemetryOff": "Off",
+    "telemetryLocal": "Local file",
+    "telemetryHint": "A JSONL file on this machine only — nothing is uploaded. It records run status, model, tokens and duration, never your prompt."
   },
   "github": {
     "title": "GitHub",

@@ -66,6 +66,7 @@ export function approvalActions(
   | 'setCheckpointMode'
   | 'setPlanModeDefault'
   | 'setAutoRoute'
+  | 'setTelemetry'
   | 'respondApproval'
   | 'respondPlan'
   | 'respondPreflight'
@@ -136,6 +137,10 @@ export function approvalActions(
 
     async setAutoRoute(value) {
       set({ settings: await window.api.settings.setAutoRoute(value) })
+    },
+
+    async setTelemetry(value) {
+      set({ settings: await window.api.settings.setTelemetry(value) })
     },
 
     async respondApproval(answer) {

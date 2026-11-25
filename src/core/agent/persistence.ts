@@ -75,6 +75,8 @@ export interface AppSettings {
   planModeDefault?: boolean
   /** T20: let the app pick the model from the active provider's catalogue (off by default). */
   autoRoute?: boolean
+  /** T21: local-only diagnostics; absent means off. */
+  telemetry?: 'off' | 'local'
   /** Keep the chosen approval mode across restarts instead of resetting to Ask (v2.3). */
   rememberApprovalMode?: boolean
   /** Active Session Profile (v2.6.2, Topic 1). */
@@ -345,6 +347,7 @@ export async function migrateSettings(
     if (recordsCheckpoints(checkpointMode)) settings.checkpointMode = checkpointMode
     if (typeof raw.planModeDefault === 'boolean') settings.planModeDefault = raw.planModeDefault
     if (typeof raw.autoRoute === 'boolean') settings.autoRoute = raw.autoRoute
+    if (raw.telemetry === 'off' || raw.telemetry === 'local') settings.telemetry = raw.telemetry
     if (typeof raw.rememberApprovalMode === 'boolean') {
       settings.rememberApprovalMode = raw.rememberApprovalMode
     }
@@ -434,6 +437,8 @@ export interface RedactedSettings {
   planModeDefault?: boolean
   /** T20: let the app pick the model from the active provider's catalogue (off by default). */
   autoRoute?: boolean
+  /** T21: local-only diagnostics; absent means off. */
+  telemetry?: 'off' | 'local'
   rememberApprovalMode?: boolean
   profile?: SessionProfile
   investigateScope?: InvestigateScope
@@ -653,6 +658,13 @@ export class Persistence {
   async setApprovalMode(mode: ApprovalMode): Promise<void> {
     await this.load()
     this.settings.approvalMode = mode
+    await this.persist()
+  }
+
+  /** T21: local diagnostics only — 'local' writes JSONL, 'off' (or absent) writes nothing. */
+  async setTelemetry(mode: 'off' | 'local'): Promise<void> {
+    await this.load()
+    this.settings.telemetry = mode
     await this.persist()
   }
 

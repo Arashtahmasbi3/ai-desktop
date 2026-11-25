@@ -46,6 +46,8 @@ import { createSubagentToolGroup } from '@core/tools/subagent-tool'
 import { createWorkflowToolGroup } from '@core/tools/workflow-tool'
 import { DEFAULT_SUBAGENT_LIMITS, SubagentLimiter, type SubagentRunner } from '@core/agent/subagent'
 import { MODEL_CATALOG } from '@shared/models'
+import { DiagnosticsLog } from './diagnostics-log'
+import { appDataDir } from './stores'
 import { routeModel } from '@shared/model-routing'
 import { RunGateFactory } from './agent-service/run-gates'
 import {
@@ -363,6 +365,25 @@ export class AgentService {
   }
 
   /** Build provider entries (with keys) ordered by preference. */
+  /**
+   * T21: local diagnostics. Off unless the user chose 'local'; a failure here must never fail the run, so the caller
+   * swallows it. The prompt itself is not recorded — only its length.
+   */
+  private async recordDiagnostics(request: AgentRunRequest, result: AgentRunResult): Promise<void> {
+    const settings = await this.persistence.load()
+    if (settings.telemetry !== 'local') return
+    await new DiagnosticsLog({ dir: appDataDir() }).record({
+      runId: result.runId,
+      status: result.status,
+      ...(result.provider ? { provider: result.provider } : {}),
+      ...(result.usage ? { promptTokens: result.usage.promptTokens, completionTokens: result.usage.completionTokens } : {}),
+      steps: result.steps.length,
+      warnings: result.warnings.length,
+      durationMs: result.finishedAt - result.startedAt,
+      taskChars: request.task.length
+    })
+  }
+
   async buildProviders(options: ProviderSelection = {}): Promise<ProviderEntry[]> {
     return this.providers.build(options)
   }
@@ -378,7 +399,9 @@ export class AgentService {
      */
     const mcpRuns: { current?: McpBridgeResult } = {}
     try {
-      return await this.runBody(request, externalSignal, mcpRuns)
+      const result = await this.runBody(request, externalSignal, mcpRuns)
+      await this.recordDiagnostics(request, result).catch(() => undefined)
+      return result
     } finally {
       await mcpRuns.current?.closeAll().catch(() => undefined)
     }

@@ -67,6 +67,8 @@ export interface SettingsView {
   approvalMode?: ApprovalMode
   /** T20: opt-in model routing, off unless the user turns it on. */
   autoRoute?: boolean
+  /** T21: local-only diagnostics; absent means off. */
+  telemetry?: 'off' | 'local'
   rememberApprovalMode?: boolean
   /**
    * v3.1: `off` (default) / `record` / `confirm` decision checkpoints. Present so the UI can show

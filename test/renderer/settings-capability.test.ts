@@ -665,6 +665,12 @@ const MAIN_SWITCHES: MainSwitch[] = [
     reason: 'Opt-in model routing: read before the provider is built, and only when the request names no model.'
   },
   {
+    handler: 'settings:setTelemetry',
+    field: 'telemetry',
+    consumer: 'src/main/agent-service.ts',
+    reason: 'Local diagnostics: decides whether a run appends one JSONL record to diagnostics.jsonl.'
+  },
+  {
     handler: 'settings:setRememberApprovalMode',
     field: 'rememberApprovalMode',
     consumer: 'src/renderer/src/store/session.ts',

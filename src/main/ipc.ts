@@ -221,6 +221,13 @@ export function registerIpc(
       }
     ],
     [
+      'settings:setTelemetry',
+      async (mode: 'off' | 'local') => {
+        await services.persistence.setTelemetry(mode)
+        return changed()
+      }
+    ],
+    [
       'settings:setRememberApprovalMode',
       async (enabled: boolean) => {
         await services.persistence.setRememberApprovalMode(enabled)

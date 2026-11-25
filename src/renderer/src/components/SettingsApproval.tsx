@@ -49,6 +49,7 @@ export default function SettingsApproval(): JSX.Element {
   const applyPermissionPreset = useStore((state) => state.applyPermissionPreset)
   const applyAgentPreset = useStore((state) => state.applyAgentPreset)
   const setAutoRoute = useStore((state) => state.setAutoRoute)
+  const setTelemetry = useStore((state) => state.setTelemetry)
 
   return (
     <section className="flex flex-col gap-3">
@@ -70,6 +71,23 @@ export default function SettingsApproval(): JSX.Element {
           {t('settings.autoRoute')}
         </label>
         <p className="text-2xs text-fg-muted">{t('settings.autoRouteHint')}</p>
+      </div>
+
+      {/* T21: local diagnostics only — there is no upload, so "on" means a file the user can read. */}
+      <div className="ui-card flex flex-col gap-1 p-3">
+        <label className="flex items-center justify-between gap-2 text-xs text-fg">
+          {t('settings.telemetry')}
+          <select
+            data-testid="telemetry"
+            value={settings?.telemetry ?? 'off'}
+            onChange={(event) => void setTelemetry(event.target.value as 'off' | 'local')}
+            className="ui-inset px-2 py-1 text-xs text-fg"
+          >
+            <option value="off">{t('settings.telemetryOff')}</option>
+            <option value="local">{t('settings.telemetryLocal')}</option>
+          </select>
+        </label>
+        <p className="text-2xs text-fg-muted">{t('settings.telemetryHint')}</p>
       </div>
 
       {/* T17: an agent preset is a named triple — profile, approval mode and plan mode together. */}
