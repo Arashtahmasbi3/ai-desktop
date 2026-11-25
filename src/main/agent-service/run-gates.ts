@@ -222,6 +222,16 @@ export class RunGateFactory {
             ? { remoteProjectRoot: activeProject.path }
             : {}),
           requestApproval: (action, reason) => requestApproval(runId, action, reason),
+          /*
+           * T22: auto-review. The impact is always known here, so an irreversible action gets a second look even when
+           * `full` mode, a remembered approval or a server grant would have skipped the prompt. The reviewer is
+           * deterministic and can only add prompts: it never approves, it says "ask".
+           */
+          impactOf: (action) => judge(action).impact,
+          autoReview: async () => ({
+            approve: false,
+            reason: 'irreversible action: the auto-review keeps the prompt even though the mode would allow it'
+          }),
           reasonFor: (action) =>
             activeTrust() ? 'outside_plan' : describeApprovalReason(action),
           onSuggestion: (tool, count) => this.emit({ type: 'approval:suggestion', tool, count }),

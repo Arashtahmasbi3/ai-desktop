@@ -14,9 +14,24 @@ import { escapedWritePaths } from '@core/remote/path-guard'
 import { detectNetworkAction } from '@core/remote/network-action'
 import { classifyShellCommand } from '@core/agent/approval'
 import { READ_ONLY_TOOL_NAMES } from '@shared/profile'
+import { autoReview } from '@shared/auto-review'
 
 export interface ApprovalGateOptions {
   mode: ApprovalMode
+  /**
+   * T22: the impact of an action, so the gate can give an irreversible one a second look even when the
+   * mode, a remembered approval or a server grant would have let it through. Supplied always; the
+   * checkpoint recorder only runs when checkpointing is on.
+   */
+  impactOf?: (action: AgentAction) => 'routine' | 'consequential' | 'irreversible'
+  /**
+   * T22: the second look itself. It can only add prompts: `approve: false` (or a throw) escalates to the
+   * user, and nothing here can turn a refusal into an allow.
+   */
+  autoReview?: (input: { impact: 'routine' | 'consequential' | 'irreversible' }) => Promise<{
+    approve: boolean
+    reason: string
+  }>
   /** Learned approvals that suppress future prompts. */
   approvedCommands?: ApprovedCommands
   /** Session id used for session-scoped learned approvals. */
@@ -210,6 +225,23 @@ export function createApprovalGate(
 
   return async (action: AgentAction): Promise<boolean> => {
     const denyListed = isDenyListedAction(action)
+    const impact = options.impactOf?.(action) ?? 'consequential'
+    /*
+     * T22: a second look. Only an `irreversible` action can be escalated, and only when a shortcut below would have
+     * skipped the prompt. The answer is cached per action, so three shortcuts cannot ask three times.
+     */
+    let reviewEscalates: boolean | null = null
+    const maySkip = async (): Promise<boolean> => {
+      if (reviewEscalates === null) {
+        const review = await autoReview({
+          wouldSkipPrompt: true,
+          impact,
+          ...(options.autoReview ? { reviewer: options.autoReview } : {})
+        })
+        reviewEscalates = review.escalate
+      }
+      return !reviewEscalates
+    }
     /*
      * S1.3: a remote write that leaves the project root. It is NOT suppressed by a remembered
      * approval or by the scoped server grant, and it is NOT auto-approved by `full` mode: the whole
@@ -257,7 +289,7 @@ export function createApprovalGate(
          * exactly the ones a user is tempted to "always allow".
          */
         if (!(options.checkpoint?.mode === 'confirm' && verdict?.impact === 'irreversible')) {
-          return true
+          if (await maySkip()) return true
         }
       }
       /*
@@ -269,12 +301,12 @@ export function createApprovalGate(
       if (scope && approvedCommands?.isServerGranted(scope)) {
         // Same rule as a remembered approval: a time-boxed grant is not consent to the irreversible.
         if (!(options.checkpoint?.mode === 'confirm' && verdict?.impact === 'irreversible')) {
-          return true
+          if (await maySkip()) return true
         }
       }
       if (!requiresApproval(options.mode, action)) {
         // v3.1: confirm mode asks about a consequential action the mode would have allowed.
-        if (!(options.checkpoint?.mode === 'confirm' && consequential)) return true
+        if (!(options.checkpoint?.mode === 'confirm' && consequential) && (await maySkip())) return true
       }
       // v2.5.5: a whitelisted or read-only command (and the remote read-only
       // tools) never pushes a prompt. Containment is still enforced downstream.
