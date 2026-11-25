@@ -214,6 +214,13 @@ export function registerIpc(
       }
     ],
     [
+      'settings:setAutoRoute',
+      async (enabled: boolean) => {
+        await services.persistence.setAutoRoute(enabled)
+        return changed()
+      }
+    ],
+    [
       'settings:setRememberApprovalMode',
       async (enabled: boolean) => {
         await services.persistence.setRememberApprovalMode(enabled)

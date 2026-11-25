@@ -45,6 +45,8 @@ import { CompositeToolExecutor } from '@core/tools/composite-executor'
 import { createSubagentToolGroup } from '@core/tools/subagent-tool'
 import { createWorkflowToolGroup } from '@core/tools/workflow-tool'
 import { DEFAULT_SUBAGENT_LIMITS, SubagentLimiter, type SubagentRunner } from '@core/agent/subagent'
+import { MODEL_CATALOG } from '@shared/models'
+import { routeModel } from '@shared/model-routing'
 import { RunGateFactory } from './agent-service/run-gates'
 import {
   clearSessionMemory,
@@ -215,6 +217,13 @@ export interface AgentServiceOptions {
  * Runs the agent orchestrator on behalf of the renderer: builds provider
  * entries from the encrypted settings, streams events, and supports abort.
  */
+/** T20: the model the active provider's catalogue would pick for this task, or undefined when it cannot say. */
+function autoRoutedModel(task: string, provider: string | undefined): string | undefined {
+  const group = MODEL_CATALOG.find((entry) => entry.provider === provider)
+  if (!group) return undefined
+  return routeModel(task, group.models)?.model
+}
+
 export class AgentService {
   /** T14: at most two children at once, for the whole app. */
   private readonly subagentLimiter = new SubagentLimiter(DEFAULT_SUBAGENT_LIMITS.maxConcurrent)
@@ -385,12 +394,21 @@ export class AgentService {
     externalSignal: AbortSignal | undefined,
     mcpRuns: { current?: McpBridgeResult }
   ): Promise<AgentRunResult> {
+    /*
+     * T20: opt-in model routing. The settings are read first so the decision can be made before the provider is built —
+     * and only when the user did not pick a model by hand. Routing stays inside one provider's catalogue; switching
+     * provider would change keys and quota, which is not a model choice.
+     */
+    const settings = await this.persistence.load()
+    const routedModel =
+      request.model === undefined && settings.autoRoute === true
+        ? autoRoutedModel(request.task, request.provider ?? settings.activeProvider)
+        : undefined
     const providers = await this.providers.build({
       ...(request.provider ? { preferred: request.provider } : {}),
-      ...(request.model ? { model: request.model } : {}),
+      ...(request.model ? { model: request.model } : routedModel ? { model: routedModel } : {}),
       ...(request.customProviderId ? { customProviderId: request.customProviderId } : {})
     })
-    const settings = await this.persistence.load()
     // Snapshot the project this run belongs to. Patches captured during the run
     // are bound to it and can never be applied to another project (P0-1).
     const activeProject = this.persistence.getActiveProject()

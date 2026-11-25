@@ -117,6 +117,7 @@ export const api = {
       invoke('settings:setApprovalMode', mode),
     setPlanModeDefault: (enabled: boolean): Promise<SettingsView> =>
       invoke('settings:setPlanModeDefault', enabled),
+    setAutoRoute: (enabled: boolean): Promise<SettingsView> => invoke('settings:setAutoRoute', enabled),
     setRememberApprovalMode: (enabled: boolean): Promise<SettingsView> =>
       invoke('settings:setRememberApprovalMode', enabled),
     addProject: (name: string, path: string): Promise<SettingsView> =>

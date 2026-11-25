@@ -109,6 +109,7 @@ export interface Api {
     setActiveProvider(provider: ProviderId): Promise<SettingsView>
     setApprovalMode(mode: ApprovalMode): Promise<SettingsView>
     setPlanModeDefault(enabled: boolean): Promise<SettingsView>
+    setAutoRoute(enabled: boolean): Promise<SettingsView>
     setRememberApprovalMode(enabled: boolean): Promise<SettingsView>
     addProject(name: string, path: string): Promise<SettingsView>
     addRemoteProject(name: string, path: string, vpsId: string): Promise<SettingsView>

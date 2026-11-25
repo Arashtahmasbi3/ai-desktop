@@ -48,6 +48,7 @@ export default function SettingsApproval(): JSX.Element {
   const setCheckpointMode = useStore((state) => state.setCheckpointMode)
   const applyPermissionPreset = useStore((state) => state.applyPermissionPreset)
   const applyAgentPreset = useStore((state) => state.applyAgentPreset)
+  const setAutoRoute = useStore((state) => state.setAutoRoute)
 
   return (
     <section className="flex flex-col gap-3">
@@ -55,6 +56,21 @@ export default function SettingsApproval(): JSX.Element {
         <ShieldCheck className="h-3.5 w-3.5" />
         {t('settings.approvalMode')}
       </h3>
+
+      {/* T20: opt-in model routing, off by default — a silent model change is a silent price change. */}
+      <div className="ui-card flex flex-col gap-1 p-3">
+        <label className="flex items-center gap-2 text-xs text-fg">
+          <input
+            type="checkbox"
+            checked={settings?.autoRoute === true}
+            onChange={(event) => void setAutoRoute(event.target.checked)}
+            data-testid="auto-route"
+            className="accent-accent"
+          />
+          {t('settings.autoRoute')}
+        </label>
+        <p className="text-2xs text-fg-muted">{t('settings.autoRouteHint')}</p>
+      </div>
 
       {/* T17: an agent preset is a named triple — profile, approval mode and plan mode together. */}
       <div className="ui-card flex flex-col gap-2 p-3" data-testid="agent-presets">

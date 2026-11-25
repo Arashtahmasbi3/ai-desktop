@@ -659,6 +659,12 @@ const MAIN_SWITCHES: MainSwitch[] = [
     reason: 'Makes a new chat plan-only unless the request overrides it.'
   },
   {
+    handler: 'settings:setAutoRoute',
+    field: 'autoRoute',
+    consumer: 'src/main/agent-service.ts',
+    reason: 'Opt-in model routing: read before the provider is built, and only when the request names no model.'
+  },
+  {
     handler: 'settings:setRememberApprovalMode',
     field: 'rememberApprovalMode',
     consumer: 'src/renderer/src/store/session.ts',

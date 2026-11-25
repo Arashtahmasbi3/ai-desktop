@@ -665,7 +665,9 @@
       "standard": "Standard",
       "minimal": "Minimal (read-only)",
       "review": "Review (plan first)"
-    }
+    },
+    "autoRoute": "Pick the model for me",
+    "autoRouteHint": "Off by default. When on, a task is routed to the best-suited model in the active provider’s list."
   },
   "github": {
     "title": "GitHub",

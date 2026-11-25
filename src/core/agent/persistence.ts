@@ -73,6 +73,8 @@ export interface AppSettings {
   checkpointMode?: CheckpointMode
   /** Start new chats in Plan Mode by default (v2). */
   planModeDefault?: boolean
+  /** T20: let the app pick the model from the active provider's catalogue (off by default). */
+  autoRoute?: boolean
   /** Keep the chosen approval mode across restarts instead of resetting to Ask (v2.3). */
   rememberApprovalMode?: boolean
   /** Active Session Profile (v2.6.2, Topic 1). */
@@ -342,6 +344,7 @@ export async function migrateSettings(
     const checkpointMode = normalizeCheckpointMode(raw.checkpointMode)
     if (recordsCheckpoints(checkpointMode)) settings.checkpointMode = checkpointMode
     if (typeof raw.planModeDefault === 'boolean') settings.planModeDefault = raw.planModeDefault
+    if (typeof raw.autoRoute === 'boolean') settings.autoRoute = raw.autoRoute
     if (typeof raw.rememberApprovalMode === 'boolean') {
       settings.rememberApprovalMode = raw.rememberApprovalMode
     }
@@ -429,6 +432,8 @@ export interface RedactedSettings {
   projects: ProjectRecord[]
   approvalMode?: ApprovalMode
   planModeDefault?: boolean
+  /** T20: let the app pick the model from the active provider's catalogue (off by default). */
+  autoRoute?: boolean
   rememberApprovalMode?: boolean
   profile?: SessionProfile
   investigateScope?: InvestigateScope
@@ -648,6 +653,13 @@ export class Persistence {
   async setApprovalMode(mode: ApprovalMode): Promise<void> {
     await this.load()
     this.settings.approvalMode = mode
+    await this.persist()
+  }
+
+  /** T20: opt-in model routing. */
+  async setAutoRoute(enabled: boolean): Promise<void> {
+    await this.load()
+    this.settings.autoRoute = enabled
     await this.persist()
   }
 

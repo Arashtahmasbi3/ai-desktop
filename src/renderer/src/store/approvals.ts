@@ -65,6 +65,7 @@ export function approvalActions(
   | 'setRememberApprovalMode'
   | 'setCheckpointMode'
   | 'setPlanModeDefault'
+  | 'setAutoRoute'
   | 'respondApproval'
   | 'respondPlan'
   | 'respondPreflight'
@@ -76,8 +77,7 @@ export function approvalActions(
   | 'rejectFileChange'
 > {
   return {
-    async applyAgentPreset(id: AgentPresetId) {
-      const preset = resolveAgentPreset(id)
+    async applyAgentPreset(id: AgentPresetId) {      const preset = resolveAgentPreset(id)
       if (!preset) return
       await window.api.session.setProfile(preset.profile)
       await get().setApprovalMode(preset.approvalMode)
@@ -132,6 +132,10 @@ export function approvalActions(
 
     async setPlanModeDefault(value) {
       set({ settings: await window.api.settings.setPlanModeDefault(value) })
+    },
+
+    async setAutoRoute(value) {
+      set({ settings: await window.api.settings.setAutoRoute(value) })
     },
 
     async respondApproval(answer) {
