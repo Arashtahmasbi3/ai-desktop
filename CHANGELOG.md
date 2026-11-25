@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.8.1] - 2026-11-25
+
+Two presets, both built on settings the app already had.
+
+### Agent presets (T17)
+
+Settings → Approval now offers **standard**, **minimal** and **review** in one click. Each writes the whole posture —
+session profile, approval mode and plan-mode default — together. Minimal is deliberately read-only (`investigate`), and
+review keeps `develop` but drafts a plan first. The panel can tell which preset is active, and returns "unnamed" rather
+than guessing when the settings are a combination no preset describes.
+
+### Permission presets (T19)
+
+The same page names the three permission combinations: **read-only** (`investigate` + `ask`), **standard** (`develop` +
+`ask`) and **auto** (`develop` + `auto-write`). A preset writes both settings at once, because a button that changed only
+one of them would leave the user in a combination its label does not describe.
+
+### Still not true
+
+- Both preset rows are **global**; there is no per-chat picker in the chat header.
+- Only the named combinations exist — a user who wants `elevated + full` sets it by hand and the panel honestly shows no
+  preset is active.
+- Model routing (T20), automatic scheduling (T16), telemetry/review/headless/voice (T21–T24) remain open.
+
 ## [4.8.0] - 2026-11-25
 
 Batch G and the scheduling engine: the agent can hand work to child agents, run a plan of them, read MCP resources, and
