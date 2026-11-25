@@ -107,8 +107,28 @@ export function nextForJob(job: ScheduleJob, from: number): number | null {
   return next
 }
 
-export function summarizeRule(rule: ScheduleRule): string {
-  const time = `${String(rule.hour).padStart(2, '0')}:${String(rule.minute).padStart(2, '0')}`
+/** Build a new job from a form. Pure, so the UI's validation and the stored shape cannot drift. */
+export function createScheduleJob(input: {
+  title: string
+  prompt: string
+  rule: ScheduleRule
+  now: number
+  id?: string
+}): ScheduleJob {
+  const id = input.id ?? `job-${Math.random().toString(36).slice(2, 10)}`
+  return {
+    id: id.trim(),
+    title: input.title.trim(),
+    prompt: input.prompt.trim(),
+    rule: input.rule,
+    enabled: true,
+    createdAt: input.now,
+    runs: 0,
+    nextAt: nextOccurrence(input.rule, input.now)
+  }
+}
+
+export function summarizeRule(rule: ScheduleRule): string {  const time = `${String(rule.hour).padStart(2, '0')}:${String(rule.minute).padStart(2, '0')}`
   if (rule.frequency === 'DAILY') return `هر ${rule.interval && rule.interval > 1 ? `${rule.interval} روز` : 'روز'} ساعت ${time}`
   const days = rule.weekdays?.length ? rule.weekdays.map((day) => ['یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه'][day]).join('، ') : 'هر هفته'
   return `${days} ساعت ${time}`

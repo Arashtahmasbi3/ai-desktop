@@ -16,7 +16,8 @@ import {
   Settings2,
   ShieldCheck,
   Wrench,
-  X
+  X,
+  CalendarClock
 } from 'lucide-react'
 import { SUPPORTED_LOCALES } from '../i18n/locale'
 import { THEMES, themeLabelKey } from '../lib/theme'
@@ -30,6 +31,7 @@ import SettingsBrowser from './SettingsBrowser'
 import SettingsConnections from './SettingsConnections'
 import SettingsCodeReview from './SettingsCodeReview'
 import SettingsApproval from './SettingsApproval'
+import SettingsSchedules from './SettingsSchedules'
 import SettingsMemory from './SettingsMemory'
 import SettingsUsage from './SettingsUsage'
 import SettingsDeveloper from './SettingsDeveloper'
@@ -50,6 +52,7 @@ type TabId =
   | 'connections'
   | 'codereview'
   | 'approval'
+  | 'schedules'
   | 'memory'
   | 'usage'
   | 'developer'
@@ -83,7 +86,8 @@ const NAV_GROUPS: Array<{ labelKey?: string; items: NavItem[] }> = [
       { id: 'projects', labelKey: 'settings.projects', icon: FolderPlus },
       { id: 'connections', labelKey: 'settings.connections', icon: Server },
       { id: 'codereview', labelKey: 'settings.codeReview', icon: GitFork },
-      { id: 'approval', labelKey: 'settings.approvalMode', icon: ShieldCheck }
+      { id: 'approval', labelKey: 'settings.approvalMode', icon: ShieldCheck },
+      { id: 'schedules', labelKey: 'settings.schedules.title', icon: CalendarClock }
     ]
   },
   {
@@ -348,6 +352,8 @@ export default function SettingsPanel(): JSX.Element | null {
             {tab === 'codereview' ? <SettingsCodeReview /> : null}
 
             {tab === 'approval' ? <SettingsApproval /> : null}
+
+            {tab === 'schedules' ? <SettingsSchedules /> : null}
 
             {tab === 'memory' ? <SettingsMemory /> : null}
 

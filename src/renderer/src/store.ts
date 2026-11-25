@@ -23,6 +23,7 @@ import { settingsActions } from './store/settings'
 import { approvalActions } from './store/approvals'
 import { designActions } from './store/design'
 import { todoActions } from './store/todos'
+import { scheduleActions } from './store/schedules'
 import { uiActions } from './store/ui'
 
 /**
@@ -149,6 +150,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...approvalActions(set, get),
   ...designActions(set, get),
   ...todoActions(set, get),
+  ...scheduleActions(set),
   ...uiActions(set, get),
 }))
 

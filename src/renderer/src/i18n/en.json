@@ -671,7 +671,29 @@
     "telemetry": "Diagnostics",
     "telemetryOff": "Off",
     "telemetryLocal": "Local file",
-    "telemetryHint": "A JSONL file on this machine only — nothing is uploaded. It records run status, model, tokens and duration, never your prompt."
+    "telemetryHint": "A JSONL file on this machine only — nothing is uploaded. It records run status, model, tokens and duration, never your prompt.",
+    "schedules": {
+      "title": "Scheduled jobs",
+      "hint": "A due job is offered with a dialog before it runs — nothing starts on its own.",
+      "newJob": "New job",
+      "titlePlaceholder": "Title",
+      "promptPlaceholder": "What should the agent do?",
+      "daily": "Every day",
+      "weekly": "Every week",
+      "weekday": {
+        "0": "Sunday",
+        "1": "Monday",
+        "2": "Tuesday",
+        "3": "Wednesday",
+        "4": "Thursday",
+        "5": "Friday",
+        "6": "Saturday"
+      },
+      "add": "Add",
+      "on": "On",
+      "off": "Off",
+      "remove": "Remove"
+    }
   },
   "github": {
     "title": "GitHub",

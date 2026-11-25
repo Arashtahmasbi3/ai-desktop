@@ -49,6 +49,7 @@ import type { DesignMemory } from '@shared/design-memory'
 import type { TodoItem } from '@shared/todo'
 import type { DocumentPreview } from '@shared/document-preview'
 import type { Deliverable } from '@shared/deliverable'
+import type { ScheduleJob } from '@shared/schedule'
 import type { DesignRecipe } from '@shared/design-recipe'
 
 export type ViewId = 'chat' | 'tasks' | 'files' | 'browser' | 'github' | 'vps' | 'goals' | 'design' | 'todos'
@@ -251,6 +252,8 @@ export interface AppState {
   todos: TodoItem[]
   /** The preview of an Office document, or null for ordinary text files (T10). */
   documentPreview: DocumentPreview | null
+  /** T16: scheduled jobs, as main has them. */
+  schedules: ScheduleJob[]
   /** Deliverables the agent presented with present (T11). */
   presented: Deliverable[]
   /** A tool approved 3+ times; the UI suggests remembering it (v2.3, B.3). */
@@ -526,6 +529,10 @@ export interface AppState {
   refreshTodos: () => Promise<void>
   /** T11: reload the deliverables list. */
   refreshPresented: () => Promise<void>
+  /** T16: scheduled jobs. */
+  loadSchedules: () => Promise<void>
+  saveSchedule: (job: ScheduleJob) => Promise<void>
+  removeSchedule: (id: string) => Promise<void>
   /** Art Board (phase 6): add a validated recipe as a custom section. */
   addDesignRecipe: (pageId: string, recipe: DesignRecipe, title: string) => void
   /** Art Board: cycle a custom section through its layouts. */
