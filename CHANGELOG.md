@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.8.4] - 2026-11-25
+
+### Auto-review keeps the prompt on irreversible actions (T22)
+
+An action the decision-checkpoint classifier calls `irreversible` now asks the user even when `full` mode, a remembered
+approval, a scoped server grant or a trusted plan would have skipped the prompt. The second look is deterministic and can
+only add prompts: an approving reviewer cannot bypass `ask` mode, and a reviewer that throws escalates instead of allowing.
+
+### Headless mode: `AI Desktop --headless` (T23)
+
+One JSON request per line on stdin, one response per line on stdout. `run` executes through the same `AgentService` a chat
+uses — same tools, same approval gate, same diagnostics — and `health` answers without a model call. Bad input is an error
+with a code, never a crash, and closing stdin quits the process.
+
+### Still not true
+
+- Headless has two methods and **no approver**: a task that needs a user decision cannot complete there.
+- Voice input and LiveShare (T24) are not implemented. The recommendation, with reasons, stays NO-GO: speech-to-text adds
+  roughly 100 MB to the package, and LiveShare needs a relay server, which contradicts this app's local-first design.
+
 ## [4.8.3] - 2026-11-25
 
 ### Local diagnostics, opt-in and never uploaded (T21)
