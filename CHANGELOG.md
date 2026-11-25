@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.8.2] - 2026-11-25
+
+A schedule that asks before it spends, and a model choice that is opt-in.
+
+### A due job is offered, then run (T16, complete)
+
+The schedule loop now runs one tick a minute and, when a job is due, shows a native dialog naming the job and its prompt.
+Declining still advances the occurrence, so the same question is not asked every minute; at most one job runs per tick,
+and a cancelled parent never asks at all. The timer is unref'd so it cannot hold the process open.
+
+### Opt-in model routing (T20)
+
+Settings → Approval has a new switch, **off by default**: when it is on and the user has not chosen a model, a
+deterministic heuristic picks from the **active provider's own catalogue** — heavy work (audit, refactor, migrate, debug,
+review, design; English or Persian) prefers a `powerful`/`reasoning` model, ordinary coding prefers `coding`, everything
+else the cheapest `fast` model. It never switches provider: keys, quota and behaviour would change, which is not a model
+choice.
+
+### Still not true
+
+- The schedule loop runs only while the app is open, and jobs are created through IPC — there is no scheduling UI yet.
+- Routing is global and applies only when no model was chosen by hand; there is no per-chat override and no learning.
+- Telemetry, auto-review, headless/SDK, voice and LiveShare (T21–T24) remain open, each waiting on a product decision.
+
 ## [4.8.1] - 2026-11-25
 
 Two presets, both built on settings the app already had.
