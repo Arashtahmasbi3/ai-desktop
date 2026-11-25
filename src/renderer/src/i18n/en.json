@@ -658,6 +658,13 @@
       "read-only": "Read-only",
       "standard": "Standard",
       "auto": "Auto-approve writes"
+    },
+    "agentPresets": {
+      "title": "Agent preset",
+      "hint": "One click sets the profile, the approval mode and whether the agent plans first.",
+      "standard": "Standard",
+      "minimal": "Minimal (read-only)",
+      "review": "Review (plan first)"
     }
   },
   "github": {

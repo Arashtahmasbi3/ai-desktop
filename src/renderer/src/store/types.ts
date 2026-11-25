@@ -383,6 +383,8 @@ export interface AppState {
   setApprovalMode: (mode: ApprovalMode) => Promise<void>
   /** T19: apply a named permission preset (profile + approval mode together). */
   applyPermissionPreset: (id: 'read-only' | 'standard' | 'auto') => Promise<void>
+  /** T17: apply a named agent preset (profile + approval + plan mode together). */
+  applyAgentPreset: (id: 'standard' | 'minimal' | 'review') => Promise<void>
   /** Re-arm the persisted 30-minute full-access deadline (v4.3.14); called once at boot. */
   applyStoredFullAccessExpiry: () => void
   setPlanModeDefault: (value: boolean) => Promise<void>

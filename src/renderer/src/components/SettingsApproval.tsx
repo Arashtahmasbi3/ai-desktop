@@ -47,6 +47,7 @@ export default function SettingsApproval(): JSX.Element {
   const setRememberApprovalMode = useStore((state) => state.setRememberApprovalMode)
   const setCheckpointMode = useStore((state) => state.setCheckpointMode)
   const applyPermissionPreset = useStore((state) => state.applyPermissionPreset)
+  const applyAgentPreset = useStore((state) => state.applyAgentPreset)
 
   return (
     <section className="flex flex-col gap-3">
@@ -54,6 +55,27 @@ export default function SettingsApproval(): JSX.Element {
         <ShieldCheck className="h-3.5 w-3.5" />
         {t('settings.approvalMode')}
       </h3>
+
+      {/* T17: an agent preset is a named triple — profile, approval mode and plan mode together. */}
+      <div className="ui-card flex flex-col gap-2 p-3" data-testid="agent-presets">
+        <div>
+          <p className="text-xs font-medium text-fg">{t('settings.agentPresets.title')}</p>
+          <p className="mt-0.5 text-2xs text-fg-muted">{t('settings.agentPresets.hint')}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {(['standard', 'minimal', 'review'] as const).map((id) => (
+            <button
+              key={id}
+              type="button"
+              data-testid={`agent-preset-${id}`}
+              onClick={() => void applyAgentPreset(id)}
+              className="ui-tab border-border-strong px-2.5 py-1.5"
+            >
+              {t(`settings.agentPresets.${id}`)}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* T19: a preset is a named pair of settings (profile + approval mode), not a fourth policy layer. */}
       <div className="ui-card flex flex-col gap-2 p-3" data-testid="permission-presets">
