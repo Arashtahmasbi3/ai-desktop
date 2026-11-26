@@ -19,7 +19,8 @@ const okRun = async (task: string) => ({
 function server(run = okRun): ReturnType<typeof createHeadlessServer> {
   return createHeadlessServer({
     run,
-    health: async () => ({ ok: true, version: '4.8.3' })
+    health: async () => ({ ok: true, version: '4.8.3' }),
+    resolveApproval: () => true
   })
 }
 
@@ -69,6 +70,31 @@ describe('createHeadlessServer (T23)', () => {
     const parsed = JSON.parse(line!)
     expect(parsed.error.code).toBe('run_failed')
     expect(parsed.error.message).toContain('provider down')
+  })
+
+  it('answers an approval and reports whether it matched', async () => {
+    const resolveApproval = vi.fn((_id: string, _approve: boolean) => true)
+    const s = createHeadlessServer({
+      run: okRun,
+      health: async () => ({ ok: true }),
+      resolveApproval
+    })
+
+    const line = await s.handleLine('{"id":6,"method":"approval","params":{"id":"approval-1","approve":true}}')
+    expect(JSON.parse(line!)).toMatchObject({ id: 6, result: { matched: true } })
+    expect(resolveApproval).toHaveBeenCalledWith('approval-1', true)
+  })
+
+  it('refuses a malformed approval instead of guessing', async () => {
+    const resolveApproval = vi.fn(() => true)
+    const s = createHeadlessServer({ run: okRun, health: async () => ({ ok: true }), resolveApproval })
+
+    const missingId = JSON.parse((await s.handleLine('{"id":7,"method":"approval","params":{"approve":true}}'))!)
+    expect(missingId.error.code).toBe('invalid_request')
+
+    const noAnswer = JSON.parse((await s.handleLine('{"id":8,"method":"approval","params":{"id":"approval-1"}}'))!)
+    expect(noAnswer.error.code).toBe('invalid_request')
+    expect(resolveApproval).not.toHaveBeenCalled()
   })
 
   it('stays alive on a malformed line', async () => {
