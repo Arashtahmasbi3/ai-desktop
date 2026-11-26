@@ -95,6 +95,8 @@ export interface AgentRunRequest {
   task: string
   /** T14: depth in the sub-agent tree; the tool is offered only at depth 0. */
   subagentDepth?: number
+  /** T20: per-chat override of the auto-route setting; absent means use the setting. */
+  autoRoute?: boolean
   provider?: ProviderId
   /** Model override for the primary provider (chosen in the chat header). */
   model?: string

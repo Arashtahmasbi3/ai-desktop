@@ -473,6 +473,9 @@ export interface AppState {
   resumeTaskPlan: () => void
   /** Stop the running task plan and mark it failed. */
   stopTaskPlan: () => void
+  /** T20: per-chat auto-route override, sent with each run. */
+  chatAutoRoute: boolean
+  setChatAutoRoute: (value: boolean) => void
   /** v2.6.2 T4.4: reload the active project's goals + goal resolution. */
   refreshGoals: () => Promise<void>
   /** Art Board: reload the project list. */

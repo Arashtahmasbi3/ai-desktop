@@ -81,6 +81,8 @@ export function runActions(
 ): Pick<
   AppState,
   | 'setPlanMode'
+  | 'setChatAutoRoute'
+  | 'chatAutoRoute'
   | 'applyEvent'
   | 'setTaskPlan'
   | 'pauseTaskPlan'
@@ -92,6 +94,10 @@ export function runActions(
 > {
   return {
     setPlanMode: (value) => set({ planMode: value }),
+
+    setChatAutoRoute: (value) => set({ chatAutoRoute: value }),
+
+    chatAutoRoute: false,
 
     applyEvent(event) {
       switch (event.type) {

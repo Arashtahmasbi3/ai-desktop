@@ -1,4 +1,5 @@
 import { Cpu } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { PROVIDERS, PROVIDER_IDS } from '@shared/providers'
 import { decodeSelection, encodeSelection } from '@shared/selection'
 import { useStore } from '../store'
@@ -14,6 +15,9 @@ export default function ModelSwitcher(): JSX.Element {
   const setSelection = useStore((state) => state.setSelection)
   const customProviders = useStore((state) => state.customProviders)
   const running = useStore((state) => state.running)
+  const chatAutoRoute = useStore((state) => state.chatAutoRoute)
+  const setChatAutoRoute = useStore((state) => state.setChatAutoRoute)
+  const { t } = useTranslation()
 
   const descriptor = PROVIDERS[selection.provider]
   const modelEntry = descriptor?.models.find((model) => model.id === selection.model)
@@ -72,6 +76,23 @@ export default function ModelSwitcher(): JSX.Element {
           </optgroup>
         ))}
       </select>
+
+      {/*
+        T20 (per-chat): the automatic choice is a decision about *this* conversation, so it sits next to the model picker
+        rather than only in Settings. When it is on, the run ignores the picked model for that turn.
+      */}
+      <button
+        type="button"
+        data-testid="chat-auto-route"
+        aria-pressed={chatAutoRoute}
+        onClick={() => setChatAutoRoute(!chatAutoRoute)}
+        disabled={running}
+        title={t('chat.autoRouteHint')}
+        className="ui-tab border-border-strong px-1.5 py-0.5 text-2xs disabled:opacity-50"
+        data-selected={chatAutoRoute}
+      >
+        {t('chat.autoRoute')}
+      </button>
     </label>
   )
 }

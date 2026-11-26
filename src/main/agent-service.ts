@@ -424,7 +424,7 @@ export class AgentService {
      */
     const settings = await this.persistence.load()
     const routedModel =
-      request.model === undefined && settings.autoRoute === true
+      request.model === undefined && (request.autoRoute ?? settings.autoRoute === true)
         ? autoRoutedModel(request.task, request.provider ?? settings.activeProvider)
         : undefined
     const providers = await this.providers.build({

@@ -327,7 +327,9 @@
     "verdictActionReconnect": "Reconnect the server, then run the step again.",
     "approvalReasonOutsideRoot": "This command writes outside the project root",
     "addRefusedPath": "Add as a project",
-    "addRefusedPathTitle": "Add {{path}} as a project on this server"
+    "addRefusedPathTitle": "Add {{path}} as a project on this server",
+    "autoRoute": "Auto",
+    "autoRouteHint": "Let the app pick the best model for this message. Off by default in Settings."
   },
   "vpsSelector": {
     "label": "VPS",

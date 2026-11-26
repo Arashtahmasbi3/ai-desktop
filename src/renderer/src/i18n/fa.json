@@ -327,7 +327,9 @@
     "verdictActionReconnect": "سرور را دوباره وصل کنید، بعد همین مرحله را دوباره اجرا کنید.",
     "approvalReasonOutsideRoot": "این فرمان بیرون از ریشهٔ پروژه می‌نویسد",
     "addRefusedPath": "افزودن به‌عنوان پروژه",
-    "addRefusedPathTitle": "افزودن {{path}} به‌عنوان پروژه روی همین سرور"
+    "addRefusedPathTitle": "افزودن {{path}} به‌عنوان پروژه روی همین سرور",
+    "autoRoute": "خودکار",
+    "autoRouteHint": "بگذار برنامه برای همین پیام بهترین مدل را انتخاب کند. پیش‌فرض در Settings خاموش است."
   },
   "vpsSelector": {
     "label": "VPS",
