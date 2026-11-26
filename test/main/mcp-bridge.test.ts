@@ -74,7 +74,7 @@ describe('registerMcpTools', () => {
       connect: async (config) => fakeHandle(config, [tool('read_note')])
     })
 
-    expect(result.statuses).toEqual([{ serverId: 'notes', state: 'connected', toolCount: 1 }])
+    expect(result.statuses).toEqual([{ serverId: 'notes', state: 'connected', toolCount: 1, resourceCount: 0 }])
     expect(builder.names()).toEqual(['mcp__notes__read_note'])
     // The description carries the server id so a model reading the tool list can tell where it comes from.
     expect(builder.definitions()[0]!.description).toContain('[notes]')
@@ -167,7 +167,7 @@ describe('registerMcpTools', () => {
     // One error entry, one connected entry, and the run still has a tool.
     expect(result.statuses).toEqual([
       { serverId: 'dead', state: 'error', toolCount: 0, error: 'spawn ENOENT' },
-      { serverId: 'alive', state: 'connected', toolCount: 1 }
+      { serverId: 'alive', state: 'connected', toolCount: 1, resourceCount: 0 }
     ])
     expect(builder.names()).toEqual(['mcp__alive__ping'])
   })
@@ -206,7 +206,7 @@ describe('registerMcpTools', () => {
       servers: [server()],
       connect: async (config) => fakeHandle(config, [])
     })
-    expect(result.statuses).toEqual([{ serverId: 'notes', state: 'connected', toolCount: 0 }])
+    expect(result.statuses).toEqual([{ serverId: 'notes', state: 'connected', toolCount: 0, resourceCount: 0 }])
     expect(builder.toolCount).toBe(0)
   })
 
@@ -242,7 +242,7 @@ describe('registerMcpTools', () => {
     const names = builder.names()
     expect(names).toHaveLength(2)
     expect(new Set(names).size).toBe(2)
-    expect(result.statuses).toEqual([{ serverId: 'notes', state: 'connected', toolCount: 2 }])
+    expect(result.statuses).toEqual([{ serverId: 'notes', state: 'connected', toolCount: 2, resourceCount: 0 }])
     await result.closeAll()
   })
 })

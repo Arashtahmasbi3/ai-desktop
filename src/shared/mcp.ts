@@ -72,6 +72,8 @@ export interface McpServerStatus {
   serverId: string
   state: McpConnectionState
   toolCount: number
+  /** T18: how many resources the server advertised, so Settings can show it is reachable for more than tools. */
+  resourceCount?: number
   error?: string
 }
 

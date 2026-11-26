@@ -224,7 +224,7 @@ describe('MCP servers in a run (F0-2c)', () => {
     expect(sentToModel()).toContain('the note says hello')
     // 4. The observation from the run is what Settings shows as the last status.
     expect(service.mcpStatuses()).toEqual([
-      { serverId: 'notes', state: 'connected', toolCount: 1 }
+      { serverId: 'notes', state: 'connected', toolCount: 1, resourceCount: 0 }
     ])
     expect(result.status).toBe('completed')
     // 5. No child process outlives the run.

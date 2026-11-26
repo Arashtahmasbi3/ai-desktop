@@ -68,6 +68,8 @@ describe('MCP resources (T18)', () => {
 
     const resourceTool = result.group!.definitions.find((definition) => definition.name.endsWith('read_resource'))!
     expect(resourceTool.description).toContain('docs://readme')
+    // T18: the status carries the count, so Settings can show the server is reachable for more than tools.
+    expect(result.statuses[0]).toMatchObject({ state: 'connected', toolCount: 1, resourceCount: 1 })
   })
 
   it('reads a resource through the executor', async () => {

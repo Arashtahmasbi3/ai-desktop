@@ -189,6 +189,17 @@ describe('Settings → MCP (F0-2e)', () => {
     await waitFor(() => expect(screen.getByTestId('settings-mcp')).toBeTruthy())
     await waitFor(() => expect(screen.getAllByTestId('mcp-server-row')).toHaveLength(2))
   })
+
+  it('shows the resource count a server advertised (T18)', async () => {
+    statusApi.mockResolvedValue([
+      { serverId: 'notes', state: 'connected', toolCount: 2, resourceCount: 3 },
+      { serverId: 'dead', state: 'error', toolCount: 0, error: 'spawn ENOENT' }
+    ])
+    render(<SettingsMcp />)
+
+    await waitFor(() => expect(screen.getByTestId('mcp-server-resources')).toBeTruthy())
+    expect(screen.getByTestId('mcp-server-resources').textContent).toContain('3')
+  })
 })
 
 describe('the add form parsers', () => {

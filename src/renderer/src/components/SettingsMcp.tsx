@@ -233,6 +233,11 @@ export default function SettingsMcp(): JSX.Element {
                       {t('settings.mcpTools')}: {toolCount}
                     </span>
                   ) : null}
+                  {server.error === undefined && (status?.resourceCount ?? 0) > 0 ? (
+                    <span data-testid="mcp-server-resources">
+                      {t('settings.mcpResources')}: {status?.resourceCount}
+                    </span>
+                  ) : null}
                   {server.error !== undefined ? (
                     <span className="text-danger" data-testid="mcp-server-error">
                       {server.error}

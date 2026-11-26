@@ -167,7 +167,7 @@ export async function registerMcpTools(options: McpBridgeOptions): Promise<McpBr
       }
 
       if (tools.length === 0 && resources.length === 0) {
-        statuses.push({ serverId: config.id, state: 'connected', toolCount: 0 })
+        statuses.push({ serverId: config.id, state: 'connected', toolCount: 0, resourceCount: 0 })
         continue
       }
       for (const info of tools) {
@@ -202,7 +202,7 @@ export async function registerMcpTools(options: McpBridgeOptions): Promise<McpBr
         })
       }
 
-      statuses.push({ serverId: config.id, state: 'connected', toolCount: tools.length })
+      statuses.push({ serverId: config.id, state: 'connected', toolCount: tools.length, resourceCount: resources.length })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       statuses.push({ serverId: config.id, state: 'error', toolCount: 0, error: message })

@@ -695,7 +695,8 @@
       "on": "On",
       "off": "Off",
       "remove": "Remove"
-    }
+    },
+    "mcpResources": "Resources"
   },
   "github": {
     "title": "GitHub",
