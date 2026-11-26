@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.8.5] - 2026-11-26
+
+### Scheduled jobs got a panel (T16)
+
+Settings → Scheduled jobs lists every job with its rule and next run, and can create, disable and delete one. A job is a
+title, a prompt and a recurrence; the form builds it through the same pure `createScheduleJob` the store uses, so what the
+panel shows and what is stored cannot drift. Execution is unchanged: a due job is offered with a native dialog first.
+
+### MCP resources are visible (T18)
+
+Settings → MCP now shows `Resources: N` next to the tool count when a server advertised any, from a real connection's
+`resources/list`. The URIs stay in the tool description, where the model reads them.
+
+### Auto-model can be chosen per conversation (T20)
+
+A new toggle next to the model picker in the chat header overrides the Settings value for one conversation. Turning it on
+means "ignore my picked model for this message"; off restores it.
+
+### Headless approvals (T23)
+
+`--headless` can now answer an approval. The run emits `{"event":"approval", …}`; the client replies with
+`{"method":"approval","params":{"id","approve"}}` and gets `{matched}`. An unanswered approval is still denied by the
+broker's timeout.
+
+### Build
+
+`scripts/patch-esbuild.mjs` runs from `prebuild`, so the esbuild temp-file workaround survives `npm ci` without a manual
+edit. Still a workaround: the permanent fix is keeping the main chunk under 1 MB.
+
+### Still not true
+
+- Voice input and LiveShare (T24) remain **NO-GO** (speech-to-text ≈ 100 MB; LiveShare needs a relay server).
+- Headless has no streaming; one response per request.
+
 ## [4.8.4] - 2026-11-25
 
 ### Auto-review keeps the prompt on irreversible actions (T22)
